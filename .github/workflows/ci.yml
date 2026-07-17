@@ -45,11 +45,13 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: npm run dist
 
-      - name: Upload Windows hotfix installer
+      - name: Upload Windows hotfix binaries
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: In-Line-v0.0.2-hotfix-windows
-          path: src-tauri/target/release/bundle/nsis/*.exe
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/in-line.exe
           if-no-files-found: error
           retention-days: 7
