@@ -22,16 +22,34 @@ export default function App(){
   const [settings,setSettings]=useState(false);
   const [menu,setMenu]=useState<MenuState>(null);
   const [message,setMessage]=useState("");
+  const [startupError,setStartupError]=useState("");
+  const [version,setVersion]=useState("");
 
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),2300);};
-  const refresh=async()=>{const next=await api.bootstrap();setData(next);setSelected(current=>current?[...next.queue,...next.archive,...next.trash].find(value=>value.id===current.id)??null:null);};
+  const refresh=async()=>{
+    setStartupError("");
+    try{
+      const next=await api.bootstrap();
+      setData(next);
+      setSelected(current=>current?[...next.queue,...next.archive,...next.trash].find(value=>value.id===current.id)??null:null);
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      setStartupError(detail||"初始化失败，请重试");
+    }
+  };
   useEffect(()=>{
     void refresh();
     const offData=api.onDataChanged(()=>void refresh());
     const offNew=api.onNewTask(()=>setEditing(null));
+    const offTaskUi=api.onTaskUiAction(({id,action})=>{
+      void api.getTask(id).then(task=>{
+        if(action==="view")setSelected(task);else setEditing(task);
+      }).catch(error=>toast("无法打开事项："+String(error)));
+    });
+    void api.getVersion().then(setVersion).catch(()=>undefined);
     let offShortcut=()=>{};
     void api.registerNewTaskShortcut(()=>{void api.showMain();setEditing(null);}).then(value=>{offShortcut=value;}).catch(()=>toast("全局快捷键注册失败，可继续使用新增按钮"));
-    return()=>{offData();offNew();offShortcut();};
+    return()=>{offData();offNew();offTaskUi();offShortcut();};
   },[]);
 
   const source=data?.[view]??[];
@@ -59,7 +77,10 @@ export default function App(){
     if(event.shiftKey&&event.key==="F10"){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();context(task,rect.left+120,rect.top+32);}
   };
 
-  if(!data)return <div className="app-loading"><img src="/inline-mark.svg"/><p>正在整理队列…</p></div>;
+  if(!data)return <div className="app-loading"><img src="/inline-mark.svg"/>{startupError?<section className="startup-error" role="alert"><h1>队列暂时无法载入</h1><p>{startupError}</p><div><button className="button primary" onClick={()=>void refresh()}>重新载入</button><button className="button secondary" onClick={()=>setEditing(null)}>直接新增取号</button></div><small>数据仍保存在本机，程序不会自动清空数据库。</small></section>:<p>正在整理队列…</p>}
+    {editing!==undefined&&<TaskForm task={editing} masters={emptyMasters} recentContacts={[]} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {message&&<div className="toast">{message}</div>}
+  </div>;
   const urgent=data.queue.filter(task=>task.isUrgent).length;
   const overdue=data.queue.filter(task=>isOverdue(task)).length;
 
@@ -74,6 +95,7 @@ export default function App(){
       </nav>
       <div className="sidebar-summary"><div><span>加急</span><b>{urgent}</b></div><div><span>逾期</span><b>{overdue}</b></div></div>
       <button className={settings?"settings-button active":"settings-button"} onClick={()=>setSettings(true)}><Settings size={18}/>系统设置</button>
+      <small className="app-version">{version?`v${version}`:""}</small>
     </aside>
     <main className="workspace">
       {settings?<SettingsPanel backups={data.backups} onChanged={()=>void refresh()} notify={toast}/>:<>

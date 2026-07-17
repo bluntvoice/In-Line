@@ -17,6 +17,7 @@ export interface TaskInput{
 export interface TaskLog{id:number;taskId:number;logType:string;content:string;createdAt:string}
 export interface MasterData{departments:string[];taskTypes:string[]}
 export interface BackupInfo{name:string;path:string;size:number;modifiedAt:string}
+export interface TaskUiAction{id:number;action:"view"|"edit"|"status"|"urgent"}
 export interface BootstrapData{
   queue:LegalTask[];archive:LegalTask[];trash:LegalTask[];masters:MasterData;settings:Record<string,string>;backups:BackupInfo[];
 }

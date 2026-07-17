@@ -1,0 +1,15 @@
+.startup-error{display:grid;justify-items:center;max-width:560px;padding:22px 26px;border:1px solid #dfe6ef;border-radius:13px;background:#fff;text-align:center;box-shadow:0 10px 35px #102a5612}
+.startup-error h1{margin:0;font-size:21px}
+.startup-error p{max-width:500px;margin:6px 0 2px;color:#9e2436;overflow-wrap:anywhere}
+.startup-error div{display:flex;gap:8px;margin-top:12px}
+.startup-error small{margin-top:10px;color:#526173}
+.app-version{display:block;min-height:18px;margin:7px 12px 0;color:#9fb0c8;font:12px/1.5 Consolas,"Cascadia Mono",monospace}
+.floating-error{display:grid;place-items:center;align-content:center;min-height:180px;padding:18px;text-align:center;color:#526173}
+.floating-error strong{color:#9e2436}
+.floating-error p{max-width:340px;margin:6px 0 12px;overflow-wrap:anywhere}
+.floating-error button{min-height:34px;padding:0 12px;border:0;border-radius:8px;background:#0b3a82;color:#fff;font-weight:650}
+@media(max-width:700px){
+  .startup-error{max-width:calc(100vw - 32px);padding:18px}
+  .startup-error div{width:100%;flex-direction:column}
+  .startup-error .button{width:100%}
+}

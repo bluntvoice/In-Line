@@ -118,7 +118,7 @@ pub enum MoveDirection {
     Down,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenTaskAction {
     pub id: i64,
