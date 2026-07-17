@@ -4,7 +4,7 @@ version = "0.0.2"
 description = "In Line - a general-purpose task queue"
 authors = ["bluntvoice"]
 edition = "2021"
-license = "MIT"
+license = "GPL-3.0-only"
 [lib]
 name = "in_line_lib"
 crate-type = ["rlib"]

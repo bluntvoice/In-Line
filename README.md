@@ -79,4 +79,4 @@ npm.cmd run dist
 
 ## 许可
 
-MIT License，见 [LICENSE](LICENSE)。
+本项目采用 GNU General Public License v3.0（`GPL-3.0-only`），详见 [LICENSE](LICENSE)。

@@ -19,6 +19,7 @@
 - Electron 运行时替换为 Tauri 2、Rust 与系统 WebView2。
 - 队列排序改为人工顺位绝对优先；加急、优先级和逾期只作醒目标识。
 - README 使用项目方提供的原始 PNG 品牌图。
+- 开源协议统一为 GNU General Public License v3.0。
 
 ## 修复
 
