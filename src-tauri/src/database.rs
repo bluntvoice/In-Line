@@ -186,6 +186,13 @@ impl Database {
                 transaction.execute("INSERT OR IGNORE INTO master_values(kind,name,sort_order) VALUES('task_type',?,?)", params![name, index]).map_err(display_error)?;
             }
         }
+        transaction
+            .execute(
+                "INSERT OR IGNORE INTO master_values(kind,name,sort_order,is_active)
+             SELECT 'contact',contact,999,1 FROM tasks WHERE trim(contact)<>''",
+                [],
+            )
+            .map_err(display_error)?;
         transaction.commit().map_err(display_error)
     }
 
@@ -366,6 +373,7 @@ impl Database {
         };
         ensure_master(&transaction, "department", &input.department)?;
         ensure_master(&transaction, "task_type", &input.task_type)?;
+        ensure_master(&transaction, "contact", &input.contact)?;
         transaction.commit().map_err(display_error)?;
         get_task_on(connection, id)
     }
@@ -558,11 +566,12 @@ impl Database {
             let rows=statement.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).map_err(display_error)?
                 .collect::<Result<Vec<_>,_>>().map_err(display_error)?;
             Ok(MasterData{departments:rows.iter().filter(|x|x.0=="department").map(|x|x.1.clone()).collect(),
-                task_types:rows.iter().filter(|x|x.0=="task_type").map(|x|x.1.clone()).collect()})
+                task_types:rows.iter().filter(|x|x.0=="task_type").map(|x|x.1.clone()).collect(),
+                contacts:rows.iter().filter(|x|x.0=="contact").map(|x|x.1.clone()).collect()})
         })
     }
     pub fn add_master(&self, kind: String, name: String) -> Result<MasterData, String> {
-        if kind != "department" && kind != "task_type" {
+        if kind != "department" && kind != "task_type" && kind != "contact" {
             return Err("事项状态无效".into());
         }
         if name.trim().is_empty() || name.chars().count() > 100 {
@@ -761,6 +770,7 @@ mod tests {
         let first = db.save_task(sample("?")).unwrap();
         let second = db.save_task(sample("?")).unwrap();
         assert_eq!(second.daily_sequence, first.daily_sequence + 1);
+        assert!(db.masters().unwrap().contacts.contains(&"小林".to_string()));
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);
         drop(db);

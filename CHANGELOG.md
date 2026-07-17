@@ -4,11 +4,23 @@
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-07-17
+
+### Added
+
+- 事项类型和经办对接人新增可输入组合下拉框，点击即可查看预设值及已保存的自定义内容。
+- 经办对接人保存后自动记忆，并在表单下方显示三个最常用联系人快捷项。
+- 侧边栏新增“关于”页面，展示作者六朝生、GitHub 开源地址和运行中的实际版本号。
+
+### Changed
+
+- 主界面侧边栏改为辨识度更高的雾蓝色，并重新校准导航、选中态和统计卡片对比度。
+- 取号图片由 1200×800 横版改为 800×1200 竖版，更接近日常取号单并适合聊天窗口预览。
+
 ### Fixed
 
 - 修复复制取号图片时将 PNG 压缩字节误传为 RGBA 数据而导致复制失败的问题。
 - 修复截止时间保存为 UTC 后，编辑表单直接截取字符串而显示错误时区时间的问题。
-- 调整主界面侧边栏为浅灰蓝背景，并重新校准导航、选中态和统计卡片对比度，使品牌图标清晰显示。
 
 ## [0.0.3] - 2026-07-17
 
@@ -58,6 +70,7 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/bluntvoice/in-line/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/bluntvoice/in-line/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/bluntvoice/in-line/releases/tag/v0.0.2

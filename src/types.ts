@@ -15,7 +15,7 @@ export interface TaskInput{
   workload:Workload;isUrgent:boolean;urgentRequester:string;urgentReason:string;requestedDeadline:string|null;internalNotes:string;
 }
 export interface TaskLog{id:number;taskId:number;logType:string;content:string;createdAt:string}
-export interface MasterData{departments:string[];taskTypes:string[]}
+export interface MasterData{departments:string[];taskTypes:string[];contacts:string[]}
 export interface BackupInfo{name:string;path:string;size:number;modifiedAt:string}
 export interface TaskUiAction{id:number;action:"view"|"edit"|"status"|"urgent"}
 export interface BootstrapData{

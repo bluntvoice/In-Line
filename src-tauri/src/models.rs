@@ -81,6 +81,7 @@ pub struct TaskLog {
 pub struct MasterData {
     pub departments: Vec<String>,
     pub task_types: Vec<String>,
+    pub contacts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -1,7 +1,7 @@
 import type { LegalTask } from "../types";
 import { displayTicket,formatDateTime,STATUS_LABELS } from "./task-utils";
 
-const WIDTH=1200,HEIGHT=800;
+const WIDTH=800,HEIGHT=1200;
 const COLORS={blue:"#0B3A82",ink:"#102A56",amber:"#FFB000",paper:"#F7F9FC",muted:"#526173",red:"#C43D4B"};
 
 function rounded(context:CanvasRenderingContext2D,x:number,y:number,w:number,h:number,r:number,fill:string){
@@ -28,33 +28,37 @@ export async function renderTicketRgba(task:LegalTask):Promise<TicketRgbaImage>{
   const canvas=document.createElement("canvas");canvas.width=WIDTH;canvas.height=HEIGHT;
   const context=canvas.getContext("2d");if(!context)throw new Error("当前设备无法生成取号图片");
   context.textBaseline="middle";context.fillStyle=COLORS.paper;context.fillRect(0,0,WIDTH,HEIGHT);
-  rounded(context,36,36,1128,728,34,"#FFFFFF");
-  context.fillStyle=COLORS.blue;context.fillRect(36,36,18,728);
-  context.font="700 28px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.ink;context.fillText("IN LINE",90,92);
-  context.font="500 22px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.muted;context.fillText("事项已登记，请按队列处理",90,132);
+  rounded(context,30,30,740,1140,34,"#FFFFFF");
+  context.fillStyle=COLORS.blue;context.fillRect(30,30,14,1140);
+  context.font="700 28px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.ink;context.fillText("IN LINE",72,88);
+  context.font="500 19px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.muted;context.fillText("事项已登记，请按队列处理",72,128);
   const alert=task.isUrgent||task.priority==="critical";
-  rounded(context,alert?928:968,74,alert?166:126,50,25,alert?COLORS.red:COLORS.blue);
-  context.font="700 22px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle="#FFF";context.textAlign="center";
-  context.fillText(alert?"加急 · "+STATUS_LABELS[task.status]:STATUS_LABELS[task.status],alert?1011:1031,100);
+  rounded(context,alert?574:614,68,alert?154:114,48,24,alert?COLORS.red:COLORS.blue);
+  context.font="700 19px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle="#FFF";context.textAlign="center";
+  context.fillText(alert?"加急 · "+STATUS_LABELS[task.status]:STATUS_LABELS[task.status],alert?651:671,92);
   context.textAlign="left";
 
-  context.font="800 168px Consolas,'Cascadia Mono',monospace";context.fillStyle=COLORS.blue;
-  context.fillText(displayTicket(task),90,310);
-  context.fillStyle=COLORS.amber;context.fillRect(92,410,240,12);
+  context.font="800 158px Consolas,'Cascadia Mono',monospace";context.fillStyle=COLORS.blue;
+  context.textAlign="center";
+  context.fillText(displayTicket(task),400,306);
+  context.fillStyle=COLORS.amber;context.fillRect(280,404,240,12);
 
-  context.font="700 46px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.ink;
-  fitLines(context,task.title,980,2).forEach((line,index)=>context.fillText(line,90,502+index*62));
+  context.font="700 43px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.ink;
+  context.textAlign="left";
+  fitLines(context,task.title,656,2).forEach((line,index)=>context.fillText(line,72,510+index*60));
 
-  const y=650;context.fillStyle="#E8EDF5";context.fillRect(90,y-36,1020,1);
+  context.fillStyle="#E8EDF5";context.fillRect(72,650,656,1);
   const fields=[["部门 / 团队",task.department],["对接人",task.contact],["事项类型",task.taskType],["截止时间",formatDateTime(task.requestedDeadline)]];
   fields.forEach(([label,value],index)=>{
-    const x=90+index*255;
-    context.font="500 17px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.muted;context.fillText(label,x,y);
-    context.font="600 23px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.ink;
-    const short=value.length>11?value.slice(0,10)+"…":value;context.fillText(short,x,y+38);
+    const x=72+(index%2)*344;
+    const y=724+Math.floor(index/2)*154;
+    context.font="500 18px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.muted;context.fillText(label,x,y);
+    context.font="600 25px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.ink;
+    fitLines(context,value,286,2).forEach((line,lineIndex)=>context.fillText(line,x,y+42+lineIndex*34));
   });
-  context.font="500 16px Consolas,monospace";context.fillStyle="#7B8797";context.fillText(task.permanentNumber,90,738);
-  context.textAlign="right";context.fillText("取号只记录登记顺序",1110,738);
+  context.font="500 16px Consolas,monospace";context.fillStyle="#7B8797";context.fillText(task.permanentNumber,72,1124);
+  context.textAlign="right";
+  context.fillText("取号只记录登记顺序",728,1124);
   const rgba=context.getImageData(0,0,WIDTH,HEIGHT).data;
   return{rgba:new Uint8Array(rgba),width:WIDTH,height:HEIGHT};
 }

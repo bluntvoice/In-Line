@@ -4,7 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
+import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView } from "./types";
 import { renderTicketRgba } from "./lib/ticket-image";
 
@@ -30,7 +30,7 @@ export const api={
   archiveTask:(id:number)=>invoke<void>("archive_task",{id}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   addLog:(taskId:number,content:string)=>invoke<void>("add_log",{taskId,content}),
-  addMaster:(kind:"department"|"task_type",name:string)=>invoke<MasterData>("add_master",{kind,name}),
+  addMaster:(kind:"department"|"task_type"|"contact",name:string)=>invoke<MasterData>("add_master",{kind,name}),
   listBackups:()=>invoke<BackupInfo[]>("list_backups"),
   createBackup:()=>invoke<BackupInfo>("create_backup"),
   restoreBackup:(path:string)=>invoke<void>("restore_backup",{path}),
@@ -40,6 +40,7 @@ export const api={
   openTaskAction:(id:number,action:TaskUiAction["action"]|"complete"|"archive"|"delete"|"restore")=>invoke<void>("open_task_action",{request:{id,action}}),
   getTask:(id:number)=>invoke<LegalTask>("copy_ticket_card",{id}),
   getVersion,
+  copyText:(value:string)=>writeText(value),
   onDataChanged:(callback:()=>void)=>{
     let dispose:(()=>void)|undefined;
     let disposed=false;

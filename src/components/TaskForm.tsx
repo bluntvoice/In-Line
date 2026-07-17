@@ -3,11 +3,12 @@ import { AlertTriangle, Check, X } from "lucide-react";
 import type { LegalTask, MasterData, Priority, TaskInput, TaskStatus, Workload } from "../types";
 import { api } from "../api";
 import { fromDateTimeLocalValue,toDateTimeLocalValue } from "../lib/task-utils";
+import ComboInput from "./ComboInput";
 
 interface Props {
   task: LegalTask | null;
   masters: MasterData;
-  recentContacts: string[];
+  commonContacts: string[];
   onClose: () => void;
   onSaved: () => void;
 }
@@ -48,7 +49,7 @@ function toInput(task: LegalTask | null): TaskInput {
   };
 }
 
-export default function TaskForm({ task, masters, recentContacts, onClose, onSaved }: Props) {
+export default function TaskForm({ task, masters, commonContacts, onClose, onSaved }: Props) {
   const [form, setForm] = useState<TaskInput>(() => toInput(task));
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -56,7 +57,7 @@ export default function TaskForm({ task, masters, recentContacts, onClose, onSav
 
   useEffect(() => firstInput.current?.focus(), []);
   const title = task ? `编辑 ${task.permanentNumber}` : "新增取号";
-  const uniqueContacts = useMemo(() => [...new Set(recentContacts)].slice(0, 5), [recentContacts]);
+  const quickContacts = useMemo(() => [...new Set(commonContacts)].slice(0, 3), [commonContacts]);
 
   const update = <K extends keyof TaskInput>(key: K, value: TaskInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -105,17 +106,16 @@ export default function TaskForm({ task, masters, recentContacts, onClose, onSav
             </label>
             <label>
               <span>对接人 *</span>
-              <input value={form.contact} onChange={(e) => update("contact", e.target.value)} placeholder="姓名" />
-              {uniqueContacts.length > 0 && (
+              <ComboInput value={form.contact} options={masters.contacts} onChange={(value) => update("contact", value)} placeholder="输入或选择对接人" />
+              {quickContacts.length > 0 && (
                 <span className="recent-contacts">
-                  {uniqueContacts.map((name) => <button type="button" key={name} onClick={() => update("contact", name)}>{name}</button>)}
+                  {quickContacts.map((name) => <button type="button" key={name} onClick={() => update("contact", name)}>{name}</button>)}
                 </span>
               )}
             </label>
             <label>
               <span>事项类型 *</span>
-              <input list="task-types" value={form.taskType} onChange={(e) => update("taskType", e.target.value)} />
-              <datalist id="task-types">{masters.taskTypes.map((item) => <option key={item}>{item}</option>)}</datalist>
+              <ComboInput value={form.taskType} options={masters.taskTypes} onChange={(value) => update("taskType", value)} placeholder="输入或选择事项类型" />
             </label>
             <label>
               <span>要求完成时间</span>

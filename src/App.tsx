@@ -1,16 +1,17 @@
 import { useEffect,useMemo,useState } from "react";
-import { Archive,ArrowDown,ArrowUp,Copy,Inbox,Plus,Search,Settings,Trash2,X } from "lucide-react";
+import { Archive,ArrowDown,ArrowUp,Copy,Inbox,Info,Plus,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
-import { displayTicket,formatDateTime,isOverdue } from "./lib/task-utils";
+import { commonContacts,displayTicket,formatDateTime,isOverdue } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
 import TaskDetail from "./components/TaskDetail";
 import TaskContextMenu,{type ContextAction} from "./components/TaskContextMenu";
 import SettingsPanel from "./components/SettingsPanel";
+import AboutPanel from "./components/AboutPanel";
 
-const emptyMasters:MasterData={departments:[],taskTypes:[]};
+const emptyMasters:MasterData={departments:[],taskTypes:[],contacts:[]};
 type MenuState={task:LegalTask;x:number;y:number}|null;
 
 export default function App(){
@@ -20,6 +21,7 @@ export default function App(){
   const [selected,setSelected]=useState<LegalTask|null>(null);
   const [editing,setEditing]=useState<LegalTask|null|undefined>(undefined);
   const [settings,setSettings]=useState(false);
+  const [about,setAbout]=useState(false);
   const [menu,setMenu]=useState<MenuState>(null);
   const [message,setMessage]=useState("");
   const [startupError,setStartupError]=useState("");
@@ -78,27 +80,29 @@ export default function App(){
   };
 
   if(!data)return <div className="app-loading"><img src="/inline-mark.svg"/>{startupError?<section className="startup-error" role="alert"><h1>队列暂时无法载入</h1><p>{startupError}</p><div><button className="button primary" onClick={()=>void refresh()}>重新载入</button><button className="button secondary" onClick={()=>setEditing(null)}>直接新增取号</button></div><small>数据仍保存在本机，程序不会自动清空数据库。</small></section>:<p>正在整理队列…</p>}
-    {editing!==undefined&&<TaskForm task={editing} masters={emptyMasters} recentContacts={[]} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {editing!==undefined&&<TaskForm task={editing} masters={emptyMasters} commonContacts={[]} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
     {message&&<div className="toast">{message}</div>}
   </div>;
   const urgent=data.queue.filter(task=>task.isUrgent).length;
   const overdue=data.queue.filter(task=>isOverdue(task)).length;
+  const frequentContacts=commonContacts([...data.queue,...data.archive].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt)));
 
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><img src="/inline-mark.svg"/><div><strong>In Line</strong><span>排着呢</span></div></div>
       <button className="new-ticket" onClick={()=>setEditing(null)}><Plus size={18}/>新增取号<kbd>Ctrl Alt N</kbd></button>
       <nav>
-        <button className={!settings&&view==="queue"?"active":""} onClick={()=>{setSettings(false);setView("queue");}}><Inbox size={18}/><span>待办队列</span><b>{data.queue.length}</b></button>
-        <button className={!settings&&view==="archive"?"active":""} onClick={()=>{setSettings(false);setView("archive");}}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
-        <button className={!settings&&view==="trash"?"active":""} onClick={()=>{setSettings(false);setView("trash");}}><Trash2 size={18}/><span>回收站</span><b>{data.trash.length}</b></button>
+        <button className={!settings&&!about&&view==="queue"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("queue");}}><Inbox size={18}/><span>待办队列</span><b>{data.queue.length}</b></button>
+        <button className={!settings&&!about&&view==="archive"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("archive");}}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
+        <button className={!settings&&!about&&view==="trash"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("trash");}}><Trash2 size={18}/><span>回收站</span><b>{data.trash.length}</b></button>
       </nav>
       <div className="sidebar-summary"><div><span>加急</span><b>{urgent}</b></div><div><span>逾期</span><b>{overdue}</b></div></div>
-      <button className={settings?"settings-button active":"settings-button"} onClick={()=>setSettings(true)}><Settings size={18}/>系统设置</button>
+      <button className={settings?"settings-button active":"settings-button"} onClick={()=>{setSettings(true);setAbout(false);}}><Settings size={18}/>系统设置</button>
+      <button className={about?"settings-button active":"settings-button"} onClick={()=>{setAbout(true);setSettings(false);}}><Info size={18}/>关于</button>
       <small className="app-version">{version?`v${version}`:""}</small>
     </aside>
     <main className="workspace">
-      {settings?<SettingsPanel backups={data.backups} onChanged={()=>void refresh()} notify={toast}/>:<>
+      {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} onChanged={()=>void refresh()} notify={toast}/>:<>
         <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="archive"?"历史归档":"回收站"}</h1></div>
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>
@@ -120,7 +124,7 @@ export default function App(){
         </div>
       </>}
     </main>
-    {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} recentContacts={data.queue.map(task=>task.contact)} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} commonContacts={frequentContacts} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
     {menu&&<TaskContextMenu {...menu} view={view} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
     {message&&<div className="toast">{message}</div>}
   </div>;

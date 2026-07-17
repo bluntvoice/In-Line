@@ -23,6 +23,15 @@ export function isOverdue(task:Pick<LegalTask,"requestedDeadline"|"status">,now=
   return Boolean(task.requestedDeadline&&!["completed","cancelled","archived"].includes(task.status)&&new Date(task.requestedDeadline).getTime()<now.getTime());
 }
 export function sortQueue(tasks:LegalTask[]){return [...tasks].sort((a,b)=>a.customSortOrder-b.customSortOrder||a.id-b.id);}
+export function commonContacts(tasks:Pick<LegalTask,"contact">[],limit=3){
+  const counts=new Map<string,{count:number;lastIndex:number}>();
+  tasks.forEach((task,index)=>{
+    const name=task.contact.trim();if(!name)return;
+    const current=counts.get(name);counts.set(name,{count:(current?.count??0)+1,lastIndex:index});
+  });
+  return [...counts.entries()].sort((a,b)=>b[1].count-a[1].count||b[1].lastIndex-a[1].lastIndex||a[0].localeCompare(b[0],"zh-CN"))
+    .slice(0,limit).map(([name])=>name);
+}
 export function formatDateTime(value:string|null){
   if(!value)return"未设置";
   return new Intl.DateTimeFormat("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(value));

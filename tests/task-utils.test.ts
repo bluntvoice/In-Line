@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,dayDifference,displayTicket,fromDateTimeLocalValue,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,dayDifference,displayTicket,fromDateTimeLocalValue,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
 import type { LegalTask } from "../src/types";
 
 const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
@@ -19,5 +19,12 @@ describe("本地截止时间",()=>{
   it("未设置时间时保持空值",()=>{
     expect(fromDateTimeLocalValue("")).toBeNull();
     expect(toDateTimeLocalValue(null)).toBe("");
+  });
+});
+
+describe("常用对接人",()=>{
+  it("按使用频次选出三个联系人，同频时优先最近出现的人",()=>{
+    const contacts=["小林","小周","小林","小陈","小周","小吴"].map(contact=>({contact}));
+    expect(commonContacts(contacts)).toEqual(["小周","小林","小吴"]);
   });
 });
