@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.0.3] - 2026-07-17
+
 ### Fixed
 
 - 修复 Windows 发布构建误显示黑色控制台窗口的问题。
@@ -14,7 +16,7 @@
 
 ### Changed
 
-- 主界面左下角显示实际应用版本，并补充 Electron v0.0.1 与 Tauri v0.0.2 并存时的升级清理说明。
+- 主界面左下角显示实际应用版本，并补充 Electron v0.0.1 与 Tauri 新版并存时的升级清理说明。
 
 ## [0.0.2] - 2026-07-17
 
@@ -50,5 +52,6 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/bluntvoice/in-line/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/bluntvoice/in-line/releases/tag/v0.0.2
