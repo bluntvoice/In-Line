@@ -1,0 +1,12 @@
+import { describe,expect,it } from "vitest";
+import { alphaPrefix,dayDifference,displayTicket,sortQueue } from "../src/lib/task-utils";
+import type { LegalTask } from "../src/types";
+
+const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
+
+describe("取号和人工顺位",()=>{
+  it("当天显示两位号码",()=>expect(displayTicket({ticketDate:"2026-07-17",dailySequence:1},"2026-07-17")).toBe("01"));
+  it("跨天增加字母前缀",()=>{expect(displayTicket({ticketDate:"2026-07-16",dailySequence:3},"2026-07-17")).toBe("A03");expect(alphaPrefix(27)).toBe("AA");});
+  it("系统时间倒退不产生负天数",()=>expect(dayDifference("2026-07-17","2026-07-16")).toBe(0));
+  it("加急不覆盖人工顺位",()=>{const first={...task(1,2),isUrgent:true,priority:"critical" as const};const second=task(2,1);expect(sortQueue([first,second]).map(value=>value.id)).toEqual([2,1]);});
+});
