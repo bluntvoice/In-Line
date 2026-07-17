@@ -1,5 +1,5 @@
 import type { LegalTask } from "../types";
-import { displayTicket,STATUS_LABELS } from "./task-utils";
+import { displayTicket,formatDateTime,STATUS_LABELS } from "./task-utils";
 
 const WIDTH=1200,HEIGHT=800;
 const COLORS={blue:"#0B3A82",ink:"#102A56",amber:"#FFB000",paper:"#F7F9FC",muted:"#526173",red:"#C43D4B"};
@@ -21,9 +21,9 @@ function fitLines(context:CanvasRenderingContext2D,text:string,maxWidth:number,m
   }
   return lines;
 }
-function dateTime(value:string|null){if(!value)return"未设置";return new Intl.DateTimeFormat("zh-CN",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(value));}
+export interface TicketRgbaImage{rgba:Uint8Array;width:number;height:number}
 
-export async function renderTicketPng(task:LegalTask):Promise<Uint8Array>{
+export async function renderTicketRgba(task:LegalTask):Promise<TicketRgbaImage>{
   await document.fonts.ready;
   const canvas=document.createElement("canvas");canvas.width=WIDTH;canvas.height=HEIGHT;
   const context=canvas.getContext("2d");if(!context)throw new Error("当前设备无法生成取号图片");
@@ -46,7 +46,7 @@ export async function renderTicketPng(task:LegalTask):Promise<Uint8Array>{
   fitLines(context,task.title,980,2).forEach((line,index)=>context.fillText(line,90,502+index*62));
 
   const y=650;context.fillStyle="#E8EDF5";context.fillRect(90,y-36,1020,1);
-  const fields=[["部门 / 团队",task.department],["对接人",task.contact],["事项类型",task.taskType],["截止时间",dateTime(task.requestedDeadline)]];
+  const fields=[["部门 / 团队",task.department],["对接人",task.contact],["事项类型",task.taskType],["截止时间",formatDateTime(task.requestedDeadline)]];
   fields.forEach(([label,value],index)=>{
     const x=90+index*255;
     context.font="500 17px 'Microsoft YaHei UI','Microsoft YaHei',sans-serif";context.fillStyle=COLORS.muted;context.fillText(label,x,y);
@@ -55,6 +55,6 @@ export async function renderTicketPng(task:LegalTask):Promise<Uint8Array>{
   });
   context.font="500 16px Consolas,monospace";context.fillStyle="#7B8797";context.fillText(task.permanentNumber,90,738);
   context.textAlign="right";context.fillText("取号只记录登记顺序",1110,738);
-  const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error("取号图片生成失败")),"image/png"));
-  return new Uint8Array(await blob.arrayBuffer());
+  const rgba=context.getImageData(0,0,WIDTH,HEIGHT).data;
+  return{rgba:new Uint8Array(rgba),width:WIDTH,height:HEIGHT};
 }

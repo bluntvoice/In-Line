@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import { AlertTriangle, Check, X } from "lucide-react";
 import type { LegalTask, MasterData, Priority, TaskInput, TaskStatus, Workload } from "../types";
 import { api } from "../api";
+import { fromDateTimeLocalValue,toDateTimeLocalValue } from "../lib/task-utils";
 
 interface Props {
   task: LegalTask | null;
@@ -118,7 +119,7 @@ export default function TaskForm({ task, masters, recentContacts, onClose, onSav
             </label>
             <label>
               <span>要求完成时间</span>
-              <input type="datetime-local" value={form.requestedDeadline?.slice(0, 16) ?? ""} onChange={(e) => update("requestedDeadline", e.target.value ? new Date(e.target.value).toISOString() : null)} />
+              <input type="datetime-local" value={toDateTimeLocalValue(form.requestedDeadline)} onChange={(e) => update("requestedDeadline", fromDateTimeLocalValue(e.target.value))} />
             </label>
             <label className="span-2">
               <span>事项标题 *</span>
