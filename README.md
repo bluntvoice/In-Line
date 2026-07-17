@@ -2,7 +2,7 @@
 
 In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合个人或内部支持岗位记录任务、展示排队顺序、发送取号卡片，并不限定法务场景。
 
-![In Line 图标](public/inline-mark.png)
+<img src=".github/assets/readme-icon.png" alt="In Line 图标" width="180">
 
 当前稳定代码版本：`v0.0.2`（2026-07-17）。本次重构的完整变更见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -45,7 +45,7 @@ v0.0.2 本地验收构建结果：
 
 - 安装包：`In Line_0.0.2_x64-setup.exe`
 - 文件大小：约 1.97 MB
-- SHA-256：`67454EE8E716B6B2FFCBA45E1FE05E2929ED8CAAEFA8558C168808A7F34227B7`
+- SHA-256：`A2979FD3C346DAF084181E637F429E2442DA23FE5DE82EC7E77A32707EC6F989`
 
 ## 开发
 
