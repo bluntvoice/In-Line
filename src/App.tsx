@@ -2,7 +2,7 @@ import { useEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,Copy,Inbox,Info,Plus,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
-import { commonContacts,displayTicket,formatDateTime,isOverdue } from "./lib/task-utils";
+import { commonContacts,displayTicket,formatDeadline,isOverdue } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
@@ -112,7 +112,7 @@ export default function App(){
               <tbody>{tasks.map((task,index)=><tr key={task.id} tabIndex={0} onClick={()=>void copy(task)} onDoubleClick={event=>{event.preventDefault();setSelected(task);}} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
                 <td><TicketNumber task={task}/></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}</td>
                 <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={isOverdue(task)}/></td>
-                <td className={isOverdue(task)?"deadline overdue":"deadline"}>{formatDateTime(task.requestedDeadline)}</td>
+                <td className={isOverdue(task)?"deadline overdue":"deadline"}>{formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
                 <td><div className="row-actions"><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制取号图片"><Copy size={17}/></button>
                   <button disabled={view!=="queue"||index===0} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={17}/></button>
                   <button disabled={view!=="queue"||index===tasks.length-1} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={17}/></button></div></td>

@@ -34,6 +34,7 @@ pub struct LegalTask {
     pub urgent_requester: String,
     pub urgent_reason: String,
     pub requested_deadline: Option<String>,
+    pub requested_deadline_label: Option<String>,
     pub internal_notes: String,
     pub created_at: String,
     pub updated_at: String,
@@ -62,6 +63,8 @@ pub struct TaskInput {
     #[serde(default)]
     pub urgent_reason: String,
     pub requested_deadline: Option<String>,
+    #[serde(default)]
+    pub requested_deadline_label: Option<String>,
     #[serde(default)]
     pub internal_notes: String,
 }
@@ -132,7 +135,6 @@ pub fn validate_task_input(input: &TaskInput) -> Result<(), String> {
         ("对接人", input.contact.trim()),
         ("事项类型", input.task_type.trim()),
         ("事项标题", input.title.trim()),
-        ("事项详情", input.details.trim()),
     ];
     let missing: Vec<&str> = required
         .iter()
@@ -150,6 +152,13 @@ pub fn validate_task_input(input: &TaskInput) -> Result<(), String> {
     }
     if input.details.chars().count() > 10_000 || input.internal_notes.chars().count() > 10_000 {
         return Err("事项详情和内部备注均不能超过 10000 个字符".into());
+    }
+    if input
+        .requested_deadline_label
+        .as_deref()
+        .is_some_and(|value| value.chars().count() > 50)
+    {
+        return Err("截止时间说明不能超过 50 个字符".into());
     }
     if !ALL_STATUSES.contains(&input.status.as_str()) {
         return Err("事项状态无效".into());

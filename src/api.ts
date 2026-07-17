@@ -31,9 +31,11 @@ export const api={
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   addLog:(taskId:number,content:string)=>invoke<void>("add_log",{taskId,content}),
   addMaster:(kind:"department"|"task_type"|"contact",name:string)=>invoke<MasterData>("add_master",{kind,name}),
+  deleteMaster:(kind:"department"|"task_type"|"contact",name:string)=>invoke<MasterData>("delete_master",{kind,name}),
   listBackups:()=>invoke<BackupInfo[]>("list_backups"),
   createBackup:()=>invoke<BackupInfo>("create_backup"),
   restoreBackup:(path:string)=>invoke<void>("restore_backup",{path}),
+  deleteBackup:(path:string)=>invoke<void>("delete_backup",{path}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
   showMain:()=>invoke<void>("show_main_window"),
   requestNewTask:()=>invoke<void>("request_new_task"),
@@ -67,7 +69,8 @@ export const api={
   },
   copyTicketImage:async(taskOrId:LegalTask|number)=>{
     const task=typeof taskOrId==="number"?await invoke<LegalTask>("copy_ticket_card",{id:taskOrId}):taskOrId;
-    const rendered=await renderTicketRgba(task);
+    const queueAhead=await invoke<number>("queue_ahead",{id:task.id});
+    const rendered=await renderTicketRgba(task,queueAhead);
     const image=await Image.new(rendered.rgba,rendered.width,rendered.height);
     try{
       await writeImage(image);

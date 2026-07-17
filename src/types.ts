@@ -7,12 +7,12 @@ export type MoveDirection="up"|"down";
 export interface LegalTask{
   id:number;permanentNumber:string;dailySequence:number;ticketDate:string;department:string;contact:string;
   taskType:string;title:string;details:string;status:TaskStatus;priority:Priority;workload:Workload;isUrgent:boolean;
-  urgentRequester:string;urgentReason:string;requestedDeadline:string|null;internalNotes:string;createdAt:string;
+  urgentRequester:string;urgentReason:string;requestedDeadline:string|null;requestedDeadlineLabel:string|null;internalNotes:string;createdAt:string;
   updatedAt:string;startedAt:string|null;completedAt:string|null;archivedAt:string|null;deletedAt:string|null;customSortOrder:number;
 }
 export interface TaskInput{
   id?:number;department:string;contact:string;taskType:string;title:string;details:string;status:TaskStatus;priority:Priority;
-  workload:Workload;isUrgent:boolean;urgentRequester:string;urgentReason:string;requestedDeadline:string|null;internalNotes:string;
+  workload:Workload;isUrgent:boolean;urgentRequester:string;urgentReason:string;requestedDeadline:string|null;requestedDeadlineLabel:string|null;internalNotes:string;
 }
 export interface TaskLog{id:number;taskId:number;logType:string;content:string;createdAt:string}
 export interface MasterData{departments:string[];taskTypes:string[];contacts:string[]}

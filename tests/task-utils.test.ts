@@ -1,8 +1,8 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,commonContacts,dayDifference,displayTicket,fromDateTimeLocalValue,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
 import type { LegalTask } from "../src/types";
 
-const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
+const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
 
 describe("取号和人工顺位",()=>{
   it("当天显示两位号码",()=>expect(displayTicket({ticketDate:"2026-07-17",dailySequence:1},"2026-07-17")).toBe("01"));
@@ -19,6 +19,14 @@ describe("本地截止时间",()=>{
   it("未设置时间时保持空值",()=>{
     expect(fromDateTimeLocalValue("")).toBeNull();
     expect(toDateTimeLocalValue(null)).toBe("");
+  });
+  it("模糊时间保留用户可读标签",()=>{
+    const morning=deadlineShortcut("morning",new Date(2026,6,17,10,0));
+    expect(morning.label).toBe("今天上午");
+    expect(formatDeadline(morning.value,morning.label)).toBe("今天上午");
+  });
+  it("当天时间已过时自动顺延到明天",()=>{
+    expect(deadlineShortcut("morning",new Date(2026,6,17,12,0)).label).toBe("明天上午");
   });
 });
 

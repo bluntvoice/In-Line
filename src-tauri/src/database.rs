@@ -8,7 +8,7 @@ use std::{
     sync::Mutex,
 };
 
-const SELECT_TASK: &str = "SELECT id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order FROM tasks";
+const SELECT_TASK: &str = "SELECT id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order, requested_deadline_label FROM tasks";
 
 pub struct Database {
     path: PathBuf,
@@ -25,18 +25,25 @@ impl Database {
         let path = root.join("inline.db");
         let backup_dir = root.join("backups");
         fs::create_dir_all(&backup_dir).map_err(display_error)?;
+        Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 2 {
-            let backup = backup_dir.join(format!(
-                "pre-tauri-migration-{}.db",
-                Local::now().format("%Y%m%d-%H%M%S")
-            ));
+        if existed && Self::schema_version(&connection)? < 3 {
+            let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
         }
         Self::migrate(&mut connection)?;
-        let daily = backup_dir.join(format!("auto-{}.db", Local::now().format("%Y%m%d")));
-        if !daily.exists() {
+        let date_marker = Local::now().format("%Y%m%d").to_string();
+        let daily_exists = fs::read_dir(&backup_dir)
+            .map_err(display_error)?
+            .filter_map(Result::ok)
+            .any(|entry| {
+                let name = entry.file_name().to_string_lossy().to_string();
+                name.starts_with(&format!("InLine-backup-{date_marker}"))
+                    && name.ends_with("-auto.db")
+            });
+        if !daily_exists {
+            let daily = backup_dir.join(Self::backup_name("auto"));
             Self::backup_connection(&connection, &daily)?;
         }
         Self::prune_backups(&backup_dir, 30)?;
@@ -163,6 +170,29 @@ impl Database {
                 .execute("INSERT INTO schema_meta(version) VALUES(2)", [])
                 .map_err(display_error)?;
         }
+        if version < 3 {
+            let has_deadline_label: i64 = transaction
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('tasks') WHERE name='requested_deadline_label'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if has_deadline_label == 0 {
+                transaction
+                    .execute(
+                        "ALTER TABLE tasks ADD COLUMN requested_deadline_label TEXT",
+                        [],
+                    )
+                    .map_err(display_error)?;
+            }
+            transaction
+                .execute("DELETE FROM schema_meta", [])
+                .map_err(display_error)?;
+            transaction
+                .execute("INSERT INTO schema_meta(version) VALUES(3)", [])
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -233,6 +263,7 @@ impl Database {
             archived_at: row.get(21)?,
             deleted_at: row.get(22)?,
             custom_sort_order: row.get(23)?,
+            requested_deadline_label: row.get(24)?,
         })
     }
 
@@ -301,11 +332,11 @@ impl Database {
             };
             transaction.execute(
                 "UPDATE tasks SET department=?,contact=?,task_type=?,title=?,details=?,status=?,priority=?,workload=?,
-                 is_urgent=?,urgent_requester=?,urgent_reason=?,requested_deadline=?,internal_notes=?,updated_at=?,
+                 is_urgent=?,urgent_requester=?,urgent_reason=?,requested_deadline=?,requested_deadline_label=?,internal_notes=?,updated_at=?,
                  started_at=?,completed_at=? WHERE id=?",
                 params![input.department.trim(),input.contact.trim(),input.task_type.trim(),input.title.trim(),
                 input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
-                input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,
+                input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,
                 input.internal_notes.trim(),stamp,started,completed,id]).map_err(display_error)?;
             if previous.status != input.status {
                 add_status(&transaction, id, Some(&previous.status), &input.status, "")?;
@@ -350,12 +381,12 @@ impl Database {
                 .map_err(display_error)?;
             transaction.execute(
                 "INSERT INTO tasks(permanent_number,daily_sequence,ticket_date,department,contact,task_type,title,details,
-                 status,priority,workload,is_urgent,urgent_requester,urgent_reason,requested_deadline,internal_notes,
+                 status,priority,workload,is_urgent,urgent_requester,urgent_reason,requested_deadline,requested_deadline_label,internal_notes,
                  created_at,updated_at,started_at,completed_at,custom_sort_order)
-                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 params![permanent,sequence,date,input.department.trim(),input.contact.trim(),input.task_type.trim(),
                 input.title.trim(),input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
-                input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.internal_notes.trim(),
+                input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,input.internal_notes.trim(),
                 stamp,stamp,if input.status=="processing"{Some(now())}else{None},if input.status=="completed"{Some(now())}else{None},order]
             ).map_err(display_error)?;
             let id = transaction.last_insert_rowid();
@@ -580,6 +611,38 @@ impl Database {
         self.with_conn(|connection| ensure_master(connection, &kind, &name))?;
         self.masters()
     }
+    pub fn delete_master(&self, kind: String, name: String) -> Result<MasterData, String> {
+        if kind != "department" && kind != "task_type" && kind != "contact" {
+            return Err("选项类型无效".into());
+        }
+        if name.trim().is_empty() || name.chars().count() > 100 {
+            return Err("选项名称无效".into());
+        }
+        self.with_conn(|connection| {
+            connection
+                .execute(
+                    "UPDATE master_values SET is_active=0 WHERE kind=? AND name=?",
+                    params![kind, name.trim()],
+                )
+                .map_err(display_error)?;
+            Ok(())
+        })?;
+        self.masters()
+    }
+    pub fn queue_ahead(&self, id: i64) -> Result<i64, String> {
+        self.with_conn(|connection| {
+            let task = get_task_on(connection, id)?;
+            connection
+                .query_row(
+                    "SELECT count(*) FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
+                     AND status NOT IN ('completed','cancelled','archived')
+                     AND (custom_sort_order < ? OR (custom_sort_order = ? AND id < ?))",
+                    params![task.custom_sort_order, task.custom_sort_order, id],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)
+        })
+    }
     pub fn settings(&self) -> Result<HashMap<String, String>, String> {
         self.with_conn(|connection| {
             let mut statement = connection
@@ -608,6 +671,54 @@ impl Database {
 }
 
 impl Database {
+    fn backup_name(kind: &str) -> String {
+        format!(
+            "InLine-backup-{}-{kind}.db",
+            Local::now().format("%Y%m%d-%H%M%S")
+        )
+    }
+
+    fn normalize_backup_names(root: &Path) -> Result<(), String> {
+        let entries = fs::read_dir(root)
+            .map_err(display_error)?
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|value| value == "db"))
+            .collect::<Vec<_>>();
+        for source in entries {
+            let old_name = source.file_name().unwrap_or_default().to_string_lossy();
+            if old_name.starts_with("InLine-backup-") {
+                continue;
+            }
+            let lower = old_name.to_ascii_lowercase();
+            let kind = if lower.starts_with("auto-") {
+                "auto"
+            } else if lower.starts_with("manual-") {
+                "manual"
+            } else if lower.starts_with("pre-restore-") {
+                "before-restore"
+            } else if lower.starts_with("pre-tauri-migration-") {
+                "before-migration"
+            } else {
+                "legacy"
+            };
+            let modified = fs::metadata(&source)
+                .and_then(|metadata| metadata.modified())
+                .ok()
+                .map(chrono::DateTime::<Local>::from)
+                .unwrap_or_else(Local::now);
+            let base = format!("InLine-backup-{}-{kind}", modified.format("%Y%m%d-%H%M%S"));
+            let mut target = root.join(format!("{base}.db"));
+            let mut suffix = 1;
+            while target.exists() {
+                target = root.join(format!("{base}-{suffix}.db"));
+                suffix += 1;
+            }
+            fs::rename(&source, target).map_err(display_error)?;
+        }
+        Ok(())
+    }
+
     fn prune_backups(root: &Path, keep: usize) -> Result<(), String> {
         let mut files = fs::read_dir(root)
             .map_err(display_error)?
@@ -615,7 +726,7 @@ impl Database {
             .map(|entry| entry.path())
             .filter(|path| {
                 path.file_name()
-                    .is_some_and(|name| name.to_string_lossy().starts_with("auto-"))
+                    .is_some_and(|name| name.to_string_lossy().ends_with("-auto.db"))
             })
             .collect::<Vec<_>>();
         files.sort_by_key(|path| fs::metadata(path).and_then(|value| value.modified()).ok());
@@ -637,10 +748,7 @@ impl Database {
     }
     pub fn create_backup(&self, label: &str) -> Result<BackupInfo, String> {
         let safe = if label == "manual" { "manual" } else { "auto" };
-        let path = self.backup_dir.join(format!(
-            "{safe}-{}.db",
-            Local::now().format("%Y%m%d-%H%M%S")
-        ));
+        let path = self.backup_dir.join(Self::backup_name(safe));
         self.with_conn(|connection| Self::backup_connection(connection, &path))?;
         backup_info(&path)
     }
@@ -655,6 +763,17 @@ impl Database {
         values.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
         Ok(values)
     }
+    pub fn delete_backup(&self, raw_path: String) -> Result<(), String> {
+        let selected = fs::canonicalize(&raw_path).map_err(|_| "找不到所选备份".to_string())?;
+        let backup_root = fs::canonicalize(&self.backup_dir).map_err(display_error)?;
+        if !selected.starts_with(&backup_root)
+            || selected.extension().is_none_or(|value| value != "db")
+        {
+            return Err("只能删除 In Line 备份目录中的数据库文件".into());
+        }
+        fs::remove_file(selected).map_err(display_error)
+    }
+
     pub fn restore_backup(&self, raw_path: String) -> Result<(), String> {
         let selected = fs::canonicalize(&raw_path).map_err(|_| "找不到所选备份".to_string())?;
         let backup_root = fs::canonicalize(&self.backup_dir).map_err(display_error)?;
@@ -669,10 +788,7 @@ impl Database {
             return Err("备份文件校验失败，当前数据未改变".into());
         }
         drop(check);
-        let emergency = self.backup_dir.join(format!(
-            "pre-restore-{}.db",
-            Local::now().format("%Y%m%d-%H%M%S")
-        ));
+        let emergency = self.backup_dir.join(Self::backup_name("before-restore"));
         {
             let mut guard = self
                 .connection
@@ -755,6 +871,7 @@ mod tests {
             urgent_requester: "".into(),
             urgent_reason: "".into(),
             requested_deadline: None,
+            requested_deadline_label: None,
             internal_notes: "".into(),
         }
     }
@@ -767,12 +884,22 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let path = root.join("inline.db");
         let db = Database::open_at(path).unwrap();
-        let first = db.save_task(sample("?")).unwrap();
-        let second = db.save_task(sample("?")).unwrap();
+        let first = db.save_task(sample("第一项")).unwrap();
+        let mut empty_details = sample("可选详情");
+        empty_details.details.clear();
+        let second = db.save_task(empty_details).unwrap();
         assert_eq!(second.daily_sequence, first.daily_sequence + 1);
+        assert_eq!(db.queue_ahead(first.id).unwrap(), 0);
+        assert_eq!(db.queue_ahead(second.id).unwrap(), 1);
         assert!(db.masters().unwrap().contacts.contains(&"小林".to_string()));
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);
+        db.delete_master("contact".into(), "小林".into()).unwrap();
+        assert!(!db.masters().unwrap().contacts.contains(&"小林".to_string()));
+        let backup = db.create_backup("manual").unwrap();
+        assert!(backup.name.starts_with("InLine-backup-"));
+        assert!(backup.name.ends_with("-manual.db"));
+        db.delete_backup(backup.path).unwrap();
         drop(db);
         let _ = fs::remove_dir_all(root);
     }

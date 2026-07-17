@@ -97,12 +97,32 @@ fn add_master(db: State<Database>, kind: String, name: String) -> Result<MasterD
     db.add_master(kind, name)
 }
 #[tauri::command]
+fn delete_master(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    kind: String,
+    name: String,
+) -> Result<MasterData, String> {
+    let values = db.delete_master(kind, name)?;
+    emit_change(&app)?;
+    Ok(values)
+}
+#[tauri::command]
+fn queue_ahead(db: State<Database>, id: i64) -> Result<i64, String> {
+    db.queue_ahead(id)
+}
+#[tauri::command]
 fn list_backups(db: State<Database>) -> Result<Vec<BackupInfo>, String> {
     db.list_backups()
 }
 #[tauri::command]
 fn create_backup(db: State<Database>) -> Result<BackupInfo, String> {
     db.create_backup("manual")
+}
+#[tauri::command]
+fn delete_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Result<(), String> {
+    db.delete_backup(path)?;
+    emit_change(&app)
 }
 #[tauri::command]
 fn restore_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Result<(), String> {
@@ -127,7 +147,6 @@ fn open_task_action(
                 .map_err(|error| error.to_string())?;
             return Ok(());
         }
-
         "complete" => db.set_status(request.id, "completed".into())?,
         "archive" => db.archive(request.id)?,
         "delete" => db.soft_delete(request.id)?,
@@ -177,7 +196,20 @@ pub fn run() {
             let backup = MenuItem::with_id(app, "backup", "立即备份", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&add, &open, &float, &backup, &quit])?;
-            let _tray = TrayIconBuilder::new()
+            let app_icon = app.default_window_icon().cloned();
+            if let Some(icon) = app_icon.clone() {
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_icon(icon.clone())?;
+                }
+                if let Some(window) = app.get_webview_window("floating") {
+                    window.set_icon(icon.clone())?;
+                }
+            }
+            let mut tray_builder = TrayIconBuilder::new();
+            if let Some(icon) = app_icon {
+                tray_builder = tray_builder.icon(icon);
+            }
+            let _tray = tray_builder
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -219,8 +251,11 @@ pub fn run() {
             get_logs,
             add_log,
             add_master,
+            delete_master,
+            queue_ahead,
             list_backups,
             create_backup,
+            delete_backup,
             restore_backup,
             copy_ticket_card,
             open_task_action,

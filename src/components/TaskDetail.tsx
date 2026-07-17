@@ -2,7 +2,7 @@ import { useEffect,useState } from "react";
 import { Archive,Edit3,RotateCcw,Trash2,X } from "lucide-react";
 import type { LegalTask,TaskLog,TaskStatus,TaskView } from "../types";
 import { api } from "../api";
-import { formatDateTime,PRIORITY_LABELS,STATUS_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
+import { formatDateTime,formatDeadline,PRIORITY_LABELS,STATUS_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
 import StatusBadge from "./StatusBadge";
 import TicketNumber from "./TicketNumber";
 
@@ -25,9 +25,9 @@ export default function TaskDetail({task,view,onClose,onEdit,onChanged}:{task:Le
       <div><dt>状态</dt><dd><StatusBadge status={task.status}/></dd></div><div><dt>优先级</dt><dd>{PRIORITY_LABELS[task.priority]}</dd></div>
       <div><dt>部门 / 团队</dt><dd>{task.department}</dd></div><div><dt>对接人</dt><dd>{task.contact}</dd></div>
       <div><dt>事项类型</dt><dd>{task.taskType}</dd></div><div><dt>预计工作量</dt><dd>{WORKLOAD_LABELS[task.workload]}</dd></div>
-      <div><dt>截止时间</dt><dd>{formatDateTime(task.requestedDeadline)}</dd></div><div><dt>永久编号</dt><dd>{task.permanentNumber}</dd></div>
+      <div><dt>截止时间</dt><dd>{formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</dd></div><div><dt>永久编号</dt><dd>{task.permanentNumber}</dd></div>
     </dl>
-    <section><h3>事项详情</h3><p className="detail-copy">{task.details}</p></section>
+    <section><h3>事项详情</h3><p className={task.details?"detail-copy":"muted"}>{task.details||"未填写"}</p></section>
     {task.isUrgent&&<section className="urgent-box"><h3>加急信息</h3><p><strong>{task.urgentRequester}</strong>：{task.urgentReason}</p></section>}
     {task.internalNotes&&<section><h3>内部备注</h3><p className="detail-copy">{task.internalNotes}</p></section>}
     <section className="timeline"><h3>处理记录</h3><div className="log-compose"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="补充一条处理记录"/><button onClick={()=>void add()}>添加</button></div>
