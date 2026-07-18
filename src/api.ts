@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
-import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TicketSnapshot } from "./types";
@@ -80,11 +79,6 @@ export const api={
       await image.close();
     }
     return snapshot.task;
-  },
-  registerNewTaskShortcut:async(callback:()=>void)=>{
-    await unregister("Ctrl+Alt+N").catch(()=>undefined);
-    await register("Ctrl+Alt+N",callback);
-    return()=>{void unregister("Ctrl+Alt+N");};
   },
   setLaunchAtLogin:async(value:boolean)=>{if(value)await enable();else await disable();},
   launchAtLogin:isEnabled

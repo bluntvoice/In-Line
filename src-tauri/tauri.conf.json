@@ -40,7 +40,7 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,
-        "shadow": false
+        "shadow": true
       },
       {
         "label": "quick-add",

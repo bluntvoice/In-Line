@@ -54,9 +54,7 @@ export default function App(){
       }).catch(error=>toast("无法打开事项："+String(error)));
     });
     void api.getVersion().then(setVersion).catch(()=>undefined);
-    let offShortcut=()=>{};
-    void api.registerNewTaskShortcut(()=>{void api.requestNewTask();}).then(value=>{offShortcut=value;}).catch(()=>toast("全局快捷键注册失败，可继续使用新增按钮"));
-    return()=>{offData();offNew();offTaskUi();offShortcut();};
+    return()=>{offData();offNew();offTaskUi();};
   },[]);
 
   const source=data?.[view]??[];
@@ -104,7 +102,7 @@ export default function App(){
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><img src="/inline-mark.svg"/><div><strong>In Line</strong><span>排着呢</span></div></div>
-      <button className="new-ticket" onClick={()=>setEditing(null)}><Plus size={18}/>新增取号<kbd>Ctrl Alt N</kbd></button>
+      <button className="new-ticket" onClick={()=>setEditing(null)}><Plus size={18}/>新增取号</button>
       <nav>
         <button className={!settings&&!about&&view==="queue"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("queue");}}><Inbox size={18}/><span>待办队列</span><b>{data.queue.length}</b></button>
         <button className={!settings&&!about&&view==="archive"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("archive");}}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
