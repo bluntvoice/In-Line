@@ -80,7 +80,21 @@ html,body,#root{background:transparent!important}
 .quick-add-loading{display:grid;place-items:center;align-content:center;gap:10px;width:100%;height:100%;padding:24px;background:#edf4fb;text-align:center}.quick-add-loading img{width:64px}.quick-add-loading p{max-width:560px;margin:0;color:#9e2436;overflow-wrap:anywhere}
 
 /* Final geometry overrides must remain after the v0.0.4 compatibility rules. */
-.floating-expanded,.floating-mini{border-radius:0!important;clip-path:none!important;box-shadow:none!important}
+.floating-expanded,.floating-mini{border:0!important;border-radius:0!important;clip-path:none!important;box-shadow:none!important}
+.floating-toolbar{display:grid;grid-template-columns:32px minmax(0,1fr) 90px;align-items:center;width:100%;height:48px;min-height:48px;background:#dcebfa;color:#102a56;border-bottom:1px solid #bfd1e3;user-select:none}
+.floating-drag-handle{display:grid;place-items:center;width:32px;height:48px;padding:0;border:0;background:transparent;color:#40536a;cursor:move}
+.floating-drag-handle:hover{background:#c9ddef;color:#0b3a82}
+.floating-toolbar-content{min-width:0;height:48px}
+.floating-brand{display:flex;align-items:center;gap:8px;width:100%;height:48px;cursor:move}
+.floating-brand img{width:27px;height:27px;flex:0 0 27px}
+.floating-brand>span{margin-left:auto;padding-right:8px;color:#526173;font-size:12px}
+.floating-window-actions{display:grid;grid-template-columns:repeat(3,30px);width:90px;height:48px;align-items:center}
+.floating-toolbar .float-icon{width:30px;height:30px;color:#40536a}
+.floating-toolbar .float-icon:hover{background:#c9ddef;color:#0b3a82}
+.floating-toolbar .mini-main{width:100%;height:48px}
+.floating-toolbar .mini-empty{display:flex;align-items:center;width:100%;height:48px;cursor:move}
+.floating-list,.floating-footer{cursor:default}
+.floating-list:empty{cursor:move}
 .combo-options{top:100%;margin-top:0;padding:4px}
 .deadline-picker{display:grid;gap:2px}
 .deadline-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:0;width:100%;height:38px;overflow:hidden;border:1px solid #cfd8e5;border-radius:8px;background:#fff}

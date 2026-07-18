@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.0.7] - 2026-07-18
+
+### Changed
+
+- 悬浮窗迷你模式和展开模式共用同一套固定工具栏，左侧拖动点和右侧三个窗口按钮在切换前后保持相同大小与位置。
+- 悬浮窗固定为 420px 宽度并关闭原生窗口缩放，避免 Windows 为无标题栏窗口绘制额外边框。
+
+### Fixed
+
+- 左侧九点拖动柄、顶部品牌空白区域、列表剩余空白区域和底部空白区域现在均可拖动悬浮窗。
+- 移除悬浮窗最外侧的 CSS 边框、阴影和 Windows 原生缩放细线。
+
 ## [0.0.6] - 2026-07-18
 
 ### Added
@@ -112,7 +124,8 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.6...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/bluntvoice/in-line/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/bluntvoice/in-line/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/bluntvoice/in-line/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/bluntvoice/in-line/compare/v0.0.3...v0.0.4
