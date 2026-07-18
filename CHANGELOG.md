@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-07-18
+
 ### Added
 
 - 新增独立的快捷取号窗口：托盘菜单和系统级快捷键可直接打开表单，无需先显示完整主界面。
@@ -97,7 +99,8 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/bluntvoice/in-line/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/bluntvoice/in-line/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/bluntvoice/in-line/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/bluntvoice/in-line/releases/tag/v0.0.2
