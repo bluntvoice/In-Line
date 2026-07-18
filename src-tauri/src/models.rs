@@ -84,7 +84,6 @@ pub struct TaskLog {
 pub struct TicketSnapshot {
     pub task: LegalTask,
     pub queue_ahead: i64,
-    pub queue_total: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

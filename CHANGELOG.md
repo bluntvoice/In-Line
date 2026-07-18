@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-07-18
+
+### Added
+
+- 待办队列、历史归档和回收站新增 Excel 式列筛选，支持按部门 / 团队、对接人、事项类型、当前状态和截止时间筛选。
+- 截止时间筛选支持指定自然日，以及上午、中午、下午和晚上四个粗粒度时段。
+
+### Changed
+
+- 悬浮窗迷你模式与展开模式保持相同宽度，并改为无圆角直角窗口。
+- 分享图右下角改为显示当前事项前方仍有多少个事项待处理，不再显示整个队列总数。
+- 事项类型与要求完成时间控件改为同宽对齐，选项面板紧贴输入框显示。
+
 ## [0.0.5] - 2026-07-18
 
 ### Added
@@ -99,7 +112,8 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/bluntvoice/in-line/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/bluntvoice/in-line/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/bluntvoice/in-line/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/bluntvoice/in-line/compare/v0.0.2...v0.0.3

@@ -72,7 +72,7 @@ export const api={
   copyTicketImage:async(taskOrId:LegalTask|number)=>{
     const id=typeof taskOrId==="number"?taskOrId:taskOrId.id;
     const snapshot=await invoke<TicketSnapshot>("ticket_snapshot",{id});
-    const rendered=await renderTicketRgba(snapshot.task,snapshot.queueAhead,snapshot.queueTotal);
+    const rendered=await renderTicketRgba(snapshot.task,snapshot.queueAhead);
     const image=await Image.new(rendered.rgba,rendered.width,rendered.height);
     try{
       await writeImage(image);

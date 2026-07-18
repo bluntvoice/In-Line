@@ -39,7 +39,7 @@ export default function FloatingWindow(){
     toast("操作已完成");
   };
   const resize=async(value:boolean)=>{
-    const window=getCurrentWindow();if(value){await window.setSize(new LogicalSize(390,48));}else{await window.setSize(new LogicalSize(420,540));}
+    const window=getCurrentWindow();if(value){await window.setSize(new LogicalSize(420,48));}else{await window.setSize(new LogicalSize(420,540));}
     setMini(value);
   };
   if(mini){

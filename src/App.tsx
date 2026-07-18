@@ -10,9 +10,13 @@ import TaskDetail from "./components/TaskDetail";
 import TaskContextMenu,{type ContextAction} from "./components/TaskContextMenu";
 import SettingsPanel from "./components/SettingsPanel";
 import AboutPanel from "./components/AboutPanel";
+import { DeadlineFilterHeader,ValueFilterHeader } from "./components/TaskTableFilter";
+import { activeFilterCount,applyTaskFilters,EMPTY_TASK_FILTERS,uniqueValues,type TaskFilters } from "./lib/task-filters";
+import { STATUS_LABELS } from "./lib/task-utils";
 
 const emptyMasters:MasterData={departments:[],taskTypes:[],contacts:[]};
 type MenuState={task:LegalTask;x:number;y:number}|null;
+const newFilters=():TaskFilters=>({...EMPTY_TASK_FILTERS,deadlinePeriods:[]});
 
 export default function App(){
   const [data,setData]=useState<BootstrapData|null>(null);
@@ -26,6 +30,7 @@ export default function App(){
   const [message,setMessage]=useState("");
   const [startupError,setStartupError]=useState("");
   const [version,setVersion]=useState("");
+  const [filtersByView,setFiltersByView]=useState<Record<TaskView,TaskFilters>>({queue:newFilters(),archive:newFilters(),trash:newFilters()});
 
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),2300);};
   const refresh=async()=>{
@@ -55,11 +60,20 @@ export default function App(){
   },[]);
 
   const source=data?.[view]??[];
+  const filters=filtersByView[view];
+  const updateFilters=(change:Partial<TaskFilters>)=>setFiltersByView(current=>({...current,[view]:{...current[view],...change}}));
+  const filterOptions=useMemo(()=>({
+    departments:uniqueValues(source.map(task=>task.department)),
+    contacts:uniqueValues(source.map(task=>task.contact)),
+    taskTypes:uniqueValues(source.map(task=>task.taskType)),
+    statuses:[...new Set(source.map(task=>task.status))]
+  }),[source]);
   const tasks=useMemo(()=>{
-    const key=query.trim().toLocaleLowerCase("zh-CN");if(!key)return source;
-    return source.filter(task=>[task.permanentNumber,task.department,task.contact,task.taskType,task.title,task.details,task.internalNotes]
+    const filtered=applyTaskFilters(source,filters);
+    const key=query.trim().toLocaleLowerCase("zh-CN");if(!key)return filtered;
+    return filtered.filter(task=>[task.permanentNumber,task.department,task.contact,task.taskType,task.title,task.details,task.internalNotes]
       .some(value=>value.toLocaleLowerCase("zh-CN").includes(key)));
-  },[source,query]);
+  },[source,query,filters]);
 
   const copy=async(task:LegalTask)=>{try{await api.copyTicketImage(task);toast("已复制："+displayTicket(task));}catch(error){toast("复制失败："+String(error));}};
   const move=async(event:React.MouseEvent,task:LegalTask,direction:"up"|"down")=>{event.stopPropagation();try{await api.moveTask(task.id,direction);}catch(error){toast("调整失败："+String(error));}};
@@ -107,8 +121,13 @@ export default function App(){
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>
         <div className={selected?"queue-layout with-detail":"queue-layout"}>
-          <section className="table-panel"><div className="table-meta"><span>共 {tasks.length} 项</span><span>单击复制取号图片 · 右键管理事项</span></div>
-            <div className="table-scroll"><table className="task-table"><thead><tr><th>号码</th><th>事项标题</th><th>部门 / 团队</th><th>对接人</th><th>类型</th><th>状态</th><th>截止时间</th><th>操作</th></tr></thead>
+          <section className="table-panel"><div className="table-meta"><span>共 {tasks.length} 项{activeFilterCount(filters)>0&&<><b> · 已启用 {activeFilterCount(filters)} 项筛选</b><button type="button" onClick={()=>setFiltersByView(current=>({...current,[view]:newFilters()}))}>清除筛选</button></>}</span><span>单击复制取号图片 · 右键管理事项</span></div>
+            <div className="table-scroll"><table className="task-table"><thead><tr><th>号码</th><th>事项标题</th>
+              <th><ValueFilterHeader label="部门 / 团队" values={filterOptions.departments} selected={filters.departments} onChange={departments=>updateFilters({departments})}/></th>
+              <th><ValueFilterHeader label="对接人" values={filterOptions.contacts} selected={filters.contacts} onChange={contacts=>updateFilters({contacts})}/></th>
+              <th><ValueFilterHeader label="事项类型" values={filterOptions.taskTypes} selected={filters.taskTypes} onChange={taskTypes=>updateFilters({taskTypes})}/></th>
+              <th><ValueFilterHeader label="当前状态" values={filterOptions.statuses} selected={filters.statuses} renderLabel={status=>STATUS_LABELS[status]} onChange={statuses=>updateFilters({statuses})}/></th>
+              <th><DeadlineFilterHeader date={filters.deadlineDate} periods={filters.deadlinePeriods} onChange={(deadlineDate,deadlinePeriods)=>updateFilters({deadlineDate,deadlinePeriods})}/></th><th>操作</th></tr></thead>
               <tbody>{tasks.map((task,index)=><tr key={task.id} tabIndex={0} onClick={()=>void copy(task)} onDoubleClick={event=>{event.preventDefault();setSelected(task);}} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
                 <td><TicketNumber task={task}/></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}</td>
                 <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={isOverdue(task)}/></td>
@@ -117,7 +136,7 @@ export default function App(){
                   <button disabled={view!=="queue"||index===0} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={17}/></button>
                   <button disabled={view!=="queue"||index===tasks.length-1} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={17}/></button></div></td>
               </tr>)}</tbody></table>
-              {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query?"没有匹配事项":"目前没有排队事项"}</h2><p>{query?"请尝试其他关键词。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
+              {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query||activeFilterCount(filters)>0?"没有匹配事项":"目前没有排队事项"}</h2><p>{query||activeFilterCount(filters)>0?"请调整关键词或列筛选条件。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
             </div>
           </section>
           {selected&&<TaskDetail task={selected} view={view} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}}/>}

@@ -119,11 +119,11 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
               <ComboInput value={form.contact} options={localMasters.contacts} onChange={(value) => update("contact", value)} onDelete={(value) => removeMaster("contact", value)} placeholder="输入或选择对接人" />
               {quickContacts.length > 0 && <span className="recent-contacts">{quickContacts.map((name) => <button type="button" key={name} onClick={() => update("contact", name)}>{name}</button>)}</span>}
             </label>
-            <label>
+            <label className="paired-control-field">
               <span>事项类型 *</span>
               <ComboInput value={form.taskType} options={localMasters.taskTypes} onChange={(value) => update("taskType", value)} onDelete={(value) => removeMaster("task_type", value)} placeholder="输入或选择事项类型" />
             </label>
-            <label>
+            <label className="paired-control-field">
               <span>要求完成时间</span>
               <DeadlinePicker value={form.requestedDeadline} label={form.requestedDeadlineLabel} onChange={(value, label) => setForm((current) => ({ ...current, requestedDeadline: value, requestedDeadlineLabel: label }))} />
             </label>

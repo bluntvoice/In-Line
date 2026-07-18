@@ -730,19 +730,7 @@ impl Database {
                     |row| row.get(0),
                 )
                 .map_err(display_error)?;
-            let queue_total = connection
-                .query_row(
-                    "SELECT count(*) FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
-                     AND status NOT IN ('completed','cancelled','archived')",
-                    [],
-                    |row| row.get(0),
-                )
-                .map_err(display_error)?;
-            Ok(TicketSnapshot {
-                task,
-                queue_ahead,
-                queue_total,
-            })
+            Ok(TicketSnapshot { task, queue_ahead })
         })
     }
     pub fn settings(&self) -> Result<HashMap<String, String>, String> {
@@ -1007,7 +995,6 @@ mod tests {
         assert_eq!(queue[1].id, third.id, "首次加急应自动前移一位");
         let snapshot = db.ticket_snapshot(third.id).unwrap();
         assert_eq!(snapshot.queue_ahead, 1);
-        assert_eq!(snapshot.queue_total, 3);
         db.add_log(third.id, "可编辑记录".into()).unwrap();
         let manual = db
             .get_logs(third.id)

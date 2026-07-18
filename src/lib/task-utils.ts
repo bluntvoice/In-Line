@@ -40,6 +40,9 @@ export function formatDateTime(value:string|null){
 export function formatDeadline(value:string|null,label:string|null= null){
   return label?.trim()||formatDateTime(value);
 }
+export function queueAheadMessage(queueAhead:number){
+  return `前面还有${Math.max(0,Math.trunc(queueAhead))}个事项待处理，请耐心等待`;
+}
 export function toDateTimeLocalValue(value:string|null){
   if(!value)return"";
   const date=new Date(value);
