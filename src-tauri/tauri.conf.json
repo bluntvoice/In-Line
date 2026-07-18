@@ -4,7 +4,7 @@
   "version": "0.0.4",
   "identifier": "io.github.bluntvoice.inline",
   "build": {
-    "beforeDevCommand": "npm.cmd run vite -- --host 127.0.0.1",
+    "beforeDevCommand": "npm.cmd exec vite -- --host 127.0.0.1",
     "devUrl": "http://127.0.0.1:1420",
     "beforeBuildCommand": "npm.cmd run build",
     "frontendDist": "../dist"
@@ -40,6 +40,19 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": true
+      },
+      {
+        "label": "quick-add",
+        "title": "新增取号｜In Line",
+        "url": "index.html#/quick-add",
+        "width": 780,
+        "height": 760,
+        "minWidth": 660,
+        "minHeight": 620,
+        "center": true,
+        "visible": false,
+        "resizable": true,
+        "skipTaskbar": true
       }
     ]
   },

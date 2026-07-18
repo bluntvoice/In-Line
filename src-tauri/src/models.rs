@@ -81,6 +81,14 @@ pub struct TaskLog {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TicketSnapshot {
+    pub task: LegalTask,
+    pub queue_ahead: i64,
+    pub queue_total: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MasterData {
     pub departments: Vec<String>,
     pub task_types: Vec<String>,

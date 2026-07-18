@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main-capability",
   "description": "In Line 主窗口和悬浮窗所需的最小权限",
-  "windows": ["main", "floating"],
+  "windows": ["main", "floating", "quick-add"],
   "permissions": [
     "core:default",
     "core:window:allow-show",

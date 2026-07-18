@@ -5,7 +5,7 @@ import { Image } from "@tauri-apps/api/image";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView } from "./types";
+import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TicketSnapshot } from "./types";
 import { renderTicketRgba } from "./lib/ticket-image";
 
 const withTimeout=<T>(request:Promise<T>,label:string,timeoutMs=12000)=>new Promise<T>((resolve,reject)=>{
@@ -30,6 +30,8 @@ export const api={
   archiveTask:(id:number)=>invoke<void>("archive_task",{id}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   addLog:(taskId:number,content:string)=>invoke<void>("add_log",{taskId,content}),
+  updateLog:(logId:number,content:string)=>invoke<void>("update_log",{logId,content}),
+  deleteLog:(logId:number)=>invoke<void>("delete_log",{logId}),
   addMaster:(kind:"department"|"task_type"|"contact",name:string)=>invoke<MasterData>("add_master",{kind,name}),
   deleteMaster:(kind:"department"|"task_type"|"contact",name:string)=>invoke<MasterData>("delete_master",{kind,name}),
   listBackups:()=>invoke<BackupInfo[]>("list_backups"),
@@ -68,16 +70,16 @@ export const api={
     return()=>{disposed=true;dispose?.();};
   },
   copyTicketImage:async(taskOrId:LegalTask|number)=>{
-    const task=typeof taskOrId==="number"?await invoke<LegalTask>("copy_ticket_card",{id:taskOrId}):taskOrId;
-    const queueAhead=await invoke<number>("queue_ahead",{id:task.id});
-    const rendered=await renderTicketRgba(task,queueAhead);
+    const id=typeof taskOrId==="number"?taskOrId:taskOrId.id;
+    const snapshot=await invoke<TicketSnapshot>("ticket_snapshot",{id});
+    const rendered=await renderTicketRgba(snapshot.task,snapshot.queueAhead,snapshot.queueTotal);
     const image=await Image.new(rendered.rgba,rendered.width,rendered.height);
     try{
       await writeImage(image);
     }finally{
       await image.close();
     }
-    return task;
+    return snapshot.task;
   },
   registerNewTaskShortcut:async(callback:()=>void)=>{
     await unregister("Ctrl+Alt+N").catch(()=>undefined);

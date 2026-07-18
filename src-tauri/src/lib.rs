@@ -4,7 +4,7 @@ mod models;
 use database::Database;
 use models::*;
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
 
 fn emit_change(app: &tauri::AppHandle) -> Result<(), String> {
@@ -21,6 +21,13 @@ fn show_main(app: &tauri::AppHandle) {
 fn show_floating(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("floating") {
         let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+fn show_quick_add(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("quick-add") {
+        let _ = window.show();
+        let _ = window.unminimize();
         let _ = window.set_focus();
     }
 }
@@ -93,6 +100,21 @@ fn add_log(
     emit_change(&app)
 }
 #[tauri::command]
+fn update_log(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    log_id: i64,
+    content: String,
+) -> Result<(), String> {
+    db.update_log(log_id, content)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn delete_log(app: tauri::AppHandle, db: State<Database>, log_id: i64) -> Result<(), String> {
+    db.delete_log(log_id)?;
+    emit_change(&app)
+}
+#[tauri::command]
 fn add_master(db: State<Database>, kind: String, name: String) -> Result<MasterData, String> {
     db.add_master(kind, name)
 }
@@ -110,6 +132,10 @@ fn delete_master(
 #[tauri::command]
 fn queue_ahead(db: State<Database>, id: i64) -> Result<i64, String> {
     db.queue_ahead(id)
+}
+#[tauri::command]
+fn ticket_snapshot(db: State<Database>, id: i64) -> Result<TicketSnapshot, String> {
+    db.ticket_snapshot(id)
 }
 #[tauri::command]
 fn list_backups(db: State<Database>) -> Result<Vec<BackupInfo>, String> {
@@ -173,12 +199,14 @@ fn show_main_window(app: tauri::AppHandle) {
 }
 #[tauri::command]
 fn request_new_task(app: tauri::AppHandle) -> Result<(), String> {
-    show_main(&app);
-    app.emit("new-task", ()).map_err(|error| error.to_string())
+    show_quick_add(&app);
+    Ok(())
 }
 
 pub fn run() {
+    let database = Database::open().expect("In Line 数据库初始化失败");
     tauri::Builder::default()
+        .manage(database)
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             show_main(app)
         }))
@@ -189,7 +217,6 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .setup(|app| {
-            app.manage(Database::open().map_err(std::io::Error::other)?);
             let open = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
             let add = MenuItem::with_id(app, "add", "新增事项", true, None::<&str>)?;
             let float = MenuItem::with_id(app, "floating", "显示悬浮窗", true, None::<&str>)?;
@@ -204,6 +231,9 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("floating") {
                     window.set_icon(icon.clone())?;
                 }
+                if let Some(window) = app.get_webview_window("quick-add") {
+                    window.set_icon(icon.clone())?;
+                }
             }
             let mut tray_builder = TrayIconBuilder::new();
             if let Some(icon) = app_icon {
@@ -215,8 +245,7 @@ pub fn run() {
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => show_main(app),
                     "add" => {
-                        show_main(app);
-                        let _ = app.emit("new-task", ());
+                        show_quick_add(app);
                     }
                     "floating" => show_floating(app),
                     "backup" => {
@@ -227,12 +256,30 @@ pub fn run() {
                     "quit" => app.exit(0),
                     _ => {}
                 })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_floating(tray.app_handle());
+                    }
+                })
                 .build(app)?;
             show_main(app.handle());
+            show_floating(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
             if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                    show_floating(window.app_handle());
+                }
+            }
+            if window.label() == "quick-add" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
@@ -250,9 +297,12 @@ pub fn run() {
             archive_task,
             get_logs,
             add_log,
+            update_log,
+            delete_log,
             add_master,
             delete_master,
             queue_ahead,
+            ticket_snapshot,
             list_backups,
             create_backup,
             delete_backup,

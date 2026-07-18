@@ -50,7 +50,7 @@ export default function App(){
     });
     void api.getVersion().then(setVersion).catch(()=>undefined);
     let offShortcut=()=>{};
-    void api.registerNewTaskShortcut(()=>{void api.showMain();setEditing(null);}).then(value=>{offShortcut=value;}).catch(()=>toast("全局快捷键注册失败，可继续使用新增按钮"));
+    void api.registerNewTaskShortcut(()=>{void api.requestNewTask();}).then(value=>{offShortcut=value;}).catch(()=>toast("全局快捷键注册失败，可继续使用新增按钮"));
     return()=>{offData();offNew();offTaskUi();offShortcut();};
   },[]);
 

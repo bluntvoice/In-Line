@@ -349,6 +349,9 @@ impl Database {
             }
             if previous.is_urgent != input.is_urgent {
                 record_urgent(&transaction, id, &input, previous.is_urgent)?;
+                if input.is_urgent {
+                    promote_one(&transaction, id)?;
+                }
             }
             add_log(&transaction, id, "updated", "更新事项信息")?;
             id
@@ -399,6 +402,7 @@ impl Database {
             add_status(&transaction, id, None, &input.status, "创建事项")?;
             if input.is_urgent {
                 record_urgent(&transaction, id, &input, false)?;
+                promote_one(&transaction, id)?;
             }
             id
         };
@@ -526,6 +530,45 @@ fn add_log(connection: &Connection, id: i64, kind: &str, content: &str) -> Resul
         .map_err(display_error)?;
     Ok(())
 }
+fn promote_one(connection: &Connection, id: i64) -> Result<(), String> {
+    let order: Option<i64> = connection
+        .query_row(
+            "SELECT custom_sort_order FROM tasks WHERE id=? AND deleted_at IS NULL AND archived_at IS NULL
+             AND status NOT IN ('completed','cancelled','archived')",
+            [id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(display_error)?;
+    let Some(order) = order else {
+        return Ok(());
+    };
+    let previous: Option<(i64, i64)> = connection
+        .query_row(
+            "SELECT id,custom_sort_order FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
+             AND status NOT IN ('completed','cancelled','archived') AND id<>? AND custom_sort_order<?
+             ORDER BY custom_sort_order DESC,id DESC LIMIT 1",
+            params![id, order],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(display_error)?;
+    if let Some((other_id, other_order)) = previous {
+        connection
+            .execute(
+                "UPDATE tasks SET custom_sort_order=? WHERE id=?",
+                params![other_order, id],
+            )
+            .map_err(display_error)?;
+        connection
+            .execute(
+                "UPDATE tasks SET custom_sort_order=? WHERE id=?",
+                params![order, other_id],
+            )
+            .map_err(display_error)?;
+    }
+    Ok(())
+}
 fn add_status(
     connection: &Connection,
     id: i64,
@@ -591,6 +634,38 @@ impl Database {
         }
         self.with_conn(|connection| add_log(connection, task_id, "note", content))
     }
+    pub fn update_log(&self, log_id: i64, content: String) -> Result<(), String> {
+        let content = content.trim();
+        if content.is_empty() || content.chars().count() > 2000 {
+            return Err("处理记录应为 1 至 2000 个字符".into());
+        }
+        self.with_conn(|connection| {
+            let changed = connection
+                .execute(
+                    "UPDATE task_logs SET content=? WHERE id=? AND log_type='note'",
+                    params![content, log_id],
+                )
+                .map_err(display_error)?;
+            if changed == 0 {
+                return Err("系统自动记录不能编辑".into());
+            }
+            Ok(())
+        })
+    }
+    pub fn delete_log(&self, log_id: i64) -> Result<(), String> {
+        self.with_conn(|connection| {
+            let changed = connection
+                .execute(
+                    "DELETE FROM task_logs WHERE id=? AND log_type='note'",
+                    [log_id],
+                )
+                .map_err(display_error)?;
+            if changed == 0 {
+                return Err("系统自动记录不能删除".into());
+            }
+            Ok(())
+        })
+    }
     pub fn masters(&self) -> Result<MasterData, String> {
         self.with_conn(|connection|{
             let mut statement=connection.prepare("SELECT kind,name FROM master_values WHERE is_active=1 ORDER BY sort_order,name").map_err(display_error)?;
@@ -641,6 +716,33 @@ impl Database {
                     |row| row.get(0),
                 )
                 .map_err(display_error)
+        })
+    }
+    pub fn ticket_snapshot(&self, id: i64) -> Result<TicketSnapshot, String> {
+        self.with_conn(|connection| {
+            let task = get_task_on(connection, id)?;
+            let queue_ahead = connection
+                .query_row(
+                    "SELECT count(*) FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
+                     AND status NOT IN ('completed','cancelled','archived')
+                     AND (custom_sort_order < ? OR (custom_sort_order = ? AND id < ?))",
+                    params![task.custom_sort_order, task.custom_sort_order, id],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            let queue_total = connection
+                .query_row(
+                    "SELECT count(*) FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
+                     AND status NOT IN ('completed','cancelled','archived')",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            Ok(TicketSnapshot {
+                task,
+                queue_ahead,
+                queue_total,
+            })
         })
     }
     pub fn settings(&self) -> Result<HashMap<String, String>, String> {
@@ -894,6 +996,41 @@ mod tests {
         assert!(db.masters().unwrap().contacts.contains(&"小林".to_string()));
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);
+        let third = db.save_task(sample("第三项")).unwrap();
+        let mut urgent = sample("加急项");
+        urgent.id = Some(third.id);
+        urgent.is_urgent = true;
+        urgent.urgent_requester = "测试人".into();
+        urgent.urgent_reason = "需要优先处理".into();
+        db.save_task(urgent).unwrap();
+        let queue = db.list_tasks(TaskView::Queue).unwrap();
+        assert_eq!(queue[1].id, third.id, "首次加急应自动前移一位");
+        let snapshot = db.ticket_snapshot(third.id).unwrap();
+        assert_eq!(snapshot.queue_ahead, 1);
+        assert_eq!(snapshot.queue_total, 3);
+        db.add_log(third.id, "可编辑记录".into()).unwrap();
+        let manual = db
+            .get_logs(third.id)
+            .unwrap()
+            .into_iter()
+            .find(|log| log.log_type == "note")
+            .unwrap();
+        db.update_log(manual.id, "已更新记录".into()).unwrap();
+        assert_eq!(
+            db.get_logs(third.id)
+                .unwrap()
+                .into_iter()
+                .find(|log| log.id == manual.id)
+                .unwrap()
+                .content,
+            "已更新记录"
+        );
+        db.delete_log(manual.id).unwrap();
+        assert!(!db
+            .get_logs(third.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.id == manual.id));
         db.delete_master("contact".into(), "小林".into()).unwrap();
         assert!(!db.masters().unwrap().contacts.contains(&"小林".to_string()));
         let backup = db.create_backup("manual").unwrap();

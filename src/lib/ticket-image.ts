@@ -44,7 +44,7 @@ function ticketFontSize(context: CanvasRenderingContext2D, ticket: string) {
 }
 export interface TicketRgbaImage { rgba: Uint8Array; width: number; height: number }
 
-export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise<TicketRgbaImage> {
+export async function renderTicketRgba(task: LegalTask, queueAhead = 0, queueTotal = 1): Promise<TicketRgbaImage> {
   await document.fonts.ready;
   const canvas = document.createElement("canvas"); canvas.width = WIDTH; canvas.height = HEIGHT;
   const context = canvas.getContext("2d"); if (!context) throw new Error("当前设备无法生成取号图片");
@@ -85,7 +85,8 @@ export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise
   });
 
   context.font = "500 15px Consolas,monospace"; context.fillStyle = "#7B8797"; context.fillText(task.permanentNumber, 66, 920);
-  context.font = `500 16px ${UI_FONT}`; context.textAlign = "right"; context.fillText("将按当前队列顺序处理", 732, 920);
+  context.font = `500 16px ${UI_FONT}`; context.textAlign = "right";
+  context.fillText(`当前有${queueTotal}个事项待处理，请耐心等待`, 732, 920);
   const rgba = context.getImageData(0, 0, WIDTH, HEIGHT).data;
   return { rgba: new Uint8Array(rgba), width: WIDTH, height: HEIGHT };
 }

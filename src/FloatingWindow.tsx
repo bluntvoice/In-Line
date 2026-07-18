@@ -1,5 +1,5 @@
 import { useEffect,useState } from "react";
-import { ArrowDown,ArrowUp,Copy,ExternalLink,Grip,Minimize2,Plus,X } from "lucide-react";
+import { ArrowDown,ArrowUp,Copy,ExternalLink,Grip,Maximize2,Minimize2,Plus,X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { api } from "./api";
@@ -45,7 +45,7 @@ export default function FloatingWindow(){
   if(mini){
     const task=tasks[0];
     return <div className="floating-mini" data-tauri-drag-region><Grip size={14}/>{task?<button className="mini-main" onClick={()=>void copy(task)}><TicketNumber task={task}/><strong>{task.title}</strong>{task.isUrgent?<span className="mini-urgent">加急</span>:<StatusBadge status={task.status} overdue={isOverdue(task)}/>}</button>:<span className="mini-empty">{loadError?"队列载入失败":loading?"正在载入…":"目前没有排队事项"}</span>}
-      <button className="float-icon" onClick={()=>void resize(false)} title="展开"><ExternalLink size={15}/></button><button className="float-icon" onClick={()=>void api.toggleFloating()} title="隐藏"><X size={15}/></button>{message&&<span className="float-toast">{message}</span>}</div>;
+      <button className="float-icon" onClick={()=>void api.showMain()} title="打开主界面"><ExternalLink size={15}/></button><button className="float-icon" onClick={()=>void resize(false)} title="展开悬浮窗"><Maximize2 size={15}/></button><button className="float-icon" onClick={()=>void api.toggleFloating()} title="隐藏"><X size={15}/></button>{message&&<span className="float-toast">{message}</span>}</div>;
   }
   return <div className="floating-expanded">
     <header className="floating-header" data-tauri-drag-region><Grip size={16}/><img src="/inline-mark.svg"/><strong>In Line</strong><span>{tasks.length} 项</span>
