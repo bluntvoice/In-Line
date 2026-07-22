@@ -51,7 +51,7 @@ html,body,#root{background:transparent!important}
 .floating-mini{color:#102a56}
 
 .combo-options{top:calc(100% + 2px);padding:4px}
-.combo-option{display:grid;grid-template-columns:minmax(0,1fr) 32px;align-items:center;min-height:38px;border-radius:7px}
+.combo-option{display:grid;grid-template-columns:minmax(0,1fr) auto 32px;align-items:center;min-height:38px;border-radius:7px}
 .combo-option:hover,.combo-option[data-selected=true]{background:#e5f0fa}
 .combo-select{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;height:38px;padding:0 9px;border:0;background:transparent;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .combo-delete{display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:6px;background:transparent;color:#7b8797}
@@ -105,3 +105,19 @@ html,body,#root{background:transparent!important}
 .deadline-confirm{padding:0 10px}
 .deadline-clear{width:36px}
 .deadline-quick{margin-top:0}
+.combo-order-actions{display:flex;align-items:center;gap:1px}
+.combo-order-actions button{display:grid;place-items:center;width:25px;height:28px;padding:0;border:0;border-radius:5px;background:transparent;color:#607086}
+.combo-order-actions button:hover:not(:disabled){background:#d8e8f7;color:#0b3a82}
+.multi-contact{position:relative;display:grid;gap:5px;min-width:0}
+.multi-contact-control{display:flex;align-items:center;flex-wrap:wrap;gap:5px;min-height:38px;padding:4px 38px 4px 7px;border:1px solid #cfd8e5;border-radius:8px;background:#fff;cursor:text}
+.multi-contact-control:focus-within{border-color:#0b3a82;box-shadow:0 0 0 3px #0b3a8214}
+.form-grid .multi-contact-control input{width:92px;min-width:72px;min-height:27px;flex:1;padding:2px 3px;border:0;border-radius:0;box-shadow:none}
+.contact-chip{display:inline-flex;align-items:center;gap:3px;max-width:180px;height:26px;padding:0 5px 0 8px;border-radius:13px;background:#e5f0fa;color:#0b3a82;font-size:12px;font-weight:650}
+.contact-chip>button{display:grid;place-items:center;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:transparent;color:#526173}
+.contact-chip>button:hover{background:#cbdff1;color:#9e2436}
+.multi-contact-toggle{position:absolute;right:1px;top:1px;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:0 7px 7px 0;background:transparent;color:#526173}
+.multi-contact-toggle:hover{background:#edf4fb;color:#0b3a82}
+.multi-contact-options{top:38px;margin-top:2px}
+.multi-contact-add{display:flex;align-items:center;width:100%;min-height:36px;padding:6px 9px;border:0;border-top:1px solid #e4eaf1;background:#fff;color:#0b3a82;text-align:left}
+.multi-contact-add:hover{background:#e5f0fa}
+.multi-contact .recent-contacts{min-height:22px}

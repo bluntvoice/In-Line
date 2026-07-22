@@ -130,6 +130,18 @@ fn delete_master(
     Ok(values)
 }
 #[tauri::command]
+fn move_master(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    kind: String,
+    name: String,
+    direction: MoveDirection,
+) -> Result<MasterData, String> {
+    let values = db.move_master(kind, name, direction)?;
+    emit_change(&app)?;
+    Ok(values)
+}
+#[tauri::command]
 fn queue_ahead(db: State<Database>, id: i64) -> Result<i64, String> {
     db.queue_ahead(id)
 }
@@ -300,6 +312,7 @@ pub fn run() {
             delete_log,
             add_master,
             delete_master,
+            move_master,
             queue_ahead,
             ticket_snapshot,
             list_backups,

@@ -4,6 +4,25 @@
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-07-22
+
+### Added
+
+- 单个事项可选择最多 10 位对接人，支持逐个输入、从历史联系人中选择，并通过标签单独移除。
+- 部门 / 团队和事项类型下拉列表支持手动上移、下移；人工顺序一经调整会持久保存。
+
+### Changed
+
+- 部门 / 团队、事项类型和联系人会记录实际选择频次；未设置人工顺序时优先展示常用选项。
+- 取号图片提升为 1600×1960 像素的高清输出，保持原有竖版比例与信息布局。
+- 长事项标题会在 40px 至 28px 之间自适应字号并完整利用两行空间，只有确实无法容纳时才显示省略号。
+- 打开新增取号页面时不再自动展开部门 / 团队下拉列表。
+
+### Fixed
+
+- 修复长标题第二行只显示少量文字便提前变为省略号的问题。
+- 修复旧版单联系人任务升级后无法直接编辑为多人对接的问题；旧数据会自动兼容且不重新取号。
+
 ## [0.0.7] - 2026-07-18
 
 ### Changed
@@ -128,7 +147,8 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.7...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.8...HEAD
+[0.0.8]: https://github.com/bluntvoice/in-line/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/bluntvoice/in-line/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/bluntvoice/in-line/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/bluntvoice/in-line/compare/v0.0.4...v0.0.5

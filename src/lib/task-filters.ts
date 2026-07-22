@@ -46,7 +46,7 @@ function matchesSelection<T extends string>(value: T, selected: ValueSelection<T
 export function applyTaskFilters(tasks: LegalTask[], filters: TaskFilters) {
   return tasks.filter((task) => {
     if (!matchesSelection(task.department, filters.departments)) return false;
-    if (!matchesSelection(task.contact, filters.contacts)) return false;
+    if (filters.contacts !== null && !(task.contacts?.length ? task.contacts : [task.contact]).some(contact => filters.contacts?.includes(contact))) return false;
     if (!matchesSelection(task.taskType, filters.taskTypes)) return false;
     if (!matchesSelection(task.status, filters.statuses)) return false;
 

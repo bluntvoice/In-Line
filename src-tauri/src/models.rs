@@ -24,6 +24,7 @@ pub struct LegalTask {
     pub ticket_date: String,
     pub department: String,
     pub contact: String,
+    pub contacts: Vec<String>,
     pub task_type: String,
     pub title: String,
     pub details: String,
@@ -50,7 +51,10 @@ pub struct LegalTask {
 pub struct TaskInput {
     pub id: Option<i64>,
     pub department: String,
+    #[serde(default)]
     pub contact: String,
+    #[serde(default)]
+    pub contacts: Vec<String>,
     pub task_type: String,
     pub title: String,
     pub details: String,
@@ -129,6 +133,22 @@ pub enum MoveDirection {
     Down,
 }
 
+pub fn normalized_contacts(input: &TaskInput) -> Vec<String> {
+    let source = if input.contacts.is_empty() {
+        vec![input.contact.as_str()]
+    } else {
+        input.contacts.iter().map(String::as_str).collect()
+    };
+    let mut contacts = Vec::new();
+    for value in source {
+        let name = value.trim();
+        if !name.is_empty() && !contacts.iter().any(|existing| existing == name) {
+            contacts.push(name.to_string());
+        }
+    }
+    contacts
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenTaskAction {
@@ -137,9 +157,10 @@ pub struct OpenTaskAction {
 }
 
 pub fn validate_task_input(input: &TaskInput) -> Result<(), String> {
+    let contacts = normalized_contacts(input);
     let required = [
         ("部门或团队", input.department.trim()),
-        ("对接人", input.contact.trim()),
+        ("对接人", if contacts.is_empty() { "" } else { "已填写" }),
         ("事项类型", input.task_type.trim()),
         ("事项标题", input.title.trim()),
     ];
@@ -151,11 +172,14 @@ pub fn validate_task_input(input: &TaskInput) -> Result<(), String> {
         return Err(format!("请填写{}", missing.join("、")));
     }
     if input.department.chars().count() > 100
-        || input.contact.chars().count() > 100
         || input.task_type.chars().count() > 100
         || input.title.chars().count() > 100
+        || contacts.iter().any(|contact| contact.chars().count() > 100)
     {
         return Err("部门、对接人、事项类型和标题均不能超过 100 个字符".into());
+    }
+    if contacts.len() > 10 {
+        return Err("每个事项最多可选择 10 位对接人".into());
     }
     if input.details.chars().count() > 10_000 || input.internal_notes.chars().count() > 10_000 {
         return Err("事项详情和内部备注均不能超过 10000 个字符".into());

@@ -62,7 +62,7 @@ export default function App(){
   const updateFilters=(change:Partial<TaskFilters>)=>setFiltersByView(current=>({...current,[view]:{...current[view],...change}}));
   const filterOptions=useMemo(()=>({
     departments:uniqueValues(source.map(task=>task.department)),
-    contacts:uniqueValues(source.map(task=>task.contact)),
+    contacts:uniqueValues(source.flatMap(task=>task.contacts?.length?task.contacts:[task.contact])),
     taskTypes:uniqueValues(source.map(task=>task.taskType)),
     statuses:[...new Set(source.map(task=>task.status))]
   }),[source]);

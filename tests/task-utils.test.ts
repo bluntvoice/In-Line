@@ -1,9 +1,10 @@
 import { describe,expect,it } from "vitest";
 import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,queueAheadMessage,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
+import { fitTextLines } from "../src/lib/ticket-image";
 import type { LegalTask } from "../src/types";
 
-const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
+const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
 
 describe("取号和人工顺位",()=>{
   it("当天显示两位号码",()=>expect(displayTicket({ticketDate:"2026-07-17",dailySequence:1},"2026-07-17")).toBe("01"));
@@ -33,7 +34,7 @@ describe("本地截止时间",()=>{
 
 describe("常用对接人",()=>{
   it("按使用频次选出三个联系人，同频时优先最近出现的人",()=>{
-    const contacts=["小林","小周","小林","小陈","小周","小吴"].map(contact=>({contact}));
+    const contacts=["小林","小周","小林","小陈","小周","小吴"].map(contact=>({contact,contacts:[contact]}));
     expect(commonContacts(contacts)).toEqual(["小周","小林","小吴"]);
   });
 });
@@ -42,7 +43,7 @@ describe("队列表头筛选",()=>{
   it("按部门、对接人、类型和状态组合筛选",()=>{
     const tasks=[
       {...task(1,1),department:"产品组",contact:"小林",taskType:"合同审查",status:"pending" as const},
-      {...task(2,2),department:"行政组",contact:"小周",taskType:"采购申请",status:"completed" as const}
+      {...task(2,2),department:"行政组",contact:"小周",contacts:["小周"],taskType:"采购申请",status:"completed" as const}
     ];
     const filters:TaskFilters={...EMPTY_TASK_FILTERS,departments:["产品组"],contacts:["小林"],taskTypes:["合同审查"],statuses:["pending"],deadlinePeriods:[]};
     expect(applyTaskFilters(tasks,filters).map(value=>value.id)).toEqual([1]);
@@ -63,5 +64,15 @@ describe("分享图排队提示",()=>{
   it("右下角只显示前方事项数而不是队列总数",()=>{
     expect(queueAheadMessage(0)).toBe("前面还有0个事项待处理，请耐心等待");
     expect(queueAheadMessage(2)).toBe("前面还有2个事项待处理，请耐心等待");
+  });
+});
+
+describe("分享图标题排版",()=>{
+  const measure=(value:string)=>value.length;
+  it("会继续填满第二行，而不是第二行首字后立即省略",()=>{
+    expect(fitTextLines("一二三四五六七八九十",5,2,measure)).toEqual({lines:["一二三四五","六七八九十"],truncated:false});
+  });
+  it("只有确实放不下时才在末尾添加省略号",()=>{
+    expect(fitTextLines("一二三四五六七八九十一",5,2,measure)).toEqual({lines:["一二三四五","六七八九…"],truncated:true});
   });
 });

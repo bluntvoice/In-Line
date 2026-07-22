@@ -3,6 +3,7 @@ import { displayTicket, formatDeadline, queueAheadMessage, STATUS_LABELS } from 
 
 const WIDTH = 800;
 const HEIGHT = 980;
+const PIXEL_RATIO = 2;
 const COLORS = { blue: "#0B3A82", ink: "#102A56", amber: "#FFB000", paper: "#F4F7FA", muted: "#526173", red: "#C43D4B", line: "#DFE6EF" };
 const UI_FONT = "'Microsoft YaHei UI','Microsoft YaHei','Segoe UI',sans-serif";
 
@@ -19,19 +20,37 @@ function pill(context: CanvasRenderingContext2D, text: string, right: number, y:
   context.fillText(text, x + width / 2, y + 23);
   context.textAlign = "left";
 }
+export function fitTextLines(text: string, maxWidth: number, maxLines: number, measure: (value: string) => number) {
+  const content = text.trim();
+  const lines: string[] = [];
+  let cursor = 0;
+  for (let lineIndex = 0; lineIndex < maxLines && cursor < content.length; lineIndex += 1) {
+    let line = "";
+    while (cursor < content.length) {
+      const next = line + content[cursor];
+      if (line && measure(next) > maxWidth) break;
+      line = next;
+      cursor += 1;
+      if (measure(line) > maxWidth) break;
+    }
+    if (lineIndex === maxLines - 1 && cursor < content.length) {
+      while (line && measure(`${line}…`) > maxWidth) line = line.slice(0, -1);
+      line = `${line}…`;
+    }
+    lines.push(line);
+  }
+  return { lines, truncated: cursor < content.length };
+}
 function fitLines(context: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines = 2) {
-  const lines: string[] = []; let line = "";
-  for (const char of text) {
-    const next = line + char;
-    if (line && context.measureText(next).width > maxWidth) { lines.push(line); line = char; if (lines.length === maxLines - 1) break; } else line = next;
+  return fitTextLines(text, maxWidth, maxLines, value => context.measureText(value).width);
+}
+function titleLayout(context: CanvasRenderingContext2D, title: string) {
+  for (let size = 40; size >= 28; size -= 2) {
+    context.font = `700 ${size}px ${UI_FONT}`;
+    const layout = fitLines(context, title, 668, 2);
+    if (!layout.truncated || size === 28) return { ...layout, size, lineHeight: Math.round(size * 1.3) };
   }
-  if (line && lines.length < maxLines) lines.push(line);
-  if (lines.join("").length < text.length) {
-    let last = lines.at(-1) ?? "";
-    while (last && context.measureText(last + "…").width > maxWidth) last = last.slice(0, -1);
-    lines[lines.length - 1] = last + "…";
-  }
-  return lines;
+  return { lines: [title], truncated: false, size: 28, lineHeight: 36 };
 }
 function ticketFontSize(context: CanvasRenderingContext2D, ticket: string) {
   let size = 196;
@@ -46,8 +65,11 @@ export interface TicketRgbaImage { rgba: Uint8Array; width: number; height: numb
 
 export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise<TicketRgbaImage> {
   await document.fonts.ready;
-  const canvas = document.createElement("canvas"); canvas.width = WIDTH; canvas.height = HEIGHT;
-  const context = canvas.getContext("2d"); if (!context) throw new Error("当前设备无法生成取号图片");
+  const canvas = document.createElement("canvas"); canvas.width = WIDTH * PIXEL_RATIO; canvas.height = HEIGHT * PIXEL_RATIO;
+  const context = canvas.getContext("2d", { alpha: false }); if (!context) throw new Error("当前设备无法生成取号图片");
+  context.scale(PIXEL_RATIO, PIXEL_RATIO);
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = "high";
   context.textBaseline = "middle";
   context.fillStyle = COLORS.paper; context.fillRect(0, 0, WIDTH, HEIGHT);
   rounded(context, 24, 24, 752, 932, 32, "#FFFFFF");
@@ -71,8 +93,9 @@ export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise
   context.fillStyle = COLORS.blue; context.fillText(aheadText, 400, 422);
 
   context.textAlign = "left";
-  context.font = `700 40px ${UI_FONT}`; context.fillStyle = COLORS.ink;
-  fitLines(context, task.title, 668, 2).forEach((line, index) => context.fillText(line, 66, 516 + index * 52));
+  const title = titleLayout(context, task.title);
+  context.font = `700 ${title.size}px ${UI_FONT}`; context.fillStyle = COLORS.ink;
+  title.lines.forEach((line, index) => context.fillText(line, 66, 516 + index * title.lineHeight));
 
   context.fillStyle = COLORS.line; context.fillRect(66, 620, 666, 1);
   const fields = [["部门 / 团队", task.department], ["对接人", task.contact], ["事项类型", task.taskType], ["要求完成", formatDeadline(task.requestedDeadline, task.requestedDeadlineLabel)]];
@@ -81,12 +104,12 @@ export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise
     const y = 674 + Math.floor(index / 2) * 116;
     context.font = `500 17px ${UI_FONT}`; context.fillStyle = COLORS.muted; context.fillText(label, x, y);
     context.font = `600 24px ${UI_FONT}`; context.fillStyle = COLORS.ink;
-    fitLines(context, value, 294, 2).forEach((line, lineIndex) => context.fillText(line, x, y + 38 + lineIndex * 31));
+    fitLines(context, value, 294, 2).lines.forEach((line, lineIndex) => context.fillText(line, x, y + 38 + lineIndex * 31));
   });
 
   context.font = "500 15px Consolas,monospace"; context.fillStyle = "#7B8797"; context.fillText(task.permanentNumber, 66, 920);
   context.font = `500 16px ${UI_FONT}`; context.textAlign = "right";
   context.fillText(queueAheadMessage(queueAhead), 732, 920);
-  const rgba = context.getImageData(0, 0, WIDTH, HEIGHT).data;
-  return { rgba: new Uint8Array(rgba), width: WIDTH, height: HEIGHT };
+  const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  return { rgba: new Uint8Array(rgba), width: canvas.width, height: canvas.height };
 }

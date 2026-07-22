@@ -1,4 +1,4 @@
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type Ref } from "react";
 
 interface Props {
@@ -8,12 +8,14 @@ interface Props {
   inputRef?: Ref<HTMLInputElement>;
   onChange: (value: string) => void;
   onDelete?: (value: string) => Promise<void> | void;
+  onMove?: (value: string, direction: "up" | "down") => Promise<void> | void;
 }
 
-export default function ComboInput({ value, options, placeholder, inputRef, onChange, onDelete }: Props) {
+export default function ComboInput({ value, options, placeholder, inputRef, onChange, onDelete, onMove }: Props) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState<string | null>(null);
   const [deleting, setDeleting] = useState("");
+  const [moving, setMoving] = useState("");
   const root = useRef<HTMLDivElement>(null);
   const listId = useId();
 
@@ -43,6 +45,15 @@ export default function ComboInput({ value, options, placeholder, inputRef, onCh
       setDeleting("");
     }
   };
+  const move = async (item: string, direction: "up" | "down") => {
+    if (!onMove || moving) return;
+    setMoving(item);
+    try {
+      await onMove(item, direction);
+    } finally {
+      setMoving("");
+    }
+  };
 
   return <div className="combo-input" ref={root}>
     <div className="combo-control">
@@ -60,6 +71,12 @@ export default function ComboInput({ value, options, placeholder, inputRef, onCh
         <button type="button" className="combo-select" onPointerDown={(event) => event.preventDefault()} onClick={() => { onChange(item); setFilter(null); setOpen(false); }}>
           <span>{item}</span>{item === value && <Check size={15} />}
         </button>
+        {onMove && <span className="combo-order-actions">
+          <button type="button" disabled={moving === item || options.indexOf(item) <= 0} title={`上移“${item}”`} aria-label={`上移“${item}”`}
+            onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.stopPropagation(); void move(item, "up"); }}><ChevronUp size={14} /></button>
+          <button type="button" disabled={moving === item || options.indexOf(item) === options.length - 1} title={`下移“${item}”`} aria-label={`下移“${item}”`}
+            onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.stopPropagation(); void move(item, "down"); }}><ChevronDown size={14} /></button>
+        </span>}
         {onDelete && <button type="button" className="combo-delete" disabled={deleting === item} title={`删除“${item}”`} aria-label={`删除“${item}”`}
           onPointerDown={(event) => event.preventDefault()} onClick={(event) => { event.stopPropagation(); void remove(item); }}><X size={14} /></button>}
       </div>)}

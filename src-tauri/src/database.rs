@@ -28,7 +28,7 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 3 {
+        if existed && Self::schema_version(&connection)? < 4 {
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
         }
@@ -119,7 +119,8 @@ impl Database {
                FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE);
              CREATE TABLE IF NOT EXISTS master_values(
                id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL, name TEXT NOT NULL,
-               sort_order INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1, UNIQUE(kind,name));
+               sort_order INTEGER NOT NULL DEFAULT 0, is_active INTEGER NOT NULL DEFAULT 1,
+               usage_count INTEGER NOT NULL DEFAULT 0, manual_order INTEGER, UNIQUE(kind,name));
              CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
              CREATE TABLE IF NOT EXISTS status_history(
                id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, old_status TEXT,
@@ -193,6 +194,50 @@ impl Database {
                 .execute("INSERT INTO schema_meta(version) VALUES(3)", [])
                 .map_err(display_error)?;
         }
+        if version < 4 {
+            let has_usage_count: i64 = transaction
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('master_values') WHERE name='usage_count'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if has_usage_count == 0 {
+                transaction
+                    .execute(
+                        "ALTER TABLE master_values ADD COLUMN usage_count INTEGER NOT NULL DEFAULT 0",
+                        [],
+                    )
+                    .map_err(display_error)?;
+            }
+            let has_manual_order: i64 = transaction
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('master_values') WHERE name='manual_order'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if has_manual_order == 0 {
+                transaction
+                    .execute(
+                        "ALTER TABLE master_values ADD COLUMN manual_order INTEGER",
+                        [],
+                    )
+                    .map_err(display_error)?;
+            }
+            transaction
+                .execute_batch(
+                    "UPDATE master_values SET usage_count=(
+                       SELECT count(*) FROM tasks
+                       WHERE (master_values.kind='department' AND trim(tasks.department)=master_values.name)
+                          OR (master_values.kind='task_type' AND trim(tasks.task_type)=master_values.name)
+                          OR (master_values.kind='contact' AND trim(tasks.contact)=master_values.name)
+                     );
+                     DELETE FROM schema_meta;
+                     INSERT INTO schema_meta(version) VALUES(4);",
+                )
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -216,13 +261,21 @@ impl Database {
                 transaction.execute("INSERT OR IGNORE INTO master_values(kind,name,sort_order) VALUES('task_type',?,?)", params![name, index]).map_err(display_error)?;
             }
         }
-        transaction
-            .execute(
-                "INSERT OR IGNORE INTO master_values(kind,name,sort_order,is_active)
-             SELECT 'contact',contact,999,1 FROM tasks WHERE trim(contact)<>''",
-                [],
-            )
-            .map_err(display_error)?;
+        let stored_contacts = {
+            let mut statement = transaction
+                .prepare("SELECT contact FROM tasks WHERE trim(contact)<>''")
+                .map_err(display_error)?;
+            statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?
+        };
+        for stored in stored_contacts {
+            for contact in parse_contacts(&stored) {
+                ensure_master(&transaction, "contact", &contact)?;
+            }
+        }
         transaction.commit().map_err(display_error)
     }
 
@@ -238,13 +291,16 @@ impl Database {
     }
 
     fn row_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<LegalTask> {
+        let stored_contact: String = row.get(5)?;
+        let contacts = parse_contacts(&stored_contact);
         Ok(LegalTask {
             id: row.get(0)?,
             permanent_number: row.get(1)?,
             daily_sequence: row.get(2)?,
             ticket_date: row.get(3)?,
             department: row.get(4)?,
-            contact: row.get(5)?,
+            contact: contacts.join("、"),
+            contacts,
             task_type: row.get(6)?,
             title: row.get(7)?,
             details: row.get(8)?,
@@ -307,10 +363,27 @@ fn today() -> String {
 fn display_error(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
+fn parse_contacts(stored: &str) -> Vec<String> {
+    let parsed =
+        serde_json::from_str::<Vec<String>>(stored).unwrap_or_else(|_| vec![stored.into()]);
+    let mut contacts = Vec::new();
+    for value in parsed {
+        let name = value.trim();
+        if !name.is_empty() && !contacts.iter().any(|existing| existing == name) {
+            contacts.push(name.to_string());
+        }
+    }
+    contacts
+}
+fn contact_storage(contacts: &[String]) -> Result<String, String> {
+    serde_json::to_string(contacts).map_err(display_error)
+}
 
 impl Database {
     pub fn save_task(&self, input: TaskInput) -> Result<LegalTask, String> {
         validate_task_input(&input)?;
+        let contacts = normalized_contacts(&input);
+        let stored_contacts = contact_storage(&contacts)?;
         let mut guard = self
             .connection
             .lock()
@@ -318,15 +391,22 @@ impl Database {
         let connection = guard.as_mut().ok_or("数据库尚未打开")?;
         let transaction = connection.transaction().map_err(display_error)?;
         let stamp = now();
-        let id = if let Some(id) = input.id {
-            let previous = get_task_on(&transaction, id)?;
+        let previous_task = input
+            .id
+            .map(|id| get_task_on(&transaction, id))
+            .transpose()?;
+        let id = if let Some(previous) = previous_task.as_ref() {
+            let id = previous.id;
             let started = if input.status == "processing" && previous.started_at.is_none() {
                 Some(stamp.clone())
             } else {
-                previous.started_at
+                previous.started_at.clone()
             };
             let completed = if input.status == "completed" {
-                previous.completed_at.or_else(|| Some(stamp.clone()))
+                previous
+                    .completed_at
+                    .clone()
+                    .or_else(|| Some(stamp.clone()))
             } else {
                 None
             };
@@ -334,7 +414,7 @@ impl Database {
                 "UPDATE tasks SET department=?,contact=?,task_type=?,title=?,details=?,status=?,priority=?,workload=?,
                  is_urgent=?,urgent_requester=?,urgent_reason=?,requested_deadline=?,requested_deadline_label=?,internal_notes=?,updated_at=?,
                  started_at=?,completed_at=? WHERE id=?",
-                params![input.department.trim(),input.contact.trim(),input.task_type.trim(),input.title.trim(),
+                params![input.department.trim(),&stored_contacts,input.task_type.trim(),input.title.trim(),
                 input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
                 input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,
                 input.internal_notes.trim(),stamp,started,completed,id]).map_err(display_error)?;
@@ -387,7 +467,7 @@ impl Database {
                  status,priority,workload,is_urgent,urgent_requester,urgent_reason,requested_deadline,requested_deadline_label,internal_notes,
                  created_at,updated_at,started_at,completed_at,custom_sort_order)
                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                params![permanent,sequence,date,input.department.trim(),input.contact.trim(),input.task_type.trim(),
+                params![permanent,sequence,date,input.department.trim(),&stored_contacts,input.task_type.trim(),
                 input.title.trim(),input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
                 input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,input.internal_notes.trim(),
                 stamp,stamp,if input.status=="processing"{Some(now())}else{None},if input.status=="completed"{Some(now())}else{None},order]
@@ -408,7 +488,30 @@ impl Database {
         };
         ensure_master(&transaction, "department", &input.department)?;
         ensure_master(&transaction, "task_type", &input.task_type)?;
-        ensure_master(&transaction, "contact", &input.contact)?;
+        let department_changed = previous_task
+            .as_ref()
+            .map(|previous| previous.department != input.department.trim())
+            .unwrap_or(true);
+        let task_type_changed = previous_task
+            .as_ref()
+            .map(|previous| previous.task_type != input.task_type.trim())
+            .unwrap_or(true);
+        if department_changed {
+            bump_master_use(&transaction, "department", &input.department)?;
+        }
+        if task_type_changed {
+            bump_master_use(&transaction, "task_type", &input.task_type)?;
+        }
+        for contact in contacts {
+            ensure_master(&transaction, "contact", &contact)?;
+            let is_new_contact = previous_task
+                .as_ref()
+                .map(|previous| !previous.contacts.contains(&contact))
+                .unwrap_or(true);
+            if is_new_contact {
+                bump_master_use(&transaction, "contact", &contact)?;
+            }
+        }
         transaction.commit().map_err(display_error)?;
         get_task_on(connection, id)
     }
@@ -617,6 +720,16 @@ fn ensure_master(connection: &Connection, kind: &str, name: &str) -> Result<(), 
         .map_err(display_error)?;
     Ok(())
 }
+fn bump_master_use(connection: &Connection, kind: &str, name: &str) -> Result<(), String> {
+    ensure_master(connection, kind, name)?;
+    connection
+        .execute(
+            "UPDATE master_values SET usage_count=usage_count+1 WHERE kind=? AND name=?",
+            params![kind, name.trim()],
+        )
+        .map_err(display_error)?;
+    Ok(())
+}
 
 impl Database {
     pub fn get_logs(&self, task_id: i64) -> Result<Vec<TaskLog>, String> {
@@ -668,7 +781,8 @@ impl Database {
     }
     pub fn masters(&self) -> Result<MasterData, String> {
         self.with_conn(|connection|{
-            let mut statement=connection.prepare("SELECT kind,name FROM master_values WHERE is_active=1 ORDER BY sort_order,name").map_err(display_error)?;
+            let mut statement=connection.prepare("SELECT kind,name FROM master_values WHERE is_active=1
+                ORDER BY kind,CASE WHEN manual_order IS NULL THEN 1 ELSE 0 END,manual_order,usage_count DESC,sort_order,name COLLATE NOCASE").map_err(display_error)?;
             let rows=statement.query_map([],|row|Ok((row.get::<_,String>(0)?,row.get::<_,String>(1)?))).map_err(display_error)?
                 .collect::<Result<Vec<_>,_>>().map_err(display_error)?;
             Ok(MasterData{departments:rows.iter().filter(|x|x.0=="department").map(|x|x.1.clone()).collect(),
@@ -700,6 +814,52 @@ impl Database {
                     params![kind, name.trim()],
                 )
                 .map_err(display_error)?;
+            Ok(())
+        })?;
+        self.masters()
+    }
+    pub fn move_master(
+        &self,
+        kind: String,
+        name: String,
+        direction: MoveDirection,
+    ) -> Result<MasterData, String> {
+        if kind != "department" && kind != "task_type" {
+            return Err("仅部门 / 团队和事项类型支持手动排序".into());
+        }
+        if name.trim().is_empty() || name.chars().count() > 100 {
+            return Err("选项名称无效".into());
+        }
+        self.with_transaction(|transaction| {
+            let mut statement = transaction
+                .prepare("SELECT name FROM master_values WHERE kind=? AND is_active=1
+                    ORDER BY CASE WHEN manual_order IS NULL THEN 1 ELSE 0 END,manual_order,usage_count DESC,sort_order,name COLLATE NOCASE")
+                .map_err(display_error)?;
+            let mut names = statement
+                .query_map([&kind], |row| row.get::<_, String>(0))
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            drop(statement);
+            let Some(index) = names.iter().position(|value| value == name.trim()) else {
+                return Err("选项不存在或已删除".into());
+            };
+            let target = match direction {
+                MoveDirection::Up if index > 0 => Some(index - 1),
+                MoveDirection::Down if index + 1 < names.len() => Some(index + 1),
+                _ => None,
+            };
+            if let Some(target) = target {
+                names.swap(index, target);
+                for (order, value) in names.iter().enumerate() {
+                    transaction
+                        .execute(
+                            "UPDATE master_values SET manual_order=? WHERE kind=? AND name=?",
+                            params![order as i64 + 1, &kind, value],
+                        )
+                        .map_err(display_error)?;
+                }
+            }
             Ok(())
         })?;
         self.masters()
@@ -951,6 +1111,7 @@ mod tests {
             id: None,
             department: "产品组".into(),
             contact: "小林".into(),
+            contacts: vec!["小林".into()],
             task_type: "任务处理".into(),
             title: title.into(),
             details: "测试事项".into(),
@@ -1024,6 +1185,39 @@ mod tests {
         assert!(backup.name.starts_with("InLine-backup-"));
         assert!(backup.name.ends_with("-manual.db"));
         db.delete_backup(backup.path).unwrap();
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn contacts_and_master_sorting_are_persistent() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-master-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let mut low = sample("低频部门事项");
+        low.department = "低频组".into();
+        low.contact = "小林、小周".into();
+        low.contacts = vec!["小林".into(), "小周".into()];
+        let saved = db.save_task(low).unwrap();
+        assert_eq!(saved.contacts, vec!["小林", "小周"]);
+        assert_eq!(saved.contact, "小林、小周");
+
+        for title in ["高频一", "高频二"] {
+            let mut high = sample(title);
+            high.department = "高频组".into();
+            db.save_task(high).unwrap();
+        }
+        let masters = db.masters().unwrap();
+        assert_eq!(&masters.departments[..2], &["高频组", "低频组"]);
+        assert!(masters.contacts.contains(&"小周".to_string()));
+
+        let moved = db
+            .move_master("department".into(), "低频组".into(), MoveDirection::Up)
+            .unwrap();
+        assert_eq!(&moved.departments[..2], &["低频组", "高频组"]);
         drop(db);
         let _ = fs::remove_dir_all(root);
     }

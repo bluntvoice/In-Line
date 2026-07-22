@@ -33,6 +33,7 @@ export const api={
   deleteLog:(logId:number)=>invoke<void>("delete_log",{logId}),
   addMaster:(kind:"department"|"task_type"|"contact",name:string)=>invoke<MasterData>("add_master",{kind,name}),
   deleteMaster:(kind:"department"|"task_type"|"contact",name:string)=>invoke<MasterData>("delete_master",{kind,name}),
+  moveMaster:(kind:"department"|"task_type",name:string,direction:MoveDirection)=>invoke<MasterData>("move_master",{kind,name,direction}),
   listBackups:()=>invoke<BackupInfo[]>("list_backups"),
   createBackup:()=>invoke<BackupInfo>("create_backup"),
   restoreBackup:(path:string)=>invoke<void>("restore_backup",{path}),

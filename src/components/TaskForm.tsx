@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import { AlertTriangle, Check, X } from "lucide-react";
 import type { LegalTask, MasterData, Priority, TaskInput, TaskStatus, Workload } from "../types";
 import { api } from "../api";
 import ComboInput from "./ComboInput";
 import DeadlinePicker from "./DeadlinePicker";
+import MultiContactInput from "./MultiContactInput";
 
 interface Props {
   task: LegalTask | null;
@@ -18,6 +19,7 @@ type MasterKind = "department" | "task_type" | "contact";
 const emptyTask: TaskInput = {
   department: "",
   contact: "",
+  contacts: [],
   taskType: "任务处理",
   title: "",
   details: "",
@@ -38,6 +40,7 @@ function toInput(task: LegalTask | null): TaskInput {
     id: task.id,
     department: task.department,
     contact: task.contact,
+    contacts: task.contacts?.length ? task.contacts : [task.contact].filter(Boolean),
     taskType: task.taskType,
     title: task.title,
     details: task.details,
@@ -58,9 +61,6 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
   const [localMasters, setLocalMasters] = useState(masters);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const firstInput = useRef<HTMLInputElement>(null);
-
-  useEffect(() => firstInput.current?.focus(), []);
   useEffect(() => setLocalMasters(masters), [masters]);
   const title = task ? `编辑 ${task.permanentNumber}` : "新增取号";
   const quickContacts = useMemo(() => [...new Set(commonContacts)].slice(0, 3), [commonContacts]);
@@ -72,6 +72,14 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
     setError("");
     try {
       setLocalMasters(await api.deleteMaster(kind, name));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    }
+  };
+  const moveMaster = async (kind: "department" | "task_type", name: string, direction: "up" | "down") => {
+    setError("");
+    try {
+      setLocalMasters(await api.moveMaster(kind, name, direction));
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     }
@@ -112,16 +120,17 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
           <div className="form-grid">
             <label>
               <span>部门 / 团队 *</span>
-              <ComboInput inputRef={firstInput} value={form.department} options={localMasters.departments} onChange={(value) => update("department", value)} onDelete={(value) => removeMaster("department", value)} placeholder="输入或选择部门 / 团队" />
+              <ComboInput value={form.department} options={localMasters.departments} onChange={(value) => update("department", value)} onDelete={(value) => removeMaster("department", value)} onMove={(value, direction) => moveMaster("department", value, direction)} placeholder="输入或选择部门 / 团队" />
             </label>
             <label>
               <span>对接人 *</span>
-              <ComboInput value={form.contact} options={localMasters.contacts} onChange={(value) => update("contact", value)} onDelete={(value) => removeMaster("contact", value)} placeholder="输入或选择对接人" />
-              {quickContacts.length > 0 && <span className="recent-contacts">{quickContacts.map((name) => <button type="button" key={name} onClick={() => update("contact", name)}>{name}</button>)}</span>}
+              <MultiContactInput values={form.contacts} options={localMasters.contacts} commonContacts={quickContacts}
+                onChange={(contacts) => setForm(current => ({ ...current, contacts, contact: contacts.join("、") }))}
+                onDelete={(value) => removeMaster("contact", value)} />
             </label>
             <label className="paired-control-field">
               <span>事项类型 *</span>
-              <ComboInput value={form.taskType} options={localMasters.taskTypes} onChange={(value) => update("taskType", value)} onDelete={(value) => removeMaster("task_type", value)} placeholder="输入或选择事项类型" />
+              <ComboInput value={form.taskType} options={localMasters.taskTypes} onChange={(value) => update("taskType", value)} onDelete={(value) => removeMaster("task_type", value)} onMove={(value, direction) => moveMaster("task_type", value, direction)} placeholder="输入或选择事项类型" />
             </label>
             <label className="paired-control-field">
               <span>要求完成时间</span>
