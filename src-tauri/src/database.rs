@@ -265,11 +265,12 @@ impl Database {
             let mut statement = transaction
                 .prepare("SELECT contact FROM tasks WHERE trim(contact)<>''")
                 .map_err(display_error)?;
-            statement
+            let values = statement
                 .query_map([], |row| row.get::<_, String>(0))
                 .map_err(display_error)?
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(display_error)?
+                .map_err(display_error)?;
+            values
         };
         for stored in stored_contacts {
             for contact in parse_contacts(&stored) {
