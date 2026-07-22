@@ -1,7 +1,7 @@
 import { describe,expect,it } from "vitest";
 import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,queueAheadMessage,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
-import { fitTextLines } from "../src/lib/ticket-image";
+import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import type { LegalTask } from "../src/types";
 
 const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
@@ -74,5 +74,14 @@ describe("分享图标题排版",()=>{
   });
   it("只有确实放不下时才在末尾添加省略号",()=>{
     expect(fitTextLines("一二三四五六七八九十一",5,2,measure)).toEqual({lines:["一二三四五","六七八九…"],truncated:true});
+  });
+});
+
+describe("分享图缓存",()=>{
+  it("相同内容复用缓存，队列位置或可见字段变化时自动失效",()=>{
+    const original=task(1,1);
+    expect(ticketRenderKey(original,2)).toBe(ticketRenderKey({...original},2));
+    expect(ticketRenderKey(original,2)).not.toBe(ticketRenderKey(original,1));
+    expect(ticketRenderKey(original,2)).not.toBe(ticketRenderKey({...original,title:"更新后的事项"},2));
   });
 });

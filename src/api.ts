@@ -5,7 +5,15 @@ import { Image } from "@tauri-apps/api/image";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TicketSnapshot } from "./types";
-import { renderTicketRgba } from "./lib/ticket-image";
+import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
+
+let pngImageSupported=true;
+
+if(typeof window!=="undefined"){
+  const warmup=()=>{void warmTicketRenderer().catch(()=>undefined);};
+  if("requestIdleCallback" in window)window.requestIdleCallback(warmup,{timeout:1500});
+  else globalThis.setTimeout(warmup,0);
+}
 
 const withTimeout=<T>(request:Promise<T>,label:string,timeoutMs=12000)=>new Promise<T>((resolve,reject)=>{
   const timer=window.setTimeout(()=>reject(new Error(`${label}超时，请重新载入；如仍失败，请确认旧版程序已退出。`)),timeoutMs);
@@ -72,8 +80,19 @@ export const api={
   copyTicketImage:async(taskOrId:LegalTask|number)=>{
     const id=typeof taskOrId==="number"?taskOrId:taskOrId.id;
     const snapshot=await invoke<TicketSnapshot>("ticket_snapshot",{id});
-    const rendered=await renderTicketRgba(snapshot.task,snapshot.queueAhead);
-    const image=await Image.new(rendered.rgba,rendered.width,rendered.height);
+    let image:Image;
+    if(pngImageSupported){
+      try{
+        image=await Image.fromBytes(await renderTicketPng(snapshot.task,snapshot.queueAhead));
+      }catch{
+        pngImageSupported=false;
+        const rendered=await renderTicketRgba(snapshot.task,snapshot.queueAhead);
+        image=await Image.new(rendered.rgba,rendered.width,rendered.height);
+      }
+    }else{
+      const rendered=await renderTicketRgba(snapshot.task,snapshot.queueAhead);
+      image=await Image.new(rendered.rgba,rendered.width,rendered.height);
+    }
     try{
       await writeImage(image);
     }finally{

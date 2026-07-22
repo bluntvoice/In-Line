@@ -63,11 +63,47 @@ function ticketFontSize(context: CanvasRenderingContext2D, ticket: string) {
 }
 export interface TicketRgbaImage { rgba: Uint8Array; width: number; height: number }
 
-export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise<TicketRgbaImage> {
-  await document.fonts.ready;
-  const canvas = document.createElement("canvas"); canvas.width = WIDTH * PIXEL_RATIO; canvas.height = HEIGHT * PIXEL_RATIO;
-  const context = canvas.getContext("2d", { alpha: false }); if (!context) throw new Error("当前设备无法生成取号图片");
-  context.scale(PIXEL_RATIO, PIXEL_RATIO);
+interface TicketRenderer { canvas: HTMLCanvasElement; context: CanvasRenderingContext2D }
+
+const PNG_CACHE_LIMIT = 8;
+const pngCache = new Map<string, Promise<Uint8Array>>();
+let renderer: TicketRenderer | undefined;
+let fontsReady: Promise<unknown> | undefined;
+let renderQueue: Promise<void> = Promise.resolve();
+
+function getRenderer(): TicketRenderer {
+  if (renderer) return renderer;
+  const canvas = document.createElement("canvas");
+  canvas.width = WIDTH * PIXEL_RATIO;
+  canvas.height = HEIGHT * PIXEL_RATIO;
+  const context = canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  if (!context) throw new Error("当前设备无法生成取号图片");
+  renderer = { canvas, context };
+  return renderer;
+}
+
+function waitForFonts() {
+  fontsReady ??= document.fonts.ready;
+  return fontsReady;
+}
+
+function enqueueRender<T>(job: () => Promise<T> | T): Promise<T> {
+  const result = renderQueue.then(job, job);
+  renderQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+export function ticketRenderKey(task: LegalTask, queueAhead = 0) {
+  return JSON.stringify([
+    displayTicket(task), task.title, task.status, task.department, task.contact,
+    task.taskType, task.requestedDeadline, task.requestedDeadlineLabel,
+    task.permanentNumber, task.isUrgent, task.priority, queueAhead
+  ]);
+}
+
+function drawTicket(task: LegalTask, queueAhead: number): TicketRenderer {
+  const { canvas, context } = getRenderer();
+  context.setTransform(PIXEL_RATIO, 0, 0, PIXEL_RATIO, 0, 0);
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.textBaseline = "middle";
@@ -110,6 +146,58 @@ export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise
   context.font = "500 15px Consolas,monospace"; context.fillStyle = "#7B8797"; context.fillText(task.permanentNumber, 66, 920);
   context.font = `500 16px ${UI_FONT}`; context.textAlign = "right";
   context.fillText(queueAheadMessage(queueAhead), 732, 920);
+  return { canvas, context };
+}
+
+function canvasToPng(canvas: HTMLCanvasElement) {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    canvas.toBlob(async blob => {
+      if (!blob) {
+        reject(new Error("当前设备无法压缩取号图片"));
+        return;
+      }
+      resolve(new Uint8Array(await blob.arrayBuffer()));
+    }, "image/png");
+  });
+}
+
+export async function warmTicketRenderer() {
+  getRenderer();
+  await waitForFonts();
+}
+
+export function renderTicketPng(task: LegalTask, queueAhead = 0): Promise<Uint8Array> {
+  const key = ticketRenderKey(task, queueAhead);
+  const cached = pngCache.get(key);
+  if (cached) {
+    pngCache.delete(key);
+    pngCache.set(key, cached);
+    return cached;
+  }
+
+  const rendered = enqueueRender(async () => {
+    await waitForFonts();
+    const { canvas } = drawTicket(task, queueAhead);
+    return canvasToPng(canvas);
+  });
+  pngCache.set(key, rendered);
+  if (pngCache.size > PNG_CACHE_LIMIT) {
+    const oldestKey = pngCache.keys().next().value as string | undefined;
+    if (oldestKey) pngCache.delete(oldestKey);
+  }
+  void rendered.catch(() => pngCache.delete(key));
+  return rendered;
+}
+
+export async function renderTicketRgba(task: LegalTask, queueAhead = 0): Promise<TicketRgbaImage> {
+  return enqueueRender(async () => {
+    await waitForFonts();
+    const { canvas, context } = drawTicket(task, queueAhead);
   const rgba = context.getImageData(0, 0, canvas.width, canvas.height).data;
-  return { rgba: new Uint8Array(rgba), width: canvas.width, height: canvas.height };
+    return {
+      rgba: new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength),
+      width: canvas.width,
+      height: canvas.height
+    };
+  });
 }
