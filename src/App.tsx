@@ -1,8 +1,8 @@
 import { useEffect,useMemo,useState } from "react";
-import { Archive,ArrowDown,ArrowUp,Copy,Inbox,Info,Plus,Search,Settings,Trash2,X } from "lucide-react";
+import { Archive,ArrowDown,ArrowUp,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
-import { commonContacts,displayTicket,formatDeadline,isOverdue } from "./lib/task-utils";
+import { commonContacts,displayTicket,formatDeadline,isDeferredStatus,isOverdue,sortQueue } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
@@ -16,11 +16,12 @@ import { STATUS_LABELS } from "./lib/task-utils";
 
 const emptyMasters:MasterData={departments:[],taskTypes:[],contacts:[]};
 type MenuState={task:LegalTask;x:number;y:number}|null;
+type PageView=TaskView|"deferred";
 const newFilters=():TaskFilters=>({...EMPTY_TASK_FILTERS,deadlinePeriods:[]});
 
 export default function App(){
   const [data,setData]=useState<BootstrapData|null>(null);
-  const [view,setView]=useState<TaskView>("queue");
+  const [view,setView]=useState<PageView>("queue");
   const [query,setQuery]=useState("");
   const [selected,setSelected]=useState<LegalTask|null>(null);
   const [editing,setEditing]=useState<LegalTask|null|undefined>(undefined);
@@ -30,7 +31,7 @@ export default function App(){
   const [message,setMessage]=useState("");
   const [startupError,setStartupError]=useState("");
   const [version,setVersion]=useState("");
-  const [filtersByView,setFiltersByView]=useState<Record<TaskView,TaskFilters>>({queue:newFilters(),archive:newFilters(),trash:newFilters()});
+  const [filtersByView,setFiltersByView]=useState<Record<PageView,TaskFilters>>({queue:newFilters(),deferred:newFilters(),archive:newFilters(),trash:newFilters()});
 
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),2300);};
   const refresh=async()=>{
@@ -57,7 +58,12 @@ export default function App(){
     return()=>{offData();offNew();offTaskUi();};
   },[]);
 
-  const source=data?.[view]??[];
+  const source=useMemo(()=>{
+    if(!data)return[];
+    if(view==="queue")return sortQueue(data.queue);
+    if(view==="deferred")return sortQueue(data.queue.filter(task=>isDeferredStatus(task.status)));
+    return data[view];
+  },[data,view]);
   const filters=filtersByView[view];
   const updateFilters=(change:Partial<TaskFilters>)=>setFiltersByView(current=>({...current,[view]:{...current[view],...change}}));
   const filterOptions=useMemo(()=>({
@@ -97,16 +103,21 @@ export default function App(){
   </div>;
   const urgent=data.queue.filter(task=>task.isUrgent).length;
   const overdue=data.queue.filter(task=>isOverdue(task)).length;
+  const deferred=data.queue.filter(task=>isDeferredStatus(task.status));
+  const deferredOverdue=deferred.filter(task=>isOverdue(task)).length;
   const frequentContacts=commonContacts([...data.queue,...data.archive].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt)));
+  const actionView:TaskView=view==="deferred"?"queue":view;
+  const openView=(next:PageView)=>{setSettings(false);setAbout(false);setSelected(null);setView(next);};
 
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><img src="/inline-mark.svg"/><div><strong>In Line</strong><span>排着呢</span></div></div>
       <button className="new-ticket" onClick={()=>setEditing(null)}><Plus size={18}/>新增取号</button>
       <nav>
-        <button className={!settings&&!about&&view==="queue"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("queue");}}><Inbox size={18}/><span>待办队列</span><b>{data.queue.length}</b></button>
-        <button className={!settings&&!about&&view==="archive"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("archive");}}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
-        <button className={!settings&&!about&&view==="trash"?"active":""} onClick={()=>{setSettings(false);setAbout(false);setView("trash");}}><Trash2 size={18}/><span>回收站</span><b>{data.trash.length}</b></button>
+        <button className={!settings&&!about&&view==="queue"?"active":""} onClick={()=>openView("queue")}><Inbox size={18}/><span>待办队列</span><b>{data.queue.length}</b></button>
+        <button className={!settings&&!about&&view==="deferred"?"active":""} onClick={()=>openView("deferred")}><PauseCircle size={18}/><span>暂缓事项</span><span className="nav-counts"><b>{deferred.length}</b>{deferredOverdue>0&&<em title={`${deferredOverdue} 项已逾期`}><ClockAlert size={12}/>{deferredOverdue}</em>}</span></button>
+        <button className={!settings&&!about&&view==="archive"?"active":""} onClick={()=>openView("archive")}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
+        <button className={!settings&&!about&&view==="trash"?"active":""} onClick={()=>openView("trash")}><Trash2 size={18}/><span>回收站</span><b>{data.trash.length}</b></button>
       </nav>
       <div className="sidebar-summary"><div><span>加急</span><b>{urgent}</b></div><div><span>逾期</span><b>{overdue}</b></div></div>
       <button className={settings?"settings-button active":"settings-button"} onClick={()=>{setSettings(true);setAbout(false);}}><Settings size={18}/>系统设置</button>
@@ -115,7 +126,7 @@ export default function App(){
     </aside>
     <main className="workspace">
       {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} onChanged={()=>void refresh()} notify={toast}/>:<>
-        <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="archive"?"历史归档":"回收站"}</h1></div>
+        <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="deferred"?"暂缓事项":view==="archive"?"历史归档":"回收站"}</h1></div>
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>
         <div className={selected?"queue-layout with-detail":"queue-layout"}>
@@ -126,23 +137,23 @@ export default function App(){
               <th><ValueFilterHeader label="事项类型" values={filterOptions.taskTypes} selected={filters.taskTypes} onChange={taskTypes=>updateFilters({taskTypes})}/></th>
               <th><ValueFilterHeader label="当前状态" values={filterOptions.statuses} selected={filters.statuses} renderLabel={status=>STATUS_LABELS[status]} onChange={statuses=>updateFilters({statuses})}/></th>
               <th><DeadlineFilterHeader date={filters.deadlineDate} periods={filters.deadlinePeriods} onChange={(deadlineDate,deadlinePeriods)=>updateFilters({deadlineDate,deadlinePeriods})}/></th><th>操作</th></tr></thead>
-              <tbody>{tasks.map((task,index)=><tr key={task.id} tabIndex={0} onClick={()=>void copy(task)} onDoubleClick={event=>{event.preventDefault();setSelected(task);}} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
+              <tbody>{tasks.map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=actionView==="queue"&&index>0&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=actionView==="queue"&&index<tasks.length-1&&isOverdue(tasks[index+1])===taskOverdue;return <tr key={task.id} className={taskOverdue?"overdue-row":undefined} tabIndex={0} onClick={()=>void copy(task)} onDoubleClick={event=>{event.preventDefault();setSelected(task);}} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
                 <td><TicketNumber task={task}/></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}</td>
-                <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={isOverdue(task)}/></td>
-                <td className={isOverdue(task)?"deadline overdue":"deadline"}>{formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
+                <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={taskOverdue}/></td>
+                <td className={taskOverdue?"deadline overdue":"deadline"}>{formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
                 <td><div className="row-actions"><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制取号图片"><Copy size={17}/></button>
-                  <button disabled={view!=="queue"||index===0} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={17}/></button>
-                  <button disabled={view!=="queue"||index===tasks.length-1} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={17}/></button></div></td>
-              </tr>)}</tbody></table>
-              {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query||activeFilterCount(filters)>0?"没有匹配事项":"目前没有排队事项"}</h2><p>{query||activeFilterCount(filters)>0?"请调整关键词或列筛选条件。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
+                  <button disabled={!canMoveUp} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={17}/></button>
+                  <button disabled={!canMoveDown} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={17}/></button></div></td>
+              </tr>})}</tbody></table>
+              {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query||activeFilterCount(filters)>0?"没有匹配事项":view==="deferred"?"目前没有暂缓事项":"目前没有排队事项"}</h2><p>{query||activeFilterCount(filters)>0?"请调整关键词或列筛选条件。":view==="deferred"?"待补充材料、待内部确认和已暂停事项会显示在这里。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
             </div>
           </section>
-          {selected&&<TaskDetail task={selected} view={view} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}}/>}
+          {selected&&<TaskDetail task={selected} view={actionView} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}}/>}
         </div>
       </>}
     </main>
     {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} commonContacts={frequentContacts} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
-    {menu&&<TaskContextMenu {...menu} view={view} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
+    {menu&&<TaskContextMenu {...menu} view={actionView} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
     {message&&<div className="toast">{message}</div>}
   </div>;
 }

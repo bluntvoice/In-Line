@@ -2,7 +2,7 @@ import { useEffect,useState } from "react";
 import { Archive,Check,Edit3,Pencil,RotateCcw,Trash2,X } from "lucide-react";
 import type { LegalTask,TaskLog,TaskStatus,TaskView } from "../types";
 import { api } from "../api";
-import { formatDateTime,formatDeadline,PRIORITY_LABELS,STATUS_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
+import { formatDateTime,formatDeadline,isOverdue,PRIORITY_LABELS,STATUS_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
 import StatusBadge from "./StatusBadge";
 import TicketNumber from "./TicketNumber";
 
@@ -25,7 +25,7 @@ export default function TaskDetail({task,view,onClose,onEdit,onChanged}:{task:Le
       </>}
     </div>
     <dl className="detail-grid">
-      <div><dt>状态</dt><dd><StatusBadge status={task.status}/></dd></div><div><dt>优先级</dt><dd>{PRIORITY_LABELS[task.priority]}</dd></div>
+      <div><dt>状态</dt><dd><StatusBadge status={task.status} overdue={isOverdue(task)}/></dd></div><div><dt>优先级</dt><dd>{PRIORITY_LABELS[task.priority]}</dd></div>
       <div><dt>部门 / 团队</dt><dd>{task.department}</dd></div><div><dt>对接人</dt><dd>{task.contact}</dd></div>
       <div><dt>事项类型</dt><dd>{task.taskType}</dd></div><div><dt>预计工作量</dt><dd>{WORKLOAD_LABELS[task.workload]}</dd></div>
       <div><dt>截止时间</dt><dd>{formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</dd></div><div><dt>永久编号</dt><dd>{task.permanentNumber}</dd></div>

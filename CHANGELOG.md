@@ -4,6 +4,23 @@
 
 ## [Unreleased]
 
+## [0.0.9] - 2026-07-29
+
+### Added
+
+- 左侧边栏新增“暂缓事项”入口，集中显示待补充材料、待内部确认和已暂停三类事项，并展示其中的逾期数量。
+
+### Changed
+
+- 已逾期事项在待办队列、暂缓事项和悬浮窗中优先显示；同一逾期分组内仍按人工顺位排列。
+- 状态列同时保留事项真实状态和红色“已逾期”标识，逾期行增加轻量红色提示，不再用逾期文字覆盖原状态。
+- 分享图状态胶囊会同时显示逾期与当前状态，前方事项数量按最新逾期优先队列计算。
+- 上移、下移操作限定在相同逾期分组内，避免普通事项通过人工移动越过逾期优先级。
+
+### Fixed
+
+- 修复主界面、悬浮窗与分享图可能使用不同排队顺序的问题。
+
 ## [0.0.8] - 2026-07-22
 
 ### Added
@@ -148,7 +165,8 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.8...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.9...HEAD
+[0.0.9]: https://github.com/bluntvoice/in-line/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/bluntvoice/in-line/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/bluntvoice/in-line/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/bluntvoice/in-line/compare/v0.0.5...v0.0.6

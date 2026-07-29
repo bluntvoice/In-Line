@@ -1,5 +1,5 @@
 import type { LegalTask } from "../types";
-import { displayTicket, formatDeadline, queueAheadMessage, STATUS_LABELS } from "./task-utils";
+import { displayTicket, formatDeadline, isOverdue, queueAheadMessage, STATUS_LABELS } from "./task-utils";
 
 const WIDTH = 800;
 const HEIGHT = 980;
@@ -97,7 +97,7 @@ export function ticketRenderKey(task: LegalTask, queueAhead = 0) {
   return JSON.stringify([
     displayTicket(task), task.title, task.status, task.department, task.contact,
     task.taskType, task.requestedDeadline, task.requestedDeadlineLabel,
-    task.permanentNumber, task.isUrgent, task.priority, queueAhead
+    task.permanentNumber, task.isUrgent, task.priority, isOverdue(task), queueAhead
   ]);
 }
 
@@ -113,8 +113,10 @@ function drawTicket(task: LegalTask, queueAhead: number): TicketRenderer {
 
   context.font = `700 27px ${UI_FONT}`; context.fillStyle = COLORS.ink; context.fillText("IN LINE", 66, 72);
   context.font = `500 18px ${UI_FONT}`; context.fillStyle = COLORS.muted; context.fillText("事项已登记", 66, 110);
-  const alert = task.isUrgent || task.priority === "critical";
-  pill(context, alert ? `加急 · ${STATUS_LABELS[task.status]}` : STATUS_LABELS[task.status], 732, 52, alert ? COLORS.red : COLORS.blue);
+  const overdue = isOverdue(task);
+  const alert = task.isUrgent || task.priority === "critical" || overdue;
+  const pillText = overdue ? `已逾期 · ${STATUS_LABELS[task.status]}` : alert ? `加急 · ${STATUS_LABELS[task.status]}` : STATUS_LABELS[task.status];
+  pill(context, pillText, 732, 52, alert ? COLORS.red : COLORS.blue);
 
   const ticket = displayTicket(task);
   const numberSize = ticketFontSize(context, ticket);

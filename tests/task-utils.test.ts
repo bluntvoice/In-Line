@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,queueAheadMessage,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,isDeferredStatus,queueAheadMessage,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import type { LegalTask } from "../src/types";
@@ -11,6 +11,17 @@ describe("取号和人工顺位",()=>{
   it("跨天增加字母前缀",()=>{expect(displayTicket({ticketDate:"2026-07-16",dailySequence:3},"2026-07-17")).toBe("A03");expect(alphaPrefix(27)).toBe("AA");});
   it("系统时间倒退不产生负天数",()=>expect(dayDifference("2026-07-17","2026-07-16")).toBe(0));
   it("加急不覆盖人工顺位",()=>{const first={...task(1,2),isUrgent:true,priority:"critical" as const};const second=task(2,1);expect(sortQueue([first,second]).map(value=>value.id)).toEqual([2,1]);});
+  it("已逾期事项优先显示，同组内仍保持人工顺位",()=>{
+    const now=new Date("2026-07-18T08:00:00.000Z");
+    const regular=task(1,1);
+    const overdue={...task(2,2),status:"waiting_materials" as const,requestedDeadline:"2026-07-17T08:00:00.000Z"};
+    const overdueLater={...task(3,3),status:"paused" as const,requestedDeadline:"2026-07-17T09:00:00.000Z"};
+    expect(sortQueue([regular,overdueLater,overdue],now).map(value=>value.id)).toEqual([2,3,1]);
+  });
+  it("暂缓事项包含待补材料、待内部确认和已暂停",()=>{
+    expect(["waiting_materials","waiting_confirmation","paused"].every(status=>isDeferredStatus(status as LegalTask["status"]))).toBe(true);
+    expect(isDeferredStatus("processing")).toBe(false);
+  });
 });
 
 describe("本地截止时间",()=>{

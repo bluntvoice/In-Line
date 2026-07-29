@@ -9,6 +9,7 @@ use std::{
 };
 
 const SELECT_TASK: &str = "SELECT id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order, requested_deadline_label FROM tasks";
+const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
 pub struct Database {
     path: PathBuf,
@@ -331,7 +332,7 @@ impl Database {
                 TaskView::Archive => "deleted_at IS NULL AND (archived_at IS NOT NULL OR status IN ('completed','cancelled','archived'))",
                 TaskView::Trash => "deleted_at IS NOT NULL",
             };
-            let order = if matches!(view, TaskView::Queue) { "custom_sort_order ASC,id ASC" } else { "updated_at DESC" };
+            let order = if matches!(view, TaskView::Queue) { format!("{OVERDUE_RANK_SQL} ASC,custom_sort_order ASC,id ASC") } else { "updated_at DESC".into() };
             let mut statement = connection.prepare(&format!("{SELECT_TASK} WHERE {condition} ORDER BY {order}")).map_err(display_error)?;
             let rows=statement.query_map([], Self::row_task).map_err(display_error)?.collect::<Result<Vec<_>,_>>().map_err(display_error);
             rows
@@ -353,6 +354,30 @@ fn get_task_on(connection: &Connection, id: i64) -> Result<LegalTask, String> {
         .optional()
         .map_err(display_error)?
         .ok_or("事项不存在或已被移除".into())
+}
+
+fn queue_ahead_on(connection: &Connection, id: i64) -> Result<i64, String> {
+    connection
+        .query_row(
+            "WITH target AS (
+                 SELECT id AS target_id,custom_sort_order AS target_order,
+                        CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END AS target_rank
+                 FROM tasks WHERE id=?
+             )
+             SELECT count(*) FROM tasks,target
+             WHERE deleted_at IS NULL AND archived_at IS NULL
+               AND status NOT IN ('completed','cancelled','archived')
+               AND (
+                 CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END < target_rank
+                 OR (
+                   CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END = target_rank
+                   AND (custom_sort_order < target_order OR (custom_sort_order = target_order AND id < target_id))
+                 )
+               )",
+            [id],
+            |row| row.get(0),
+        )
+        .map_err(display_error)
 }
 
 fn now() -> String {
@@ -571,9 +596,11 @@ impl Database {
             let comparison = if matches!(direction,MoveDirection::Up){"<"}else{">"};
             let order = if matches!(direction,MoveDirection::Up){"DESC"}else{"ASC"};
             let sql = format!("SELECT id,custom_sort_order FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
-                AND status NOT IN ('completed','cancelled','archived') AND custom_sort_order {comparison} ?
+                AND status NOT IN ('completed','cancelled','archived')
+                AND {OVERDUE_RANK_SQL}=(SELECT CASE WHEN target.requested_deadline IS NOT NULL AND strftime('%s',target.requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END FROM tasks target WHERE target.id=?)
+                AND custom_sort_order {comparison} ?
                 ORDER BY custom_sort_order {order},id {order} LIMIT 1");
-            let adjacent: Option<(i64,i64)> = transaction.query_row(&sql,[task.custom_sort_order],|row|Ok((row.get(0)?,row.get(1)?)))
+            let adjacent: Option<(i64,i64)> = transaction.query_row(&sql,params![id,task.custom_sort_order],|row|Ok((row.get(0)?,row.get(1)?)))
                 .optional().map_err(display_error)?;
             if let Some((other_id,other_order))=adjacent {
                 transaction.execute("UPDATE tasks SET custom_sort_order=? WHERE id=?",params![other_order,id]).map_err(display_error)?;
@@ -650,9 +677,12 @@ fn promote_one(connection: &Connection, id: i64) -> Result<(), String> {
     let previous: Option<(i64, i64)> = connection
         .query_row(
             "SELECT id,custom_sort_order FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
-             AND status NOT IN ('completed','cancelled','archived') AND id<>? AND custom_sort_order<?
+             AND status NOT IN ('completed','cancelled','archived') AND id<>?
+             AND CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END
+                 =(SELECT CASE WHEN target.requested_deadline IS NOT NULL AND strftime('%s',target.requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END FROM tasks target WHERE target.id=?)
+             AND custom_sort_order<?
              ORDER BY custom_sort_order DESC,id DESC LIMIT 1",
-            params![id, order],
+            params![id, id, order],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
@@ -866,31 +896,12 @@ impl Database {
         self.masters()
     }
     pub fn queue_ahead(&self, id: i64) -> Result<i64, String> {
-        self.with_conn(|connection| {
-            let task = get_task_on(connection, id)?;
-            connection
-                .query_row(
-                    "SELECT count(*) FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
-                     AND status NOT IN ('completed','cancelled','archived')
-                     AND (custom_sort_order < ? OR (custom_sort_order = ? AND id < ?))",
-                    params![task.custom_sort_order, task.custom_sort_order, id],
-                    |row| row.get(0),
-                )
-                .map_err(display_error)
-        })
+        self.with_conn(|connection| queue_ahead_on(connection, id))
     }
     pub fn ticket_snapshot(&self, id: i64) -> Result<TicketSnapshot, String> {
         self.with_conn(|connection| {
             let task = get_task_on(connection, id)?;
-            let queue_ahead = connection
-                .query_row(
-                    "SELECT count(*) FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
-                     AND status NOT IN ('completed','cancelled','archived')
-                     AND (custom_sort_order < ? OR (custom_sort_order = ? AND id < ?))",
-                    params![task.custom_sort_order, task.custom_sort_order, id],
-                    |row| row.get(0),
-                )
-                .map_err(display_error)?;
+            let queue_ahead = queue_ahead_on(connection, id)?;
             Ok(TicketSnapshot { task, queue_ahead })
         })
     }
@@ -1186,6 +1197,32 @@ mod tests {
         assert!(backup.name.starts_with("InLine-backup-"));
         assert!(backup.name.ends_with("-manual.db"));
         db.delete_backup(backup.path).unwrap();
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn overdue_tasks_are_prioritized_consistently() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-overdue-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let regular = db.save_task(sample("普通事项")).unwrap();
+        let mut overdue_input = sample("逾期暂缓事项");
+        overdue_input.status = "waiting_materials".into();
+        overdue_input.requested_deadline =
+            Some((Utc::now() - chrono::Duration::hours(1)).to_rfc3339());
+        let overdue = db.save_task(overdue_input).unwrap();
+
+        let queue = db.list_tasks(TaskView::Queue).unwrap();
+        assert_eq!(queue[0].id, overdue.id);
+        assert_eq!(db.queue_ahead(overdue.id).unwrap(), 0);
+        assert_eq!(db.ticket_snapshot(regular.id).unwrap().queue_ahead, 1);
+        db.move_task(regular.id, MoveDirection::Up).unwrap();
+        assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, overdue.id);
+
         drop(db);
         let _ = fs::remove_dir_all(root);
     }
