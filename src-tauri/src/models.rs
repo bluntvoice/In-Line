@@ -1,11 +1,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub const ALL_STATUSES: [&str; 8] = [
+pub const ALL_STATUSES: [&str; 9] = [
     "pending",
     "processing",
     "waiting_materials",
     "waiting_confirmation",
+    "waiting_counterparty_confirmation",
     "paused",
     "completed",
     "cancelled",

@@ -18,8 +18,8 @@ describe("取号和人工顺位",()=>{
     const overdueLater={...task(3,3),status:"paused" as const,requestedDeadline:"2026-07-17T09:00:00.000Z"};
     expect(sortQueue([regular,overdueLater,overdue],now).map(value=>value.id)).toEqual([2,3,1]);
   });
-  it("暂缓事项包含待补材料、待内部确认和已暂停",()=>{
-    expect(["waiting_materials","waiting_confirmation","paused"].every(status=>isDeferredStatus(status as LegalTask["status"]))).toBe(true);
+  it("暂缓事项包含待补材料、待内部确认、待对方确认和已暂停",()=>{
+    expect(["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused"].every(status=>isDeferredStatus(status as LegalTask["status"]))).toBe(true);
     expect(isDeferredStatus("processing")).toBe(false);
   });
 });

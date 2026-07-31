@@ -3,9 +3,10 @@ import { STATUS_LABELS } from "../lib/task-utils";
 import { ClockAlert } from "lucide-react";
 
 export default function StatusBadge({ status, overdue = false }: { status: TaskStatus; overdue?: boolean }) {
+  const visualStatus = status === "waiting_counterparty_confirmation" ? "waiting_confirmation" : status;
   return (
     <span className="status-stack">
-      <span className={`status-badge status-${status}`}>
+      <span className={`status-badge status-${visualStatus}`}>
         <span className="status-dot" aria-hidden="true" />
         {STATUS_LABELS[status]}
       </span>

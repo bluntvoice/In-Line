@@ -1,4 +1,4 @@
-export type TaskStatus="pending"|"processing"|"waiting_materials"|"waiting_confirmation"|"paused"|"completed"|"cancelled"|"archived";
+export type TaskStatus="pending"|"processing"|"waiting_materials"|"waiting_confirmation"|"waiting_counterparty_confirmation"|"paused"|"completed"|"cancelled"|"archived";
 export type Priority="normal"|"elevated"|"urgent"|"critical";
 export type Workload="simple"|"standard"|"complex"|"major";
 export type TaskView="queue"|"archive"|"trash";

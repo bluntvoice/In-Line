@@ -1227,6 +1227,12 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
     #[test]
+    fn counterparty_confirmation_is_a_valid_status() {
+        let mut input = sample("等待对方确认");
+        input.status = "waiting_counterparty_confirmation".into();
+        validate_task_input(&input).unwrap();
+    }
+    #[test]
     fn contacts_and_master_sorting_are_persistent() {
         let root = std::env::temp_dir().join(format!(
             "inline-master-test-{}",
@@ -1237,6 +1243,7 @@ mod tests {
 
         let mut low = sample("低频部门事项");
         low.department = "低频组".into();
+        low.task_type = "低频类型".into();
         low.contact = "小林、小周".into();
         low.contacts = vec!["小林".into(), "小周".into()];
         let saved = db.save_task(low).unwrap();
@@ -1246,10 +1253,13 @@ mod tests {
         for title in ["高频一", "高频二"] {
             let mut high = sample(title);
             high.department = "高频组".into();
+            high.task_type = "高频类型".into();
             db.save_task(high).unwrap();
         }
         let masters = db.masters().unwrap();
         assert_eq!(&masters.departments[..2], &["高频组", "低频组"]);
+        assert_eq!(&masters.task_types[..2], &["高频类型", "低频类型"]);
+        assert_eq!(masters.contacts[0], "小林");
         assert!(masters.contacts.contains(&"小周".to_string()));
 
         let moved = db

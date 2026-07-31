@@ -16,11 +16,11 @@ interface Props {
 
 type MasterKind = "department" | "task_type" | "contact";
 
-const emptyTask: TaskInput = {
+const emptyTask = (defaultTaskType: string): TaskInput => ({
   department: "",
   contact: "",
   contacts: [],
-  taskType: "任务处理",
+  taskType: defaultTaskType,
   title: "",
   details: "",
   status: "pending",
@@ -32,10 +32,10 @@ const emptyTask: TaskInput = {
   requestedDeadline: null,
   requestedDeadlineLabel: null,
   internalNotes: ""
-};
+});
 
-function toInput(task: LegalTask | null): TaskInput {
-  if (!task) return { ...emptyTask };
+function toInput(task: LegalTask | null, defaultTaskType: string): TaskInput {
+  if (!task) return emptyTask(defaultTaskType);
   return {
     id: task.id,
     department: task.department,
@@ -57,11 +57,16 @@ function toInput(task: LegalTask | null): TaskInput {
 }
 
 export default function TaskForm({ task, masters, commonContacts, onClose, onSaved }: Props) {
-  const [form, setForm] = useState<TaskInput>(() => toInput(task));
+  const [form, setForm] = useState<TaskInput>(() => toInput(task, masters.taskTypes[0] ?? ""));
   const [localMasters, setLocalMasters] = useState(masters);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  useEffect(() => setLocalMasters(masters), [masters]);
+  useEffect(() => {
+    setLocalMasters(masters);
+    if (!task) {
+      setForm((current) => current.taskType ? current : { ...current, taskType: masters.taskTypes[0] ?? "" });
+    }
+  }, [masters, task]);
   const title = task ? `编辑 ${task.permanentNumber}` : "新增取号";
   const quickContacts = useMemo(() => [...new Set(commonContacts)].slice(0, 3), [commonContacts]);
 
@@ -147,7 +152,7 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
             <label>
               <span>当前状态</span>
               <select value={form.status} onChange={(event) => update("status", event.target.value as TaskStatus)}>
-                <option value="pending">待处理</option><option value="processing">处理中</option><option value="waiting_materials">待补充材料</option><option value="waiting_confirmation">待内部确认</option><option value="paused">已暂停</option><option value="completed">已完成</option><option value="cancelled">已取消</option>
+                <option value="pending">待处理</option><option value="processing">处理中</option><option value="waiting_materials">待补充材料</option><option value="waiting_confirmation">待内部确认</option><option value="waiting_counterparty_confirmation">待对方确认</option><option value="paused">已暂停</option><option value="completed">已完成</option><option value="cancelled">已取消</option>
               </select>
             </label>
             <label>

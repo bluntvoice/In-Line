@@ -1,7 +1,7 @@
 import type { LegalTask,Priority,TaskStatus,Workload } from "../types";
 
-export const STATUS_LABELS:Record<TaskStatus,string>={pending:"待处理",processing:"处理中",waiting_materials:"待补材料",waiting_confirmation:"待内部确认",paused:"已暂停",completed:"已完成",cancelled:"已取消",archived:"已归档"};
-export const DEFERRED_STATUSES:TaskStatus[]=["waiting_materials","waiting_confirmation","paused"];
+export const STATUS_LABELS:Record<TaskStatus,string>={pending:"待处理",processing:"处理中",waiting_materials:"待补材料",waiting_confirmation:"待内部确认",waiting_counterparty_confirmation:"待对方确认",paused:"已暂停",completed:"已完成",cancelled:"已取消",archived:"已归档"};
+export const DEFERRED_STATUSES:TaskStatus[]=["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused"];
 export const PRIORITY_LABELS:Record<Priority,string>={normal:"普通",elevated:"较急",urgent:"紧急",critical:"重大紧急"};
 export const WORKLOAD_LABELS:Record<Workload,string>={simple:"简单",standard:"一般",complex:"复杂",major:"重大"};
 export type DeadlineShortcut="half_hour"|"one_hour"|"morning"|"noon"|"afternoon"|"before_off_work";
