@@ -920,6 +920,23 @@ impl Database {
             Ok(rows.into_iter().collect())
         })
     }
+    pub fn set_setting(&self, key: String, value: String) -> Result<(), String> {
+        if key != "show_deferred_in_queue" {
+            return Err("不支持的设置项".into());
+        }
+        if value != "true" && value != "false" {
+            return Err("设置值无效".into());
+        }
+        self.with_conn(|connection| {
+            connection
+                .execute(
+                    "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    params![key, value],
+                )
+                .map_err(display_error)?;
+            Ok(())
+        })
+    }
     pub fn bootstrap(&self) -> Result<BootstrapData, String> {
         Ok(BootstrapData {
             queue: self.list_tasks(TaskView::Queue)?,
@@ -1210,23 +1227,6 @@ mod tests {
         db.delete_backup(backup.path).unwrap();
         drop(db);
         let _ = fs::remove_dir_all(root);
-    }
-    pub fn set_setting(&self, key: String, value: String) -> Result<(), String> {
-        if key != "show_deferred_in_queue" {
-            return Err("不支持的设置项".into());
-        }
-        if value != "true" && value != "false" {
-            return Err("设置值无效".into());
-        }
-        self.with_conn(|connection| {
-            connection
-                .execute(
-                    "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                    params![key, value],
-                )
-                .map_err(display_error)?;
-            Ok(())
-        })
     }
     #[test]
     fn overdue_tasks_are_prioritized_consistently() {
