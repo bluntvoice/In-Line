@@ -1155,6 +1155,17 @@ mod tests {
         assert_eq!(db.queue_ahead(first.id).unwrap(), 0);
         assert_eq!(db.queue_ahead(second.id).unwrap(), 1);
         assert!(db.masters().unwrap().contacts.contains(&"小林".to_string()));
+        assert_eq!(db.settings().unwrap().get("show_deferred_in_queue"), None);
+        db.set_setting("show_deferred_in_queue".into(), "true".into())
+            .unwrap();
+        assert_eq!(
+            db.settings()
+                .unwrap()
+                .get("show_deferred_in_queue")
+                .map(String::as_str),
+            Some("true")
+        );
+        assert!(db.set_setting("unknown".into(), "true".into()).is_err());
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);
         let third = db.save_task(sample("第三项")).unwrap();
@@ -1199,6 +1210,23 @@ mod tests {
         db.delete_backup(backup.path).unwrap();
         drop(db);
         let _ = fs::remove_dir_all(root);
+    }
+    pub fn set_setting(&self, key: String, value: String) -> Result<(), String> {
+        if key != "show_deferred_in_queue" {
+            return Err("不支持的设置项".into());
+        }
+        if value != "true" && value != "false" {
+            return Err("设置值无效".into());
+        }
+        self.with_conn(|connection| {
+            connection
+                .execute(
+                    "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                    params![key, value],
+                )
+                .map_err(display_error)?;
+            Ok(())
+        })
     }
     #[test]
     fn overdue_tasks_are_prioritized_consistently() {

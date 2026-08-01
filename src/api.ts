@@ -46,6 +46,7 @@ export const api={
   createBackup:()=>invoke<BackupInfo>("create_backup"),
   restoreBackup:(path:string)=>invoke<void>("restore_backup",{path}),
   deleteBackup:(path:string)=>invoke<void>("delete_backup",{path}),
+  setSetting:(key:"show_deferred_in_queue",value:boolean)=>invoke<void>("set_setting",{key,value:value?"true":"false"}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
   showMain:()=>invoke<void>("show_main_window"),
   requestNewTask:()=>invoke<void>("request_new_task"),

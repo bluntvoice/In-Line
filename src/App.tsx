@@ -2,7 +2,7 @@ import { useEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
-import { commonContacts,displayTicket,formatDeadline,isDeferredStatus,isOverdue,sortQueue } from "./lib/task-utils";
+import { commonContacts,displayTicket,formatDeadline,isDeferredStatus,isOverdue,sortQueue,visibleQueueTasks } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
@@ -60,7 +60,7 @@ export default function App(){
 
   const source=useMemo(()=>{
     if(!data)return[];
-    if(view==="queue")return sortQueue(data.queue);
+    if(view==="queue")return visibleQueueTasks(data.queue,data.settings.show_deferred_in_queue==="true");
     if(view==="deferred")return sortQueue(data.queue.filter(task=>isDeferredStatus(task.status)));
     return data[view];
   },[data,view]);
@@ -104,6 +104,7 @@ export default function App(){
   const urgent=data.queue.filter(task=>task.isUrgent).length;
   const overdue=data.queue.filter(task=>isOverdue(task)).length;
   const deferred=data.queue.filter(task=>isDeferredStatus(task.status));
+  const queueCount=data.settings.show_deferred_in_queue==="true"?data.queue.length:data.queue.length-deferred.length;
   const deferredOverdue=deferred.filter(task=>isOverdue(task)).length;
   const frequentContacts=commonContacts([...data.queue,...data.archive].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt)));
   const actionView:TaskView=view==="deferred"?"queue":view;
@@ -114,7 +115,7 @@ export default function App(){
       <div className="brand"><img src="/inline-mark.svg"/><div><strong>In Line</strong><span>排着呢</span></div></div>
       <button className="new-ticket" onClick={()=>setEditing(null)}><Plus size={18}/>新增取号</button>
       <nav>
-        <button className={!settings&&!about&&view==="queue"?"active":""} onClick={()=>openView("queue")}><Inbox size={18}/><span>待办队列</span><b>{data.queue.length}</b></button>
+        <button className={!settings&&!about&&view==="queue"?"active":""} onClick={()=>openView("queue")}><Inbox size={18}/><span>待办队列</span><b>{queueCount}</b></button>
         <button className={!settings&&!about&&view==="deferred"?"active":""} onClick={()=>openView("deferred")}><PauseCircle size={18}/><span>暂缓事项</span><span className="nav-counts"><b>{deferred.length}</b>{deferredOverdue>0&&<em title={`${deferredOverdue} 项已逾期`}><ClockAlert size={12}/>{deferredOverdue}</em>}</span></button>
         <button className={!settings&&!about&&view==="archive"?"active":""} onClick={()=>openView("archive")}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
         <button className={!settings&&!about&&view==="trash"?"active":""} onClick={()=>openView("trash")}><Trash2 size={18}/><span>回收站</span><b>{data.trash.length}</b></button>
@@ -125,7 +126,7 @@ export default function App(){
       <small className="app-version">{version?`v${version}`:""}</small>
     </aside>
     <main className="workspace">
-      {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} onChanged={()=>void refresh()} notify={toast}/>:<>
+      {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} onChanged={()=>void refresh()} notify={toast}/>:<>
         <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="deferred"?"暂缓事项":view==="archive"?"历史归档":"回收站"}</h1></div>
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>

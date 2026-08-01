@@ -163,6 +163,16 @@ fn delete_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Re
     emit_change(&app)
 }
 #[tauri::command]
+fn set_setting(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    db.set_setting(key, value)?;
+    emit_change(&app)
+}
+#[tauri::command]
 fn restore_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Result<(), String> {
     db.restore_backup(path)?;
     emit_change(&app)
@@ -318,6 +328,7 @@ pub fn run() {
             list_backups,
             create_backup,
             delete_backup,
+            set_setting,
             restore_backup,
             copy_ticket_card,
             open_task_action,

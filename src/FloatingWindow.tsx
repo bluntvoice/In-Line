@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { api } from "./api";
 import type { LegalTask } from "./types";
-import { displayTicket,isOverdue,sortQueue } from "./lib/task-utils";
+import { displayTicket,isOverdue,visibleQueueTasks } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TaskContextMenu,{type ContextAction} from "./components/TaskContextMenu";
 import TicketNumber from "./components/TicketNumber";
@@ -14,7 +14,7 @@ export default function FloatingWindow(){
   const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState("");
   const refresh=async()=>{
     setLoading(true);setLoadError("");
-    try{setTasks(sortQueue(await api.listTasks("queue")));}
+    try{const data=await api.bootstrap();setTasks(visibleQueueTasks(data.queue,data.settings.show_deferred_in_queue==="true"));}
     catch(error){setLoadError(error instanceof Error?error.message:String(error));}
     finally{setLoading(false);}
   };

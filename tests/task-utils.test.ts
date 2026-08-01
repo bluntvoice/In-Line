@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,isDeferredStatus,queueAheadMessage,sortQueue,toDateTimeLocalValue } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,isDeferredStatus,queueAheadMessage,sortQueue,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import type { LegalTask } from "../src/types";
@@ -21,6 +21,12 @@ describe("取号和人工顺位",()=>{
   it("暂缓事项包含待补材料、待内部确认、待对方确认和已暂停",()=>{
     expect(["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused"].every(status=>isDeferredStatus(status as LegalTask["status"]))).toBe(true);
     expect(isDeferredStatus("processing")).toBe(false);
+  });
+  it("待办队列默认隐藏暂缓事项，并允许通过设置重新显示",()=>{
+    const regular=task(1,1);
+    const deferred={...task(2,2),status:"waiting_counterparty_confirmation" as const};
+    expect(visibleQueueTasks([regular,deferred],false).map(value=>value.id)).toEqual([1]);
+    expect(visibleQueueTasks([regular,deferred],true).map(value=>value.id)).toEqual([1,2]);
   });
 });
 
