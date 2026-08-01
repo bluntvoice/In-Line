@@ -7,31 +7,6 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
 
-#[cfg(target_os = "windows")]
-fn disable_native_window_border<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
-    use std::ffi::c_void;
-    use windows::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_COLOR_NONE,
-    };
-
-    if let Ok(hwnd) = window.hwnd() {
-        let border_color = DWMWA_COLOR_NONE;
-        // The floating window keeps its DWM shadow, but Windows must not draw a
-        // focus-sensitive border around three sides. CSS owns all four edges.
-        let _ = unsafe {
-            DwmSetWindowAttribute(
-                hwnd,
-                DWMWA_BORDER_COLOR,
-                &border_color as *const u32 as *const c_void,
-                std::mem::size_of_val(&border_color) as u32,
-            )
-        };
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn disable_native_window_border<R: tauri::Runtime>(_window: &tauri::WebviewWindow<R>) {}
-
 fn emit_change(app: &tauri::AppHandle) -> Result<(), String> {
     app.emit("data-changed", ())
         .map_err(|error| error.to_string())
@@ -280,9 +255,6 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("quick-add") {
                     window.set_icon(icon.clone())?;
                 }
-            }
-            if let Some(window) = app.get_webview_window("floating") {
-                disable_native_window_border(&window);
             }
             let mut tray_builder = TrayIconBuilder::new();
             if let Some(icon) = app_icon {

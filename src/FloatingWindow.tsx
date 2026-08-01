@@ -11,7 +11,7 @@ import TicketNumber from "./components/TicketNumber";
 
 export default function FloatingWindow(){
   const [tasks,setTasks]=useState<LegalTask[]>([]);const [mini,setMini]=useState(false);const [message,setMessage]=useState("");const [menu,setMenu]=useState<{task:LegalTask;x:number;y:number}|null>(null);
-  const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState("");
+  const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState("");const [focused,setFocused]=useState(false);
   const refresh=async()=>{
     setLoading(true);setLoadError("");
     try{const data=await api.bootstrap();setTasks(visibleQueueTasks(data.queue,data.settings.show_deferred_in_queue==="true"));}
@@ -19,6 +19,12 @@ export default function FloatingWindow(){
     finally{setLoading(false);}
   };
   useEffect(()=>{void refresh();return api.onDataChanged(()=>void refresh());},[]);
+  useEffect(()=>{
+    const currentWindow=getCurrentWindow();let disposed=false;let unlisten:(()=>void)|undefined;
+    void currentWindow.isFocused().then(value=>{if(!disposed)setFocused(value);});
+    void currentWindow.onFocusChanged(({payload})=>{if(!disposed)setFocused(payload);}).then(value=>{if(disposed)value();else unlisten=value;});
+    return()=>{disposed=true;unlisten?.();};
+  },[]);
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),1600);};
   const copy=async(task:LegalTask)=>{try{await api.copyTicketImage(task);toast("已复制："+displayTicket(task));}catch(error){toast("复制失败："+String(error));}};
   const move=async(event:React.MouseEvent,task:LegalTask,direction:"up"|"down")=>{
@@ -64,9 +70,9 @@ export default function FloatingWindow(){
   </header>;
 
   if(mini){
-    return <div className="floating-mini">{toolbar}{message&&<span className="float-toast">{message}</span>}</div>;
+    return <div className={`floating-mini${focused?" window-focused":""}`}>{toolbar}{message&&<span className="float-toast">{message}</span>}</div>;
   }
-  return <div className="floating-expanded">
+  return <div className={`floating-expanded${focused?" window-focused":""}`}>
     {toolbar}
     <div className="floating-list" onMouseDown={startBlankDrag}>{loadError?<div className="floating-error" role="alert"><strong>队列载入失败</strong><p>{loadError}</p><button onClick={()=>void refresh()}>重新载入</button></div>:tasks.slice(0,12).map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=index>0&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=index<tasks.length-1&&isOverdue(tasks[index+1])===taskOverdue;return <article key={task.id} className={`floating-card${task.isUrgent?" urgent":""}${taskOverdue?" overdue":""}`} onClick={()=>void copy(task)} onContextMenu={event=>{event.preventDefault();setMenu({task,x:event.clientX,y:event.clientY});}}>
       <TicketNumber task={task}/><div className="floating-copy"><strong>{task.title}</strong><span>{task.department} · {task.contact}{isOverdue(task)&&<i className="floating-overdue"><ClockAlert size={11}/>已逾期</i>}</span></div>
