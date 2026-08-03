@@ -18,6 +18,7 @@ type MasterKind = "department" | "task_type" | "contact";
 
 const emptyTask = (defaultTaskType: string): TaskInput => ({
   department: "",
+  departments: [],
   contact: "",
   contacts: [],
   taskType: defaultTaskType,
@@ -39,6 +40,7 @@ function toInput(task: LegalTask | null, defaultTaskType: string): TaskInput {
   return {
     id: task.id,
     department: task.department,
+    departments: task.departments?.length ? task.departments : [task.department].filter(Boolean),
     contact: task.contact,
     contacts: task.contacts?.length ? task.contacts : [task.contact].filter(Boolean),
     taskType: task.taskType,
@@ -125,7 +127,9 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
           <div className="form-grid">
             <label>
               <span>部门 / 团队 *</span>
-              <ComboInput value={form.department} options={localMasters.departments} onChange={(value) => update("department", value)} onDelete={(value) => removeMaster("department", value)} onMove={(value, direction) => moveMaster("department", value, direction)} placeholder="输入或选择部门 / 团队" />
+              <MultiContactInput values={form.departments} options={localMasters.departments} itemLabel="部门 / 团队" placeholder="输入或选择部门 / 团队"
+                onChange={(departments) => setForm(current => ({ ...current, departments, department: departments.join("、") }))}
+                onDelete={(value) => removeMaster("department", value)} />
             </label>
             <label>
               <span>对接人 *</span>
@@ -152,7 +156,7 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
             <label>
               <span>当前状态</span>
               <select value={form.status} onChange={(event) => update("status", event.target.value as TaskStatus)}>
-                <option value="pending">待处理</option><option value="processing">处理中</option><option value="waiting_materials">待补充材料</option><option value="waiting_confirmation">待内部确认</option><option value="waiting_counterparty_confirmation">待对方确认</option><option value="paused">已暂停</option><option value="completed">已完成</option><option value="cancelled">已取消</option>
+                <option value="pending">待处理</option><option value="processing">处理中</option><option value="waiting_materials">待补充材料</option><option value="waiting_confirmation">待内部确认</option><option value="waiting_counterparty_confirmation">待对方确认</option><option value="paused">已暂停</option><option value="processed">已处理</option><option value="completed">已完成</option><option value="cancelled">已取消</option>{task?.status==="archived"&&<option value="archived">已归档</option>}
               </select>
             </label>
             <label>

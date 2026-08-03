@@ -4,7 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TicketSnapshot } from "./types";
+import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkEventInput,WorkEventUpdateInput } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -36,6 +36,16 @@ export const api={
   restoreTask:(id:number)=>invoke<void>("restore_task",{id}),
   archiveTask:(id:number)=>invoke<void>("archive_task",{id}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
+  getWorkEvents:(taskId:number)=>invoke<TaskWorkEvent[]>("get_work_events",{taskId}),
+  recordWorkEvent:(input:WorkEventInput)=>invoke<void>("record_work_event",{input}),
+  updateWorkEvent:(input:WorkEventUpdateInput)=>invoke<void>("update_work_event",{input}),
+  voidWorkEvent:(id:number,confirmHistoricalImpact=false)=>invoke<void>("void_work_event",{id,confirmHistoricalImpact}),
+  processRound:(id:number)=>invoke<void>("process_round",{id}),
+  completeRound:(id:number)=>invoke<void>("complete_round",{id}),
+  enqueueTask:(input:QueueInput)=>invoke<void>("enqueue_task",{input}),
+  reopenTask:(input:QueueInput)=>invoke<void>("reopen_task",{input}),
+  getStatistics:(start:string,end:string)=>invoke<StatisticsResult>("get_statistics",{start,end,timezoneOffsetMinutes:-new Date().getTimezoneOffset()}),
+  getStatisticsDetails:(start:string,end:string,taskType:string)=>invoke<StatisticsDetail[]>("get_statistics_details",{start,end,taskType}),
   addLog:(taskId:number,content:string)=>invoke<void>("add_log",{taskId,content}),
   updateLog:(logId:number,content:string)=>invoke<void>("update_log",{logId,content}),
   deleteLog:(logId:number)=>invoke<void>("delete_log",{logId}),

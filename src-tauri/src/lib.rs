@@ -90,6 +90,84 @@ fn get_logs(db: State<Database>, task_id: i64) -> Result<Vec<TaskLog>, String> {
     db.get_logs(task_id)
 }
 #[tauri::command]
+fn get_work_events(db: State<Database>, task_id: i64) -> Result<Vec<TaskWorkEvent>, String> {
+    db.list_work_events(task_id)
+}
+#[tauri::command]
+fn record_work_event(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: WorkEventInput,
+) -> Result<(), String> {
+    db.record_work_event(input)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn update_work_event(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: WorkEventUpdateInput,
+) -> Result<(), String> {
+    db.update_work_event(input)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn void_work_event(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    id: i64,
+    confirm_historical_impact: bool,
+) -> Result<(), String> {
+    db.void_work_event(id, confirm_historical_impact)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn process_round(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(), String> {
+    db.process_round(id)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn complete_round(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(), String> {
+    db.complete_round(id)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn enqueue_task(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: QueueInput,
+) -> Result<(), String> {
+    db.enqueue_task(input)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn reopen_task(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: QueueInput,
+) -> Result<(), String> {
+    db.reopen_task(input)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn get_statistics(
+    db: State<Database>,
+    start: String,
+    end: String,
+    timezone_offset_minutes: i32,
+) -> Result<StatisticsResult, String> {
+    db.statistics(start, end, timezone_offset_minutes)
+}
+#[tauri::command]
+fn get_statistics_details(
+    db: State<Database>,
+    start: String,
+    end: String,
+    task_type: String,
+) -> Result<Vec<StatisticsDetail>, String> {
+    db.statistics_details(start, end, task_type)
+}
+#[tauri::command]
 fn add_log(
     app: tauri::AppHandle,
     db: State<Database>,
@@ -195,7 +273,7 @@ fn open_task_action(
                 .map_err(|error| error.to_string())?;
             return Ok(());
         }
-        "complete" => db.set_status(request.id, "completed".into())?,
+        "complete" => db.complete_round(request.id)?,
         "archive" => db.archive(request.id)?,
         "delete" => db.soft_delete(request.id)?,
         "restore" => db.restore(request.id)?,
@@ -317,6 +395,16 @@ pub fn run() {
             restore_task,
             archive_task,
             get_logs,
+            get_work_events,
+            record_work_event,
+            update_work_event,
+            void_work_event,
+            process_round,
+            complete_round,
+            enqueue_task,
+            reopen_task,
+            get_statistics,
+            get_statistics_details,
             add_log,
             update_log,
             delete_log,

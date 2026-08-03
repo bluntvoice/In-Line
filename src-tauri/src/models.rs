@@ -1,13 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub const ALL_STATUSES: [&str; 9] = [
+pub const ALL_STATUSES: [&str; 10] = [
     "pending",
     "processing",
     "waiting_materials",
     "waiting_confirmation",
     "waiting_counterparty_confirmation",
     "paused",
+    "processed",
     "completed",
     "cancelled",
     "archived",
@@ -24,6 +25,7 @@ pub struct LegalTask {
     pub daily_sequence: i64,
     pub ticket_date: String,
     pub department: String,
+    pub departments: Vec<String>,
     pub contact: String,
     pub contacts: Vec<String>,
     pub task_type: String,
@@ -45,6 +47,8 @@ pub struct LegalTask {
     pub archived_at: Option<String>,
     pub deleted_at: Option<String>,
     pub custom_sort_order: i64,
+    pub processing_rounds: i64,
+    pub has_active_queue: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -52,6 +56,8 @@ pub struct LegalTask {
 pub struct TaskInput {
     pub id: Option<i64>,
     pub department: String,
+    #[serde(default)]
+    pub departments: Vec<String>,
     #[serde(default)]
     pub contact: String,
     #[serde(default)]
@@ -82,6 +88,115 @@ pub struct TaskLog {
     pub log_type: String,
     pub content: String,
     pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskWorkEvent {
+    pub id: i64,
+    pub task_id: i64,
+    pub result_status: String,
+    pub handled_at: String,
+    pub task_type_snapshot: String,
+    pub source: String,
+    pub note: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub is_first_valid: bool,
+    pub can_delete: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkEventInput {
+    pub task_id: i64,
+    pub result_status: String,
+    pub handled_at: String,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default)]
+    pub sync_status: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkEventUpdateInput {
+    pub id: i64,
+    pub result_status: String,
+    pub handled_at: String,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default)]
+    pub confirm_historical_impact: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueueInput {
+    pub id: i64,
+    #[serde(default)]
+    pub inherit_deadline: bool,
+    #[serde(default)]
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatisticsRange {
+    pub start: String,
+    pub end: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct StatisticsSummary {
+    pub handled_tasks: i64,
+    pub processed: i64,
+    pub completed: i64,
+    pub waiting_materials: i64,
+    pub waiting_confirmation: i64,
+    pub waiting_counterparty_confirmation: i64,
+    pub completion_rate: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskTypeStatistics {
+    pub task_type: String,
+    pub handled_tasks: i64,
+    pub completed: i64,
+    pub pending_follow_up: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrendPoint {
+    pub period_start: String,
+    pub handled_tasks: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatisticsResult {
+    pub range: StatisticsRange,
+    pub summary: StatisticsSummary,
+    pub by_task_type: Vec<TaskTypeStatistics>,
+    pub trend: Vec<TrendPoint>,
+    pub trend_granularity: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatisticsDetail {
+    pub task_id: i64,
+    pub permanent_number: String,
+    pub title: String,
+    pub department: String,
+    pub contact: String,
+    pub result_status: String,
+    pub first_handled_at: String,
+    pub last_handled_at: String,
+    pub handling_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -150,6 +265,22 @@ pub fn normalized_contacts(input: &TaskInput) -> Vec<String> {
     contacts
 }
 
+pub fn normalized_departments(input: &TaskInput) -> Vec<String> {
+    let source = if input.departments.is_empty() {
+        vec![input.department.as_str()]
+    } else {
+        input.departments.iter().map(String::as_str).collect()
+    };
+    let mut departments = Vec::new();
+    for value in source {
+        let name = value.trim();
+        if !name.is_empty() && !departments.iter().any(|existing| existing == name) {
+            departments.push(name.to_string());
+        }
+    }
+    departments
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenTaskAction {
@@ -159,8 +290,16 @@ pub struct OpenTaskAction {
 
 pub fn validate_task_input(input: &TaskInput) -> Result<(), String> {
     let contacts = normalized_contacts(input);
+    let departments = normalized_departments(input);
     let required = [
-        ("部门或团队", input.department.trim()),
+        (
+            "部门或团队",
+            if departments.is_empty() {
+                ""
+            } else {
+                "已填写"
+            },
+        ),
         ("对接人", if contacts.is_empty() { "" } else { "已填写" }),
         ("事项类型", input.task_type.trim()),
         ("事项标题", input.title.trim()),
@@ -172,15 +311,20 @@ pub fn validate_task_input(input: &TaskInput) -> Result<(), String> {
     if !missing.is_empty() {
         return Err(format!("请填写{}", missing.join("、")));
     }
-    if input.department.chars().count() > 100
-        || input.task_type.chars().count() > 100
+    if input.task_type.chars().count() > 100
         || input.title.chars().count() > 100
+        || departments
+            .iter()
+            .any(|department| department.chars().count() > 100)
         || contacts.iter().any(|contact| contact.chars().count() > 100)
     {
         return Err("部门、对接人、事项类型和标题均不能超过 100 个字符".into());
     }
     if contacts.len() > 10 {
         return Err("每个事项最多可选择 10 位对接人".into());
+    }
+    if departments.len() > 10 {
+        return Err("每个事项最多可选择 10 个部门或团队".into());
     }
     if input.details.chars().count() > 10_000 || input.internal_notes.chars().count() > 10_000 {
         return Err("事项详情和内部备注均不能超过 10000 个字符".into());

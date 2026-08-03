@@ -1,10 +1,10 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,isDeferredStatus,queueAheadMessage,sortQueue,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,isDeferredStatus,localizeStatusText,queueAheadMessage,sortQueue,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import type { LegalTask } from "../src/types";
 
-const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null});
+const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",departments:["产品组"],contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null,processingRounds:0,hasActiveQueue:true});
 
 describe("取号和人工顺位",()=>{
   it("当天显示两位号码",()=>expect(displayTicket({ticketDate:"2026-07-17",dailySequence:1},"2026-07-17")).toBe("01"));
@@ -19,7 +19,7 @@ describe("取号和人工顺位",()=>{
     expect(sortQueue([regular,overdueLater,overdue],now).map(value=>value.id)).toEqual([2,3,1]);
   });
   it("暂缓事项包含待补材料、待内部确认、待对方确认和已暂停",()=>{
-    expect(["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused"].every(status=>isDeferredStatus(status as LegalTask["status"]))).toBe(true);
+    expect(["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused","processed"].every(status=>isDeferredStatus(status as LegalTask["status"]))).toBe(true);
     expect(isDeferredStatus("processing")).toBe(false);
   });
   it("待办队列默认隐藏暂缓事项，并允许通过设置重新显示",()=>{
@@ -91,6 +91,13 @@ describe("分享图标题排版",()=>{
   });
   it("只有确实放不下时才在末尾添加省略号",()=>{
     expect(fitTextLines("一二三四五六七八九十一",5,2,measure)).toEqual({lines:["一二三四五","六七八九…"],truncated:true});
+  });
+});
+
+describe("时间线状态中文化",()=>{
+  it("将历史记录中的内部状态码替换为中文",()=>{
+    expect(localizeStatusText("记录本次处理：completed")).toBe("记录本次处理：已完成");
+    expect(localizeStatusText("状态变更为：cancelled")).toBe("状态变更为：已取消");
   });
 });
 

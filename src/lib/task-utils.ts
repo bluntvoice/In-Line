@@ -1,7 +1,8 @@
 import type { LegalTask,Priority,TaskStatus,Workload } from "../types";
 
-export const STATUS_LABELS:Record<TaskStatus,string>={pending:"待处理",processing:"处理中",waiting_materials:"待补材料",waiting_confirmation:"待内部确认",waiting_counterparty_confirmation:"待对方确认",paused:"已暂停",completed:"已完成",cancelled:"已取消",archived:"已归档"};
-export const DEFERRED_STATUSES:TaskStatus[]=["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused"];
+export const STATUS_LABELS:Record<TaskStatus,string>={pending:"待处理",processing:"处理中",waiting_materials:"待补材料",waiting_confirmation:"待内部确认",waiting_counterparty_confirmation:"待对方确认",paused:"已暂停",processed:"已处理",completed:"已完成",cancelled:"已取消",archived:"已归档"};
+const STATUS_TOKEN_PATTERN=/\b(pending|processing|waiting_materials|waiting_confirmation|waiting_counterparty_confirmation|paused|processed|completed|cancelled|archived)\b/g;
+export const DEFERRED_STATUSES:TaskStatus[]=["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused","processed"];
 export const PRIORITY_LABELS:Record<Priority,string>={normal:"普通",elevated:"较急",urgent:"紧急",critical:"重大紧急"};
 export const WORKLOAD_LABELS:Record<Workload,string>={simple:"简单",standard:"一般",complex:"复杂",major:"重大"};
 export type DeadlineShortcut="half_hour"|"one_hour"|"morning"|"noon"|"afternoon"|"before_off_work";
@@ -22,14 +23,17 @@ export function displayTicket(task:Pick<LegalTask,"ticketDate"|"dailySequence">,
   return `${alphaPrefix(dayDifference(task.ticketDate,today))}${String(task.dailySequence).padStart(2,"0")}`;
 }
 export function isOverdue(task:Pick<LegalTask,"requestedDeadline"|"status">,now=new Date()){
-  return Boolean(task.requestedDeadline&&!['completed','cancelled','archived'].includes(task.status)&&new Date(task.requestedDeadline).getTime()<now.getTime());
+  return Boolean(task.requestedDeadline&&!['processed','completed','cancelled','archived'].includes(task.status)&&new Date(task.requestedDeadline).getTime()<now.getTime());
 }
 export function isDeferredStatus(status:TaskStatus){return DEFERRED_STATUSES.includes(status);}
+export function localizeStatusText(value:string){
+  return value.replace(STATUS_TOKEN_PATTERN,status=>STATUS_LABELS[status as TaskStatus]);
+}
 export function sortQueue(tasks:LegalTask[],now=new Date()){
   return [...tasks].sort((a,b)=>Number(isOverdue(b,now))-Number(isOverdue(a,now))||a.customSortOrder-b.customSortOrder||a.id-b.id);
 }
 export function visibleQueueTasks(tasks:LegalTask[],showDeferred:boolean,now=new Date()){
-  return sortQueue(showDeferred?tasks:tasks.filter(task=>!isDeferredStatus(task.status)),now);
+  return sortQueue(tasks.filter(task=>task.hasActiveQueue&&!isDeferredStatus(task.status)||showDeferred&&isDeferredStatus(task.status)),now);
 }
 export function commonContacts(tasks:Pick<LegalTask,"contact"|"contacts">[],limit=3){
   const counts=new Map<string,{count:number;lastIndex:number}>();

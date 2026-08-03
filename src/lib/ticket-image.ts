@@ -120,11 +120,13 @@ function drawTicket(task: LegalTask, queueAhead: number): TicketRenderer {
 
   const ticket = displayTicket(task);
   const numberSize = ticketFontSize(context, ticket);
+  context.font = `600 18px ${UI_FONT}`; context.fillStyle = COLORS.muted; context.textAlign = "center";
+  context.fillText(task.hasActiveQueue ? "今日序号" : "最近序号", 400, 158);
   context.font = `800 ${numberSize}px Consolas,'Cascadia Mono',monospace`; context.fillStyle = COLORS.blue; context.textAlign = "center";
   context.fillText(ticket, 400, 258);
   context.fillStyle = COLORS.amber; context.fillRect(268, 360, 264, 10);
 
-  const aheadText = queueAhead > 0 ? `前方还有 ${queueAhead} 项` : "当前排在队首";
+  const aheadText = !task.hasActiveQueue ? "当前未加入有效队列" : queueAhead > 0 ? `前方还有 ${queueAhead} 项` : "当前排在队首";
   context.font = `600 22px ${UI_FONT}`;
   const aheadWidth = Math.max(190, Math.ceil(context.measureText(aheadText).width) + 48);
   rounded(context, (WIDTH - aheadWidth) / 2, 396, aheadWidth, 52, 26, "#E4ECF5");
@@ -145,9 +147,9 @@ function drawTicket(task: LegalTask, queueAhead: number): TicketRenderer {
     fitLines(context, value, 294, 2).lines.forEach((line, lineIndex) => context.fillText(line, x, y + 38 + lineIndex * 31));
   });
 
-  context.font = "500 15px Consolas,monospace"; context.fillStyle = "#7B8797"; context.fillText(task.permanentNumber, 66, 920);
+  context.font = "500 15px Consolas,monospace"; context.fillStyle = "#7B8797"; context.fillText(`事项编号：${task.permanentNumber}`, 66, 920);
   context.font = `500 16px ${UI_FONT}`; context.textAlign = "right";
-  context.fillText(queueAheadMessage(queueAhead), 732, 920);
+  context.fillText(task.hasActiveQueue ? queueAheadMessage(queueAhead) : "后续可按需重新加入今日队列", 732, 920);
   return { canvas, context };
 }
 

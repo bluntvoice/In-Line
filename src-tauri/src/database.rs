@@ -1,14 +1,17 @@
 use crate::models::*;
-use chrono::{Local, Utc};
+use chrono::{Datelike, FixedOffset, Local, Utc};
 use rusqlite::{params, Connection, OptionalExtension, Transaction};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     sync::Mutex,
 };
 
-const SELECT_TASK: &str = "SELECT id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order, requested_deadline_label FROM tasks";
+const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order, requested_deadline_label,
+    (SELECT count(*) FROM task_work_events work WHERE work.task_id=tasks.id AND work.voided_at IS NULL),
+    EXISTS(SELECT 1 FROM task_queue_entries queue_entry WHERE queue_entry.task_id=tasks.id AND queue_entry.closed_at IS NULL)
+    FROM tasks";
 const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
 pub struct Database {
@@ -29,7 +32,7 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 4 {
+        if existed && Self::schema_version(&connection)? < 5 {
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
         }
@@ -239,6 +242,84 @@ impl Database {
                 )
                 .map_err(display_error)?;
         }
+        if version < 5 {
+            transaction
+                .execute_batch(
+                    "CREATE TABLE IF NOT EXISTS task_queue_entries(
+                       id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       task_id INTEGER NOT NULL,
+                       queue_date TEXT NOT NULL,
+                       daily_sequence INTEGER NOT NULL,
+                       requested_deadline TEXT,
+                       requested_deadline_label TEXT,
+                       enqueued_at TEXT NOT NULL,
+                       closed_at TEXT,
+                       close_reason TEXT NOT NULL DEFAULT '',
+                       created_at TEXT NOT NULL,
+                       updated_at TEXT NOT NULL,
+                       FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                       UNIQUE(queue_date,daily_sequence)
+                     );
+                     CREATE TABLE IF NOT EXISTS task_work_events(
+                       id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       task_id INTEGER NOT NULL,
+                       result_status TEXT NOT NULL,
+                       handled_at TEXT NOT NULL,
+                       task_type_snapshot TEXT NOT NULL,
+                       source TEXT NOT NULL,
+                       note TEXT NOT NULL DEFAULT '',
+                       created_at TEXT NOT NULL,
+                       updated_at TEXT NOT NULL,
+                       voided_at TEXT,
+                       FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+                     );
+                     CREATE UNIQUE INDEX IF NOT EXISTS idx_queue_one_active_task
+                       ON task_queue_entries(task_id) WHERE closed_at IS NULL;
+                     CREATE INDEX IF NOT EXISTS idx_queue_active
+                       ON task_queue_entries(closed_at,queue_date,daily_sequence);
+                     CREATE INDEX IF NOT EXISTS idx_work_events_range
+                       ON task_work_events(handled_at,task_id) WHERE voided_at IS NULL;
+                     CREATE INDEX IF NOT EXISTS idx_work_events_task
+                       ON task_work_events(task_id,handled_at DESC) WHERE voided_at IS NULL;
+                     INSERT OR IGNORE INTO task_queue_entries(
+                       task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+                       enqueued_at,closed_at,close_reason,created_at,updated_at
+                     )
+                     SELECT id,ticket_date,daily_sequence,requested_deadline,requested_deadline_label,
+                       created_at,
+                       CASE WHEN deleted_at IS NOT NULL OR archived_at IS NOT NULL
+                                  OR status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed','completed','cancelled','archived')
+                            THEN COALESCE(completed_at,archived_at,deleted_at,updated_at) ELSE NULL END,
+                       CASE WHEN deleted_at IS NOT NULL THEN 'deleted'
+                            WHEN archived_at IS NOT NULL OR status='archived' THEN 'archived'
+                            WHEN status='completed' THEN 'completed'
+                            WHEN status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed') THEN 'deferred'
+                            WHEN status='cancelled' THEN 'cancelled' ELSE '' END,
+                       created_at,updated_at
+                     FROM tasks;
+                     INSERT INTO task_work_events(
+                       task_id,result_status,handled_at,task_type_snapshot,source,note,created_at,updated_at
+                     )
+                     SELECT history.task_id,history.new_status,history.created_at,tasks.task_type,
+                       'status_change','',history.created_at,history.created_at
+                     FROM status_history history
+                     JOIN tasks ON tasks.id=history.task_id
+                     WHERE history.new_status IN ('completed','waiting_materials','waiting_confirmation','waiting_counterparty_confirmation');
+                     INSERT INTO task_work_events(
+                       task_id,result_status,handled_at,task_type_snapshot,source,note,created_at,updated_at
+                     )
+                     SELECT tasks.id,'completed',tasks.completed_at,tasks.task_type,'status_change','',tasks.completed_at,tasks.completed_at
+                     FROM tasks
+                     WHERE tasks.completed_at IS NOT NULL
+                       AND NOT EXISTS(
+                         SELECT 1 FROM task_work_events event
+                         WHERE event.task_id=tasks.id AND event.result_status='completed'
+                       );
+                     DELETE FROM schema_meta;
+                     INSERT INTO schema_meta(version) VALUES(5);",
+                )
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -293,6 +374,8 @@ impl Database {
     }
 
     fn row_task(row: &rusqlite::Row<'_>) -> rusqlite::Result<LegalTask> {
+        let stored_department: String = row.get(4)?;
+        let departments = parse_contacts(&stored_department);
         let stored_contact: String = row.get(5)?;
         let contacts = parse_contacts(&stored_contact);
         Ok(LegalTask {
@@ -300,7 +383,8 @@ impl Database {
             permanent_number: row.get(1)?,
             daily_sequence: row.get(2)?,
             ticket_date: row.get(3)?,
-            department: row.get(4)?,
+            department: departments.join("、"),
+            departments,
             contact: contacts.join("、"),
             contacts,
             task_type: row.get(6)?,
@@ -322,6 +406,8 @@ impl Database {
             deleted_at: row.get(22)?,
             custom_sort_order: row.get(23)?,
             requested_deadline_label: row.get(24)?,
+            processing_rounds: row.get(25)?,
+            has_active_queue: row.get::<_, i64>(26)? != 0,
         })
     }
 
@@ -362,11 +448,14 @@ fn queue_ahead_on(connection: &Connection, id: i64) -> Result<i64, String> {
             "WITH target AS (
                  SELECT id AS target_id,custom_sort_order AS target_order,
                         CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END AS target_rank
-                 FROM tasks WHERE id=?
+                 FROM tasks WHERE id=? AND EXISTS(
+                   SELECT 1 FROM task_queue_entries entry WHERE entry.task_id=tasks.id AND entry.closed_at IS NULL
+                 )
              )
              SELECT count(*) FROM tasks,target
              WHERE deleted_at IS NULL AND archived_at IS NULL
-               AND status NOT IN ('completed','cancelled','archived')
+                AND status NOT IN ('completed','cancelled','archived')
+                AND EXISTS(SELECT 1 FROM task_queue_entries entry WHERE entry.task_id=tasks.id AND entry.closed_at IS NULL)
                AND (
                  CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END < target_rank
                  OR (
@@ -405,11 +494,246 @@ fn contact_storage(contacts: &[String]) -> Result<String, String> {
     serde_json::to_string(contacts).map_err(display_error)
 }
 
+const WORK_EVENT_STATUSES: [&str; 5] = [
+    "processed",
+    "completed",
+    "waiting_materials",
+    "waiting_confirmation",
+    "waiting_counterparty_confirmation",
+];
+
+fn is_work_event_status(status: &str) -> bool {
+    WORK_EVENT_STATUSES.contains(&status)
+}
+
+fn is_deferred_status(status: &str) -> bool {
+    matches!(
+        status,
+        "processed"
+            | "waiting_materials"
+            | "waiting_confirmation"
+            | "waiting_counterparty_confirmation"
+            | "paused"
+    )
+}
+
+fn validate_handled_at(value: &str) -> Result<(), String> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map(|_| ())
+        .map_err(|_| "处理时间格式无效".to_string())
+}
+
+fn record_work_event_on(
+    connection: &Connection,
+    task_id: i64,
+    result_status: &str,
+    handled_at: &str,
+    task_type_snapshot: &str,
+    source: &str,
+    note: &str,
+) -> Result<i64, String> {
+    if !is_work_event_status(result_status) {
+        return Err("处理结果无效".into());
+    }
+    validate_handled_at(handled_at)?;
+    if note.chars().count() > 2_000 {
+        return Err("处理说明不能超过 2000 个字符".into());
+    }
+    let stamp = now();
+    connection
+        .execute(
+            "INSERT INTO task_work_events(task_id,result_status,handled_at,task_type_snapshot,source,note,created_at,updated_at)
+             VALUES(?,?,?,?,?,?,?,?)",
+            params![
+                task_id,
+                result_status,
+                handled_at,
+                task_type_snapshot,
+                source,
+                note.trim(),
+                stamp,
+                stamp
+            ],
+        )
+        .map_err(display_error)?;
+    Ok(connection.last_insert_rowid())
+}
+
+fn close_active_queue(
+    connection: &Connection,
+    task_id: i64,
+    reason: &str,
+) -> Result<Option<(String, i64)>, String> {
+    let active: Option<(i64, String, i64)> = connection
+        .query_row(
+            "SELECT id,queue_date,daily_sequence FROM task_queue_entries
+             WHERE task_id=? AND closed_at IS NULL LIMIT 1",
+            [task_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .optional()
+        .map_err(display_error)?;
+    let Some((entry_id, queue_date, daily_sequence)) = active else {
+        return Ok(None);
+    };
+    let stamp = now();
+    connection
+        .execute(
+            "UPDATE task_queue_entries SET closed_at=?,close_reason=?,updated_at=? WHERE id=?",
+            params![stamp, reason, stamp, entry_id],
+        )
+        .map_err(display_error)?;
+    add_log(
+        connection,
+        task_id,
+        "queue",
+        &format!(
+            "退出 {} 队列：{:02}（{}）",
+            queue_date, daily_sequence, reason
+        ),
+    )?;
+    Ok(Some((queue_date, daily_sequence)))
+}
+
+fn next_daily_sequence(connection: &Connection, date: &str) -> Result<i64, String> {
+    let sequence: i64 = connection
+        .query_row(
+            "SELECT last_sequence FROM daily_sequences WHERE ticket_date=?",
+            [date],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(display_error)?
+        .unwrap_or(0)
+        + 1;
+    connection
+        .execute(
+            "INSERT INTO daily_sequences(ticket_date,last_sequence) VALUES(?,?)
+             ON CONFLICT(ticket_date) DO UPDATE SET last_sequence=excluded.last_sequence",
+            params![date, sequence],
+        )
+        .map_err(display_error)?;
+    Ok(sequence)
+}
+
+fn enqueue_on(
+    connection: &Connection,
+    task_id: i64,
+    target_status: &str,
+    inherit_deadline: bool,
+    supplied_deadline: Option<(Option<String>, Option<String>)>,
+    reason: &str,
+    reopen: bool,
+) -> Result<(String, i64), String> {
+    if !matches!(target_status, "pending" | "processing") {
+        return Err("加入队列后的状态必须为待处理或处理中".into());
+    }
+    let task = get_task_on(connection, task_id)?;
+    if task.has_active_queue {
+        return Err("该事项已在有效队列中".into());
+    }
+    if !reopen
+        && (task.deleted_at.is_some()
+            || task.archived_at.is_some()
+            || matches!(task.status.as_str(), "completed" | "archived"))
+    {
+        return Err("已完成或已归档事项请使用重新开启操作".into());
+    }
+    let date = today();
+    let sequence = next_daily_sequence(connection, &date)?;
+    let inherited: Option<(Option<String>, Option<String>)> = if inherit_deadline {
+        connection
+            .query_row(
+                "SELECT requested_deadline,requested_deadline_label FROM task_queue_entries
+                 WHERE task_id=? ORDER BY id DESC LIMIT 1",
+                [task_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(display_error)?
+    } else {
+        None
+    };
+    let (deadline, deadline_label) = supplied_deadline.or(inherited).unwrap_or((None, None));
+    let order: i64 = connection
+        .query_row(
+            "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    let stamp = now();
+    connection
+        .execute(
+            "INSERT INTO task_queue_entries(
+               task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+               enqueued_at,created_at,updated_at
+             ) VALUES(?,?,?,?,?,?,?,?)",
+            params![
+                task_id,
+                date,
+                sequence,
+                deadline,
+                deadline_label,
+                stamp,
+                stamp,
+                stamp
+            ],
+        )
+        .map_err(display_error)?;
+    connection
+        .execute(
+            "UPDATE tasks SET daily_sequence=?,ticket_date=?,requested_deadline=?,requested_deadline_label=?,
+             status=?,archived_at=CASE WHEN ? THEN NULL ELSE archived_at END,
+             deleted_at=CASE WHEN ? THEN NULL ELSE deleted_at END,
+             custom_sort_order=?,updated_at=?,started_at=CASE WHEN ?='processing' AND started_at IS NULL THEN ? ELSE started_at END
+             WHERE id=?",
+            params![
+                sequence,
+                date,
+                deadline,
+                deadline_label,
+                target_status,
+                reopen,
+                reopen,
+                order,
+                stamp,
+                target_status,
+                stamp,
+                task_id
+            ],
+        )
+        .map_err(display_error)?;
+    if task.status != target_status {
+        add_status(
+            connection,
+            task_id,
+            Some(&task.status),
+            target_status,
+            reason,
+        )?;
+    }
+    let reason_text = reason.trim();
+    add_log(
+        connection,
+        task_id,
+        "queue",
+        &if reason_text.is_empty() {
+            format!("重新加入 {} 队列：{:02}", date, sequence)
+        } else {
+            format!("重新加入 {} 队列：{:02}（{}）", date, sequence, reason_text)
+        },
+    )?;
+    Ok((date, sequence))
+}
+
 impl Database {
     pub fn save_task(&self, input: TaskInput) -> Result<LegalTask, String> {
         validate_task_input(&input)?;
         let contacts = normalized_contacts(&input);
+        let departments = normalized_departments(&input);
         let stored_contacts = contact_storage(&contacts)?;
+        let stored_departments = contact_storage(&departments)?;
         let mut guard = self
             .connection
             .lock()
@@ -423,6 +747,11 @@ impl Database {
             .transpose()?;
         let id = if let Some(previous) = previous_task.as_ref() {
             let id = previous.id;
+            if (previous.archived_at.is_some() || previous.status == "archived")
+                && input.status != previous.status
+            {
+                return Err("已归档事项请先使用“重新开启并加入今日队列”".into());
+            }
             let started = if input.status == "processing" && previous.started_at.is_none() {
                 Some(stamp.clone())
             } else {
@@ -434,13 +763,13 @@ impl Database {
                     .clone()
                     .or_else(|| Some(stamp.clone()))
             } else {
-                None
+                previous.completed_at.clone()
             };
             transaction.execute(
                 "UPDATE tasks SET department=?,contact=?,task_type=?,title=?,details=?,status=?,priority=?,workload=?,
                  is_urgent=?,urgent_requester=?,urgent_reason=?,requested_deadline=?,requested_deadline_label=?,internal_notes=?,updated_at=?,
                  started_at=?,completed_at=? WHERE id=?",
-                params![input.department.trim(),&stored_contacts,input.task_type.trim(),input.title.trim(),
+                params![&stored_departments,&stored_contacts,input.task_type.trim(),input.title.trim(),
                 input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
                 input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,
                 input.internal_notes.trim(),stamp,started,completed,id]).map_err(display_error)?;
@@ -452,6 +781,56 @@ impl Database {
                     "status",
                     &format!("状态变更为：{}", input.status),
                 )?;
+                if is_work_event_status(&input.status) {
+                    record_work_event_on(
+                        &transaction,
+                        id,
+                        &input.status,
+                        &stamp,
+                        input.task_type.trim(),
+                        "status_change",
+                        "",
+                    )?;
+                }
+                if is_deferred_status(&input.status)
+                    || matches!(
+                        input.status.as_str(),
+                        "completed" | "cancelled" | "archived"
+                    )
+                {
+                    close_active_queue(&transaction, id, &format!("状态变更为 {}", input.status))?;
+                } else if matches!(input.status.as_str(), "pending" | "processing")
+                    && !previous.has_active_queue
+                {
+                    enqueue_on(
+                        &transaction,
+                        id,
+                        &input.status,
+                        false,
+                        Some((
+                            input.requested_deadline.clone(),
+                            input.requested_deadline_label.clone(),
+                        )),
+                        "通过事项编辑重新加入队列",
+                        false,
+                    )?;
+                }
+            }
+            if previous.has_active_queue
+                && matches!(input.status.as_str(), "pending" | "processing")
+            {
+                transaction
+                    .execute(
+                        "UPDATE task_queue_entries SET requested_deadline=?,requested_deadline_label=?,updated_at=?
+                         WHERE task_id=? AND closed_at IS NULL",
+                        params![
+                            input.requested_deadline,
+                            input.requested_deadline_label,
+                            stamp,
+                            id
+                        ],
+                    )
+                    .map_err(display_error)?;
             }
             if previous.is_urgent != input.is_urgent {
                 record_urgent(&transaction, id, &input, previous.is_urgent)?;
@@ -463,23 +842,7 @@ impl Database {
             id
         } else {
             let date = today();
-            let sequence: i64 = transaction
-                .query_row(
-                    "SELECT last_sequence FROM daily_sequences WHERE ticket_date=?",
-                    [&date],
-                    |row| row.get(0),
-                )
-                .optional()
-                .map_err(display_error)?
-                .unwrap_or(0)
-                + 1;
-            transaction
-                .execute(
-                    "INSERT INTO daily_sequences(ticket_date,last_sequence) VALUES(?,?)
-                 ON CONFLICT(ticket_date) DO UPDATE SET last_sequence=excluded.last_sequence",
-                    params![date, sequence],
-                )
-                .map_err(display_error)?;
+            let sequence = next_daily_sequence(&transaction, &date)?;
             let permanent = format!("{}-{:02}", date.replace('-', ""), sequence);
             let order: i64 = transaction
                 .query_row(
@@ -493,12 +856,30 @@ impl Database {
                  status,priority,workload,is_urgent,urgent_requester,urgent_reason,requested_deadline,requested_deadline_label,internal_notes,
                  created_at,updated_at,started_at,completed_at,custom_sort_order)
                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                params![permanent,sequence,date,input.department.trim(),&stored_contacts,input.task_type.trim(),
+                params![permanent,sequence,date,&stored_departments,&stored_contacts,input.task_type.trim(),
                 input.title.trim(),input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
                 input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,input.internal_notes.trim(),
                 stamp,stamp,if input.status=="processing"{Some(now())}else{None},if input.status=="completed"{Some(now())}else{None},order]
             ).map_err(display_error)?;
             let id = transaction.last_insert_rowid();
+            transaction
+                .execute(
+                    "INSERT INTO task_queue_entries(
+                       task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+                       enqueued_at,created_at,updated_at
+                     ) VALUES(?,?,?,?,?,?,?,?)",
+                    params![
+                        id,
+                        date,
+                        sequence,
+                        input.requested_deadline,
+                        input.requested_deadline_label,
+                        stamp,
+                        stamp,
+                        stamp
+                    ],
+                )
+                .map_err(display_error)?;
             add_log(
                 &transaction,
                 id,
@@ -506,24 +887,45 @@ impl Database {
                 &format!("创建事项并取号：{permanent}"),
             )?;
             add_status(&transaction, id, None, &input.status, "创建事项")?;
+            if is_work_event_status(&input.status) {
+                record_work_event_on(
+                    &transaction,
+                    id,
+                    &input.status,
+                    &stamp,
+                    input.task_type.trim(),
+                    "status_change",
+                    "",
+                )?;
+            }
+            if is_deferred_status(&input.status)
+                || matches!(
+                    input.status.as_str(),
+                    "completed" | "cancelled" | "archived"
+                )
+            {
+                close_active_queue(&transaction, id, &format!("初始状态为 {}", input.status))?;
+            }
             if input.is_urgent {
                 record_urgent(&transaction, id, &input, false)?;
                 promote_one(&transaction, id)?;
             }
             id
         };
-        ensure_master(&transaction, "department", &input.department)?;
         ensure_master(&transaction, "task_type", &input.task_type)?;
         let department_changed = previous_task
             .as_ref()
-            .map(|previous| previous.department != input.department.trim())
+            .map(|previous| previous.departments != departments)
             .unwrap_or(true);
         let task_type_changed = previous_task
             .as_ref()
             .map(|previous| previous.task_type != input.task_type.trim())
             .unwrap_or(true);
         if department_changed {
-            bump_master_use(&transaction, "department", &input.department)?;
+            for department in &departments {
+                ensure_master(&transaction, "department", department)?;
+                bump_master_use(&transaction, "department", department)?;
+            }
         }
         if task_type_changed {
             bump_master_use(&transaction, "task_type", &input.task_type)?;
@@ -568,6 +970,21 @@ impl Database {
         }
         self.with_transaction(|transaction| {
             let task = get_task_on(transaction, id)?;
+            if task.status == status {
+                return Ok(());
+            }
+            if matches!(status.as_str(), "pending" | "processing") && !task.has_active_queue {
+                enqueue_on(
+                    transaction,
+                    id,
+                    &status,
+                    false,
+                    Some((None, None)),
+                    "修改状态并加入今日队列",
+                    false,
+                )?;
+                return Ok(());
+            }
             let stamp = now();
             let started = if status == "processing" && task.started_at.is_none() {
                 Some(stamp.clone())
@@ -586,7 +1003,24 @@ impl Database {
                 )
                 .map_err(display_error)?;
             add_status(transaction, id, Some(&task.status), &status, "")?;
-            add_log(transaction, id, "status", &format!("状态变更为：{status}"))
+            add_log(transaction, id, "status", &format!("状态变更为：{status}"))?;
+            if is_work_event_status(&status) {
+                record_work_event_on(
+                    transaction,
+                    id,
+                    &status,
+                    &stamp,
+                    &task.task_type,
+                    "status_change",
+                    "",
+                )?;
+            }
+            if is_deferred_status(&status)
+                || matches!(status.as_str(), "completed" | "cancelled" | "archived")
+            {
+                close_active_queue(transaction, id, &format!("状态变更为 {status}"))?;
+            }
+            Ok(())
         })
     }
 
@@ -597,6 +1031,7 @@ impl Database {
             let order = if matches!(direction,MoveDirection::Up){"DESC"}else{"ASC"};
             let sql = format!("SELECT id,custom_sort_order FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
                 AND status NOT IN ('completed','cancelled','archived')
+                AND EXISTS(SELECT 1 FROM task_queue_entries entry WHERE entry.task_id=tasks.id AND entry.closed_at IS NULL)
                 AND {OVERDUE_RANK_SQL}=(SELECT CASE WHEN target.requested_deadline IS NOT NULL AND strftime('%s',target.requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END FROM tasks target WHERE target.id=?)
                 AND custom_sort_order {comparison} ?
                 ORDER BY custom_sort_order {order},id {order} LIMIT 1");
@@ -611,12 +1046,17 @@ impl Database {
     }
 
     pub fn soft_delete(&self, id: i64) -> Result<(), String> {
-        self.simple_change(
-            id,
-            "UPDATE tasks SET deleted_at=?,updated_at=? WHERE id=?",
-            "deleted",
-            "事项移入回收站",
-        )
+        self.with_transaction(|tx| {
+            get_task_on(tx, id)?;
+            let stamp = now();
+            tx.execute(
+                "UPDATE tasks SET deleted_at=?,updated_at=? WHERE id=?",
+                params![stamp, stamp, id],
+            )
+            .map_err(display_error)?;
+            close_active_queue(tx, id, "移入回收站")?;
+            add_log(tx, id, "deleted", "事项移入回收站")
+        })
     }
     pub fn archive(&self, id: i64) -> Result<(), String> {
         self.with_transaction(|tx| {
@@ -627,28 +1067,532 @@ impl Database {
                 params![stamp, stamp, id],
             )
             .map_err(display_error)?;
+            close_active_queue(tx, id, "事项归档")?;
             add_status(tx, id, Some(&old.status), "archived", "归档事项")?;
             add_log(tx, id, "archived", "事项已归档")
         })
     }
     pub fn restore(&self, id: i64) -> Result<(), String> {
-        self.with_transaction(|tx|{
-            let task=get_task_on(tx,id)?;
-            let order:i64=tx.query_row("SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",[],|row|row.get(0)).map_err(display_error)?;
-            let status=if task.status=="archived"||task.status=="completed"||task.status=="cancelled"{"pending"}else{&task.status};
-            tx.execute("UPDATE tasks SET deleted_at=NULL,archived_at=NULL,status=?,custom_sort_order=?,updated_at=? WHERE id=?",
-                params![status,order,now(),id]).map_err(display_error)?;
-            add_log(tx,id,"restored","事项已恢复并排到队尾")
+        self.with_transaction(|tx| {
+            let task = get_task_on(tx, id)?;
+            if task.deleted_at.is_none() {
+                return Err("事项不在回收站中".into());
+            }
+            enqueue_on(
+                tx,
+                id,
+                "pending",
+                false,
+                Some((None, None)),
+                "从回收站恢复",
+                true,
+            )?;
+            add_log(tx, id, "restored", "事项已恢复并加入今日队列")
         })
     }
 
-    fn simple_change(&self, id: i64, sql: &str, kind: &str, content: &str) -> Result<(), String> {
+    pub fn enqueue_task(&self, input: QueueInput) -> Result<(), String> {
         self.with_transaction(|tx| {
-            get_task_on(tx, id)?;
+            enqueue_on(
+                tx,
+                input.id,
+                "pending",
+                input.inherit_deadline,
+                None,
+                &input.reason,
+                false,
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn reopen_task(&self, input: QueueInput) -> Result<(), String> {
+        self.with_transaction(|tx| {
+            let task = get_task_on(tx, input.id)?;
+            if task.deleted_at.is_some() {
+                return Err("回收站事项请先使用恢复操作".into());
+            }
+            if task.archived_at.is_none()
+                && !matches!(task.status.as_str(), "completed" | "archived")
+            {
+                return Err("只有已完成或已归档事项可以重新开启".into());
+            }
+            enqueue_on(
+                tx,
+                input.id,
+                "pending",
+                input.inherit_deadline,
+                None,
+                &input.reason,
+                true,
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn process_round(&self, id: i64) -> Result<(), String> {
+        self.with_transaction(|tx| {
+            let task = get_task_on(tx, id)?;
+            if task.deleted_at.is_some()
+                || task.archived_at.is_some()
+                || matches!(task.status.as_str(), "completed" | "cancelled" | "archived")
+            {
+                return Err("已完成或已归档事项需先重新开启".into());
+            }
             let stamp = now();
-            tx.execute(sql, params![stamp, stamp, id])
+            let result_status = if matches!(
+                task.status.as_str(),
+                "waiting_materials" | "waiting_confirmation" | "waiting_counterparty_confirmation"
+            ) {
+                task.status.as_str()
+            } else {
+                "processed"
+            };
+            if matches!(task.status.as_str(), "pending" | "processing") {
+                tx.execute(
+                    "UPDATE tasks SET status='processed',updated_at=? WHERE id=?",
+                    params![stamp, id],
+                )
                 .map_err(display_error)?;
-            add_log(tx, id, kind, content)
+                add_status(tx, id, Some(&task.status), "processed", "本轮已处理")?;
+            }
+            close_active_queue(tx, id, "本轮已处理")?;
+            record_work_event_on(
+                tx,
+                id,
+                result_status,
+                &stamp,
+                &task.task_type,
+                "quick_action",
+                "",
+            )?;
+            add_log(tx, id, "work", "已记录本轮处理，事项进入暂缓队列")
+        })
+    }
+
+    pub fn complete_round(&self, id: i64) -> Result<(), String> {
+        self.with_transaction(|tx| {
+            let task = get_task_on(tx, id)?;
+            if task.deleted_at.is_some()
+                || task.archived_at.is_some()
+                || matches!(task.status.as_str(), "completed" | "archived")
+            {
+                return Err("该事项已经完成或归档".into());
+            }
+            let stamp = now();
+            tx.execute(
+                "UPDATE tasks SET status='completed',completed_at=?,updated_at=? WHERE id=?",
+                params![stamp, stamp, id],
+            )
+            .map_err(display_error)?;
+            add_status(tx, id, Some(&task.status), "completed", "本轮已完成")?;
+            close_active_queue(tx, id, "本轮已完成")?;
+            record_work_event_on(
+                tx,
+                id,
+                "completed",
+                &stamp,
+                &task.task_type,
+                "quick_action",
+                "",
+            )?;
+            add_log(tx, id, "work", "本轮已完成，事项整体结束")
+        })
+    }
+
+    pub fn record_work_event(&self, input: WorkEventInput) -> Result<(), String> {
+        if !is_work_event_status(&input.result_status) {
+            return Err("处理结果无效".into());
+        }
+        validate_handled_at(&input.handled_at)?;
+        self.with_transaction(|tx| {
+            let task = get_task_on(tx, input.task_id)?;
+            if task.deleted_at.is_some() {
+                return Err("回收站事项不能新增处理活动".into());
+            }
+            if input.sync_status && (task.archived_at.is_some() || task.status == "archived") {
+                return Err(
+                    "已归档事项请先重新开启；也可以取消勾选同步状态，仅补录处理活动".into(),
+                );
+            }
+            if input.sync_status && task.status != input.result_status {
+                let completed_at = if input.result_status == "completed" {
+                    Some(input.handled_at.clone())
+                } else {
+                    task.completed_at.clone()
+                };
+                tx.execute(
+                    "UPDATE tasks SET status=?,completed_at=?,updated_at=? WHERE id=?",
+                    params![input.result_status, completed_at, now(), input.task_id],
+                )
+                .map_err(display_error)?;
+                add_status(
+                    tx,
+                    input.task_id,
+                    Some(&task.status),
+                    &input.result_status,
+                    "记录本次处理",
+                )?;
+            }
+            if input.sync_status {
+                close_active_queue(tx, input.task_id, "记录本次处理并同步状态")?;
+            } else {
+                tx.execute(
+                    "UPDATE tasks SET updated_at=? WHERE id=?",
+                    params![now(), input.task_id],
+                )
+                .map_err(display_error)?;
+            }
+            record_work_event_on(
+                tx,
+                input.task_id,
+                &input.result_status,
+                &input.handled_at,
+                &task.task_type,
+                "manual",
+                &input.note,
+            )?;
+            add_log(
+                tx,
+                input.task_id,
+                "work",
+                &format!("记录本次处理：{}", input.result_status),
+            )
+        })
+    }
+
+    pub fn list_work_events(&self, task_id: i64) -> Result<Vec<TaskWorkEvent>, String> {
+        self.with_conn(|connection| {
+            get_task_on(connection, task_id)?;
+            let mut statement = connection
+                .prepare(
+                    "SELECT event.id,event.task_id,event.result_status,event.handled_at,event.task_type_snapshot,
+                            event.source,event.note,event.created_at,event.updated_at,
+                            event.id=(SELECT first.id FROM task_work_events first
+                                      WHERE first.task_id=event.task_id AND first.voided_at IS NULL
+                                      ORDER BY strftime('%s',first.handled_at),first.id LIMIT 1)
+                     FROM task_work_events event
+                     WHERE event.task_id=? AND event.voided_at IS NULL
+                     ORDER BY strftime('%s',event.handled_at) DESC,event.id DESC",
+                )
+                .map_err(display_error)?;
+            let events = statement
+                .query_map([task_id], |row| {
+                    let source: String = row.get(5)?;
+                    Ok(TaskWorkEvent {
+                        id: row.get(0)?,
+                        task_id: row.get(1)?,
+                        result_status: row.get(2)?,
+                        handled_at: row.get(3)?,
+                        task_type_snapshot: row.get(4)?,
+                        can_delete: source == "manual",
+                        source,
+                        note: row.get(6)?,
+                        created_at: row.get(7)?,
+                        updated_at: row.get(8)?,
+                        is_first_valid: row.get::<_, i64>(9)? != 0,
+                    })
+                })
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            Ok(events)
+        })
+    }
+
+    pub fn update_work_event(&self, input: WorkEventUpdateInput) -> Result<(), String> {
+        if !is_work_event_status(&input.result_status) {
+            return Err("处理结果无效".into());
+        }
+        validate_handled_at(&input.handled_at)?;
+        self.with_transaction(|tx| {
+            let current: (i64, String, String, String) = tx
+                .query_row(
+                    "SELECT task_id,result_status,handled_at,source FROM task_work_events
+                     WHERE id=? AND voided_at IS NULL",
+                    [input.id],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .optional()
+                .map_err(display_error)?
+                .ok_or("处理活动不存在")?;
+            if current.3 != "manual" && current.1 != input.result_status {
+                return Err("自动处理活动不能修改处理结果".into());
+            }
+            let first_id: i64 = tx
+                .query_row(
+                    "SELECT id FROM task_work_events WHERE task_id=? AND voided_at IS NULL
+                     ORDER BY strftime('%s',handled_at),id LIMIT 1",
+                    [current.0],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if first_id == input.id
+                && current.2 != input.handled_at
+                && !input.confirm_historical_impact
+            {
+                return Err("此操作将改变该事项的统计归属期间，并可能影响历史周报、月报或季度统计。是否继续？".into());
+            }
+            tx.execute(
+                "UPDATE task_work_events SET result_status=?,handled_at=?,note=?,updated_at=? WHERE id=?",
+                params![
+                    input.result_status,
+                    input.handled_at,
+                    input.note.trim(),
+                    now(),
+                    input.id
+                ],
+            )
+            .map_err(display_error)?;
+            tx.execute(
+                "UPDATE tasks SET updated_at=? WHERE id=?",
+                params![now(), current.0],
+            )
+            .map_err(display_error)?;
+            add_log(tx, current.0, "audit", "调整结构化处理活动")
+        })
+    }
+
+    pub fn void_work_event(&self, id: i64, confirm_historical_impact: bool) -> Result<(), String> {
+        self.with_transaction(|tx| {
+            let (task_id, source): (i64, String) = tx
+                .query_row(
+                    "SELECT task_id,source FROM task_work_events WHERE id=? AND voided_at IS NULL",
+                    [id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()
+                .map_err(display_error)?
+                .ok_or("处理活动不存在")?;
+            if source != "manual" {
+                return Err("自动生成的处理活动不能删除".into());
+            }
+            let first_id: i64 = tx
+                .query_row(
+                    "SELECT id FROM task_work_events WHERE task_id=? AND voided_at IS NULL
+                     ORDER BY strftime('%s',handled_at),id LIMIT 1",
+                    [task_id],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if first_id == id && !confirm_historical_impact {
+                return Err("此操作将改变该事项的统计归属期间，并可能影响历史周报、月报或季度统计。是否继续？".into());
+            }
+            tx.execute(
+                "UPDATE task_work_events SET voided_at=?,updated_at=? WHERE id=?",
+                params![now(), now(), id],
+            )
+            .map_err(display_error)?;
+            tx.execute(
+                "UPDATE tasks SET updated_at=? WHERE id=?",
+                params![now(), task_id],
+            )
+            .map_err(display_error)?;
+            add_log(tx, task_id, "audit", "作废一条结构化处理活动")
+        })
+    }
+}
+
+impl Database {
+    pub fn statistics(
+        &self,
+        start: String,
+        end: String,
+        timezone_offset_minutes: i32,
+    ) -> Result<StatisticsResult, String> {
+        let start_time = chrono::DateTime::parse_from_rfc3339(&start)
+            .map_err(|_| "统计开始时间无效".to_string())?;
+        let end_time = chrono::DateTime::parse_from_rfc3339(&end)
+            .map_err(|_| "统计结束时间无效".to_string())?;
+        if end_time <= start_time {
+            return Err("统计开始日期不能晚于结束日期".into());
+        }
+        let weekly = (end_time - start_time).num_days() > 62;
+        let offset_seconds = timezone_offset_minutes.clamp(-14 * 60, 14 * 60) * 60;
+        let offset = FixedOffset::east_opt(offset_seconds).ok_or("本地时区无效")?;
+        self.with_conn(|connection| {
+            let cte = "WITH ranged AS (
+                SELECT event.id,event.task_id,event.result_status,event.handled_at,event.task_type_snapshot
+                FROM task_work_events event
+                JOIN tasks ON tasks.id=event.task_id
+                WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                  AND strftime('%s',event.handled_at)>=strftime('%s',?1)
+                  AND strftime('%s',event.handled_at)<strftime('%s',?2)
+              ), ranked AS (
+                SELECT *,ROW_NUMBER() OVER(
+                  PARTITION BY task_id ORDER BY strftime('%s',handled_at) DESC,id DESC
+                ) AS position
+                FROM ranged
+              )";
+            let summary_sql = format!(
+                "{cte}
+                 SELECT count(*),
+                   COALESCE(sum(result_status='processed'),0),
+                   COALESCE(sum(result_status='completed'),0),
+                   COALESCE(sum(result_status='waiting_materials'),0),
+                   COALESCE(sum(result_status='waiting_confirmation'),0),
+                   COALESCE(sum(result_status='waiting_counterparty_confirmation'),0)
+                 FROM ranked WHERE position=1"
+            );
+            let values: (i64, i64, i64, i64, i64, i64) = connection
+                .query_row(&summary_sql, params![start, end], |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                })
+                .map_err(display_error)?;
+            let summary = StatisticsSummary {
+                handled_tasks: values.0,
+                processed: values.1,
+                completed: values.2,
+                waiting_materials: values.3,
+                waiting_confirmation: values.4,
+                waiting_counterparty_confirmation: values.5,
+                completion_rate: if values.0 == 0 {
+                    0.0
+                } else {
+                    values.2 as f64 / values.0 as f64
+                },
+            };
+            let type_sql = format!(
+                "{cte}
+                 SELECT task_type_snapshot,count(*),
+                   COALESCE(sum(result_status='completed'),0),
+                   COALESCE(sum(result_status<>'completed'),0)
+                 FROM ranked WHERE position=1
+                 GROUP BY task_type_snapshot ORDER BY count(*) DESC,task_type_snapshot"
+            );
+            let mut type_statement = connection.prepare(&type_sql).map_err(display_error)?;
+            let by_task_type = type_statement
+                .query_map(params![start, end], |row| {
+                    Ok(TaskTypeStatistics {
+                        task_type: row.get(0)?,
+                        handled_tasks: row.get(1)?,
+                        completed: row.get(2)?,
+                        pending_follow_up: row.get(3)?,
+                    })
+                })
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+
+            let mut trend_statement = connection
+                .prepare(
+                    "SELECT event.task_id,event.handled_at
+                     FROM task_work_events event
+                     JOIN tasks ON tasks.id=event.task_id
+                     WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                       AND strftime('%s',event.handled_at)>=strftime('%s',?)
+                       AND strftime('%s',event.handled_at)<strftime('%s',?)
+                     ORDER BY strftime('%s',event.handled_at),event.id",
+                )
+                .map_err(display_error)?;
+            let raw_trend = trend_statement
+                .query_map(params![start, end], |row| {
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+                })
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            let mut buckets: BTreeMap<String, HashSet<i64>> = BTreeMap::new();
+            for (task_id, handled_at) in raw_trend {
+                let parsed = chrono::DateTime::parse_from_rfc3339(&handled_at)
+                    .map_err(|_| "处理活动中存在无效时间".to_string())?
+                    .with_timezone(&offset);
+                let mut date = parsed.date_naive();
+                if weekly {
+                    date -= chrono::Duration::days(
+                        date.weekday().num_days_from_monday() as i64,
+                    );
+                }
+                buckets
+                    .entry(date.format("%Y-%m-%d").to_string())
+                    .or_default()
+                    .insert(task_id);
+            }
+            let trend = buckets
+                .into_iter()
+                .map(|(period_start, ids)| TrendPoint {
+                    period_start,
+                    handled_tasks: ids.len() as i64,
+                })
+                .collect();
+            Ok(StatisticsResult {
+                range: StatisticsRange {
+                    start: start.clone(),
+                    end: end.clone(),
+                },
+                summary,
+                by_task_type,
+                trend,
+                trend_granularity: if weekly { "week" } else { "day" }.into(),
+            })
+        })
+    }
+
+    pub fn statistics_details(
+        &self,
+        start: String,
+        end: String,
+        task_type: String,
+    ) -> Result<Vec<StatisticsDetail>, String> {
+        let start_time = chrono::DateTime::parse_from_rfc3339(&start)
+            .map_err(|_| "统计开始时间无效".to_string())?;
+        let end_time = chrono::DateTime::parse_from_rfc3339(&end)
+            .map_err(|_| "统计结束时间无效".to_string())?;
+        if end_time <= start_time {
+            return Err("统计结束时间必须晚于开始时间".into());
+        }
+        self.with_conn(|connection| {
+            let mut statement = connection
+                .prepare(
+                    "WITH ranged AS (
+                       SELECT event.id,event.task_id,event.result_status,event.handled_at,event.task_type_snapshot
+                       FROM task_work_events event
+                       JOIN tasks ON tasks.id=event.task_id
+                       WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                         AND strftime('%s',event.handled_at)>=strftime('%s',?1)
+                         AND strftime('%s',event.handled_at)<strftime('%s',?2)
+                     ), annotated AS (
+                       SELECT *,
+                         ROW_NUMBER() OVER(PARTITION BY task_id ORDER BY strftime('%s',handled_at) DESC,id DESC) AS position,
+                         FIRST_VALUE(handled_at) OVER(PARTITION BY task_id ORDER BY strftime('%s',handled_at),id) AS first_handled_at,
+                         FIRST_VALUE(handled_at) OVER(PARTITION BY task_id ORDER BY strftime('%s',handled_at) DESC,id DESC) AS last_handled_at,
+                         count(*) OVER(PARTITION BY task_id) AS handling_count
+                       FROM ranged
+                     )
+                     SELECT tasks.id,tasks.permanent_number,tasks.title,tasks.department,tasks.contact,
+                            annotated.result_status,annotated.first_handled_at,annotated.last_handled_at,annotated.handling_count
+                     FROM annotated JOIN tasks ON tasks.id=annotated.task_id
+                     WHERE annotated.position=1 AND annotated.task_type_snapshot=?3
+                     ORDER BY strftime('%s',annotated.last_handled_at) DESC,tasks.id DESC",
+                )
+                .map_err(display_error)?;
+            let details = statement
+                .query_map(params![start, end, task_type], |row| {
+                    let departments = parse_contacts(&row.get::<_, String>(3)?).join("、");
+                    let contacts = parse_contacts(&row.get::<_, String>(4)?).join("、");
+                    Ok(StatisticsDetail {
+                        task_id: row.get(0)?,
+                        permanent_number: row.get(1)?,
+                        title: row.get(2)?,
+                        department: departments,
+                        contact: contacts,
+                        result_status: row.get(5)?,
+                        first_handled_at: row.get(6)?,
+                        last_handled_at: row.get(7)?,
+                        handling_count: row.get(8)?,
+                    })
+                })
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            Ok(details)
         })
     }
 }
@@ -665,7 +1609,8 @@ fn promote_one(connection: &Connection, id: i64) -> Result<(), String> {
     let order: Option<i64> = connection
         .query_row(
             "SELECT custom_sort_order FROM tasks WHERE id=? AND deleted_at IS NULL AND archived_at IS NULL
-             AND status NOT IN ('completed','cancelled','archived')",
+             AND status NOT IN ('completed','cancelled','archived')
+             AND EXISTS(SELECT 1 FROM task_queue_entries entry WHERE entry.task_id=tasks.id AND entry.closed_at IS NULL)",
             [id],
             |row| row.get(0),
         )
@@ -678,6 +1623,7 @@ fn promote_one(connection: &Connection, id: i64) -> Result<(), String> {
         .query_row(
             "SELECT id,custom_sort_order FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
              AND status NOT IN ('completed','cancelled','archived') AND id<>?
+             AND EXISTS(SELECT 1 FROM task_queue_entries entry WHERE entry.task_id=tasks.id AND entry.closed_at IS NULL)
              AND CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END
                  =(SELECT CASE WHEN target.requested_deadline IS NOT NULL AND strftime('%s',target.requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END FROM tasks target WHERE target.id=?)
              AND custom_sort_order<?
@@ -1139,6 +2085,7 @@ mod tests {
         TaskInput {
             id: None,
             department: "产品组".into(),
+            departments: vec!["产品组".into()],
             contact: "小林".into(),
             contacts: vec!["小林".into()],
             task_type: "任务处理".into(),
@@ -1246,8 +2193,9 @@ mod tests {
 
         let queue = db.list_tasks(TaskView::Queue).unwrap();
         assert_eq!(queue[0].id, overdue.id);
+        assert!(!overdue.has_active_queue);
         assert_eq!(db.queue_ahead(overdue.id).unwrap(), 0);
-        assert_eq!(db.ticket_snapshot(regular.id).unwrap().queue_ahead, 1);
+        assert_eq!(db.ticket_snapshot(regular.id).unwrap().queue_ahead, 0);
         db.move_task(regular.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, overdue.id);
 
@@ -1271,6 +2219,7 @@ mod tests {
 
         let mut low = sample("低频部门事项");
         low.department = "低频组".into();
+        low.departments = vec!["低频组".into()];
         low.task_type = "低频类型".into();
         low.contact = "小林、小周".into();
         low.contacts = vec!["小林".into(), "小周".into()];
@@ -1281,6 +2230,7 @@ mod tests {
         for title in ["高频一", "高频二"] {
             let mut high = sample(title);
             high.department = "高频组".into();
+            high.departments = vec!["高频组".into()];
             high.task_type = "高频类型".into();
             db.save_task(high).unwrap();
         }
@@ -1295,6 +2245,181 @@ mod tests {
             .unwrap();
         assert_eq!(&moved.departments[..2], &["低频组", "高频组"]);
         drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn processed_tasks_can_requeue_without_losing_identity_or_rounds() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-processed-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let mut input = sample("多部门处理事项");
+        input.departments = vec!["产品组".into(), "法务组".into()];
+        input.department = "产品组、法务组".into();
+        input.requested_deadline = Some((Utc::now() + chrono::Duration::days(1)).to_rfc3339());
+        let created = db.save_task(input).unwrap();
+        let original_number = created.permanent_number.clone();
+        let original_sequence = created.daily_sequence;
+        assert_eq!(created.departments, vec!["产品组", "法务组"]);
+        assert!(created.has_active_queue);
+
+        db.process_round(created.id).unwrap();
+        let processed = db.get_task(created.id).unwrap();
+        assert_eq!(processed.status, "processed");
+        assert_eq!(processed.processing_rounds, 1);
+        assert!(!processed.has_active_queue);
+
+        let start = (Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        let end = (Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        let statistics = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(statistics.summary.handled_tasks, 1);
+        assert_eq!(statistics.summary.processed, 1);
+
+        db.enqueue_task(QueueInput {
+            id: created.id,
+            inherit_deadline: false,
+            reason: "继续跟进".into(),
+        })
+        .unwrap();
+        let requeued = db.get_task(created.id).unwrap();
+        assert_eq!(requeued.status, "pending");
+        assert!(requeued.has_active_queue);
+        assert_eq!(requeued.permanent_number, original_number);
+        assert!(requeued.daily_sequence > original_sequence);
+        assert_eq!(requeued.processing_rounds, 1);
+        assert_eq!(requeued.requested_deadline, None);
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn statistics_use_latest_event_and_guard_historical_attribution() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-statistics-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let mut input = sample("等待材料事项");
+        input.status = "waiting_materials".into();
+        let created = db.save_task(input).unwrap();
+        db.process_round(created.id).unwrap();
+        let waiting = db.get_task(created.id).unwrap();
+        assert_eq!(waiting.status, "waiting_materials");
+        assert!(!waiting.has_active_queue);
+
+        let completed_at = (Utc::now() + chrono::Duration::seconds(1)).to_rfc3339();
+        db.record_work_event(WorkEventInput {
+            task_id: created.id,
+            result_status: "completed".into(),
+            handled_at: completed_at,
+            note: "补录完成结果".into(),
+            sync_status: false,
+        })
+        .unwrap();
+
+        let start = (Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        let end = (Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        let statistics = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(statistics.summary.handled_tasks, 1);
+        assert_eq!(statistics.summary.completed, 1);
+        assert_eq!(statistics.summary.waiting_materials, 0);
+        let details = db
+            .statistics_details(start.clone(), end.clone(), "任务处理".into())
+            .unwrap();
+        assert_eq!(details.len(), 1);
+        assert_eq!(details[0].result_status, "completed");
+        assert_eq!(details[0].handling_count, 3);
+
+        let first = db
+            .list_work_events(created.id)
+            .unwrap()
+            .into_iter()
+            .find(|event| event.is_first_valid)
+            .unwrap();
+        let changed_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
+        assert!(db
+            .update_work_event(WorkEventUpdateInput {
+                id: first.id,
+                result_status: first.result_status.clone(),
+                handled_at: changed_time.clone(),
+                note: first.note.clone(),
+                confirm_historical_impact: false,
+            })
+            .is_err());
+        db.update_work_event(WorkEventUpdateInput {
+            id: first.id,
+            result_status: first.result_status,
+            handled_at: changed_time,
+            note: first.note,
+            confirm_historical_impact: true,
+        })
+        .unwrap();
+        assert!(db.void_work_event(first.id, true).is_err());
+
+        db.soft_delete(created.id).unwrap();
+        assert_eq!(
+            db.statistics(start, end, 480)
+                .unwrap()
+                .summary
+                .handled_tasks,
+            0
+        );
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn migration_v5_backfills_legacy_queue_and_work_events() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-migration-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("inline.db");
+        let db = Database::open_at(path.clone()).unwrap();
+        let created = db.save_task(sample("旧版迁移事项")).unwrap();
+        drop(db);
+
+        let legacy = Connection::open(&path).unwrap();
+        legacy
+            .execute_batch(
+                "DROP TABLE task_work_events;
+                 DROP TABLE task_queue_entries;
+                 DELETE FROM schema_meta;
+                 INSERT INTO schema_meta(version) VALUES(4);",
+            )
+            .unwrap();
+        legacy
+            .execute(
+                "UPDATE tasks SET status='waiting_materials',department='法务组' WHERE id=?",
+                [created.id],
+            )
+            .unwrap();
+        legacy
+            .execute(
+                "INSERT INTO status_history(task_id,old_status,new_status,reason,created_at)
+                 VALUES(?,'pending','waiting_materials','旧版记录',?)",
+                params![created.id, now()],
+            )
+            .unwrap();
+        drop(legacy);
+
+        let migrated = Database::open_at(path).unwrap();
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 5);
+        let task = migrated.get_task(created.id).unwrap();
+        assert_eq!(task.departments, vec!["法务组"]);
+        assert!(!task.has_active_queue);
+        let events = migrated.list_work_events(created.id).unwrap();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].result_status, "waiting_materials");
+
+        drop(migrated);
         let _ = fs::remove_dir_all(root);
     }
 }
