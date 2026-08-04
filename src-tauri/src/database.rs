@@ -1150,13 +1150,7 @@ impl Database {
                  SET status='archived',archived_at=COALESCE(archived_at,?),
                      deleted_at=CASE WHEN ? THEN ? ELSE NULL END,updated_at=?
                  WHERE id=?",
-                params![
-                    stamp,
-                    input.trash_source,
-                    stamp,
-                    stamp,
-                    source.id
-                ],
+                params![stamp, input.trash_source, stamp, stamp, source.id],
             )
             .map_err(display_error)?;
             add_log(
