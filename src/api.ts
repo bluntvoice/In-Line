@@ -4,7 +4,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BootstrapData,LegalTask,MasterData,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkEventInput,WorkEventUpdateInput } from "./types";
+import type { BackupInfo,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkEventInput,WorkEventUpdateInput } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -35,6 +35,7 @@ export const api={
   deleteTask:(id:number)=>invoke<void>("delete_task",{id}),
   restoreTask:(id:number)=>invoke<void>("restore_task",{id}),
   archiveTask:(id:number)=>invoke<void>("archive_task",{id}),
+  mergeTasks:(input:MergeTaskInput)=>invoke<void>("merge_tasks",{input}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   getWorkEvents:(taskId:number)=>invoke<TaskWorkEvent[]>("get_work_events",{taskId}),
   recordWorkEvent:(input:WorkEventInput)=>invoke<void>("record_work_event",{input}),

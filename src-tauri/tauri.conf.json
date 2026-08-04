@@ -30,17 +30,17 @@
         "label": "floating",
         "title": "In Line 悬浮窗",
         "url": "index.html#/floating",
-        "width": 420,
-        "height": 540,
-        "minWidth": 340,
-        "minHeight": 40,
+        "width": 444,
+        "height": 564,
+        "minWidth": 364,
+        "minHeight": 64,
         "visible": false,
         "decorations": false,
-        "transparent": false,
+        "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,
-        "shadow": true
+        "shadow": false
       },
       {
         "label": "quick-add",

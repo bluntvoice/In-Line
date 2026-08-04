@@ -140,6 +140,17 @@ pub struct QueueInput {
     pub reason: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergeTaskInput {
+    pub target_task_id: i64,
+    pub source_task_id: i64,
+    #[serde(default)]
+    pub deduplicate_records: bool,
+    #[serde(default)]
+    pub trash_source: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatisticsRange {

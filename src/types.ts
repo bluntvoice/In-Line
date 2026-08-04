@@ -21,6 +21,7 @@ export type WorkResult="processed"|"completed"|"waiting_materials"|"waiting_conf
 export interface WorkEventInput{taskId:number;resultStatus:WorkResult;handledAt:string;note:string;syncStatus:boolean}
 export interface WorkEventUpdateInput{id:number;resultStatus:WorkResult;handledAt:string;note:string;confirmHistoricalImpact:boolean}
 export interface QueueInput{id:number;inheritDeadline:boolean;reason:string}
+export interface MergeTaskInput{targetTaskId:number;sourceTaskId:number;deduplicateRecords:boolean;trashSource:boolean}
 export interface TicketSnapshot{task:LegalTask;queueAhead:number}
 export interface MasterData{departments:string[];taskTypes:string[];contacts:string[]}
 export interface BackupInfo{name:string;path:string;size:number;modifiedAt:string}

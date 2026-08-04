@@ -19,8 +19,14 @@ export function alphaPrefix(days:number){
   while(value>0){value-=1;output=String.fromCharCode(65+(value%26))+output;value=Math.floor(value/26);}
   return output;
 }
-export function displayTicket(task:Pick<LegalTask,"ticketDate"|"dailySequence">,today?:string){
-  return `${alphaPrefix(dayDifference(task.ticketDate,today))}${String(task.dailySequence).padStart(2,"0")}`;
+type TicketDisplayTask=Pick<LegalTask,"ticketDate"|"dailySequence">&Partial<Pick<LegalTask,"archivedAt">>;
+export function displayTicket(task:TicketDisplayTask,today?:string){
+  let referenceDate=today;
+  if(task.archivedAt){
+    const archivedAt=new Date(task.archivedAt);
+    if(!Number.isNaN(archivedAt.getTime()))referenceDate=dateOnly(archivedAt);
+  }
+  return `${alphaPrefix(dayDifference(task.ticketDate,referenceDate))}${String(task.dailySequence).padStart(2,"0")}`;
 }
 export function isOverdue(task:Pick<LegalTask,"requestedDeadline"|"status">,now=new Date()){
   return Boolean(task.requestedDeadline&&!['processed','completed','cancelled','archived'].includes(task.status)&&new Date(task.requestedDeadline).getTime()<now.getTime());

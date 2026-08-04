@@ -12,7 +12,6 @@ export default function TicketNumber({ task, showPermanent = false }: { task: Le
         className={`ticket-number ${age > 0 ? "ticket-aged" : ""} ${alert ? "ticket-alert" : ""}`}
         title={task.hasActiveQueue ? (age > 0 ? `该事项已在队列中等候 ${age} 天，请关注时效风险。` : "今日取号事项") : "最近一次排队序号"}
       >
-        {task.hasActiveQueue && <small>今日序号</small>}
         {alert && <span className="ticket-triangle" aria-label="时效警示">▲</span>}
         <span className="ticket-prefix">{match?.[1]}</span>
         <strong>{match?.[2] ?? ticket}</strong>

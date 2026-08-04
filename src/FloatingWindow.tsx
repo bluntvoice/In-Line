@@ -43,7 +43,9 @@ export default function FloatingWindow(){
   };
   const resize=async(value:boolean)=>{
     const currentWindow=getCurrentWindow();
-    await currentWindow.setSize(new LogicalSize(420,value?48:540));
+    // Reserve 12 px on every side for the CSS shadow while keeping the
+    // visible floating content at 420 × 540 (or 420 × 48 in mini mode).
+    await currentWindow.setSize(new LogicalSize(444,value?72:564));
     setMini(value);
   };
   const startDrag=(event:React.MouseEvent<HTMLElement>)=>{

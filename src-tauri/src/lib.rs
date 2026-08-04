@@ -86,6 +86,15 @@ fn archive_task(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(
     emit_change(&app)
 }
 #[tauri::command]
+fn merge_tasks(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: MergeTaskInput,
+) -> Result<(), String> {
+    db.merge_tasks(input)?;
+    emit_change(&app)
+}
+#[tauri::command]
 fn get_logs(db: State<Database>, task_id: i64) -> Result<Vec<TaskLog>, String> {
     db.get_logs(task_id)
 }
@@ -394,6 +403,7 @@ pub fn run() {
             delete_task,
             restore_task,
             archive_task,
+            merge_tasks,
             get_logs,
             get_work_events,
             record_work_event,

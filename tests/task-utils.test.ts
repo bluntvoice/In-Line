@@ -9,6 +9,11 @@ const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,perman
 describe("取号和人工顺位",()=>{
   it("当天显示两位号码",()=>expect(displayTicket({ticketDate:"2026-07-17",dailySequence:1},"2026-07-17")).toBe("01"));
   it("跨天增加字母前缀",()=>{expect(displayTicket({ticketDate:"2026-07-16",dailySequence:3},"2026-07-17")).toBe("A03");expect(alphaPrefix(27)).toBe("AA");});
+  it("归档后固定为归档当天的排队编号",()=>{
+    const archived={ticketDate:"2026-07-17",dailySequence:3,archivedAt:"2026-07-19T10:00:00"};
+    expect(displayTicket(archived,"2026-08-04")).toBe("B03");
+    expect(displayTicket(archived,"2027-08-04")).toBe("B03");
+  });
   it("系统时间倒退不产生负天数",()=>expect(dayDifference("2026-07-17","2026-07-16")).toBe(0));
   it("加急不覆盖人工顺位",()=>{const first={...task(1,2),isUrgent:true,priority:"critical" as const};const second=task(2,1);expect(sortQueue([first,second]).map(value=>value.id)).toEqual([2,1]);});
   it("已逾期事项优先显示，同组内仍保持人工顺位",()=>{

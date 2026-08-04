@@ -125,13 +125,13 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
         <form onSubmit={submit} onKeyDown={enterToSave}>
           {error && <div className="form-error"><AlertTriangle size={15} />{error}</div>}
           <div className="form-grid">
-            <label>
+            <label className="paired-control-field">
               <span>部门 / 团队 *</span>
               <MultiContactInput values={form.departments} options={localMasters.departments} itemLabel="部门 / 团队" placeholder="输入或选择部门 / 团队"
                 onChange={(departments) => setForm(current => ({ ...current, departments, department: departments.join("、") }))}
                 onDelete={(value) => removeMaster("department", value)} />
             </label>
-            <label>
+            <label className="paired-control-field">
               <span>对接人 *</span>
               <MultiContactInput values={form.contacts} options={localMasters.contacts} commonContacts={quickContacts}
                 onChange={(contacts) => setForm(current => ({ ...current, contacts, contact: contacts.join("、") }))}

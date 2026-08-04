@@ -1,5 +1,5 @@
 import { useEffect,useState } from "react";
-import { Archive,Check,CheckCircle2,Edit3,ListPlus,Pencil,PlayCircle,RotateCcw,Trash2,X } from "lucide-react";
+import { Archive,Check,CheckCircle2,Edit3,GitMerge,ListPlus,Pencil,PlayCircle,RotateCcw,Trash2,X } from "lucide-react";
 import type { LegalTask,TaskLog,TaskView,TaskWorkEvent } from "../types";
 import { api } from "../api";
 import { formatDateTime,formatDeadline,isDeferredStatus,isOverdue,localizeStatusText,PRIORITY_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
@@ -7,14 +7,15 @@ import StatusBadge from "./StatusBadge";
 import TicketNumber from "./TicketNumber";
 import QueueDialog from "./QueueDialog";
 import WorkEventDialog from "./WorkEventDialog";
+import MergeTaskDialog from "./MergeTaskDialog";
 
 const historyWarning="此操作将改变该事项的统计归属期间，并可能影响历史周报、月报或季度统计。是否继续？";
 const sourceLabel=(source:string)=>source==="manual"?"手动记录":source==="quick_action"?"快捷处理":"状态变化自动记录";
 
-export default function TaskDetail({task,view,onClose,onEdit,onChanged,notify=()=>undefined}:{task:LegalTask;view:TaskView;onClose:()=>void;onEdit:()=>void;onChanged:()=>void;notify?:(message:string)=>void}){
+export default function TaskDetail({task,view,mergeCandidates,onClose,onEdit,onChanged,notify=()=>undefined}:{task:LegalTask;view:TaskView;mergeCandidates:LegalTask[];onClose:()=>void;onEdit:()=>void;onChanged:()=>void;notify?:(message:string)=>void}){
   const [logs,setLogs]=useState<TaskLog[]>([]);const [events,setEvents]=useState<TaskWorkEvent[]>([]);const [note,setNote]=useState("");
   const [editingLog,setEditingLog]=useState<number|null>(null);const [editingContent,setEditingContent]=useState("");
-  const [workDialog,setWorkDialog]=useState<TaskWorkEvent|null|undefined>(undefined);const [queueDialog,setQueueDialog]=useState<"enqueue"|"reopen"|null>(null);
+  const [workDialog,setWorkDialog]=useState<TaskWorkEvent|null|undefined>(undefined);const [queueDialog,setQueueDialog]=useState<"enqueue"|"reopen"|null>(null);const [mergeDialog,setMergeDialog]=useState(false);
   const refresh=async()=>{const [nextLogs,nextEvents]=await Promise.all([api.getLogs(task.id),api.getWorkEvents(task.id)]);setLogs(nextLogs);setEvents(nextEvents);};
   useEffect(()=>{void refresh();},[task.id]);
   const add=async()=>{if(!note.trim())return;await api.addLog(task.id,note);setNote("");await refresh();};
@@ -29,7 +30,7 @@ export default function TaskDetail({task,view,onClose,onEdit,onChanged,notify=()
     <header><div><TicketNumber task={task} showPermanent/><h2>{task.title}</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18}/></button></header>
     <div className="detail-actions">
       {view==="trash"?<button className="button primary" onClick={async()=>{await api.restoreTask(task.id);notify("事项已恢复并加入今日队列");onChanged();}}><RotateCcw size={16}/>恢复</button>:<>
-        <button className="button secondary" onClick={onEdit}><Edit3 size={16}/>编辑</button>
+        <button className="button secondary" onClick={onEdit}><Edit3 size={16}/>编辑</button><button className="button secondary" onClick={()=>setMergeDialog(true)}><GitMerge size={16}/>合并</button>
         {terminal?<><button className="button primary" onClick={()=>setQueueDialog("reopen")}><RotateCcw size={16}/>重新开启并加入今日队列</button>{task.status==="completed"&&!task.archivedAt&&<button className="button secondary" onClick={async()=>{await api.archiveTask(task.id);onChanged();}}><Archive size={16}/>归档</button>}</>:<>
           {canWork&&<button className="button secondary" onClick={()=>void process()}><PlayCircle size={16}/>本轮已处理</button>}
           {canWork&&<button className="button primary" onClick={()=>void complete()}><CheckCircle2 size={16}/>本轮已完成</button>}
@@ -49,7 +50,7 @@ export default function TaskDetail({task,view,onClose,onEdit,onChanged,notify=()
     <section><h3>事项详情</h3><p className={task.details?"detail-copy":"muted"}>{task.details||"未填写"}</p></section>
     {task.isUrgent&&<section className="urgent-box"><h3>加急信息</h3><p><strong>{task.urgentRequester}</strong>：{task.urgentReason}</p></section>}
     {task.internalNotes&&<section><h3>内部备注</h3><p className="detail-copy">{task.internalNotes}</p></section>}
-    {view!=="trash"&&<section className="work-events"><div className="section-heading"><div><h3>办理记录</h3><small>每完成一次办理就在此记录，并计入统计</small></div><button className="button secondary small" onClick={()=>setWorkDialog(null)}><ListPlus size={15}/>记录本次处理</button></div>
+    {view!=="trash"&&<section className="work-events"><div className="section-heading"><div><h3>办理记录</h3></div><button className="button secondary small" onClick={()=>setWorkDialog(null)}><ListPlus size={15}/>新增记录</button></div>
       {events.map(event=><article className="work-event" key={event.id}><div><StatusBadge status={event.resultStatus}/><time>{formatDateTime(event.handledAt)}</time><small>{sourceLabel(event.source)} · {event.taskTypeSnapshot}</small></div>{event.note&&<p>{event.note}</p>}<span className="timeline-actions"><button title="编辑处理活动" onClick={()=>setWorkDialog(event)}><Pencil size={14}/></button>{event.canDelete&&<button className="danger" title="作废处理活动" onClick={()=>void removeEvent(event)}><Trash2 size={14}/></button>}</span></article>)}
       {!events.length&&<p className="muted">暂无办理记录</p>}
     </section>}
@@ -59,5 +60,6 @@ export default function TaskDetail({task,view,onClose,onEdit,onChanged,notify=()
     </section>
     {workDialog!==undefined&&<WorkEventDialog task={task} event={workDialog??undefined} onClose={()=>setWorkDialog(undefined)} onSaved={()=>{setWorkDialog(undefined);notify("处理活动已保存");void refresh();onChanged();}}/>}
     {queueDialog&&<QueueDialog task={task} reopen={queueDialog==="reopen"} onClose={()=>setQueueDialog(null)} onSaved={()=>{setQueueDialog(null);notify(queueDialog==="reopen"?"事项已重新开启并加入今日队列":"事项已加入今日队列");onChanged();}}/>}
+    {mergeDialog&&<MergeTaskDialog target={task} candidates={mergeCandidates} onClose={()=>setMergeDialog(false)} onMerged={()=>{setMergeDialog(false);notify("事项已合并，相关记录已保留");onChanged();}}/>}
   </aside>;
 }

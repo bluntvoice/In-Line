@@ -1072,6 +1072,104 @@ impl Database {
             add_log(tx, id, "archived", "事项已归档")
         })
     }
+
+    pub fn merge_tasks(&self, input: MergeTaskInput) -> Result<(), String> {
+        if input.target_task_id == input.source_task_id {
+            return Err("不能将事项合并到自身".into());
+        }
+        self.with_transaction(|tx| {
+            let target = get_task_on(tx, input.target_task_id)?;
+            let source = get_task_on(tx, input.source_task_id)?;
+            if target.deleted_at.is_some() || source.deleted_at.is_some() {
+                return Err("回收站中的事项不能参与合并，请先恢复".into());
+            }
+
+            close_active_queue(tx, source.id, "合并至其他事项")?;
+            if input.deduplicate_records {
+                tx.execute(
+                    "DELETE FROM task_logs
+                     WHERE task_id=? AND EXISTS(
+                       SELECT 1 FROM task_logs target
+                       WHERE target.task_id=?
+                         AND target.log_type=task_logs.log_type
+                         AND target.content=task_logs.content
+                         AND target.created_at=task_logs.created_at
+                     )",
+                    params![source.id, target.id],
+                )
+                .map_err(display_error)?;
+                tx.execute(
+                    "DELETE FROM task_work_events
+                     WHERE task_id=? AND EXISTS(
+                       SELECT 1 FROM task_work_events target
+                       WHERE target.task_id=?
+                         AND target.result_status=task_work_events.result_status
+                         AND target.handled_at=task_work_events.handled_at
+                         AND target.task_type_snapshot=task_work_events.task_type_snapshot
+                         AND target.source=task_work_events.source
+                         AND target.note=task_work_events.note
+                         AND (target.voided_at IS NULL)=(task_work_events.voided_at IS NULL)
+                     )",
+                    params![source.id, target.id],
+                )
+                .map_err(display_error)?;
+            }
+
+            for table in [
+                "task_logs",
+                "task_work_events",
+                "status_history",
+                "urgent_records",
+                "task_queue_entries",
+            ] {
+                tx.execute(
+                    &format!("UPDATE {table} SET task_id=? WHERE task_id=?"),
+                    params![target.id, source.id],
+                )
+                .map_err(display_error)?;
+            }
+
+            let stamp = now();
+            tx.execute(
+                "UPDATE tasks SET updated_at=? WHERE id=?",
+                params![stamp, target.id],
+            )
+            .map_err(display_error)?;
+            add_log(
+                tx,
+                target.id,
+                "merged",
+                &format!(
+                    "已合并事项 {}《{}》，相关办理记录与历史记录已并入",
+                    source.permanent_number, source.title
+                ),
+            )?;
+
+            tx.execute(
+                "UPDATE tasks
+                 SET status='archived',archived_at=COALESCE(archived_at,?),
+                     deleted_at=CASE WHEN ? THEN ? ELSE NULL END,updated_at=?
+                 WHERE id=?",
+                params![
+                    stamp,
+                    input.trash_source,
+                    stamp,
+                    stamp,
+                    source.id
+                ],
+            )
+            .map_err(display_error)?;
+            add_log(
+                tx,
+                source.id,
+                "merged",
+                &format!(
+                    "该重复事项已合并至 {}《{}》",
+                    target.permanent_number, target.title
+                ),
+            )
+        })
+    }
     pub fn restore(&self, id: i64) -> Result<(), String> {
         self.with_transaction(|tx| {
             let task = get_task_on(tx, id)?;
@@ -2172,6 +2270,65 @@ mod tests {
         assert!(backup.name.starts_with("InLine-backup-"));
         assert!(backup.name.ends_with("-manual.db"));
         db.delete_backup(backup.path).unwrap();
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn merge_tasks_preserves_history_and_deduplicates_events() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-merge-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let target = db.save_task(sample("主事项")).unwrap();
+        let source = db.save_task(sample("重复事项")).unwrap();
+        let handled_at = now();
+        for task_id in [target.id, source.id] {
+            db.record_work_event(WorkEventInput {
+                task_id,
+                result_status: "processed".into(),
+                handled_at: handled_at.clone(),
+                note: "相同办理记录".into(),
+                sync_status: false,
+            })
+            .unwrap();
+        }
+        db.record_work_event(WorkEventInput {
+            task_id: source.id,
+            result_status: "completed".into(),
+            handled_at: (Utc::now() + chrono::Duration::minutes(1)).to_rfc3339(),
+            note: "来源事项独有记录".into(),
+            sync_status: false,
+        })
+        .unwrap();
+        db.add_log(source.id, "需要保留的普通备注".into()).unwrap();
+
+        db.merge_tasks(MergeTaskInput {
+            target_task_id: target.id,
+            source_task_id: source.id,
+            deduplicate_records: true,
+            trash_source: true,
+        })
+        .unwrap();
+
+        let merged_events = db.list_work_events(target.id).unwrap();
+        assert_eq!(merged_events.len(), 2);
+        assert!(merged_events
+            .iter()
+            .any(|event| event.note == "来源事项独有记录"));
+        assert!(db
+            .get_logs(target.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.content == "需要保留的普通备注"));
+        assert_eq!(db.list_work_events(source.id).unwrap().len(), 0);
+        assert!(!db.get_task(source.id).unwrap().has_active_queue);
+        assert!(db
+            .list_tasks(TaskView::Trash)
+            .unwrap()
+            .iter()
+            .any(|task| task.id == source.id));
         drop(db);
         let _ = fs::remove_dir_all(root);
     }

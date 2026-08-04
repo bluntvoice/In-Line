@@ -135,7 +135,7 @@ export default function App(){
       <small className="app-version">{version?`v${version}`:""}</small>
     </aside>
     <main className="workspace">
-      {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} onChanged={()=>void refresh()} notify={toast}/>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:<>
+      {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} onChanged={()=>void refresh()} notify={toast}/>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:<>
         <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="deferred"?"暂缓事项":view==="archive"?"历史归档":"回收站"}</h1></div>
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>
@@ -158,7 +158,7 @@ export default function App(){
               {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query||activeFilterCount(filters)>0?"没有匹配事项":view==="deferred"?"目前没有暂缓事项":"目前没有排队事项"}</h2><p>{query||activeFilterCount(filters)>0?"请调整关键词或列筛选条件。":view==="deferred"?"待补充材料、待内部确认、待对方确认和已暂停事项会显示在这里。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
             </div>
           </section>
-          {selected&&<TaskDetail task={selected} view={actionView} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}
+          {selected&&<TaskDetail task={selected} view={actionView} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}
         </div>
       </>}
     </main>
