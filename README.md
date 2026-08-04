@@ -151,8 +151,8 @@ Windows x64 安装包采用 NSIS 格式，使用系统 WebView2，不捆绑完�
 
 v0.1.1 正式安装包：
 
-- `In Line_0.1.1_x64-setup.exe`
-- 通过 GitHub Release 工作流构建并发布
+- `In.Line_0.1.1_x64-setup.exe`
+- 通过 GitHub Release 工作流构建并发布，资产列表同时提供 SHA-256 校验值
 
 ## 开发
 

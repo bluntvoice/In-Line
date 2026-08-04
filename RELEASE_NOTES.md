@@ -41,6 +41,6 @@
 
 | 平台 | 架构 | 文件 |
 |------|------|------|
-| Windows 10 / 11 | x64 | `In Line_0.1.1_x64-setup.exe` |
+| Windows 10 / 11 | x64 | `In.Line_0.1.1_x64-setup.exe` |
 
 **完整变更日志**：https://github.com/bluntvoice/In-Line/compare/v0.1.0...v0.1.1
