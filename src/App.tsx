@@ -2,7 +2,7 @@ import { useEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,BarChart3,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
-import { commonContacts,displayTicket,formatDeadline,isDeferredStatus,isOverdue,sortQueue,visibleQueueTasks } from "./lib/task-utils";
+import { commonContacts,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortQueue,visibleQueueTasks } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
@@ -146,11 +146,11 @@ export default function App(){
               <th><ValueFilterHeader label="对接人" values={filterOptions.contacts} selected={filters.contacts} onChange={contacts=>updateFilters({contacts})}/></th>
               <th><ValueFilterHeader label="事项类型" values={filterOptions.taskTypes} selected={filters.taskTypes} onChange={taskTypes=>updateFilters({taskTypes})}/></th>
               <th><ValueFilterHeader label="当前状态" values={filterOptions.statuses} selected={filters.statuses} renderLabel={status=>STATUS_LABELS[status]} onChange={statuses=>updateFilters({statuses})}/></th>
-              <th><DeadlineFilterHeader date={filters.deadlineDate} periods={filters.deadlinePeriods} onChange={(deadlineDate,deadlinePeriods)=>updateFilters({deadlineDate,deadlinePeriods})}/></th><th>操作</th></tr></thead>
+              <th>{view==="archive"?"完成时间":<DeadlineFilterHeader date={filters.deadlineDate} periods={filters.deadlinePeriods} onChange={(deadlineDate,deadlinePeriods)=>updateFilters({deadlineDate,deadlinePeriods})}/>}</th><th>操作</th></tr></thead>
               <tbody>{tasks.map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=view==="queue"&&task.hasActiveQueue&&index>0&&tasks[index-1].hasActiveQueue&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=view==="queue"&&task.hasActiveQueue&&index<tasks.length-1&&tasks[index+1].hasActiveQueue&&isOverdue(tasks[index+1])===taskOverdue;return <tr key={task.id} className={taskOverdue?"overdue-row":undefined} tabIndex={0} onClick={()=>void copy(task)} onDoubleClick={event=>{event.preventDefault();setSelected(task);}} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
                 <td><TicketNumber task={task}/></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}</td>
                 <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={taskOverdue}/></td>
-                <td className={taskOverdue?"deadline overdue":"deadline"}>{formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
+                <td className={taskOverdue?"deadline overdue":"deadline"}>{view==="archive"?formatDateTime(historyTimestamp(task)):formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
                 <td><div className="row-actions"><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制取号图片"><Copy size={17}/></button>
                   <button disabled={!canMoveUp} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={17}/></button>
                   <button disabled={!canMoveDown} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={17}/></button></div></td>

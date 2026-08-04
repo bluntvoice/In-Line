@@ -19,11 +19,19 @@ export function alphaPrefix(days:number){
   while(value>0){value-=1;output=String.fromCharCode(65+(value%26))+output;value=Math.floor(value/26);}
   return output;
 }
-type TicketDisplayTask=Pick<LegalTask,"ticketDate"|"dailySequence">&Partial<Pick<LegalTask,"archivedAt">>;
+type HistoryTask=Partial<Pick<LegalTask,"archivedAt"|"completedAt"|"updatedAt"|"status">>;
+export function historyTimestamp(task:HistoryTask){
+  if(task.archivedAt)return task.archivedAt;
+  if(task.status==="completed")return task.completedAt??task.updatedAt??null;
+  if(task.status==="cancelled"||task.status==="archived")return task.updatedAt??task.completedAt??null;
+  return null;
+}
+type TicketDisplayTask=Pick<LegalTask,"ticketDate"|"dailySequence">&HistoryTask;
 export function displayTicket(task:TicketDisplayTask,today?:string){
   let referenceDate=today;
-  if(task.archivedAt){
-    const archivedAt=new Date(task.archivedAt);
+  const historyTime=historyTimestamp(task);
+  if(historyTime){
+    const archivedAt=new Date(historyTime);
     if(!Number.isNaN(archivedAt.getTime()))referenceDate=dateOnly(archivedAt);
   }
   return `${alphaPrefix(dayDifference(task.ticketDate,referenceDate))}${String(task.dailySequence).padStart(2,"0")}`;

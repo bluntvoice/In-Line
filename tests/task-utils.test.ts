@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,isDeferredStatus,localizeStatusText,queueAheadMessage,sortQueue,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortQueue,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import type { LegalTask } from "../src/types";
@@ -13,6 +13,11 @@ describe("取号和人工顺位",()=>{
     const archived={ticketDate:"2026-07-17",dailySequence:3,archivedAt:"2026-07-19T10:00:00"};
     expect(displayTicket(archived,"2026-08-04")).toBe("B03");
     expect(displayTicket(archived,"2027-08-04")).toBe("B03");
+  });
+  it("旧版归档数据缺少归档时间时按完成时间固定编号",()=>{
+    const archived={ticketDate:"2026-07-17",dailySequence:4,status:"completed" as const,archivedAt:null,completedAt:"2026-07-20T10:00:00",updatedAt:"2026-08-04T10:00:00"};
+    expect(historyTimestamp(archived)).toBe("2026-07-20T10:00:00");
+    expect(displayTicket(archived,"2027-08-04")).toBe("C04");
   });
   it("系统时间倒退不产生负天数",()=>expect(dayDifference("2026-07-17","2026-07-16")).toBe(0));
   it("加急不覆盖人工顺位",()=>{const first={...task(1,2),isUrgent:true,priority:"critical" as const};const second=task(2,1);expect(sortQueue([first,second]).map(value=>value.id)).toEqual([2,1]);});
