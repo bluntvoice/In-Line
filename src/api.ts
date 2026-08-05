@@ -57,7 +57,7 @@ export const api={
   createBackup:()=>invoke<BackupInfo>("create_backup"),
   restoreBackup:(path:string)=>invoke<void>("restore_backup",{path}),
   deleteBackup:(path:string)=>invoke<void>("delete_backup",{path}),
-  setSetting:(key:"show_deferred_in_queue",value:boolean)=>invoke<void>("set_setting",{key,value:value?"true":"false"}),
+  setSetting:(key:"show_deferred_in_queue"|"week_start_day",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
   showMain:()=>invoke<void>("show_main_window"),
   requestNewTask:()=>invoke<void>("request_new_task"),

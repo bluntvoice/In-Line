@@ -107,6 +107,7 @@ function drawTicket(task: LegalTask, queueAhead: number): TicketRenderer {
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = "high";
   context.textBaseline = "middle";
+  context.textAlign = "left";
   context.fillStyle = COLORS.paper; context.fillRect(0, 0, WIDTH, HEIGHT);
   rounded(context, 24, 24, 752, 932, 32, "#FFFFFF");
   context.fillStyle = COLORS.blue; context.fillRect(24, 24, 10, 932);

@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-08-05
+
+### Added
+
+- 统计中心新增“本周”选项并默认选中，自动统计本周起始日至当天的事项完成情况。
+- 系统设置新增“每周起始日”，可选择周一或周日，并同步影响“本周”和“上一周”的日期范围。
+
+### Changed
+
+- 关于页面在项目作者“六朝声”后补充“微信公众号：凡声”，并优化作者信息间距与层级。
+
+### Fixed
+
+- 修复取号图片复用画布后，“事项已登记”可能继承右对齐状态并向左错位的问题。
+
 ## [0.1.1] - 2026-08-04
 
 ### Added
@@ -214,7 +229,10 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.0.9...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/bluntvoice/in-line/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/bluntvoice/in-line/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/bluntvoice/in-line/compare/v0.0.9...v0.1.0
 [0.0.9]: https://github.com/bluntvoice/in-line/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/bluntvoice/in-line/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/bluntvoice/in-line/compare/v0.0.6...v0.0.7

@@ -1959,10 +1959,12 @@ impl Database {
         })
     }
     pub fn set_setting(&self, key: String, value: String) -> Result<(), String> {
-        if key != "show_deferred_in_queue" {
-            return Err("不支持的设置项".into());
-        }
-        if value != "true" && value != "false" {
+        let valid = match key.as_str() {
+            "show_deferred_in_queue" => value == "true" || value == "false",
+            "week_start_day" => value == "monday" || value == "sunday",
+            _ => return Err("不支持的设置项".into()),
+        };
+        if !valid {
             return Err("设置值无效".into());
         }
         self.with_conn(|connection| {
@@ -2221,6 +2223,18 @@ mod tests {
                 .map(String::as_str),
             Some("true")
         );
+        db.set_setting("week_start_day".into(), "sunday".into())
+            .unwrap();
+        assert_eq!(
+            db.settings()
+                .unwrap()
+                .get("week_start_day")
+                .map(String::as_str),
+            Some("sunday")
+        );
+        assert!(db
+            .set_setting("week_start_day".into(), "friday".into())
+            .is_err());
         assert!(db.set_setting("unknown".into(), "true".into()).is_err());
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);

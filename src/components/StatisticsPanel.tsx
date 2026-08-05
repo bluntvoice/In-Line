@@ -3,37 +3,23 @@ import { BarChart3,ChevronRight,RefreshCw } from "lucide-react";
 import { api } from "../api";
 import type { StatisticsDetail,StatisticsResult } from "../types";
 import { formatDateTime,STATUS_LABELS } from "../lib/task-utils";
+import { statisticsPresetRange,type StatisticsPreset,type WeekStart } from "../lib/statistics-range";
 
-type Preset="week"|"month"|"quarter"|"custom";
-const dateInput=(date:Date)=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 const localStart=(value:string)=>new Date(`${value}T00:00:00`).toISOString();
 const nextLocalDay=(value:string)=>{const date=new Date(`${value}T00:00:00`);date.setDate(date.getDate()+1);return date.toISOString();};
-function presetRange(preset:Exclude<Preset,"custom">){
-  const now=new Date();let start:Date;let end:Date;
-  if(preset==="week"){
-    end=new Date(now.getFullYear(),now.getMonth(),now.getDate());end.setDate(end.getDate()-((end.getDay()+6)%7));
-    start=new Date(end);start.setDate(start.getDate()-7);
-  }else if(preset==="month"){
-    end=new Date(now.getFullYear(),now.getMonth(),1);start=new Date(now.getFullYear(),now.getMonth()-1,1);
-  }else{
-    const quarterStart=Math.floor(now.getMonth()/3)*3;end=new Date(now.getFullYear(),quarterStart,1);start=new Date(now.getFullYear(),quarterStart-3,1);
-  }
-  const inclusiveEnd=new Date(end);inclusiveEnd.setDate(inclusiveEnd.getDate()-1);
-  return{start:dateInput(start),end:dateInput(inclusiveEnd)};
-}
 
-export default function StatisticsPanel({onOpenTask,refreshKey=0}:{onOpenTask:(id:number)=>void;refreshKey?:string|number}){
-  const [preset,setPreset]=useState<Preset>("week");const initial=presetRange("week");
+export default function StatisticsPanel({onOpenTask,refreshKey=0,weekStartsOn}:{onOpenTask:(id:number)=>void;refreshKey?:string|number;weekStartsOn:WeekStart}){
+  const [preset,setPreset]=useState<StatisticsPreset>("currentWeek");const initial=statisticsPresetRange("currentWeek",weekStartsOn);
   const [customStart,setCustomStart]=useState(initial.start);const [customEnd,setCustomEnd]=useState(initial.end);
   const [data,setData]=useState<StatisticsResult|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
   const [selectedType,setSelectedType]=useState("");const [details,setDetails]=useState<StatisticsDetail[]>([]);const [detailsLoading,setDetailsLoading]=useState(false);
-  const range=useMemo(()=>preset==="custom"?{start:customStart,end:customEnd}:presetRange(preset),[preset,customStart,customEnd]);
+  const range=useMemo(()=>preset==="custom"?{start:customStart,end:customEnd}:statisticsPresetRange(preset,weekStartsOn),[preset,customStart,customEnd,weekStartsOn]);
   const load=async()=>{if(!range.start||!range.end||range.start>range.end){setError("开始日期不能晚于结束日期");setLoading(false);return;}setLoading(true);setError("");setSelectedType("");setDetails([]);try{setData(await api.getStatistics(localStart(range.start),nextLocalDay(range.end)));}catch(value){setError(value instanceof Error?value.message:String(value));}finally{setLoading(false);}};
   useEffect(()=>{void load();},[range.start,range.end,refreshKey]);
   const openType=async(taskType:string)=>{setSelectedType(taskType);setDetailsLoading(true);try{setDetails(await api.getStatisticsDetails(localStart(range.start),nextLocalDay(range.end),taskType));}catch(value){setError(value instanceof Error?value.message:String(value));}finally{setDetailsLoading(false);}};
   const maxTrend=Math.max(1,...(data?.trend.map(point=>point.handledTasks)??[1]));
   return <section className="statistics-panel">
-    <header className="statistics-header"><div><p>实际处理事项 · 周期内按事项去重</p><h1>统计中心</h1></div><div className="period-controls"><div className="preset-tabs">{(["week","month","quarter","custom"] as Preset[]).map(value=><button className={preset===value?"active":""} key={value} onClick={()=>setPreset(value)}>{value==="week"?"上一周":value==="month"?"上一个月":value==="quarter"?"上一季度":"自定义"}</button>)}</div>{preset==="custom"&&<div className="custom-range"><input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)}/><span>至</span><input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)}/></div>}<small>{range.start} 至 {range.end}</small></div></header>
+    <header className="statistics-header"><div><p>实际处理事项 · 周期内按事项去重</p><h1>统计中心</h1></div><div className="period-controls"><div className="preset-tabs">{(["currentWeek","previousWeek","month","quarter","custom"] as StatisticsPreset[]).map(value=><button className={preset===value?"active":""} key={value} onClick={()=>setPreset(value)}>{value==="currentWeek"?"本周":value==="previousWeek"?"上一周":value==="month"?"上一个月":value==="quarter"?"上一季度":"自定义"}</button>)}</div>{preset==="custom"&&<div className="custom-range"><input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)}/><span>至</span><input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)}/></div>}<small>{range.start} 至 {range.end}{preset==="currentWeek"&&` · ${weekStartsOn==="monday"?"周一":"周日"}起算`}</small></div></header>
     {error&&<div className="statistics-error"><span>{error}</span><button onClick={()=>void load()}><RefreshCw size={15}/>重新加载</button></div>}
     {loading?<div className="statistics-loading"><BarChart3 size={32}/><p>正在汇总处理活动…</p></div>:data&&<>
       <div className="summary-grid">
