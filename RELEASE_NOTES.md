@@ -1,5 +1,3 @@
-# In Line v0.1.2 测试版
-
 > 增加本周统计和周起始日设置，完善作者信息，并修复取号图片文字错位。
 
 ## 新增与优化
@@ -12,13 +10,14 @@
 
 - 修复取号图片生成器复用 Canvas 后，“事项已登记”继承上一帧右对齐状态、导致向左偏移的问题。
 
-> [!WARNING]
-> v0.1.2 当前为测试版。升级会继续使用 `%APPDATA%\in-line\inline.db`，建议安装前在系统设置中手动创建一次备份。
+## 升级提示
+
+升级后继续使用 `%APPDATA%\in-line\inline.db` 中的原有数据。建议安装前在系统设置中手动创建一次备份。
 
 ## 下载
 
 | 平台 | 架构 | 文件 |
 |------|------|------|
-| Windows 10 / 11 | x64 | `In Line_0.1.2_x64-setup.exe` |
+| Windows 10 / 11 | x64 | `In.Line_0.1.2_x64-setup.exe` |
 
-**完整变更日志**：https://github.com/bluntvoice/In-Line/compare/v0.1.1...HEAD
+**完整变更日志**：https://github.com/bluntvoice/In-Line/compare/v0.1.1...v0.1.2
