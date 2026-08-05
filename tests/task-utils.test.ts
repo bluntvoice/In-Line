@@ -3,6 +3,7 @@ import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import { statisticsPresetRange } from "../src/lib/statistics-range";
+import { isMiniFloatingHeight } from "../src/lib/floating-window";
 import type { LegalTask } from "../src/types";
 
 const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",departments:["产品组"],contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null,processingRounds:0,hasActiveQueue:true});
@@ -132,5 +133,13 @@ describe("统计周期",()=>{
   it("上一周跟随系统设置并取完整七天",()=>{
     expect(statisticsPresetRange("previousWeek","monday",wednesday)).toEqual({start:"2026-07-27",end:"2026-08-02"});
     expect(statisticsPresetRange("previousWeek","sunday",wednesday)).toEqual({start:"2026-07-26",end:"2026-08-01"});
+  });
+});
+
+describe("悬浮窗尺寸模式",()=>{
+  it("根据实际视口高度识别迷你与展开模式",()=>{
+    expect(isMiniFloatingHeight(72)).toBe(true);
+    expect(isMiniFloatingHeight(120)).toBe(true);
+    expect(isMiniFloatingHeight(564)).toBe(false);
   });
 });

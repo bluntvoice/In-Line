@@ -5,12 +5,13 @@ import { LogicalSize } from "@tauri-apps/api/dpi";
 import { api } from "./api";
 import type { LegalTask } from "./types";
 import { displayTicket,isOverdue,visibleQueueTasks } from "./lib/task-utils";
+import { isMiniFloatingHeight } from "./lib/floating-window";
 import StatusBadge from "./components/StatusBadge";
 import TaskContextMenu,{type ContextAction} from "./components/TaskContextMenu";
 import TicketNumber from "./components/TicketNumber";
 
 export default function FloatingWindow(){
-  const [tasks,setTasks]=useState<LegalTask[]>([]);const [mini,setMini]=useState(false);const [message,setMessage]=useState("");const [menu,setMenu]=useState<{task:LegalTask;x:number;y:number}|null>(null);
+  const [tasks,setTasks]=useState<LegalTask[]>([]);const [mini,setMini]=useState(()=>isMiniFloatingHeight(window.innerHeight));const [message,setMessage]=useState("");const [menu,setMenu]=useState<{task:LegalTask;x:number;y:number}|null>(null);
   const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState("");
   const refresh=async()=>{
     setLoading(true);setLoadError("");
@@ -19,6 +20,12 @@ export default function FloatingWindow(){
     finally{setLoading(false);}
   };
   useEffect(()=>{void refresh();return api.onDataChanged(()=>void refresh());},[]);
+  useEffect(()=>{
+    const syncMode=()=>setMini(isMiniFloatingHeight(window.innerHeight));
+    window.addEventListener("resize",syncMode);
+    syncMode();
+    return()=>window.removeEventListener("resize",syncMode);
+  },[]);
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),1600);};
   const copy=async(task:LegalTask)=>{try{await api.copyTicketImage(task);toast("已复制："+displayTicket(task));}catch(error){toast("复制失败："+String(error));}};
   const move=async(event:React.MouseEvent,task:LegalTask,direction:"up"|"down")=>{
