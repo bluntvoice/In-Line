@@ -32,7 +32,7 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 5 {
+        if existed && Self::schema_version(&connection)? < 6 {
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
         }
@@ -320,6 +320,40 @@ impl Database {
                 )
                 .map_err(display_error)?;
         }
+        if version < 6 {
+            let stamp = now();
+            let handled_condition = "is_urgent=1 AND (deleted_at IS NOT NULL OR status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed','completed'))";
+            transaction
+                .execute(
+                    &format!(
+                        "UPDATE urgent_records SET cancelled_at=? WHERE cancelled_at IS NULL
+                         AND task_id IN (SELECT id FROM tasks WHERE {handled_condition})"
+                    ),
+                    [stamp.clone()],
+                )
+                .map_err(display_error)?;
+            transaction
+                .execute(
+                    &format!(
+                        "INSERT INTO task_logs(task_id,log_type,content,created_at)
+                         SELECT id,'urgent','取消加急：事项已完成、进入暂缓队列或回收站',?
+                         FROM tasks WHERE {handled_condition}"
+                    ),
+                    [stamp.clone()],
+                )
+                .map_err(display_error)?;
+            transaction
+                .execute(
+                    &format!("UPDATE tasks SET is_urgent=0 WHERE {handled_condition}"),
+                    [],
+                )
+                .map_err(display_error)?;
+            transaction
+                .execute_batch(
+                    "DELETE FROM schema_meta; INSERT INTO schema_meta(version) VALUES(6);",
+                )
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -515,6 +549,10 @@ fn is_deferred_status(status: &str) -> bool {
             | "waiting_counterparty_confirmation"
             | "paused"
     )
+}
+
+fn clears_urgent_status(status: &str) -> bool {
+    status == "completed" || is_deferred_status(status)
 }
 
 fn validate_handled_at(value: &str) -> Result<(), String> {
@@ -741,6 +779,7 @@ impl Database {
         let connection = guard.as_mut().ok_or("数据库尚未打开")?;
         let transaction = connection.transaction().map_err(display_error)?;
         let stamp = now();
+        let effective_is_urgent = input.is_urgent && !clears_urgent_status(&input.status);
         let previous_task = input
             .id
             .map(|id| get_task_on(&transaction, id))
@@ -770,7 +809,7 @@ impl Database {
                  is_urgent=?,urgent_requester=?,urgent_reason=?,requested_deadline=?,requested_deadline_label=?,internal_notes=?,updated_at=?,
                  started_at=?,completed_at=? WHERE id=?",
                 params![&stored_departments,&stored_contacts,input.task_type.trim(),input.title.trim(),
-                input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
+                 input.details.trim(),input.status,input.priority,input.workload,effective_is_urgent as i64,
                 input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,
                 input.internal_notes.trim(),stamp,started,completed,id]).map_err(display_error)?;
             if previous.status != input.status {
@@ -832,10 +871,20 @@ impl Database {
                     )
                     .map_err(display_error)?;
             }
-            if previous.is_urgent != input.is_urgent {
-                record_urgent(&transaction, id, &input, previous.is_urgent)?;
-                if input.is_urgent {
+            if previous.is_urgent != effective_is_urgent {
+                if effective_is_urgent {
+                    record_urgent(&transaction, id, &input)?;
                     promote_one(&transaction, id)?;
+                } else {
+                    cancel_urgent_records(
+                        &transaction,
+                        id,
+                        if clears_urgent_status(&input.status) {
+                            "事项已完成或进入暂缓队列"
+                        } else {
+                            ""
+                        },
+                    )?;
                 }
             }
             add_log(&transaction, id, "updated", "更新事项信息")?;
@@ -857,7 +906,7 @@ impl Database {
                  created_at,updated_at,started_at,completed_at,custom_sort_order)
                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 params![permanent,sequence,date,&stored_departments,&stored_contacts,input.task_type.trim(),
-                input.title.trim(),input.details.trim(),input.status,input.priority,input.workload,input.is_urgent as i64,
+                 input.title.trim(),input.details.trim(),input.status,input.priority,input.workload,effective_is_urgent as i64,
                 input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,input.requested_deadline_label,input.internal_notes.trim(),
                 stamp,stamp,if input.status=="processing"{Some(now())}else{None},if input.status=="completed"{Some(now())}else{None},order]
             ).map_err(display_error)?;
@@ -906,8 +955,8 @@ impl Database {
             {
                 close_active_queue(&transaction, id, &format!("初始状态为 {}", input.status))?;
             }
-            if input.is_urgent {
-                record_urgent(&transaction, id, &input, false)?;
+            if effective_is_urgent {
+                record_urgent(&transaction, id, &input)?;
                 promote_one(&transaction, id)?;
             }
             id
@@ -971,6 +1020,9 @@ impl Database {
         self.with_transaction(|transaction| {
             let task = get_task_on(transaction, id)?;
             if task.status == status {
+                if clears_urgent_status(&status) {
+                    clear_urgent_on(transaction, id, "事项已完成或进入暂缓队列")?;
+                }
                 return Ok(());
             }
             if matches!(status.as_str(), "pending" | "processing") && !task.has_active_queue {
@@ -1020,6 +1072,9 @@ impl Database {
             {
                 close_active_queue(transaction, id, &format!("状态变更为 {status}"))?;
             }
+            if clears_urgent_status(&status) {
+                clear_urgent_on(transaction, id, "事项已完成或进入暂缓队列")?;
+            }
             Ok(())
         })
     }
@@ -1054,6 +1109,7 @@ impl Database {
                 params![stamp, stamp, id],
             )
             .map_err(display_error)?;
+            clear_urgent_on(tx, id, "事项移入回收站")?;
             close_active_queue(tx, id, "移入回收站")?;
             add_log(tx, id, "deleted", "事项移入回收站")
         })
@@ -1085,6 +1141,9 @@ impl Database {
             }
 
             close_active_queue(tx, source.id, "合并至其他事项")?;
+            if input.trash_source {
+                clear_urgent_on(tx, source.id, "合并后移入回收站")?;
+            }
             if input.deduplicate_records {
                 tx.execute(
                     "DELETE FROM task_logs
@@ -1248,6 +1307,7 @@ impl Database {
                 .map_err(display_error)?;
                 add_status(tx, id, Some(&task.status), "processed", "本轮已处理")?;
             }
+            clear_urgent_on(tx, id, "事项进入暂缓队列")?;
             close_active_queue(tx, id, "本轮已处理")?;
             record_work_event_on(
                 tx,
@@ -1277,6 +1337,7 @@ impl Database {
                 params![stamp, stamp, id],
             )
             .map_err(display_error)?;
+            clear_urgent_on(tx, id, "事项已完成")?;
             add_status(tx, id, Some(&task.status), "completed", "本轮已完成")?;
             close_active_queue(tx, id, "本轮已完成")?;
             record_work_event_on(
@@ -1327,6 +1388,9 @@ impl Database {
                 )?;
             }
             if input.sync_status {
+                if clears_urgent_status(&input.result_status) {
+                    clear_urgent_on(tx, input.task_id, "处理记录已同步事项状态")?;
+                }
                 close_active_queue(tx, input.task_id, "记录本次处理并同步状态")?;
             } else {
                 tx.execute(
@@ -1795,32 +1859,43 @@ fn add_status(
         params![id,old,new,reason,now()]).map_err(display_error)?;
     Ok(())
 }
-fn record_urgent(
-    connection: &Connection,
-    id: i64,
-    input: &TaskInput,
-    was_urgent: bool,
-) -> Result<(), String> {
-    if input.is_urgent {
-        connection.execute("INSERT INTO urgent_records(task_id,requester,reason,requested_deadline,requested_at,confirmation_status,confirmed_at)
+fn record_urgent(connection: &Connection, id: i64, input: &TaskInput) -> Result<(), String> {
+    connection.execute("INSERT INTO urgent_records(task_id,requester,reason,requested_deadline,requested_at,confirmation_status,confirmed_at)
             VALUES(?,?,?,?,?,'confirmed',?)",params![id,input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,now(),now()]).map_err(display_error)?;
-        add_log(
-            connection,
-            id,
-            "urgent",
-            &format!("标记加急：{}", input.urgent_requester.trim()),
+    add_log(
+        connection,
+        id,
+        "urgent",
+        &format!("标记加急：{}", input.urgent_requester.trim()),
+    )
+}
+
+fn cancel_urgent_records(connection: &Connection, id: i64, reason: &str) -> Result<(), String> {
+    connection
+        .execute(
+            "UPDATE urgent_records SET cancelled_at=? WHERE task_id=? AND cancelled_at IS NULL",
+            params![now(), id],
         )
-    } else if was_urgent {
-        connection
-            .execute(
-                "UPDATE urgent_records SET cancelled_at=? WHERE task_id=? AND cancelled_at IS NULL",
-                params![now(), id],
-            )
-            .map_err(display_error)?;
-        add_log(connection, id, "urgent", "取消加急")
+        .map_err(display_error)?;
+    let content = if reason.is_empty() {
+        "取消加急".to_string()
     } else {
-        Ok(())
+        format!("取消加急：{reason}")
+    };
+    add_log(connection, id, "urgent", &content)
+}
+
+fn clear_urgent_on(connection: &Connection, id: i64, reason: &str) -> Result<(), String> {
+    let changed = connection
+        .execute(
+            "UPDATE tasks SET is_urgent=0 WHERE id=? AND is_urgent=1",
+            [id],
+        )
+        .map_err(display_error)?;
+    if changed > 0 {
+        cancel_urgent_records(connection, id, reason)?;
     }
+    Ok(())
 }
 fn ensure_master(connection: &Connection, kind: &str, name: &str) -> Result<(), String> {
     connection
@@ -2240,6 +2315,13 @@ mod tests {
             internal_notes: "".into(),
         }
     }
+    fn urgent_sample(title: &str) -> TaskInput {
+        let mut input = sample(title);
+        input.is_urgent = true;
+        input.urgent_requester = "测试人".into();
+        input.urgent_reason = "需要优先处理".into();
+        input
+    }
     #[test]
     fn sequence_and_manual_order_are_persistent() {
         let root = std::env::temp_dir().join(format!(
@@ -2518,6 +2600,71 @@ mod tests {
     }
 
     #[test]
+    fn handled_deferred_and_deleted_tasks_cancel_urgent_state() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-urgent-lifecycle-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let processed = db.save_task(urgent_sample("本轮已处理")).unwrap();
+        db.process_round(processed.id).unwrap();
+        assert!(!db.get_task(processed.id).unwrap().is_urgent);
+
+        let completed = db.save_task(urgent_sample("本轮已完成")).unwrap();
+        db.complete_round(completed.id).unwrap();
+        assert!(!db.get_task(completed.id).unwrap().is_urgent);
+
+        let deferred = db.save_task(urgent_sample("状态改为暂缓")).unwrap();
+        db.set_status(deferred.id, "waiting_confirmation".into())
+            .unwrap();
+        assert!(!db.get_task(deferred.id).unwrap().is_urgent);
+
+        let deleted = db.save_task(urgent_sample("移入回收站")).unwrap();
+        db.soft_delete(deleted.id).unwrap();
+        assert!(!db.get_task(deleted.id).unwrap().is_urgent);
+
+        let edited = db.save_task(urgent_sample("编辑时完成")).unwrap();
+        let mut edited_input = urgent_sample("编辑时完成");
+        edited_input.id = Some(edited.id);
+        edited_input.status = "completed".into();
+        assert!(!db.save_task(edited_input).unwrap().is_urgent);
+
+        let synced = db.save_task(urgent_sample("同步处理状态")).unwrap();
+        db.record_work_event(WorkEventInput {
+            task_id: synced.id,
+            result_status: "waiting_materials".into(),
+            handled_at: now(),
+            note: "等待补充材料".into(),
+            sync_status: true,
+        })
+        .unwrap();
+        assert!(!db.get_task(synced.id).unwrap().is_urgent);
+
+        let mut initially_deferred = sample("初始暂缓事项");
+        initially_deferred.status = "paused".into();
+        initially_deferred.is_urgent = true;
+        assert!(!db.save_task(initially_deferred).unwrap().is_urgent);
+
+        let active_urgent_records: i64 = db
+            .with_conn(|connection| {
+                connection
+                    .query_row(
+                        "SELECT count(*) FROM urgent_records WHERE cancelled_at IS NULL",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)
+            })
+            .unwrap();
+        assert_eq!(active_urgent_records, 0);
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn statistics_use_latest_event_and_guard_historical_attribution() {
         let root = std::env::temp_dir().join(format!(
             "inline-statistics-test-{}",
@@ -2613,7 +2760,7 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
     #[test]
-    fn migration_v5_backfills_legacy_queue_and_work_events() {
+    fn migration_v6_backfills_queue_events_and_clears_handled_urgency() {
         let root = std::env::temp_dir().join(format!(
             "inline-migration-test-{}",
             Utc::now().timestamp_nanos_opt().unwrap()
@@ -2635,8 +2782,15 @@ mod tests {
             .unwrap();
         legacy
             .execute(
-                "UPDATE tasks SET status='waiting_materials',department='法务组' WHERE id=?",
+                "UPDATE tasks SET status='waiting_materials',department='法务组',is_urgent=1 WHERE id=?",
                 [created.id],
+            )
+            .unwrap();
+        legacy
+            .execute(
+                "INSERT INTO urgent_records(task_id,requester,reason,requested_at,confirmation_status)
+                 VALUES(?, '测试人', '旧版加急', ?, 'confirmed')",
+                params![created.id, now()],
             )
             .unwrap();
         legacy
@@ -2649,10 +2803,23 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 5);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 6);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);
+        assert!(!task.is_urgent);
+        let active_urgent_records: i64 = migrated
+            .with_conn(|connection| {
+                connection
+                    .query_row(
+                        "SELECT count(*) FROM urgent_records WHERE task_id=? AND cancelled_at IS NULL",
+                        [created.id],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)
+            })
+            .unwrap();
+        assert_eq!(active_urgent_records, 0);
         let events = migrated.list_work_events(created.id).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].result_status, "waiting_materials");

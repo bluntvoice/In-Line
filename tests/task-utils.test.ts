@@ -16,6 +16,12 @@ describe("取号和人工顺位",()=>{
     expect(displayTicket(archived,"2026-08-04")).toBe("B03");
     expect(displayTicket(archived,"2027-08-04")).toBe("B03");
   });
+  it("进入回收站后固定为移入当天的排队编号",()=>{
+    const deleted={ticketDate:"2026-07-17",dailySequence:5,archivedAt:"2026-07-18T10:00:00",deletedAt:"2026-07-20T10:00:00"};
+    expect(historyTimestamp(deleted)).toBe("2026-07-20T10:00:00");
+    expect(displayTicket(deleted,"2026-08-04")).toBe("C05");
+    expect(displayTicket(deleted,"2027-08-04")).toBe("C05");
+  });
   it("旧版归档数据缺少归档时间时按完成时间固定编号",()=>{
     const archived={ticketDate:"2026-07-17",dailySequence:4,status:"completed" as const,archivedAt:null,completedAt:"2026-07-20T10:00:00",updatedAt:"2026-08-04T10:00:00"};
     expect(historyTimestamp(archived)).toBe("2026-07-20T10:00:00");

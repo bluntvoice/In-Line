@@ -359,7 +359,17 @@ pub fn validate_task_input(input: &TaskInput) -> Result<(), String> {
     if !WORKLOADS.contains(&input.workload.as_str()) {
         return Err("预计工作量无效".into());
     }
+    let clears_urgent = matches!(
+        input.status.as_str(),
+        "waiting_materials"
+            | "waiting_confirmation"
+            | "waiting_counterparty_confirmation"
+            | "paused"
+            | "processed"
+            | "completed"
+    );
     if input.is_urgent
+        && !clears_urgent
         && (input.urgent_requester.trim().is_empty() || input.urgent_reason.trim().is_empty())
     {
         return Err("加急事项需要填写加急申请人和加急原因".into());

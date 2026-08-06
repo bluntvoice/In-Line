@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from
 import { AlertTriangle, Check, X } from "lucide-react";
 import type { LegalTask, MasterData, Priority, TaskInput, TaskStatus, Workload } from "../types";
 import { api } from "../api";
+import { isDeferredStatus } from "../lib/task-utils";
 import ComboInput from "./ComboInput";
 import DeadlinePicker from "./DeadlinePicker";
 import MultiContactInput from "./MultiContactInput";
@@ -15,6 +16,7 @@ interface Props {
 }
 
 type MasterKind = "department" | "task_type" | "contact";
+const clearsUrgentStatus = (status: TaskStatus) => status === "completed" || isDeferredStatus(status);
 
 const emptyTask = (defaultTaskType: string): TaskInput => ({
   department: "",
@@ -49,7 +51,7 @@ function toInput(task: LegalTask | null, defaultTaskType: string): TaskInput {
     status: task.status,
     priority: task.priority,
     workload: task.workload,
-    isUrgent: task.isUrgent,
+    isUrgent: task.isUrgent && !clearsUrgentStatus(task.status),
     urgentRequester: task.urgentRequester,
     urgentReason: task.urgentReason,
     requestedDeadline: task.requestedDeadline,
@@ -74,6 +76,13 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
 
   const update = <K extends keyof TaskInput>(key: K, value: TaskInput[K]) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+  const updateStatus = (status: TaskStatus) => {
+    setForm((current) => ({
+      ...current,
+      status,
+      isUrgent: clearsUrgentStatus(status) ? false : current.isUrgent
+    }));
   };
   const removeMaster = async (kind: MasterKind, name: string) => {
     setError("");
@@ -155,7 +164,7 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
             </label>
             <label>
               <span>当前状态</span>
-              <select value={form.status} onChange={(event) => update("status", event.target.value as TaskStatus)}>
+              <select value={form.status} onChange={(event) => updateStatus(event.target.value as TaskStatus)}>
                 <option value="pending">待处理</option><option value="processing">处理中</option><option value="waiting_materials">待补充材料</option><option value="waiting_confirmation">待内部确认</option><option value="waiting_counterparty_confirmation">待对方确认</option><option value="paused">已暂停</option><option value="processed">已处理</option><option value="completed">已完成</option><option value="cancelled">已取消</option>{task?.status==="archived"&&<option value="archived">已归档</option>}
               </select>
             </label>
@@ -171,7 +180,7 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
                 <option value="simple">简单</option><option value="standard">一般</option><option value="complex">复杂</option><option value="major">重大</option>
               </select>
             </label>
-            <label className="urgent-check"><input type="checkbox" checked={form.isUrgent} onChange={(event) => update("isUrgent", event.target.checked)} /><span>标记为加急事项</span></label>
+            <label className="urgent-check"><input type="checkbox" checked={form.isUrgent} disabled={clearsUrgentStatus(form.status)} onChange={(event) => update("isUrgent", event.target.checked)} /><span>标记为加急事项</span></label>
             {form.isUrgent && <div className="urgent-fields span-2">
               <label><span>加急申请人 *</span><input value={form.urgentRequester} onChange={(event) => update("urgentRequester", event.target.value)} /></label>
               <label><span>加急原因 *</span><input value={form.urgentReason} onChange={(event) => update("urgentReason", event.target.value)} /></label>

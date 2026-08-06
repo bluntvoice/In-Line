@@ -19,8 +19,9 @@ export function alphaPrefix(days:number){
   while(value>0){value-=1;output=String.fromCharCode(65+(value%26))+output;value=Math.floor(value/26);}
   return output;
 }
-type HistoryTask=Partial<Pick<LegalTask,"archivedAt"|"completedAt"|"updatedAt"|"status">>;
+type HistoryTask=Partial<Pick<LegalTask,"archivedAt"|"completedAt"|"deletedAt"|"updatedAt"|"status">>;
 export function historyTimestamp(task:HistoryTask){
+  if(task.deletedAt)return task.deletedAt;
   if(task.archivedAt)return task.archivedAt;
   if(task.status==="completed")return task.completedAt??task.updatedAt??null;
   if(task.status==="cancelled"||task.status==="archived")return task.updatedAt??task.completedAt??null;

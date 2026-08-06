@@ -13,7 +13,7 @@ export default function TaskContextMenu({task,view,x,y,onAction,onClose}:{task:L
         <button onClick={()=>fire("view")}><Eye size={16}/>查看详情</button>
         <button onClick={()=>fire("edit")}><Edit3 size={16}/>编辑事项</button>
         {!terminal&&<button onClick={()=>fire("status")}><CheckCircle2 size={16}/>修改状态</button>}
-        {!terminal&&<button onClick={()=>fire("urgent")}><Flame size={16}/>{task.isUrgent?"取消加急":"设置加急"}</button>}
+        {!terminal&&(!isDeferredStatus(task.status)||task.isUrgent)&&<button onClick={()=>fire("urgent")}><Flame size={16}/>{task.isUrgent?"取消加急":"设置加急"}</button>}
         <span/>
         {canWork&&<button onClick={()=>fire("process")}><PlayCircle size={16}/>本轮已处理</button>}
         {canWork&&<button onClick={()=>fire("complete")}><CheckCircle2 size={16}/>本轮已完成</button>}
