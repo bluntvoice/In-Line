@@ -6,12 +6,18 @@ use models::*;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
+use tauri_plugin_window_state::StateFlags;
 
 fn emit_change(app: &tauri::AppHandle) -> Result<(), String> {
     app.emit("data-changed", ())
         .map_err(|error| error.to_string())
 }
 fn show_main(app: &tauri::AppHandle) {
+    for label in ["floating", "quick-add"] {
+        if let Some(window) = app.get_webview_window(label) {
+            let _ = window.hide();
+        }
+    }
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
@@ -84,6 +90,14 @@ fn restore_task(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(
 fn archive_task(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(), String> {
     db.archive(id)?;
     emit_change(&app)
+}
+
+fn persisted_window_state_flags() -> StateFlags {
+    StateFlags::SIZE
+        | StateFlags::POSITION
+        | StateFlags::MAXIMIZED
+        | StateFlags::DECORATIONS
+        | StateFlags::FULLSCREEN
 }
 #[tauri::command]
 fn merge_tasks(
@@ -323,7 +337,11 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .with_state_flags(persisted_window_state_flags())
+                .build(),
+        )
         .setup(|app| {
             let open = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
             let add = MenuItem::with_id(app, "add", "新增事项", true, None::<&str>)?;
@@ -376,7 +394,6 @@ pub fn run() {
                 })
                 .build(app)?;
             show_main(app.handle());
-            show_floating(app.handle());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -436,4 +453,14 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("In Line 启动失败");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn window_visibility_is_not_restored_on_startup() {
+        assert!(!persisted_window_state_flags().contains(StateFlags::VISIBLE));
+    }
 }

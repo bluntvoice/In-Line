@@ -1538,6 +1538,46 @@ impl Database {
                     ))
                 })
                 .map_err(display_error)?;
+            let rate_mode = connection
+                .query_row(
+                    "SELECT value FROM settings WHERE key='statistics_rate_mode'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(display_error)?
+                .filter(|value| value == "closure")
+                .unwrap_or_else(|| "processing".into());
+            let eligible_tasks = if rate_mode == "processing" {
+                connection
+                    .query_row(
+                        "WITH eligible AS (
+                           SELECT entry.task_id
+                           FROM task_queue_entries entry
+                           JOIN tasks ON tasks.id=entry.task_id
+                           WHERE tasks.deleted_at IS NULL
+                             AND strftime('%s',entry.enqueued_at)<strftime('%s',?2)
+                             AND (entry.closed_at IS NULL OR strftime('%s',entry.closed_at)>strftime('%s',?1))
+                           UNION
+                           SELECT event.task_id
+                           FROM task_work_events event
+                           JOIN tasks ON tasks.id=event.task_id
+                           WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                             AND strftime('%s',event.handled_at)>=strftime('%s',?1)
+                             AND strftime('%s',event.handled_at)<strftime('%s',?2)
+                         ) SELECT count(*) FROM eligible",
+                        params![start, end],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .map_err(display_error)?
+            } else {
+                values.0
+            };
+            let (rate_numerator, rate_denominator) = if rate_mode == "processing" {
+                (values.0, eligible_tasks)
+            } else {
+                (values.2, values.0)
+            };
             let summary = StatisticsSummary {
                 handled_tasks: values.0,
                 processed: values.1,
@@ -1545,10 +1585,13 @@ impl Database {
                 waiting_materials: values.3,
                 waiting_confirmation: values.4,
                 waiting_counterparty_confirmation: values.5,
-                completion_rate: if values.0 == 0 {
+                rate_mode,
+                rate_numerator,
+                rate_denominator,
+                completion_rate: if rate_denominator == 0 {
                     0.0
                 } else {
-                    values.2 as f64 / values.0 as f64
+                    rate_numerator as f64 / rate_denominator as f64
                 },
             };
             let type_sql = format!(
@@ -1962,6 +2005,7 @@ impl Database {
         let valid = match key.as_str() {
             "show_deferred_in_queue" => value == "true" || value == "false",
             "week_start_day" => value == "monday" || value == "sunday",
+            "statistics_rate_mode" => value == "closure" || value == "processing",
             _ => return Err("不支持的设置项".into()),
         };
         if !valid {
@@ -2235,6 +2279,18 @@ mod tests {
         assert!(db
             .set_setting("week_start_day".into(), "friday".into())
             .is_err());
+        db.set_setting("statistics_rate_mode".into(), "processing".into())
+            .unwrap();
+        assert_eq!(
+            db.settings()
+                .unwrap()
+                .get("statistics_rate_mode")
+                .map(String::as_str),
+            Some("processing")
+        );
+        assert!(db
+            .set_setting("statistics_rate_mode".into(), "unknown".into())
+            .is_err());
         assert!(db.set_setting("unknown".into(), "true".into()).is_err());
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);
@@ -2494,6 +2550,23 @@ mod tests {
         assert_eq!(statistics.summary.handled_tasks, 1);
         assert_eq!(statistics.summary.completed, 1);
         assert_eq!(statistics.summary.waiting_materials, 0);
+        assert_eq!(statistics.summary.rate_mode, "processing");
+        assert_eq!(statistics.summary.rate_numerator, 1);
+        assert_eq!(statistics.summary.rate_denominator, 1);
+        assert_eq!(statistics.summary.completion_rate, 1.0);
+        db.save_task(sample("本周期尚未处理事项")).unwrap();
+        let processing_statistics = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(processing_statistics.summary.rate_mode, "processing");
+        assert_eq!(processing_statistics.summary.rate_numerator, 1);
+        assert_eq!(processing_statistics.summary.rate_denominator, 2);
+        assert_eq!(processing_statistics.summary.completion_rate, 0.5);
+        db.set_setting("statistics_rate_mode".into(), "closure".into())
+            .unwrap();
+        let closure_statistics = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(closure_statistics.summary.rate_mode, "closure");
+        assert_eq!(closure_statistics.summary.rate_numerator, 1);
+        assert_eq!(closure_statistics.summary.rate_denominator, 1);
+        assert_eq!(closure_statistics.summary.completion_rate, 1.0);
         let details = db
             .statistics_details(start.clone(), end.clone(), "任务处理".into())
             .unwrap();

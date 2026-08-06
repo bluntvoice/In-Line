@@ -167,6 +167,9 @@ pub struct StatisticsSummary {
     pub waiting_materials: i64,
     pub waiting_confirmation: i64,
     pub waiting_counterparty_confirmation: i64,
+    pub rate_mode: String,
+    pub rate_numerator: i64,
+    pub rate_denominator: i64,
     pub completion_rate: f64,
 }
 

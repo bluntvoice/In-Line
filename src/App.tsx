@@ -130,7 +130,7 @@ export default function App(){
         <button className={!settings&&!about&&!statistics&&view==="trash"?"active":""} onClick={()=>openView("trash")}><Trash2 size={18}/><span>回收站</span><b>{data.trash.length}</b></button>
       </nav>
       <div className="sidebar-summary"><div><span>加急</span><b>{urgent}</b></div><div><span>逾期</span><b>{overdue}</b></div></div>
-      <button className={settings?"settings-button active":"settings-button"} onClick={()=>{setSettings(true);setAbout(false);setStatistics(false);}}><Settings size={18}/>系统设置</button>
+      <button className={settings?"settings-button active":"settings-button"} onClick={()=>{setSettings(true);setAbout(false);setStatistics(false);}}><Settings size={18}/>软件设置</button>
       <button className={about?"settings-button active":"settings-button"} onClick={()=>{setAbout(true);setSettings(false);setStatistics(false);}}><Info size={18}/>关于</button>
       <small className="app-version">{version?`v${version}`:""}</small>
     </aside>

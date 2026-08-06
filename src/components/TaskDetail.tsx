@@ -27,7 +27,7 @@ export default function TaskDetail({task,view,mergeCandidates,onClose,onEdit,onC
   const terminal=task.status==="completed"||task.status==="archived"||Boolean(task.archivedAt);
   const canWork=!terminal&&task.status!=="cancelled";
   return <aside className="detail-panel">
-    <header><div><TicketNumber task={task} showPermanent/><h2>{task.title}</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18}/></button></header>
+    <header><div><TicketNumber task={task}/><h2>{task.title}</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18}/></button></header>
     <div className="detail-actions">
       {view==="trash"?<button className="button primary" onClick={async()=>{await api.restoreTask(task.id);notify("事项已恢复并加入今日队列");onChanged();}}><RotateCcw size={16}/>恢复</button>:<>
         <button className="button secondary" onClick={onEdit}><Edit3 size={16}/>编辑</button><button className="button secondary" onClick={()=>setMergeDialog(true)}><GitMerge size={16}/>合并</button>

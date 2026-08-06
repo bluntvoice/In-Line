@@ -148,8 +148,14 @@ function drawTicket(task: LegalTask, queueAhead: number): TicketRenderer {
     fitLines(context, value, 294, 2).lines.forEach((line, lineIndex) => context.fillText(line, x, y + 38 + lineIndex * 31));
   });
 
-  context.font = "500 15px Consolas,monospace"; context.fillStyle = "#7B8797"; context.fillText(`事项编号：${task.permanentNumber}`, 66, 920);
-  context.font = `500 16px ${UI_FONT}`; context.textAlign = "right";
+  const numberLabel = "事项编号：";
+  context.textAlign = "left"; context.fillStyle = "#7B8797"; context.font = `500 17px ${UI_FONT}`;
+  context.fillText(numberLabel, 66, 920);
+  const numberX = 66 + context.measureText(numberLabel).width + 5;
+  context.font = '500 15px Consolas,"Cascadia Mono",monospace';
+  context.fillText(task.permanentNumber, numberX, 920);
+  // 与右侧信息标签使用同一套无衬线字体，避免系统回退为衬线字体。
+  context.font = `500 17px ${UI_FONT}`; context.textAlign = "right";
   context.fillText(task.hasActiveQueue ? queueAheadMessage(queueAhead) : "后续可按需重新加入今日队列", 732, 920);
   return { canvas, context };
 }
