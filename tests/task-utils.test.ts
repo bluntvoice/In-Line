@@ -1,12 +1,12 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortQueue,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortDeferredQueue,sortQueue,taskDetailView,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import { statisticsPresetRange,statisticsWeekdayLabel } from "../src/lib/statistics-range";
 import { isMiniFloatingHeight } from "../src/lib/floating-window";
 import type { LegalTask } from "../src/types";
 
-const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",departments:["产品组"],contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null,processingRounds:0,hasActiveQueue:true});
+const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",departments:["产品组"],contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null,processingRounds:0,hasActiveQueue:true,deferredEnteredAt:null});
 
 describe("取号和人工顺位",()=>{
   it("当天显示两位号码",()=>expect(displayTicket({ticketDate:"2026-07-17",dailySequence:1},"2026-07-17")).toBe("01"));
@@ -39,6 +39,11 @@ describe("取号和人工顺位",()=>{
   it("暂缓事项包含待补材料、待内部确认、待对方确认和已暂停",()=>{
     expect(["waiting_materials","waiting_confirmation","waiting_counterparty_confirmation","paused","processed"].every(status=>isDeferredStatus(status as LegalTask["status"]))).toBe(true);
     expect(isDeferredStatus("processing")).toBe(false);
+  });
+  it("暂缓队列按最近进入时间倒序排列，不受人工顺位影响",()=>{
+    const earlier={...task(1,1),status:"waiting_materials" as const,deferredEnteredAt:"2026-07-17T09:00:00Z"};
+    const later={...task(2,9),status:"waiting_confirmation" as const,deferredEnteredAt:"2026-07-17T10:00:00Z"};
+    expect(sortDeferredQueue([earlier,later]).map(value=>value.id)).toEqual([2,1]);
   });
   it("待办队列默认隐藏暂缓事项，并允许通过设置重新显示",()=>{
     const regular=task(1,1);
@@ -151,5 +156,14 @@ describe("悬浮窗尺寸模式",()=>{
     expect(isMiniFloatingHeight(72)).toBe(true);
     expect(isMiniFloatingHeight(120)).toBe(true);
     expect(isMiniFloatingHeight(564)).toBe(false);
+  });
+});
+
+describe("外部打开事项详情",()=>{
+  it("根据事项当前归属切换到对应队列页面",()=>{
+    expect(taskDetailView(task(1,1))).toBe("queue");
+    expect(taskDetailView({...task(2,2),status:"waiting_materials"})).toBe("deferred");
+    expect(taskDetailView({...task(3,3),status:"completed"})).toBe("archive");
+    expect(taskDetailView({...task(4,4),deletedAt:"2026-08-07T02:00:00Z"})).toBe("trash");
   });
 });

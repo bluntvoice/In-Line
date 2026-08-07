@@ -1,4 +1,4 @@
-import type { LegalTask,Priority,TaskStatus,Workload } from "../types";
+import type { LegalTask,Priority,TaskStatus,TaskView,Workload } from "../types";
 
 export const STATUS_LABELS:Record<TaskStatus,string>={pending:"待处理",processing:"处理中",waiting_materials:"待补材料",waiting_confirmation:"待内部确认",waiting_counterparty_confirmation:"待对方确认",paused:"已暂停",processed:"已处理",completed:"已完成",cancelled:"已取消",archived:"已归档"};
 const STATUS_TOKEN_PATTERN=/\b(pending|processing|waiting_materials|waiting_confirmation|waiting_counterparty_confirmation|paused|processed|completed|cancelled|archived)\b/g;
@@ -41,11 +41,21 @@ export function isOverdue(task:Pick<LegalTask,"requestedDeadline"|"status">,now=
   return Boolean(task.requestedDeadline&&!['processed','completed','cancelled','archived'].includes(task.status)&&new Date(task.requestedDeadline).getTime()<now.getTime());
 }
 export function isDeferredStatus(status:TaskStatus){return DEFERRED_STATUSES.includes(status);}
+export function taskDetailView(task:Pick<LegalTask,"archivedAt"|"deletedAt"|"status">):TaskView|"deferred"{
+  if(task.deletedAt)return"trash";
+  if(task.archivedAt||["completed","cancelled","archived"].includes(task.status))return"archive";
+  if(isDeferredStatus(task.status))return"deferred";
+  return"queue";
+}
 export function localizeStatusText(value:string){
   return value.replace(STATUS_TOKEN_PATTERN,status=>STATUS_LABELS[status as TaskStatus]);
 }
 export function sortQueue(tasks:LegalTask[],now=new Date()){
   return [...tasks].sort((a,b)=>Number(isOverdue(b,now))-Number(isOverdue(a,now))||a.customSortOrder-b.customSortOrder||a.id-b.id);
+}
+export function sortDeferredQueue(tasks:LegalTask[]){
+  const enteredAt=(task:LegalTask)=>Date.parse(task.deferredEnteredAt??task.updatedAt)||0;
+  return [...tasks].sort((a,b)=>enteredAt(b)-enteredAt(a)||b.id-a.id);
 }
 export function visibleQueueTasks(tasks:LegalTask[],showDeferred:boolean,now=new Date()){
   return sortQueue(tasks.filter(task=>task.hasActiveQueue&&!isDeferredStatus(task.status)||showDeferred&&isDeferredStatus(task.status)),now);

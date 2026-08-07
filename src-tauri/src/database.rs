@@ -10,7 +10,12 @@ use std::{
 
 const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order, requested_deadline_label,
     (SELECT count(*) FROM task_work_events work WHERE work.task_id=tasks.id AND work.voided_at IS NULL),
-    EXISTS(SELECT 1 FROM task_queue_entries queue_entry WHERE queue_entry.task_id=tasks.id AND queue_entry.closed_at IS NULL)
+    EXISTS(SELECT 1 FROM task_queue_entries queue_entry WHERE queue_entry.task_id=tasks.id AND queue_entry.closed_at IS NULL),
+    (SELECT history.created_at FROM status_history history
+     WHERE history.task_id=tasks.id
+       AND history.new_status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed')
+       AND (history.old_status IS NULL OR history.old_status NOT IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed'))
+     ORDER BY history.id DESC LIMIT 1)
     FROM tasks";
 const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
@@ -136,7 +141,8 @@ impl Database {
                confirmation_status TEXT NOT NULL DEFAULT 'confirmed', confirmed_at TEXT, cancelled_at TEXT,
                notes TEXT NOT NULL DEFAULT '', FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE);
              CREATE INDEX IF NOT EXISTS idx_tasks_queue ON tasks(deleted_at,archived_at,status,custom_sort_order);
-             CREATE INDEX IF NOT EXISTS idx_logs_task ON task_logs(task_id,created_at DESC);"
+             CREATE INDEX IF NOT EXISTS idx_logs_task ON task_logs(task_id,created_at DESC);
+             CREATE INDEX IF NOT EXISTS idx_status_history_task ON status_history(task_id,id DESC);"
         ).map_err(display_error)?;
         let version: i64 = transaction
             .query_row(
@@ -442,6 +448,7 @@ impl Database {
             requested_deadline_label: row.get(24)?,
             processing_rounds: row.get(25)?,
             has_active_queue: row.get::<_, i64>(26)? != 0,
+            deferred_entered_at: row.get(27)?,
         })
     }
 
@@ -1568,7 +1575,7 @@ impl Database {
         let offset = FixedOffset::east_opt(offset_seconds).ok_or("本地时区无效")?;
         self.with_conn(|connection| {
             let cte = "WITH ranged AS (
-                SELECT event.id,event.task_id,event.result_status,event.handled_at,event.task_type_snapshot
+                SELECT event.id,event.task_id,event.result_status,event.handled_at,tasks.task_type AS current_task_type
                 FROM task_work_events event
                 JOIN tasks ON tasks.id=event.task_id
                 WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
@@ -1622,6 +1629,10 @@ impl Database {
                            WHERE tasks.deleted_at IS NULL
                              AND strftime('%s',entry.enqueued_at)<strftime('%s',?2)
                              AND (entry.closed_at IS NULL OR strftime('%s',entry.closed_at)>strftime('%s',?1))
+                             AND (tasks.requested_deadline IS NULL OR (
+                               strftime('%s',tasks.requested_deadline)>=strftime('%s',?1)
+                               AND strftime('%s',tasks.requested_deadline)<strftime('%s',?2)
+                             ))
                            UNION
                            SELECT event.task_id
                            FROM task_work_events event
@@ -1660,11 +1671,11 @@ impl Database {
             };
             let type_sql = format!(
                 "{cte}
-                 SELECT task_type_snapshot,count(*),
+                 SELECT current_task_type,count(*),
                    COALESCE(sum(result_status='completed'),0),
                    COALESCE(sum(result_status<>'completed'),0)
                  FROM ranked WHERE position=1
-                 GROUP BY task_type_snapshot ORDER BY count(*) DESC,task_type_snapshot"
+                 GROUP BY current_task_type ORDER BY count(*) DESC,current_task_type"
             );
             let mut type_statement = connection.prepare(&type_sql).map_err(display_error)?;
             let by_task_type = type_statement
@@ -1751,7 +1762,7 @@ impl Database {
             let mut statement = connection
                 .prepare(
                     "WITH ranged AS (
-                       SELECT event.id,event.task_id,event.result_status,event.handled_at,event.task_type_snapshot
+                       SELECT event.id,event.task_id,event.result_status,event.handled_at
                        FROM task_work_events event
                        JOIN tasks ON tasks.id=event.task_id
                        WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
@@ -1768,7 +1779,7 @@ impl Database {
                      SELECT tasks.id,tasks.permanent_number,tasks.title,tasks.department,tasks.contact,
                             annotated.result_status,annotated.first_handled_at,annotated.last_handled_at,annotated.handling_count
                      FROM annotated JOIN tasks ON tasks.id=annotated.task_id
-                     WHERE annotated.position=1 AND annotated.task_type_snapshot=?3
+                     WHERE annotated.position=1 AND tasks.task_type=?3
                      ORDER BY strftime('%s',annotated.last_handled_at) DESC,tasks.id DESC",
                 )
                 .map_err(display_error)?;
@@ -2600,6 +2611,69 @@ mod tests {
     }
 
     #[test]
+    fn deferred_entry_time_only_changes_after_leaving_and_reentering() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-deferred-entry-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let created = db.save_task(sample("暂缓排序事项")).unwrap();
+
+        db.set_status(created.id, "waiting_materials".into())
+            .unwrap();
+        db.with_conn(|connection| {
+            connection.execute(
+                "UPDATE status_history SET created_at='2026-08-07T09:00:00Z' WHERE id=(SELECT max(id) FROM status_history WHERE task_id=?)",
+                [created.id],
+            ).map(|_| ()).map_err(display_error)
+        }).unwrap();
+        assert_eq!(
+            db.get_task(created.id)
+                .unwrap()
+                .deferred_entered_at
+                .as_deref(),
+            Some("2026-08-07T09:00:00Z")
+        );
+
+        db.set_status(created.id, "waiting_confirmation".into())
+            .unwrap();
+        db.with_conn(|connection| {
+            connection.execute(
+                "UPDATE status_history SET created_at='2026-08-07T10:00:00Z' WHERE id=(SELECT max(id) FROM status_history WHERE task_id=?)",
+                [created.id],
+            ).map(|_| ()).map_err(display_error)
+        }).unwrap();
+        assert_eq!(
+            db.get_task(created.id)
+                .unwrap()
+                .deferred_entered_at
+                .as_deref(),
+            Some("2026-08-07T09:00:00Z")
+        );
+
+        db.set_status(created.id, "pending".into()).unwrap();
+        db.set_status(created.id, "waiting_counterparty_confirmation".into())
+            .unwrap();
+        db.with_conn(|connection| {
+            connection.execute(
+                "UPDATE status_history SET created_at='2026-08-07T11:00:00Z' WHERE id=(SELECT max(id) FROM status_history WHERE task_id=?)",
+                [created.id],
+            ).map(|_| ()).map_err(display_error)
+        }).unwrap();
+        assert_eq!(
+            db.get_task(created.id)
+                .unwrap()
+                .deferred_entered_at
+                .as_deref(),
+            Some("2026-08-07T11:00:00Z")
+        );
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn handled_deferred_and_deleted_tasks_cancel_urgent_state() {
         let root = std::env::temp_dir().join(format!(
             "inline-urgent-lifecycle-test-{}",
@@ -2707,6 +2781,26 @@ mod tests {
         assert_eq!(processing_statistics.summary.rate_numerator, 1);
         assert_eq!(processing_statistics.summary.rate_denominator, 2);
         assert_eq!(processing_statistics.summary.completion_rate, 0.5);
+
+        let mut future_deadline_input = sample("远期截止事项");
+        future_deadline_input.requested_deadline =
+            Some((Utc::now() + chrono::Duration::days(1)).to_rfc3339());
+        let future_deadline = db.save_task(future_deadline_input).unwrap();
+        let future_excluded = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(future_excluded.summary.rate_denominator, 2);
+
+        let mut in_range_deadline_input = sample("周期内截止事项");
+        in_range_deadline_input.requested_deadline = Some(Utc::now().to_rfc3339());
+        db.save_task(in_range_deadline_input).unwrap();
+        let in_range_included = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(in_range_included.summary.rate_denominator, 3);
+
+        let mut cleared_deadline_input = sample("远期截止事项");
+        cleared_deadline_input.id = Some(future_deadline.id);
+        db.save_task(cleared_deadline_input).unwrap();
+        let cleared_deadline_included = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(cleared_deadline_included.summary.rate_denominator, 4);
+
         db.set_setting("statistics_rate_mode".into(), "closure".into())
             .unwrap();
         let closure_statistics = db.statistics(start.clone(), end.clone(), 480).unwrap();
@@ -2720,6 +2814,30 @@ mod tests {
         assert_eq!(details.len(), 1);
         assert_eq!(details[0].result_status, "completed");
         assert_eq!(details[0].handling_count, 3);
+
+        let mut reclassified = sample("等待材料事项");
+        reclassified.id = Some(created.id);
+        reclassified.status = "waiting_materials".into();
+        reclassified.task_type = "法律咨询".into();
+        db.save_task(reclassified).unwrap();
+        let reclassified_statistics = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(reclassified_statistics.by_task_type.len(), 1);
+        assert_eq!(
+            reclassified_statistics.by_task_type[0].task_type,
+            "法律咨询"
+        );
+        assert_eq!(
+            db.statistics_details(start.clone(), end.clone(), "任务处理".into())
+                .unwrap()
+                .len(),
+            0
+        );
+        assert_eq!(
+            db.statistics_details(start.clone(), end.clone(), "法律咨询".into())
+                .unwrap()
+                .len(),
+            1
+        );
 
         let first = db
             .list_work_events(created.id)

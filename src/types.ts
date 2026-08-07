@@ -9,7 +9,7 @@ export interface LegalTask{
   taskType:string;title:string;details:string;status:TaskStatus;priority:Priority;workload:Workload;isUrgent:boolean;
   urgentRequester:string;urgentReason:string;requestedDeadline:string|null;requestedDeadlineLabel:string|null;internalNotes:string;createdAt:string;
   updatedAt:string;startedAt:string|null;completedAt:string|null;archivedAt:string|null;deletedAt:string|null;customSortOrder:number;
-  processingRounds:number;hasActiveQueue:boolean;
+  processingRounds:number;hasActiveQueue:boolean;deferredEnteredAt:string|null;
 }
 export interface TaskInput{
   id?:number;department:string;departments:string[];contact:string;contacts:string[];taskType:string;title:string;details:string;status:TaskStatus;priority:Priority;

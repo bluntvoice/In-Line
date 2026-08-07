@@ -2,7 +2,7 @@ import { useEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,BarChart3,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
-import { commonContacts,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortQueue,visibleQueueTasks } from "./lib/task-utils";
+import { commonContacts,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortDeferredQueue,taskDetailView,visibleQueueTasks } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
@@ -38,6 +38,13 @@ export default function App(){
   const [filtersByView,setFiltersByView]=useState<Record<PageView,TaskFilters>>({queue:newFilters(),deferred:newFilters(),archive:newFilters(),trash:newFilters()});
 
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),2300);};
+  const showTaskDetails=(task:LegalTask)=>{
+    setSettings(false);
+    setAbout(false);
+    setStatistics(false);
+    setView(taskDetailView(task));
+    setSelected(task);
+  };
   const refresh=async()=>{
     setStartupError("");
     try{
@@ -55,7 +62,7 @@ export default function App(){
     const offNew=api.onNewTask(()=>setEditing(null));
     const offTaskUi=api.onTaskUiAction(({id,action})=>{
       void api.getTask(id).then(task=>{
-        if(action==="view")setSelected(task);else setEditing(task);
+        if(action==="view")showTaskDetails(task);else setEditing(task);
       }).catch(error=>toast("无法打开事项："+String(error)));
     });
     void api.getVersion().then(setVersion).catch(()=>undefined);
@@ -65,7 +72,7 @@ export default function App(){
   const source=useMemo(()=>{
     if(!data)return[];
     if(view==="queue")return visibleQueueTasks(data.queue,data.settings.show_deferred_in_queue==="true");
-    if(view==="deferred")return sortQueue(data.queue.filter(task=>isDeferredStatus(task.status)));
+    if(view==="deferred")return sortDeferredQueue(data.queue.filter(task=>isDeferredStatus(task.status)));
     return data[view];
   },[data,view]);
   const filters=filtersByView[view];
@@ -102,6 +109,7 @@ export default function App(){
   const context=(task:LegalTask,x:number,y:number)=>setMenu({task,x,y});
   const contextKey=(event:React.KeyboardEvent,task:LegalTask)=>{
     if(event.shiftKey&&event.key==="F10"){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();context(task,rect.left+120,rect.top+32);}
+    else if(event.key==="Enter"){event.preventDefault();setSelected(task);}
   };
 
   if(!data)return <div className="app-loading"><img src="/inline-mark.svg"/>{startupError?<section className="startup-error" role="alert"><h1>队列暂时无法载入</h1><p>{startupError}</p><div><button className="button primary" onClick={()=>void refresh()}>重新载入</button><button className="button secondary" onClick={()=>setEditing(null)}>直接新增取号</button></div><small>数据仍保存在本机，程序不会自动清空数据库。</small></section>:<p>正在整理队列…</p>}
@@ -140,14 +148,14 @@ export default function App(){
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>
         <div className={selected?"queue-layout with-detail":"queue-layout"}>
-          <section className="table-panel"><div className="table-meta"><span>共 {tasks.length} 项{activeFilterCount(filters)>0&&<><b> · 已启用 {activeFilterCount(filters)} 项筛选</b><button type="button" onClick={()=>setFiltersByView(current=>({...current,[view]:newFilters()}))}>清除筛选</button></>}</span><span>单击复制取号图片 · 右键管理事项</span></div>
+          <section className="table-panel"><div className="table-meta"><span>共 {tasks.length} 项{activeFilterCount(filters)>0&&<><b> · 已启用 {activeFilterCount(filters)} 项筛选</b><button type="button" onClick={()=>setFiltersByView(current=>({...current,[view]:newFilters()}))}>清除筛选</button></>}</span><span>单击查看详情 · 复制按钮生成图片 · 右键管理事项</span></div>
             <div className="table-scroll"><table className="task-table"><thead><tr><th>号码</th><th>事项标题</th>
               <th><ValueFilterHeader label="部门 / 团队" values={filterOptions.departments} selected={filters.departments} onChange={departments=>updateFilters({departments})}/></th>
               <th><ValueFilterHeader label="对接人" values={filterOptions.contacts} selected={filters.contacts} onChange={contacts=>updateFilters({contacts})}/></th>
               <th><ValueFilterHeader label="事项类型" values={filterOptions.taskTypes} selected={filters.taskTypes} onChange={taskTypes=>updateFilters({taskTypes})}/></th>
               <th><ValueFilterHeader label="当前状态" values={filterOptions.statuses} selected={filters.statuses} renderLabel={status=>STATUS_LABELS[status]} onChange={statuses=>updateFilters({statuses})}/></th>
               <th>{view==="archive"?"完成时间":<DeadlineFilterHeader date={filters.deadlineDate} periods={filters.deadlinePeriods} onChange={(deadlineDate,deadlinePeriods)=>updateFilters({deadlineDate,deadlinePeriods})}/>}</th><th>操作</th></tr></thead>
-              <tbody>{tasks.map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=view==="queue"&&task.hasActiveQueue&&index>0&&tasks[index-1].hasActiveQueue&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=view==="queue"&&task.hasActiveQueue&&index<tasks.length-1&&tasks[index+1].hasActiveQueue&&isOverdue(tasks[index+1])===taskOverdue;return <tr key={task.id} className={taskOverdue?"overdue-row":undefined} tabIndex={0} onClick={()=>void copy(task)} onDoubleClick={event=>{event.preventDefault();setSelected(task);}} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
+              <tbody>{tasks.map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=view==="queue"&&task.hasActiveQueue&&index>0&&tasks[index-1].hasActiveQueue&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=view==="queue"&&task.hasActiveQueue&&index<tasks.length-1&&tasks[index+1].hasActiveQueue&&isOverdue(tasks[index+1])===taskOverdue;return <tr key={task.id} className={taskOverdue?"overdue-row":undefined} tabIndex={0} onClick={()=>setSelected(task)} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
                 <td><TicketNumber task={task}/></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}</td>
                 <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={taskOverdue}/></td>
                 <td className={taskOverdue?"deadline overdue":"deadline"}>{view==="archive"?formatDateTime(historyTimestamp(task)):formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>

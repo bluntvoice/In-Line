@@ -146,3 +146,6 @@ html,body,#root{background:transparent!important}
 /* 迷你悬浮窗：编号固定宽度，标题仅占用剩余空间。 */
 .floating-toolbar .mini-main>.ticket-identity{width:78px;min-width:78px;flex:0 0 78px}
 .floating-toolbar .mini-main>strong{min-width:0;flex:1 1 0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 事项行默认进入详情，复制图片由独立按钮触发。 */
+.task-table tbody tr,.floating-card{cursor:pointer}

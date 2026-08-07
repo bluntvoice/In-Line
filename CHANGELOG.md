@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-08-07
+
+### Changed
+
+- 暂缓事项按最近一次从非暂缓状态进入暂缓队列的时间倒序排列；暂缓状态之间切换不重新置顶。
+- 统计中心的事项类型分布及类型明细统一按照事项当前类型归类，办理记录中的历史类型快照继续保留用于审计。
+- 有效处理率的“应处理事项”按照事项当前截止时间筛选；截止时间不在统计周期内且周期内没有办理记录的事项不计入分母，截止时间为空时继续按队列占用统计。
+- 主界面各事项列表单击后打开事项详情，仅右侧复制按钮生成并复制取号图片。
+- 展开模式悬浮窗单击事项后打开详情，仅复制按钮生成图片；迷你模式继续保留单击复制。
+
+### Fixed
+
+- 修复事项修改类型后，统计中心仍按最初办理记录类型显示的问题。
+- 修复主界面停留在软件设置等页面时，从悬浮窗打开事项无法切换到详情页面的问题。
+
 ## [0.1.3] - 2026-08-06
 
 ### Added
@@ -254,7 +269,8 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/bluntvoice/in-line/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/bluntvoice/in-line/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/bluntvoice/in-line/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/bluntvoice/in-line/compare/v0.1.0...v0.1.1

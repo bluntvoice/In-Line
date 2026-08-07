@@ -49,6 +49,7 @@ pub struct LegalTask {
     pub custom_sort_order: i64,
     pub processing_rounds: i64,
     pub has_active_queue: bool,
+    pub deferred_entered_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
