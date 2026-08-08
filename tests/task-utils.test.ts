@@ -2,11 +2,13 @@ import { describe,expect,it } from "vitest";
 import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortDeferredQueue,sortQueue,taskDetailView,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
-import { statisticsPresetRange,statisticsWeekdayLabel } from "../src/lib/statistics-range";
+import { statisticsComparisonRange,statisticsPresetRange,statisticsWeekdayLabel } from "../src/lib/statistics-range";
+import { buildReportPrompt,customReportTemplateIsValid,DEFAULT_CUSTOM_REPORT_TEMPLATE,reportTypeForPreset } from "../src/lib/report-prompts";
+import { DEFAULT_STATISTICS_CHART_ORDER,moveStatisticsChart,normalizeHiddenStatisticsCharts,normalizeStatisticsChartOrder,normalizeTaskTypeChartMode } from "../src/lib/statistics-charts";
 import { isMiniFloatingHeight } from "../src/lib/floating-window";
 import type { LegalTask } from "../src/types";
 
-const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",departments:["产品组"],contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null,processingRounds:0,hasActiveQueue:true,deferredEnteredAt:null});
+const task=(id:number,order:number):LegalTask=>({id,customSortOrder:order,permanentNumber:`20260717-${String(id).padStart(2,"0")}`,dailySequence:id,ticketDate:"2026-07-17",department:"产品组",departments:["产品组"],contact:"小林",contacts:["小林"],taskType:"任务处理",title:"测试事项",details:"测试",status:"pending",priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-07-17T00:00:00Z",updatedAt:"2026-07-17T00:00:00Z",startedAt:null,completedAt:null,archivedAt:null,deletedAt:null,processingRounds:0,hasActiveQueue:true,deferredEnteredAt:null,isImportConflict:false});
 
 describe("取号和人工顺位",()=>{
   it("当天显示两位号码",()=>expect(displayTicket({ticketDate:"2026-07-17",dailySequence:1},"2026-07-17")).toBe("01"));
@@ -45,11 +47,13 @@ describe("取号和人工顺位",()=>{
     const later={...task(2,9),status:"waiting_confirmation" as const,deferredEnteredAt:"2026-07-17T10:00:00Z"};
     expect(sortDeferredQueue([earlier,later]).map(value=>value.id)).toEqual([2,1]);
   });
-  it("待办队列默认隐藏暂缓事项，并允许通过设置重新显示",()=>{
+  it("待办队列始终排除暂缓、已完成和其他非待办事项",()=>{
     const regular=task(1,1);
     const deferred={...task(2,2),status:"waiting_counterparty_confirmation" as const};
-    expect(visibleQueueTasks([regular,deferred],false).map(value=>value.id)).toEqual([1]);
-    expect(visibleQueueTasks([regular,deferred],true).map(value=>value.id)).toEqual([1,2]);
+    const processed={...task(3,3),status:"processed" as const};
+    const completed={...task(4,4),status:"completed" as const};
+    const inactive={...task(5,5),hasActiveQueue:false};
+    expect(visibleQueueTasks([regular,deferred,processed,completed,inactive]).map(value=>value.id)).toEqual([1]);
   });
 });
 
@@ -148,6 +152,56 @@ describe("统计周期",()=>{
   it("为趋势日期生成中文星期标识",()=>{
     expect(statisticsWeekdayLabel("2026-08-03")).toBe("周一");
     expect(statisticsWeekdayLabel("2026-08-09")).toBe("周日");
+  });
+  it("本周对比上周同期，完整自然周期对比前一周期",()=>{
+    expect(statisticsComparisonRange("currentWeek",{start:"2026-08-03",end:"2026-08-05"})).toEqual({start:"2026-07-27",end:"2026-07-29"});
+    expect(statisticsComparisonRange("previousWeek",{start:"2026-07-27",end:"2026-08-02"})).toEqual({start:"2026-07-20",end:"2026-07-26"});
+    expect(statisticsComparisonRange("month",{start:"2026-07-01",end:"2026-07-31"})).toEqual({start:"2026-06-01",end:"2026-06-30"});
+    expect(statisticsComparisonRange("quarter",{start:"2026-04-01",end:"2026-06-30"})).toEqual({start:"2026-01-01",end:"2026-03-31"});
+  });
+  it("自定义范围对比紧邻的等长周期",()=>{
+    expect(statisticsComparisonRange("custom",{start:"2026-08-03",end:"2026-08-08"})).toEqual({start:"2026-07-28",end:"2026-08-02"});
+  });
+});
+
+describe("报告指令模板",()=>{
+  it("根据统计范围识别报告类型",()=>{
+    expect(reportTypeForPreset("currentWeek")).toBe("本周周报");
+    expect(reportTypeForPreset("previousWeek")).toBe("上周周报");
+    expect(reportTypeForPreset("month")).toBe("月报");
+    expect(reportTypeForPreset("quarter")).toBe("季度工作报告");
+  });
+  it("将自定义模板的三个占位符替换为真实值",()=>{
+    const prompt=buildReportPrompt({mode:"custom",preset:"currentWeek",start:"2026-08-03",end:"2026-08-08",customTemplate:DEFAULT_CUSTOM_REPORT_TEMPLATE});
+    expect(prompt).toContain("一份简洁的本周周报");
+    expect(prompt).toContain("2026-08-03 至 2026-08-08（包含结束日）");
+    expect(prompt).toContain("请调用 get_report_summary 和 list_report_items 读取完整数据");
+  });
+  it("拒绝缺少必要占位符的自定义模板",()=>{
+    expect(customReportTemplateIsValid(DEFAULT_CUSTOM_REPORT_TEMPLATE)).toBe(true);
+    expect(customReportTemplateIsValid("只有{{报告类型}}和{{开始日期}}" )).toBe(false);
+  });
+  it("内置模板包含分页读取和数据真实性约束",()=>{
+    const prompt=buildReportPrompt({mode:"review",preset:"previousWeek",start:"2026-07-27",end:"2026-08-02"});
+    expect(prompt).toContain("如果 hasMore 为 true");
+    expect(prompt).toContain("不得补充或推测不存在的事项");
+    expect(prompt).toContain("统计数字保持 MCP 返回的原值");
+  });
+});
+
+describe("统计图表布局",()=>{
+  it("保留用户排序并自动补上新加入的图表",()=>{
+    expect(normalizeStatisticsChartOrder('["trend","taskType"]')).toEqual(["trend","taskType","workload","department"]);
+    expect(normalizeStatisticsChartOrder("无效配置")).toEqual(DEFAULT_STATISTICS_CHART_ORDER);
+  });
+  it("上下移动图表但不越界",()=>{
+    expect(moveStatisticsChart([...DEFAULT_STATISTICS_CHART_ORDER],"department",-1)).toEqual(["department","workload","taskType","trend"]);
+    expect(moveStatisticsChart([...DEFAULT_STATISTICS_CHART_ORDER],"workload",-1)).toEqual(DEFAULT_STATISTICS_CHART_ORDER);
+  });
+  it("只接受有效的隐藏项和饼图模式",()=>{
+    expect(normalizeHiddenStatisticsCharts('["department","unknown","department"]')).toEqual(["department"]);
+    expect(normalizeTaskTypeChartMode("pie")).toBe("pie");
+    expect(normalizeTaskTypeChartMode("unknown")).toBe("list");
   });
 });
 

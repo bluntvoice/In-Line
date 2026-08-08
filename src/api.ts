@@ -2,9 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
-import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkEventInput,WorkEventUpdateInput } from "./types";
+import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkEventInput,WorkEventUpdateInput } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -36,6 +35,7 @@ export const api={
   restoreTask:(id:number)=>invoke<void>("restore_task",{id}),
   archiveTask:(id:number)=>invoke<void>("archive_task",{id}),
   mergeTasks:(input:MergeTaskInput)=>invoke<void>("merge_tasks",{input}),
+  resolveImportConflict:(id:number)=>invoke<void>("resolve_import_conflict",{id}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   getWorkEvents:(taskId:number)=>invoke<TaskWorkEvent[]>("get_work_events",{taskId}),
   recordWorkEvent:(input:WorkEventInput)=>invoke<void>("record_work_event",{input}),
@@ -55,9 +55,12 @@ export const api={
   moveMaster:(kind:"department"|"task_type",name:string,direction:MoveDirection)=>invoke<MasterData>("move_master",{kind,name,direction}),
   listBackups:()=>invoke<BackupInfo[]>("list_backups"),
   createBackup:()=>invoke<BackupInfo>("create_backup"),
-  restoreBackup:(path:string)=>invoke<void>("restore_backup",{path}),
+  importBackup:(path:string)=>invoke<BackupInfo>("import_backup",{path}),
+  openBackupDirectory:()=>invoke<void>("open_backup_directory"),
+  mcpConnectionGuide:()=>invoke<string>("mcp_connection_guide"),
+  restoreBackup:(path:string)=>invoke<BackupMergeResult>("restore_backup",{path}),
   deleteBackup:(path:string)=>invoke<void>("delete_backup",{path}),
-  setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
+  setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode"|"launch_at_login",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
   showMain:()=>invoke<void>("show_main_window"),
   requestNewTask:()=>invoke<void>("request_new_task"),
@@ -112,6 +115,6 @@ export const api={
     }
     return snapshot.task;
   },
-  setLaunchAtLogin:async(value:boolean)=>{if(value)await enable();else await disable();},
-  launchAtLogin:isEnabled
+  setLaunchAtLogin:(enabled:boolean)=>invoke<void>("set_launch_at_login",{enabled}),
+  launchAtLogin:()=>invoke<boolean>("get_launch_at_login")
 };

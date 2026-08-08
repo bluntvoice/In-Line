@@ -1,3 +1,4 @@
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -50,6 +51,7 @@ pub struct LegalTask {
     pub processing_rounds: i64,
     pub has_active_queue: bool,
     pub deferred_entered_at: Option<String>,
+    pub is_import_conflict: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -152,14 +154,14 @@ pub struct MergeTaskInput {
     pub trash_source: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StatisticsRange {
     pub start: String,
     pub end: String,
 }
 
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize, Default, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StatisticsSummary {
     pub handled_tasks: i64,
@@ -174,7 +176,7 @@ pub struct StatisticsSummary {
     pub completion_rate: f64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskTypeStatistics {
     pub task_type: String,
@@ -183,19 +185,29 @@ pub struct TaskTypeStatistics {
     pub pending_follow_up: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DepartmentStatistics {
+    pub department: String,
+    pub handled_tasks: i64,
+    pub completed: i64,
+    pub pending_follow_up: i64,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TrendPoint {
     pub period_start: String,
     pub handled_tasks: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct StatisticsResult {
     pub range: StatisticsRange,
     pub summary: StatisticsSummary,
     pub by_task_type: Vec<TaskTypeStatistics>,
+    pub by_department: Vec<DepartmentStatistics>,
     pub trend: Vec<TrendPoint>,
     pub trend_granularity: String,
 }
@@ -212,6 +224,38 @@ pub struct StatisticsDetail {
     pub first_handled_at: String,
     pub last_handled_at: String,
     pub handling_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportWorkEvent {
+    pub result_status: String,
+    pub handled_at: String,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportItem {
+    pub task_id: i64,
+    pub permanent_number: String,
+    pub title: String,
+    pub departments: Vec<String>,
+    pub task_type: String,
+    pub current_status: String,
+    pub workload: String,
+    pub completed_at: Option<String>,
+    pub work_events: Vec<ReportWorkEvent>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ReportItemsPage {
+    pub total: i64,
+    pub offset: i64,
+    pub limit: i64,
+    pub has_more: bool,
+    pub items: Vec<ReportItem>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -236,6 +280,25 @@ pub struct BackupInfo {
     pub path: String,
     pub size: u64,
     pub modified_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupMergeResult {
+    pub added_tasks: usize,
+    pub merged_tasks: usize,
+    pub conflict_tasks: usize,
+    pub applied_settings: usize,
+    pub conflicts: Vec<BackupConflictItem>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupConflictItem {
+    pub task_id: i64,
+    pub permanent_number: String,
+    pub source_title: String,
+    pub imported_title: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -57,8 +57,8 @@ export function sortDeferredQueue(tasks:LegalTask[]){
   const enteredAt=(task:LegalTask)=>Date.parse(task.deferredEnteredAt??task.updatedAt)||0;
   return [...tasks].sort((a,b)=>enteredAt(b)-enteredAt(a)||b.id-a.id);
 }
-export function visibleQueueTasks(tasks:LegalTask[],showDeferred:boolean,now=new Date()){
-  return sortQueue(tasks.filter(task=>task.hasActiveQueue&&!isDeferredStatus(task.status)||showDeferred&&isDeferredStatus(task.status)),now);
+export function visibleQueueTasks(tasks:LegalTask[],now=new Date()){
+  return sortQueue(tasks.filter(task=>task.hasActiveQueue&&(task.status==="pending"||task.status==="processing")),now);
 }
 export function commonContacts(tasks:Pick<LegalTask,"contact"|"contacts">[],limit=3){
   const counts=new Map<string,{count:number;lastIndex:number}>();

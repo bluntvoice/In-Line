@@ -71,7 +71,7 @@ export default function App(){
 
   const source=useMemo(()=>{
     if(!data)return[];
-    if(view==="queue")return visibleQueueTasks(data.queue,data.settings.show_deferred_in_queue==="true");
+    if(view==="queue")return visibleQueueTasks(data.queue);
     if(view==="deferred")return sortDeferredQueue(data.queue.filter(task=>isDeferredStatus(task.status)));
     return data[view];
   },[data,view]);
@@ -143,7 +143,7 @@ export default function App(){
       <small className="app-version">{version?`v${version}`:""}</small>
     </aside>
     <main className="workspace">
-      {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} onChanged={()=>void refresh()} notify={toast}/>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:<>
+      {about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} onChanged={()=>void refresh()} onOpenTask={id=>{void api.getTask(id).then(showTaskDetails).catch(error=>toast(String(error)));}} notify={toast}/>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} notify={toast} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:<>
         <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="deferred"?"暂缓事项":view==="archive"?"历史归档":"回收站"}</h1></div>
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>
@@ -156,7 +156,7 @@ export default function App(){
               <th><ValueFilterHeader label="当前状态" values={filterOptions.statuses} selected={filters.statuses} renderLabel={status=>STATUS_LABELS[status]} onChange={statuses=>updateFilters({statuses})}/></th>
               <th>{view==="archive"?"完成时间":<DeadlineFilterHeader date={filters.deadlineDate} periods={filters.deadlinePeriods} onChange={(deadlineDate,deadlinePeriods)=>updateFilters({deadlineDate,deadlinePeriods})}/>}</th><th>操作</th></tr></thead>
               <tbody>{tasks.map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=view==="queue"&&task.hasActiveQueue&&index>0&&tasks[index-1].hasActiveQueue&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=view==="queue"&&task.hasActiveQueue&&index<tasks.length-1&&tasks[index+1].hasActiveQueue&&isOverdue(tasks[index+1])===taskOverdue;return <tr key={task.id} className={taskOverdue?"overdue-row":undefined} tabIndex={0} onClick={()=>setSelected(task)} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
-                <td><TicketNumber task={task}/></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}</td>
+                <td><TicketNumber task={task}/></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}{task.isImportConflict&&<span className="conflict-mark">导入冲突</span>}</td>
                 <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={taskOverdue}/></td>
                 <td className={taskOverdue?"deadline overdue":"deadline"}>{view==="archive"?formatDateTime(historyTimestamp(task)):formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
                 <td><div className="row-actions"><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制取号图片"><Copy size={17}/></button>

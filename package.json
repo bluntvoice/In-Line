@@ -1,6 +1,6 @@
 {
   "name": "in-line",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "private": false,
   "description": "In Line｜排着呢——通用事项取号与桌面队列工具",
   "author": "bluntvoice",
@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tauri dev",
     "build": "tsc -p tsconfig.renderer.json --noEmit && vite build",
+    "build:bundle": "npm.cmd run build && node scripts/prepare-mcp-sidecar.mjs",
     "test": "vitest run",
     "tauri": "tauri",
     "dist": "tauri build --bundles nsis"

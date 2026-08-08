@@ -1,11 +1,12 @@
-mod database;
-mod models;
+pub mod database;
+pub mod models;
 
 use database::Database;
 use models::*;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
+use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 use tauri_plugin_window_state::StateFlags;
 
 fn emit_change(app: &tauri::AppHandle) -> Result<(), String> {
@@ -106,6 +107,15 @@ fn merge_tasks(
     input: MergeTaskInput,
 ) -> Result<(), String> {
     db.merge_tasks(input)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn resolve_import_conflict(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    id: i64,
+) -> Result<(), String> {
+    db.resolve_import_conflict(id)?;
     emit_change(&app)
 }
 #[tauri::command]
@@ -259,6 +269,41 @@ fn create_backup(db: State<Database>) -> Result<BackupInfo, String> {
     db.create_backup("manual")
 }
 #[tauri::command]
+fn import_backup(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    path: String,
+) -> Result<BackupInfo, String> {
+    let backup = db.import_backup(path)?;
+    emit_change(&app)?;
+    Ok(backup)
+}
+#[tauri::command]
+fn open_backup_directory(db: State<Database>) -> Result<(), String> {
+    std::process::Command::new("explorer.exe")
+        .arg(db.backup_directory())
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开备份目录：{error}"))
+}
+fn mcp_executable() -> Result<std::path::PathBuf, String> {
+    let executable = std::env::current_exe()
+        .map_err(|error| format!("无法定位软件安装目录：{error}"))?
+        .with_file_name("in-line-mcp.exe");
+    if !executable.is_file() {
+        return Err("未找到 MCP 服务程序，请重新安装包含 MCP 功能的新版本".into());
+    }
+    Ok(executable)
+}
+#[tauri::command]
+fn mcp_connection_guide() -> Result<String, String> {
+    let executable = mcp_executable()?;
+    Ok(format!(
+        "请为当前 AI 工具接入以下 In Line MCP 服务。\n\n服务器名称：in_line\n传输方式：stdio\n启动命令：{}\n启动参数：无\n\n可用工具：\n- get_report_summary：读取指定日期范围的统计汇总\n- list_report_items：分页读取指定日期范围的办理事项明细\n\n权限范围：仅只读；不返回联系人、事项详情、内部备注、普通操作日志或回收站事项。\n\n请完成配置、检查格式和程序路径，并告诉我是否需要重启当前 AI 工具。",
+        executable.display()
+    ))
+}
+#[tauri::command]
 fn delete_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Result<(), String> {
     db.delete_backup(path)?;
     emit_change(&app)
@@ -274,9 +319,64 @@ fn set_setting(
     emit_change(&app)
 }
 #[tauri::command]
-fn restore_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Result<(), String> {
-    db.restore_backup(path)?;
+fn get_launch_at_login(app: tauri::AppHandle, db: State<Database>) -> Result<bool, String> {
+    let actual = app
+        .autolaunch()
+        .is_enabled()
+        .map_err(|error| error.to_string())?;
+    let stored = db
+        .settings()?
+        .get("launch_at_login")
+        .and_then(|value| value.parse::<bool>().ok());
+    let Some(desired) = stored else {
+        db.set_setting("launch_at_login".into(), actual.to_string())?;
+        return Ok(actual);
+    };
+    if desired != actual {
+        if desired {
+            app.autolaunch().enable()
+        } else {
+            app.autolaunch().disable()
+        }
+        .map_err(|error| error.to_string())?;
+    }
+    Ok(desired)
+}
+#[tauri::command]
+fn set_launch_at_login(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    enabled: bool,
+) -> Result<(), String> {
+    if enabled {
+        app.autolaunch().enable()
+    } else {
+        app.autolaunch().disable()
+    }
+    .map_err(|error| error.to_string())?;
+    db.set_setting("launch_at_login".into(), enabled.to_string())?;
     emit_change(&app)
+}
+#[tauri::command]
+fn restore_backup(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    path: String,
+) -> Result<BackupMergeResult, String> {
+    let result = db.restore_backup(path)?;
+    if let Some(enabled) = db
+        .settings()?
+        .get("launch_at_login")
+        .and_then(|value| value.parse::<bool>().ok())
+    {
+        let _ = if enabled {
+            app.autolaunch().enable()
+        } else {
+            app.autolaunch().disable()
+        };
+    }
+    emit_change(&app)?;
+    Ok(result)
 }
 #[tauri::command]
 fn copy_ticket_card(db: State<Database>, id: i64) -> Result<LegalTask, String> {
@@ -421,6 +521,7 @@ pub fn run() {
             restore_task,
             archive_task,
             merge_tasks,
+            resolve_import_conflict,
             get_logs,
             get_work_events,
             record_work_event,
@@ -442,8 +543,13 @@ pub fn run() {
             ticket_snapshot,
             list_backups,
             create_backup,
+            import_backup,
+            open_backup_directory,
+            mcp_connection_guide,
             delete_backup,
             set_setting,
+            get_launch_at_login,
+            set_launch_at_login,
             restore_backup,
             copy_ticket_card,
             open_task_action,

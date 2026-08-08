@@ -1,6 +1,8 @@
 use crate::models::*;
 use chrono::{Datelike, FixedOffset, Local, Utc};
-use rusqlite::{params, Connection, OptionalExtension, Transaction};
+use rusqlite::{
+    params, params_from_iter, types::Value, Connection, OpenFlags, OptionalExtension, Transaction,
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs,
@@ -15,12 +17,11 @@ const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ti
      WHERE history.task_id=tasks.id
        AND history.new_status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed')
        AND (history.old_status IS NULL OR history.old_status NOT IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed'))
-     ORDER BY history.id DESC LIMIT 1)
+     ORDER BY history.id DESC LIMIT 1), is_import_conflict
     FROM tasks";
 const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
 pub struct Database {
-    path: PathBuf,
     backup_dir: PathBuf,
     connection: Mutex<Option<Connection>>,
 }
@@ -37,7 +38,7 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 6 {
+        if existed && Self::schema_version(&connection)? < 7 {
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
         }
@@ -57,20 +58,54 @@ impl Database {
         }
         Self::prune_backups(&backup_dir, 30)?;
         Ok(Self {
-            path,
+            backup_dir,
+            connection: Mutex::new(Some(connection)),
+        })
+    }
+
+    pub fn open_reporting() -> Result<Self, String> {
+        let root = dirs::config_dir()
+            .ok_or("无法定位应用数据目录")?
+            .join("in-line");
+        let path = root.join("inline.db");
+        #[cfg(debug_assertions)]
+        let path = std::env::var_os("IN_LINE_MCP_DATABASE_PATH")
+            .map(PathBuf::from)
+            .unwrap_or(path);
+        Self::open_reporting_path(path)
+    }
+
+    fn open_reporting_path(path: PathBuf) -> Result<Self, String> {
+        if !path.is_file() {
+            return Err("找不到 In Line 数据库，请先启动一次主程序".into());
+        }
+        let connection = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(display_error)?;
+        connection
+            .execute_batch("PRAGMA query_only=ON; PRAGMA busy_timeout=5000;")
+            .map_err(display_error)?;
+        if Self::schema_version(&connection)? < 5 {
+            return Err("数据库版本过旧，请先启动 In Line 完成升级".into());
+        }
+        let backup_dir = path.parent().ok_or("数据库路径无效")?.join("backups");
+        Ok(Self {
             backup_dir,
             connection: Mutex::new(Some(connection)),
         })
     }
 
     #[cfg(test)]
+    pub fn open_reporting_at(path: PathBuf) -> Result<Self, String> {
+        Self::open_reporting_path(path)
+    }
+
+    #[cfg(any(test, debug_assertions))]
     pub fn open_at(path: PathBuf) -> Result<Self, String> {
         let backup_dir = path.parent().unwrap().join("backups");
         fs::create_dir_all(&backup_dir).map_err(display_error)?;
         let mut connection = Self::connect(&path)?;
         Self::migrate(&mut connection)?;
         Ok(Self {
-            path,
             backup_dir,
             connection: Mutex::new(Some(connection)),
         })
@@ -121,6 +156,7 @@ impl Database {
                requested_deadline TEXT, internal_notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
                updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT, archived_at TEXT,
                deleted_at TEXT, custom_sort_order INTEGER NOT NULL DEFAULT 0,
+               is_import_conflict INTEGER NOT NULL DEFAULT 0,
                UNIQUE(ticket_date,daily_sequence));
              CREATE TABLE IF NOT EXISTS task_logs(
                id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, log_type TEXT NOT NULL,
@@ -360,6 +396,35 @@ impl Database {
                 )
                 .map_err(display_error)?;
         }
+        if version < 7 {
+            let has_import_conflict: i64 = transaction
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('tasks') WHERE name='is_import_conflict'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if has_import_conflict == 0 {
+                transaction
+                    .execute(
+                        "ALTER TABLE tasks ADD COLUMN is_import_conflict INTEGER NOT NULL DEFAULT 0",
+                        [],
+                    )
+                    .map_err(display_error)?;
+            }
+            transaction
+                .execute(
+                    "UPDATE tasks SET is_import_conflict=1
+                     WHERE title LIKE '%（冲突）' OR title GLOB '*（冲突 [0-9]*）'",
+                    [],
+                )
+                .map_err(display_error)?;
+            transaction
+                .execute_batch(
+                    "DELETE FROM schema_meta; INSERT INTO schema_meta(version) VALUES(7);",
+                )
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -449,6 +514,7 @@ impl Database {
             processing_rounds: row.get(25)?,
             has_active_queue: row.get::<_, i64>(26)? != 0,
             deferred_entered_at: row.get(27)?,
+            is_import_conflict: row.get::<_, i64>(28)? != 0,
         })
     }
 
@@ -518,6 +584,14 @@ fn today() -> String {
 }
 fn display_error(error: impl std::fmt::Display) -> String {
     error.to_string()
+}
+fn valid_setting(key: &str, value: &str) -> bool {
+    match key {
+        "show_deferred_in_queue" | "launch_at_login" => matches!(value, "true" | "false"),
+        "week_start_day" => matches!(value, "monday" | "sunday"),
+        "statistics_rate_mode" => matches!(value, "closure" | "processing"),
+        _ => false,
+    }
 }
 fn parse_contacts(stored: &str) -> Vec<String> {
     let parsed =
@@ -1197,7 +1271,7 @@ impl Database {
 
             let stamp = now();
             tx.execute(
-                "UPDATE tasks SET updated_at=? WHERE id=?",
+                "UPDATE tasks SET updated_at=?,is_import_conflict=0 WHERE id=?",
                 params![stamp, target.id],
             )
             .map_err(display_error)?;
@@ -1214,7 +1288,7 @@ impl Database {
             tx.execute(
                 "UPDATE tasks
                  SET status='archived',archived_at=COALESCE(archived_at,?),
-                     deleted_at=CASE WHEN ? THEN ? ELSE NULL END,updated_at=?
+                     deleted_at=CASE WHEN ? THEN ? ELSE NULL END,updated_at=?,is_import_conflict=0
                  WHERE id=?",
                 params![stamp, input.trash_source, stamp, stamp, source.id],
             )
@@ -1228,6 +1302,21 @@ impl Database {
                     target.permanent_number, target.title
                 ),
             )
+        })
+    }
+    pub fn resolve_import_conflict(&self, id: i64) -> Result<(), String> {
+        self.with_transaction(|tx| {
+            let task = get_task_on(tx, id)?;
+            if !task.is_import_conflict {
+                return Err("该事项没有待复核的导入冲突".into());
+            }
+            let stamp = now();
+            tx.execute(
+                "UPDATE tasks SET is_import_conflict=0,updated_at=? WHERE id=?",
+                params![stamp, id],
+            )
+            .map_err(display_error)?;
+            add_log(tx, id, "import_conflict", "已人工复核并解除导入冲突标识")
         })
     }
     pub fn restore(&self, id: i64) -> Result<(), String> {
@@ -1575,7 +1664,8 @@ impl Database {
         let offset = FixedOffset::east_opt(offset_seconds).ok_or("本地时区无效")?;
         self.with_conn(|connection| {
             let cte = "WITH ranged AS (
-                SELECT event.id,event.task_id,event.result_status,event.handled_at,tasks.task_type AS current_task_type
+                SELECT event.id,event.task_id,event.result_status,event.handled_at,
+                       tasks.task_type AS current_task_type,tasks.department AS current_department
                 FROM task_work_events event
                 JOIN tasks ON tasks.id=event.task_id
                 WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
@@ -1691,6 +1781,54 @@ impl Database {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(display_error)?;
 
+            let department_sql = format!(
+                "{cte}
+                 SELECT current_department,result_status
+                 FROM ranked WHERE position=1"
+            );
+            let mut department_statement = connection
+                .prepare(&department_sql)
+                .map_err(display_error)?;
+            let department_rows = department_statement
+                .query_map(params![start, end], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            let mut departments: HashMap<String, DepartmentStatistics> = HashMap::new();
+            for (stored_departments, result_status) in department_rows {
+                let names = parse_contacts(&stored_departments);
+                let names = if names.is_empty() {
+                    vec!["未分类".to_string()]
+                } else {
+                    names
+                };
+                for department in names {
+                    let entry = departments
+                        .entry(department.clone())
+                        .or_insert(DepartmentStatistics {
+                            department,
+                            handled_tasks: 0,
+                            completed: 0,
+                            pending_follow_up: 0,
+                        });
+                    entry.handled_tasks += 1;
+                    if result_status == "completed" {
+                        entry.completed += 1;
+                    } else {
+                        entry.pending_follow_up += 1;
+                    }
+                }
+            }
+            let mut by_department = departments.into_values().collect::<Vec<_>>();
+            by_department.sort_by(|left, right| {
+                right
+                    .handled_tasks
+                    .cmp(&left.handled_tasks)
+                    .then_with(|| left.department.cmp(&right.department))
+            });
+
             let mut trend_statement = connection
                 .prepare(
                     "SELECT event.task_id,event.handled_at
@@ -1739,6 +1877,7 @@ impl Database {
                 },
                 summary,
                 by_task_type,
+                by_department,
                 trend,
                 trend_granularity: if weekly { "week" } else { "day" }.into(),
             })
@@ -1803,6 +1942,127 @@ impl Database {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(display_error)?;
             Ok(details)
+        })
+    }
+
+    pub fn report_items(
+        &self,
+        start: String,
+        end: String,
+        limit: i64,
+        offset: i64,
+    ) -> Result<ReportItemsPage, String> {
+        let start_time = chrono::DateTime::parse_from_rfc3339(&start)
+            .map_err(|_| "报告开始时间无效".to_string())?;
+        let end_time = chrono::DateTime::parse_from_rfc3339(&end)
+            .map_err(|_| "报告结束时间无效".to_string())?;
+        if end_time <= start_time {
+            return Err("报告结束时间必须晚于开始时间".into());
+        }
+        let limit = limit.clamp(1, 500);
+        let offset = offset.max(0);
+        self.with_conn(|connection| {
+            let total = connection
+                .query_row(
+                    "SELECT count(DISTINCT event.task_id)
+                     FROM task_work_events event
+                     JOIN tasks ON tasks.id=event.task_id
+                     WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                       AND strftime('%s',event.handled_at)>=strftime('%s',?1)
+                       AND strftime('%s',event.handled_at)<strftime('%s',?2)",
+                    params![&start, &end],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map_err(display_error)?;
+            let mut statement = connection
+                .prepare(
+                    "WITH ranged AS (
+                       SELECT event.task_id,max(strftime('%s',event.handled_at)) AS last_handled
+                       FROM task_work_events event
+                       JOIN tasks ON tasks.id=event.task_id
+                       WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                         AND strftime('%s',event.handled_at)>=strftime('%s',?1)
+                         AND strftime('%s',event.handled_at)<strftime('%s',?2)
+                       GROUP BY event.task_id
+                     ), paged AS (
+                       SELECT task_id,last_handled FROM ranged
+                       ORDER BY last_handled DESC,task_id DESC LIMIT ?3 OFFSET ?4
+                     )
+                     SELECT tasks.id,tasks.permanent_number,tasks.title,tasks.department,
+                            tasks.task_type,tasks.status,tasks.workload,tasks.completed_at,
+                            event.result_status,event.handled_at,event.note
+                     FROM paged
+                     JOIN tasks ON tasks.id=paged.task_id
+                     JOIN task_work_events event ON event.task_id=tasks.id
+                     WHERE event.voided_at IS NULL
+                       AND strftime('%s',event.handled_at)>=strftime('%s',?1)
+                       AND strftime('%s',event.handled_at)<strftime('%s',?2)
+                     ORDER BY paged.last_handled DESC,tasks.id DESC,
+                              strftime('%s',event.handled_at),event.id",
+                )
+                .map_err(display_error)?;
+            let rows = statement
+                .query_map(params![&start, &end, limit, offset], |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
+                        row.get::<_, Option<String>>(7)?,
+                        row.get::<_, String>(8)?,
+                        row.get::<_, String>(9)?,
+                        row.get::<_, String>(10)?,
+                    ))
+                })
+                .map_err(display_error)?;
+            let mut items: Vec<ReportItem> = Vec::new();
+            for row in rows {
+                let (
+                    task_id,
+                    permanent_number,
+                    title,
+                    department,
+                    task_type,
+                    current_status,
+                    workload,
+                    completed_at,
+                    result_status,
+                    handled_at,
+                    note,
+                ) = row.map_err(display_error)?;
+                if items.last().is_none_or(|item| item.task_id != task_id) {
+                    items.push(ReportItem {
+                        task_id,
+                        permanent_number,
+                        title,
+                        departments: parse_contacts(&department),
+                        task_type,
+                        current_status,
+                        workload,
+                        completed_at,
+                        work_events: Vec::new(),
+                    });
+                }
+                items
+                    .last_mut()
+                    .expect("刚加入的报告事项应存在")
+                    .work_events
+                    .push(ReportWorkEvent {
+                        result_status,
+                        handled_at,
+                        note,
+                    });
+            }
+            Ok(ReportItemsPage {
+                total,
+                offset,
+                limit,
+                has_more: offset + (items.len() as i64) < total,
+                items,
+            })
         })
     }
 }
@@ -2088,13 +2348,7 @@ impl Database {
         })
     }
     pub fn set_setting(&self, key: String, value: String) -> Result<(), String> {
-        let valid = match key.as_str() {
-            "show_deferred_in_queue" => value == "true" || value == "false",
-            "week_start_day" => value == "monday" || value == "sunday",
-            "statistics_rate_mode" => value == "closure" || value == "processing",
-            _ => return Err("不支持的设置项".into()),
-        };
-        if !valid {
+        if !valid_setting(&key, &value) {
             return Err("设置值无效".into());
         }
         self.with_conn(|connection| {
@@ -2132,7 +2386,10 @@ impl Database {
             .map_err(display_error)?
             .filter_map(Result::ok)
             .map(|entry| entry.path())
-            .filter(|path| path.extension().is_some_and(|value| value == "db"))
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|value| value.eq_ignore_ascii_case("db"))
+            })
             .collect::<Vec<_>>();
         for source in entries {
             let old_name = source.file_name().unwrap_or_default().to_string_lossy();
@@ -2197,16 +2454,89 @@ impl Database {
     }
     pub fn create_backup(&self, label: &str) -> Result<BackupInfo, String> {
         let safe = if label == "manual" { "manual" } else { "auto" };
-        let path = self.backup_dir.join(Self::backup_name(safe));
+        let path = self.unique_backup_path(safe);
         self.with_conn(|connection| Self::backup_connection(connection, &path))?;
         backup_info(&path)
+    }
+
+    fn unique_backup_path(&self, kind: &str) -> PathBuf {
+        let initial = self.backup_dir.join(Self::backup_name(kind));
+        if !initial.exists() {
+            return initial;
+        }
+        let stem = initial
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+        let mut suffix = 2;
+        loop {
+            let candidate = self.backup_dir.join(format!("{stem}-{suffix}.db"));
+            if !candidate.exists() {
+                return candidate;
+            }
+            suffix += 1;
+        }
+    }
+
+    fn validate_backup_file(path: &Path) -> Result<(), String> {
+        if !path.is_file()
+            || path
+                .extension()
+                .is_none_or(|value| !value.eq_ignore_ascii_case("db"))
+        {
+            return Err("请选择 .db 格式的 In Line 备份".into());
+        }
+        let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|_| "备份文件无法打开".to_string())?;
+        let integrity: String = connection
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .map_err(display_error)?;
+        if integrity != "ok" {
+            return Err("备份文件校验失败，当前数据未改变".into());
+        }
+        for table in ["tasks", "settings"] {
+            let exists: i64 = connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name=?)",
+                    [table],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if exists == 0 {
+                return Err("所选文件不是有效的 In Line 备份".into());
+            }
+        }
+        let version = Self::schema_version(&connection)?;
+        if version > 7 {
+            return Err("该备份来自更高版本的 In Line，请先升级软件".into());
+        }
+        Ok(())
+    }
+
+    pub fn import_backup(&self, raw_path: String) -> Result<BackupInfo, String> {
+        let source = fs::canonicalize(raw_path).map_err(|_| "找不到所选备份".to_string())?;
+        Self::validate_backup_file(&source)?;
+        let target = self.unique_backup_path("import");
+        fs::copy(&source, &target).map_err(display_error)?;
+        if let Err(error) = Self::validate_backup_file(&target) {
+            let _ = fs::remove_file(&target);
+            return Err(error);
+        }
+        backup_info(&target)
+    }
+    pub fn backup_directory(&self) -> PathBuf {
+        self.backup_dir.clone()
     }
     pub fn list_backups(&self) -> Result<Vec<BackupInfo>, String> {
         let mut values = fs::read_dir(&self.backup_dir)
             .map_err(display_error)?
             .filter_map(Result::ok)
             .map(|entry| entry.path())
-            .filter(|path| path.extension().is_some_and(|v| v == "db"))
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|value| value.eq_ignore_ascii_case("db"))
+            })
             .filter_map(|path| backup_info(&path).ok())
             .collect::<Vec<_>>();
         values.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
@@ -2223,68 +2553,728 @@ impl Database {
         fs::remove_file(selected).map_err(display_error)
     }
 
-    pub fn restore_backup(&self, raw_path: String) -> Result<(), String> {
+    pub fn restore_backup(&self, raw_path: String) -> Result<BackupMergeResult, String> {
         let selected = fs::canonicalize(&raw_path).map_err(|_| "找不到所选备份".to_string())?;
         let backup_root = fs::canonicalize(&self.backup_dir).map_err(display_error)?;
-        if !selected.starts_with(&backup_root) || selected.extension().is_none_or(|v| v != "db") {
+        if !selected.starts_with(&backup_root)
+            || selected
+                .extension()
+                .is_none_or(|value| !value.eq_ignore_ascii_case("db"))
+        {
             return Err("只能恢复 In Line 备份目录中的数据库文件".into());
         }
-        let check = Connection::open(&selected).map_err(|_| "备份文件无法打开".to_string())?;
-        let integrity: String = check
-            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
-            .map_err(display_error)?;
-        if integrity != "ok" {
-            return Err("备份文件校验失败，当前数据未改变".into());
-        }
-        drop(check);
-        let emergency = self.backup_dir.join(Self::backup_name("before-restore"));
-        {
+        Self::validate_backup_file(&selected)?;
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(display_error)?
+            .as_nanos();
+        let staged = self.backup_dir.join(format!(".merge-source-{nonce}.tmp"));
+        fs::copy(&selected, &staged).map_err(display_error)?;
+        let merge_result = (|| -> Result<BackupMergeResult, String> {
+            let mut source = Self::connect(&staged)?;
+            Self::migrate(&mut source)?;
+            let source_tasks = load_all_tasks(&source)?;
+
+            let emergency = self.unique_backup_path("before-restore");
+            self.with_conn(|connection| Self::backup_connection(connection, &emergency))?;
+
             let mut guard = self
                 .connection
                 .lock()
                 .map_err(|_| "数据库正忙，请稍后重试".to_string())?;
-            if let Some(connection) = guard.as_ref() {
-                Self::backup_connection(connection, &emergency)?;
+            let connection = guard.as_mut().ok_or("数据库尚未打开")?;
+            let transaction = connection.transaction().map_err(display_error)?;
+            let mut result = BackupMergeResult {
+                added_tasks: 0,
+                merged_tasks: 0,
+                conflict_tasks: 0,
+                applied_settings: 0,
+                conflicts: Vec::new(),
+            };
+
+            for mut source_task in source_tasks {
+                source_task.task_type = canonical_task_type(&transaction, &source_task.task_type)?;
+                let same_title = tasks_with_title(&transaction, &source_task.title)?;
+                let exact = same_title
+                    .iter()
+                    .find(|current| same_task_content(current, &source_task));
+                let conflict = exact.is_none() && !same_title.is_empty();
+                let (target_id, inserted) = if let Some(current) = exact {
+                    result.merged_tasks += 1;
+                    (current.id, false)
+                } else {
+                    let title = if conflict {
+                        result.conflict_tasks += 1;
+                        conflict_title(&transaction, &source_task.title)?
+                    } else {
+                        source_task.title.clone()
+                    };
+                    let id = insert_imported_task(
+                        &transaction,
+                        &source_task,
+                        &title,
+                        conflict || source_task.is_import_conflict,
+                    )?;
+                    result.added_tasks += 1;
+                    (id, true)
+                };
+                if conflict {
+                    let imported = get_task_on(&transaction, target_id)?;
+                    result.conflicts.push(BackupConflictItem {
+                        task_id: imported.id,
+                        permanent_number: imported.permanent_number,
+                        source_title: source_task.title.clone(),
+                        imported_title: imported.title,
+                    });
+                }
+
+                for (table, columns) in [
+                    ("task_logs", &["log_type", "content", "created_at"][..]),
+                    (
+                        "status_history",
+                        &["old_status", "new_status", "reason", "created_at"][..],
+                    ),
+                    (
+                        "urgent_records",
+                        &[
+                            "requester",
+                            "reason",
+                            "requested_deadline",
+                            "requested_at",
+                            "confirmation_status",
+                            "confirmed_at",
+                            "cancelled_at",
+                            "notes",
+                        ][..],
+                    ),
+                    (
+                        "task_work_events",
+                        &[
+                            "result_status",
+                            "handled_at",
+                            "task_type_snapshot",
+                            "source",
+                            "note",
+                            "created_at",
+                            "updated_at",
+                            "voided_at",
+                        ][..],
+                    ),
+                ] {
+                    copy_unique_task_rows(
+                        &source,
+                        &transaction,
+                        table,
+                        columns,
+                        source_task.id,
+                        target_id,
+                    )?;
+                }
+                copy_queue_entries(&source, &transaction, source_task.id, target_id, inserted)?;
             }
-            guard.take();
-        }
-        let staged = self.path.with_extension("restore.tmp");
-        let old = self.path.with_extension("restore.old");
-        let restore_result = (|| -> Result<(), String> {
-            if staged.exists() {
-                fs::remove_file(&staged).map_err(display_error)?;
-            }
-            fs::copy(&selected, &staged).map_err(display_error)?;
-            if old.exists() {
-                fs::remove_file(&old).map_err(display_error)?;
-            }
-            if self.path.exists() {
-                fs::rename(&self.path, &old).map_err(display_error)?;
-            }
-            fs::rename(&staged, &self.path).map_err(display_error)?;
-            let mut connection = Self::connect(&self.path)?;
-            Self::migrate(&mut connection)?;
-            *self
-                .connection
-                .lock()
-                .map_err(|_| "数据库正忙".to_string())? = Some(connection);
-            if old.exists() {
-                let _ = fs::remove_file(&old);
-            }
-            Ok(())
+
+            merge_master_values(&source, &transaction)?;
+            deduplicate_task_types(&transaction)?;
+            result.applied_settings = merge_settings(&source, &transaction)?;
+            transaction.commit().map_err(display_error)?;
+            Ok(result)
         })();
-        if restore_result.is_err() {
-            let _ = fs::remove_file(&staged);
-            if old.exists() {
-                let _ = fs::remove_file(&self.path);
-                let _ = fs::rename(&old, &self.path);
-            }
-            if let Ok(connection) = Self::connect(&self.path) {
-                *self.connection.lock().unwrap() = Some(connection);
+        let _ = fs::remove_file(&staged);
+        for suffix in ["-wal", "-shm"] {
+            let mut sidecar = staged.as_os_str().to_os_string();
+            sidecar.push(suffix);
+            let _ = fs::remove_file(PathBuf::from(sidecar));
+        }
+        merge_result
+    }
+}
+
+fn load_all_tasks(connection: &Connection) -> Result<Vec<LegalTask>, String> {
+    let ids = {
+        let mut statement = connection
+            .prepare("SELECT id FROM tasks ORDER BY id")
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([], |row| row.get::<_, i64>(0))
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    ids.into_iter()
+        .map(|id| get_task_on(connection, id))
+        .collect()
+}
+
+fn tasks_with_title(connection: &Connection, title: &str) -> Result<Vec<LegalTask>, String> {
+    let mut statement = connection
+        .prepare(&format!("{SELECT_TASK} WHERE title=? ORDER BY id"))
+        .map_err(display_error)?;
+    let values = statement
+        .query_map([title], Database::row_task)
+        .map_err(display_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(display_error)?;
+    Ok(values)
+}
+
+fn same_task_content(left: &LegalTask, right: &LegalTask) -> bool {
+    left.department == right.department
+        && left.contact == right.contact
+        && left.task_type == right.task_type
+        && left.title == right.title
+        && left.details == right.details
+        && left.status == right.status
+        && left.priority == right.priority
+        && left.workload == right.workload
+        && left.is_urgent == right.is_urgent
+        && left.urgent_requester == right.urgent_requester
+        && left.urgent_reason == right.urgent_reason
+        && left.requested_deadline == right.requested_deadline
+        && left.requested_deadline_label == right.requested_deadline_label
+        && left.internal_notes == right.internal_notes
+        && left.started_at == right.started_at
+        && left.completed_at == right.completed_at
+        && left.archived_at == right.archived_at
+        && left.deleted_at == right.deleted_at
+}
+
+fn canonical_task_type(connection: &Connection, source: &str) -> Result<String, String> {
+    let normalized = source.trim();
+    let names = {
+        let mut statement = connection
+            .prepare("SELECT name FROM master_values WHERE kind='task_type' ORDER BY id")
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    Ok(names
+        .into_iter()
+        .find(|name| name.trim().to_lowercase() == normalized.to_lowercase())
+        .map(|name| name.trim().to_string())
+        .unwrap_or_else(|| normalized.to_string()))
+}
+
+fn conflict_title(connection: &Connection, source: &str) -> Result<String, String> {
+    for index in 1.. {
+        let candidate = if index == 1 {
+            format!("{source}（冲突）")
+        } else {
+            format!("{source}（冲突 {index}）")
+        };
+        let exists: i64 = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM tasks WHERE title=?)",
+                [&candidate],
+                |row| row.get(0),
+            )
+            .map_err(display_error)?;
+        if exists == 0 {
+            return Ok(candidate);
+        }
+    }
+    unreachable!()
+}
+
+fn reserve_daily_sequence(
+    connection: &Connection,
+    date: &str,
+    sequence: i64,
+) -> Result<(), String> {
+    connection
+        .execute(
+            "INSERT INTO daily_sequences(ticket_date,last_sequence) VALUES(?,?)
+             ON CONFLICT(ticket_date) DO UPDATE SET last_sequence=max(last_sequence,excluded.last_sequence)",
+            params![date, sequence],
+        )
+        .map_err(display_error)?;
+    Ok(())
+}
+
+fn next_import_sequence(connection: &Connection, date: &str) -> Result<i64, String> {
+    let current: i64 = connection
+        .query_row(
+            "SELECT max(value) FROM (
+               SELECT COALESCE(MAX(last_sequence),0) AS value FROM daily_sequences WHERE ticket_date=?
+               UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM tasks WHERE ticket_date=?
+               UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM task_queue_entries WHERE queue_date=?
+             )",
+            params![date, date, date],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    let next = current + 1;
+    reserve_daily_sequence(connection, date, next)?;
+    Ok(next)
+}
+
+fn imported_identity(
+    connection: &Connection,
+    task: &LegalTask,
+) -> Result<(String, i64, String), String> {
+    let pair_used: i64 = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM tasks WHERE ticket_date=? AND daily_sequence=?)",
+            params![task.ticket_date, task.daily_sequence],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    let number_used: i64 = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM tasks WHERE permanent_number=?)",
+            [&task.permanent_number],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    if pair_used == 0 && number_used == 0 {
+        reserve_daily_sequence(connection, &task.ticket_date, task.daily_sequence)?;
+        return Ok((
+            task.ticket_date.clone(),
+            task.daily_sequence,
+            task.permanent_number.clone(),
+        ));
+    }
+    let mut sequence = next_import_sequence(connection, &task.ticket_date)?;
+    loop {
+        let permanent = format!("{}-{sequence:02}", task.ticket_date.replace('-', ""));
+        let exists: i64 = connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM tasks WHERE permanent_number=?)",
+                [&permanent],
+                |row| row.get(0),
+            )
+            .map_err(display_error)?;
+        if exists == 0 {
+            return Ok((task.ticket_date.clone(), sequence, permanent));
+        }
+        sequence = next_import_sequence(connection, &task.ticket_date)?;
+    }
+}
+
+fn insert_imported_task(
+    connection: &Connection,
+    task: &LegalTask,
+    title: &str,
+    is_import_conflict: bool,
+) -> Result<i64, String> {
+    let (ticket_date, daily_sequence, permanent_number) = imported_identity(connection, task)?;
+    let order: i64 = connection
+        .query_row(
+            "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    let departments = contact_storage(&task.departments)?;
+    let contacts = contact_storage(&task.contacts)?;
+    connection
+        .execute(
+            "INSERT INTO tasks(
+               permanent_number,daily_sequence,ticket_date,department,contact,task_type,title,details,
+               status,priority,workload,is_urgent,urgent_requester,urgent_reason,requested_deadline,
+               internal_notes,created_at,updated_at,started_at,completed_at,archived_at,deleted_at,
+               custom_sort_order,requested_deadline_label,is_import_conflict
+             ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            params![
+                permanent_number,
+                daily_sequence,
+                ticket_date,
+                departments,
+                contacts,
+                task.task_type,
+                title,
+                task.details,
+                task.status,
+                task.priority,
+                task.workload,
+                task.is_urgent as i64,
+                task.urgent_requester,
+                task.urgent_reason,
+                task.requested_deadline,
+                task.internal_notes,
+                task.created_at,
+                task.updated_at,
+                task.started_at,
+                task.completed_at,
+                task.archived_at,
+                task.deleted_at,
+                order,
+                task.requested_deadline_label,
+                is_import_conflict as i64,
+            ],
+        )
+        .map_err(display_error)?;
+    Ok(connection.last_insert_rowid())
+}
+
+fn copy_unique_task_rows(
+    source: &Connection,
+    target: &Connection,
+    table: &str,
+    columns: &[&str],
+    source_task_id: i64,
+    target_task_id: i64,
+) -> Result<(), String> {
+    let rows = {
+        let mut statement = source
+            .prepare(&format!(
+                "SELECT {} FROM {table} WHERE task_id=? ORDER BY id",
+                columns.join(",")
+            ))
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([source_task_id], |row| {
+                (0..columns.len())
+                    .map(|index| row.get::<_, Value>(index))
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    let predicates = columns
+        .iter()
+        .map(|column| format!("{column} IS ?"))
+        .collect::<Vec<_>>()
+        .join(" AND ");
+    let placeholders = std::iter::repeat_n("?", columns.len() + 1)
+        .collect::<Vec<_>>()
+        .join(",");
+    for row in rows {
+        let mut values = vec![Value::Integer(target_task_id)];
+        values.extend(row);
+        let exists: i64 = target
+            .query_row(
+                &format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE task_id=? AND {predicates})"),
+                params_from_iter(values.iter()),
+                |result| result.get(0),
+            )
+            .map_err(display_error)?;
+        if exists == 0 {
+            target
+                .execute(
+                    &format!(
+                        "INSERT INTO {table}(task_id,{}) VALUES({placeholders})",
+                        columns.join(",")
+                    ),
+                    params_from_iter(values.iter()),
+                )
+                .map_err(display_error)?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+struct ImportedQueueEntry {
+    queue_date: String,
+    daily_sequence: i64,
+    requested_deadline: Option<String>,
+    requested_deadline_label: Option<String>,
+    enqueued_at: String,
+    closed_at: Option<String>,
+    close_reason: String,
+    created_at: String,
+    updated_at: String,
+}
+
+fn copy_queue_entries(
+    source: &Connection,
+    target: &Connection,
+    source_task_id: i64,
+    target_task_id: i64,
+    inserted_task: bool,
+) -> Result<(), String> {
+    let entries = {
+        let mut statement = source
+            .prepare(
+                "SELECT queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+                        enqueued_at,closed_at,close_reason,created_at,updated_at
+                 FROM task_queue_entries WHERE task_id=? ORDER BY id",
+            )
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([source_task_id], |row| {
+                Ok(ImportedQueueEntry {
+                    queue_date: row.get(0)?,
+                    daily_sequence: row.get(1)?,
+                    requested_deadline: row.get(2)?,
+                    requested_deadline_label: row.get(3)?,
+                    enqueued_at: row.get(4)?,
+                    closed_at: row.get(5)?,
+                    close_reason: row.get(6)?,
+                    created_at: row.get(7)?,
+                    updated_at: row.get(8)?,
+                })
+            })
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    for entry in entries {
+        let duplicate: i64 = target
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM task_queue_entries
+                 WHERE task_id=? AND queue_date=? AND requested_deadline IS ?
+                   AND requested_deadline_label IS ? AND enqueued_at=? AND closed_at IS ?
+                   AND close_reason=? AND created_at=? AND updated_at=?)",
+                params![
+                    target_task_id,
+                    entry.queue_date,
+                    entry.requested_deadline,
+                    entry.requested_deadline_label,
+                    entry.enqueued_at,
+                    entry.closed_at,
+                    entry.close_reason,
+                    entry.created_at,
+                    entry.updated_at,
+                ],
+                |row| row.get(0),
+            )
+            .map_err(display_error)?;
+        if duplicate != 0 {
+            continue;
+        }
+        if entry.closed_at.is_none() {
+            let active: i64 = target
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM task_queue_entries WHERE task_id=? AND closed_at IS NULL)",
+                    [target_task_id],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if active != 0 {
+                continue;
             }
         }
-        restore_result
+        let pair_used: i64 = target
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM task_queue_entries WHERE queue_date=? AND daily_sequence=?)",
+                params![entry.queue_date, entry.daily_sequence],
+                |row| row.get(0),
+            )
+            .map_err(display_error)?;
+        let sequence = if pair_used == 0 {
+            reserve_daily_sequence(target, &entry.queue_date, entry.daily_sequence)?;
+            entry.daily_sequence
+        } else {
+            next_import_sequence(target, &entry.queue_date)?
+        };
+        target
+            .execute(
+                "INSERT INTO task_queue_entries(
+                   task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+                   enqueued_at,closed_at,close_reason,created_at,updated_at
+                 ) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                params![
+                    target_task_id,
+                    entry.queue_date,
+                    sequence,
+                    entry.requested_deadline,
+                    entry.requested_deadline_label,
+                    entry.enqueued_at,
+                    entry.closed_at,
+                    entry.close_reason,
+                    entry.created_at,
+                    entry.updated_at,
+                ],
+            )
+            .map_err(display_error)?;
+        if inserted_task && entry.closed_at.is_none() {
+            target
+                .execute(
+                    "UPDATE tasks SET ticket_date=?,daily_sequence=?,requested_deadline=?,requested_deadline_label=? WHERE id=?",
+                    params![
+                        entry.queue_date,
+                        sequence,
+                        entry.requested_deadline,
+                        entry.requested_deadline_label,
+                        target_task_id,
+                    ],
+                )
+                .map_err(display_error)?;
+        }
     }
+    Ok(())
+}
+
+fn merge_master_values(source: &Connection, target: &Connection) -> Result<(), String> {
+    let values = {
+        let mut statement = source
+            .prepare(
+                "SELECT kind,name,sort_order,is_active,usage_count,manual_order FROM master_values ORDER BY id",
+            )
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, Option<i64>>(5)?,
+                ))
+            })
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    for (kind, name, sort_order, is_active, usage_count, manual_order) in values {
+        target
+            .execute(
+                "INSERT INTO master_values(kind,name,sort_order,is_active,usage_count,manual_order)
+                 VALUES(?,?,?,?,?,?) ON CONFLICT(kind,name) DO UPDATE SET
+                   is_active=max(is_active,excluded.is_active),
+                   usage_count=max(usage_count,excluded.usage_count),
+                   manual_order=COALESCE(master_values.manual_order,excluded.manual_order)",
+                params![kind, name, sort_order, is_active, usage_count, manual_order],
+            )
+            .map_err(display_error)?;
+    }
+    Ok(())
+}
+
+fn deduplicate_task_types(connection: &Connection) -> Result<(), String> {
+    let task_types = {
+        let mut statement = connection
+            .prepare("SELECT DISTINCT task_type FROM tasks WHERE trim(task_type)<>''")
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    for name in task_types {
+        connection
+            .execute(
+                "INSERT OR IGNORE INTO master_values(kind,name,sort_order,is_active) VALUES('task_type',?,999,1)",
+                [name],
+            )
+            .map_err(display_error)?;
+    }
+
+    let rows = {
+        let mut statement = connection
+            .prepare(
+                "SELECT id,name,sort_order,is_active,usage_count,manual_order
+                 FROM master_values WHERE kind='task_type' ORDER BY id",
+            )
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, Option<i64>>(5)?,
+                ))
+            })
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    let mut groups: BTreeMap<String, Vec<(i64, String, i64, i64, i64, Option<i64>)>> =
+        BTreeMap::new();
+    for row in rows {
+        groups
+            .entry(row.1.trim().to_lowercase())
+            .or_default()
+            .push(row);
+    }
+    for group in groups.into_values() {
+        let canonical_name = group[0].1.trim().to_string();
+        let keep = group
+            .iter()
+            .find(|row| row.1 == canonical_name)
+            .unwrap_or(&group[0]);
+        let active = group.iter().map(|row| row.3).max().unwrap_or(1);
+        let sort_order = group.iter().map(|row| row.2).min().unwrap_or(999);
+        let manual_order = group.iter().filter_map(|row| row.5).min();
+        for row in &group {
+            connection
+                .execute(
+                    "UPDATE tasks SET task_type=? WHERE task_type=?",
+                    params![canonical_name, row.1],
+                )
+                .map_err(display_error)?;
+            connection
+                .execute(
+                    "UPDATE task_work_events SET task_type_snapshot=? WHERE task_type_snapshot=?",
+                    params![canonical_name, row.1],
+                )
+                .map_err(display_error)?;
+            if row.0 != keep.0 {
+                connection
+                    .execute("DELETE FROM master_values WHERE id=?", [row.0])
+                    .map_err(display_error)?;
+            }
+        }
+        let usage_count: i64 = connection
+            .query_row(
+                "SELECT count(*) FROM tasks WHERE task_type=?",
+                [&canonical_name],
+                |row| row.get(0),
+            )
+            .map_err(display_error)?;
+        connection
+            .execute(
+                "UPDATE master_values SET name=?,sort_order=?,is_active=?,usage_count=?,manual_order=? WHERE id=?",
+                params![
+                    canonical_name,
+                    sort_order,
+                    active,
+                    usage_count,
+                    manual_order,
+                    keep.0
+                ],
+            )
+            .map_err(display_error)?;
+    }
+    Ok(())
+}
+
+fn merge_settings(source: &Connection, target: &Connection) -> Result<usize, String> {
+    let settings = {
+        let mut statement = source
+            .prepare("SELECT key,value FROM settings ORDER BY key")
+            .map_err(display_error)?;
+        let values = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        values
+    };
+    let mut applied = 0;
+    for (key, value) in settings {
+        if !valid_setting(&key, &value) {
+            continue;
+        }
+        target
+            .execute(
+                "INSERT INTO settings(key,value) VALUES(?,?)
+                 ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                params![key, value],
+            )
+            .map_err(display_error)?;
+        applied += 1;
+    }
+    Ok(applied)
 }
 fn backup_info(path: &Path) -> Result<BackupInfo, String> {
     let metadata = fs::metadata(path).map_err(display_error)?;
@@ -2423,11 +3413,61 @@ mod tests {
             .any(|log| log.id == manual.id));
         db.delete_master("contact".into(), "小林".into()).unwrap();
         assert!(!db.masters().unwrap().contacts.contains(&"小林".to_string()));
+        assert_eq!(db.backup_directory(), root.join("backups"));
+        assert!(db.backup_directory().is_dir());
         let backup = db.create_backup("manual").unwrap();
         assert!(backup.name.starts_with("InLine-backup-"));
         assert!(backup.name.ends_with("-manual.db"));
         db.delete_backup(backup.path).unwrap();
         drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn reporting_reader_is_read_only_and_excludes_private_fields() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-report-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("inline.db");
+        let db = Database::open_at(path.clone()).unwrap();
+        let mut input = sample("完成报告功能");
+        input.details = "不应暴露的事项详情".into();
+        input.internal_notes = "不应暴露的内部备注".into();
+        input.contact = "不应暴露的联系人".into();
+        input.contacts = vec!["不应暴露的联系人".into()];
+        let task = db.save_task(input).unwrap();
+        db.record_work_event(WorkEventInput {
+            task_id: task.id,
+            result_status: "completed".into(),
+            handled_at: "2026-08-08T09:00:00+08:00".into(),
+            note: "完成 MCP 只读查询".into(),
+            sync_status: true,
+        })
+        .unwrap();
+        drop(db);
+
+        let reader = Database::open_reporting_at(path).unwrap();
+        let page = reader
+            .report_items(
+                "2026-08-08T00:00:00+08:00".into(),
+                "2026-08-09T00:00:00+08:00".into(),
+                100,
+                0,
+            )
+            .unwrap();
+        assert_eq!(page.total, 1);
+        assert_eq!(page.items[0].title, "完成报告功能");
+        assert_eq!(page.items[0].departments, vec!["产品组"]);
+        assert_eq!(page.items[0].work_events[0].note, "完成 MCP 只读查询");
+        let json = serde_json::to_string(&page).unwrap();
+        assert!(!json.contains("不应暴露的联系人"));
+        assert!(!json.contains("不应暴露的事项详情"));
+        assert!(!json.contains("不应暴露的内部备注"));
+        assert!(reader
+            .set_setting("week_start_day".into(), "sunday".into())
+            .is_err());
+        drop(reader);
         let _ = fs::remove_dir_all(root);
     }
     #[test]
@@ -2775,6 +3815,9 @@ mod tests {
         assert_eq!(statistics.summary.rate_numerator, 1);
         assert_eq!(statistics.summary.rate_denominator, 1);
         assert_eq!(statistics.summary.completion_rate, 1.0);
+        assert_eq!(statistics.by_department.len(), 1);
+        assert_eq!(statistics.by_department[0].department, "产品组");
+        assert_eq!(statistics.by_department[0].handled_tasks, 1);
         db.save_task(sample("本周期尚未处理事项")).unwrap();
         let processing_statistics = db.statistics(start.clone(), end.clone(), 480).unwrap();
         assert_eq!(processing_statistics.summary.rate_mode, "processing");
@@ -2878,7 +3921,7 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
     #[test]
-    fn migration_v6_backfills_queue_events_and_clears_handled_urgency() {
+    fn migration_v7_backfills_queue_events_and_clears_handled_urgency() {
         let root = std::env::temp_dir().join(format!(
             "inline-migration-test-{}",
             Utc::now().timestamp_nanos_opt().unwrap()
@@ -2921,7 +3964,7 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 6);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 7);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);
@@ -2944,5 +3987,135 @@ mod tests {
 
         drop(migrated);
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn backup_restore_merges_tasks_preserves_conflicts_and_applies_settings() {
+        let nonce = Utc::now().timestamp_nanos_opt().unwrap();
+        let source_root = std::env::temp_dir().join(format!("inline-merge-source-{nonce}"));
+        let target_root = std::env::temp_dir().join(format!("inline-merge-target-{nonce}"));
+        fs::create_dir_all(&source_root).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+
+        let source = Database::open_at(source_root.join("inline.db")).unwrap();
+        source
+            .set_setting("week_start_day".into(), "sunday".into())
+            .unwrap();
+        source
+            .set_setting("launch_at_login".into(), "true".into())
+            .unwrap();
+        source.save_task(sample("完全一致事项")).unwrap();
+        source
+            .with_conn(|connection| {
+                connection
+                    .execute(
+                        "UPDATE tasks SET task_type=' 任务处理 ' WHERE title='完全一致事项'",
+                        [],
+                    )
+                    .map_err(display_error)?;
+                connection
+                    .execute(
+                        "INSERT INTO master_values(kind,name,sort_order,is_active) VALUES('task_type',' 任务处理 ',998,1)",
+                        [],
+                    )
+                    .map_err(display_error)?;
+                Ok(())
+            })
+            .unwrap();
+        let mut source_conflict = sample("同名事项");
+        source_conflict.details = "备份中的详情更多".into();
+        source.save_task(source_conflict).unwrap();
+        source.save_task(sample("仅备份中存在")).unwrap();
+        let source_backup = source.create_backup("manual").unwrap();
+        drop(source);
+
+        let target = Database::open_at(target_root.join("inline.db")).unwrap();
+        target
+            .set_setting("week_start_day".into(), "monday".into())
+            .unwrap();
+        let identical = target.save_task(sample("完全一致事项")).unwrap();
+        let mut target_conflict = sample("同名事项");
+        target_conflict.details = "当前数据中的详情".into();
+        target.save_task(target_conflict).unwrap();
+
+        let imported = target.import_backup(source_backup.path).unwrap();
+        assert!(imported.name.contains("-import"));
+        let result = target.restore_backup(imported.path).unwrap();
+        assert_eq!(result.added_tasks, 2);
+        assert_eq!(result.merged_tasks, 1);
+        assert_eq!(result.conflict_tasks, 1);
+        assert_eq!(result.applied_settings, 2);
+        assert_eq!(result.conflicts.len(), 1);
+
+        let all = [
+            target.list_tasks(TaskView::Queue).unwrap(),
+            target.list_tasks(TaskView::Archive).unwrap(),
+            target.list_tasks(TaskView::Trash).unwrap(),
+        ]
+        .concat();
+        assert_eq!(all.len(), 4);
+        assert!(all.iter().any(|task| task.title == "同名事项"));
+        assert!(all.iter().any(|task| task.title == "同名事项（冲突）"));
+        assert!(
+            !all.iter()
+                .find(|task| task.title == "同名事项")
+                .unwrap()
+                .is_import_conflict
+        );
+        let imported_conflict = all
+            .iter()
+            .find(|task| task.title == "同名事项（冲突）")
+            .unwrap();
+        assert!(imported_conflict.is_import_conflict);
+        assert_eq!(result.conflicts[0].task_id, imported_conflict.id);
+        target
+            .resolve_import_conflict(imported_conflict.id)
+            .unwrap();
+        assert!(
+            !target
+                .get_task(imported_conflict.id)
+                .unwrap()
+                .is_import_conflict
+        );
+        assert!(all.iter().any(|task| task.title == "仅备份中存在"));
+        assert!(all
+            .iter()
+            .all(|task| task.task_type == task.task_type.trim()));
+        assert_eq!(
+            target
+                .masters()
+                .unwrap()
+                .task_types
+                .iter()
+                .filter(|name| name.trim() == "任务处理")
+                .count(),
+            1
+        );
+        assert_eq!(
+            target
+                .settings()
+                .unwrap()
+                .get("week_start_day")
+                .map(String::as_str),
+            Some("sunday")
+        );
+        assert_eq!(
+            target
+                .settings()
+                .unwrap()
+                .get("launch_at_login")
+                .map(String::as_str),
+            Some("true")
+        );
+        assert!(target.get_logs(identical.id).unwrap().len() >= 2);
+        assert!(target
+            .list_backups()
+            .unwrap()
+            .iter()
+            .any(|backup| backup.name.contains("before-restore")));
+
+        drop(target);
+        let _ = fs::remove_dir_all(source_root);
+        let _ = fs::remove_dir_all(target_root);
     }
 }

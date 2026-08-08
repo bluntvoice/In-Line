@@ -46,3 +46,37 @@ export function statisticsPresetRange(
   inclusiveEnd.setDate(inclusiveEnd.getDate() - 1);
   return { start: dateInput(start), end: dateInput(inclusiveEnd) };
 }
+
+function parseDateInput(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function statisticsComparisonRange(
+  preset: StatisticsPreset,
+  range: { start: string; end: string }
+) {
+  const currentStart = parseDateInput(range.start);
+  const currentEnd = parseDateInput(range.end);
+  let comparisonStart: Date;
+
+  if (preset === "currentWeek") {
+    comparisonStart = new Date(currentStart);
+    comparisonStart.setDate(comparisonStart.getDate() - 7);
+    const comparisonEnd = new Date(currentEnd);
+    comparisonEnd.setDate(comparisonEnd.getDate() - 7);
+    return { start: dateInput(comparisonStart), end: dateInput(comparisonEnd) };
+  } else if (preset === "month") {
+    comparisonStart = new Date(currentStart.getFullYear(), currentStart.getMonth() - 1, 1);
+  } else if (preset === "quarter") {
+    comparisonStart = new Date(currentStart.getFullYear(), currentStart.getMonth() - 3, 1);
+  } else {
+    const inclusiveDays = Math.round((currentEnd.getTime() - currentStart.getTime()) / 86_400_000) + 1;
+    comparisonStart = new Date(currentStart);
+    comparisonStart.setDate(comparisonStart.getDate() - inclusiveDays);
+  }
+
+  const comparisonEnd = new Date(currentStart);
+  comparisonEnd.setDate(comparisonEnd.getDate() - 1);
+  return { start: dateInput(comparisonStart), end: dateInput(comparisonEnd) };
+}

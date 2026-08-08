@@ -15,7 +15,7 @@ export default function FloatingWindow(){
   const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState("");
   const refresh=async()=>{
     setLoading(true);setLoadError("");
-    try{const data=await api.bootstrap();setTasks(visibleQueueTasks(data.queue,data.settings.show_deferred_in_queue==="true"));}
+    try{const data=await api.bootstrap();setTasks(visibleQueueTasks(data.queue));}
     catch(error){setLoadError(error instanceof Error?error.message:String(error));}
     finally{setLoading(false);}
   };
@@ -83,7 +83,7 @@ export default function FloatingWindow(){
   return <div className="floating-expanded">
     {toolbar}
     <div className="floating-list" onMouseDown={startBlankDrag}>{loadError?<div className="floating-error" role="alert"><strong>队列载入失败</strong><p>{loadError}</p><button onClick={()=>void refresh()}>重新载入</button></div>:tasks.slice(0,12).map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=index>0&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=index<tasks.length-1&&isOverdue(tasks[index+1])===taskOverdue;return <article key={task.id} className={`floating-card${task.isUrgent?" urgent":""}${taskOverdue?" overdue":""}`} onClick={()=>void openDetails(task)} onContextMenu={event=>{event.preventDefault();setMenu({task,x:event.clientX,y:event.clientY});}}>
-      <TicketNumber task={task}/><div className="floating-copy"><strong>{task.title}</strong><span>{task.department} · {task.contact}{isOverdue(task)&&<i className="floating-overdue"><ClockAlert size={11}/>已逾期</i>}</span></div>
+      <TicketNumber task={task}/><div className="floating-copy"><strong>{task.title}</strong><span>{task.department} · {task.contact}{isOverdue(task)&&<i className="floating-overdue"><ClockAlert size={11}/>已逾期</i>}{task.isImportConflict&&<i className="floating-conflict">导入冲突</i>}</span></div>
       <div className="float-row-actions"><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制"><Copy size={15}/></button><button disabled={!canMoveUp} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={15}/></button><button disabled={!canMoveDown} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={15}/></button></div>
     </article>})}{!loadError&&!loading&&!tasks.length&&<div className="floating-empty" onMouseDown={startDrag}><img src="/inline-mark.svg" alt=""/><p>目前没有排队事项</p></div>}</div>
     <footer className="floating-footer" onMouseDown={startBlankDrag}><button onClick={()=>void api.requestNewTask().catch(error=>toast("无法新增："+String(error)))}><Plus size={15}/>新增取号</button><span>单击查看详情 · 右键管理</span></footer>{menu&&<TaskContextMenu {...menu} view="queue" onAction={value=>void action(value).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>} {message&&<div className="float-toast expanded">{message}</div>}
