@@ -590,6 +590,7 @@ fn valid_setting(key: &str, value: &str) -> bool {
         "show_deferred_in_queue" | "launch_at_login" => matches!(value, "true" | "false"),
         "week_start_day" => matches!(value, "monday" | "sunday"),
         "statistics_rate_mode" => matches!(value, "closure" | "processing"),
+        "global_shortcut" => value.is_ascii() && value.len() <= 64 && value.contains('+'),
         _ => false,
     }
 }
@@ -1335,6 +1336,37 @@ impl Database {
                 true,
             )?;
             add_log(tx, id, "restored", "事项已恢复并加入今日队列")
+        })
+    }
+
+    pub fn permanently_delete_tasks(&self, ids: Vec<i64>) -> Result<usize, String> {
+        if ids.is_empty() {
+            return Err("未选择需要永久删除的事项".into());
+        }
+        self.with_transaction(|tx| {
+            for id in &ids {
+                let task = get_task_on(tx, *id)?;
+                if task.deleted_at.is_none() {
+                    return Err(format!("事项 {} 不在回收站中", task.permanent_number));
+                }
+            }
+            let mut deleted = 0;
+            for id in ids {
+                deleted += tx
+                    .execute(
+                        "DELETE FROM tasks WHERE id=? AND deleted_at IS NOT NULL",
+                        [id],
+                    )
+                    .map_err(display_error)?;
+            }
+            Ok(deleted)
+        })
+    }
+
+    pub fn empty_trash(&self) -> Result<usize, String> {
+        self.with_transaction(|tx| {
+            tx.execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL", [])
+                .map_err(display_error)
         })
     }
 
@@ -3419,6 +3451,28 @@ mod tests {
         assert!(backup.name.starts_with("InLine-backup-"));
         assert!(backup.name.ends_with("-manual.db"));
         db.delete_backup(backup.path).unwrap();
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn permanent_delete_is_limited_to_trash_and_empty_trash_is_scoped() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-trash-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let active = db.save_task(sample("保留事项")).unwrap();
+        let first = db.save_task(sample("永久删除事项")).unwrap();
+        let second = db.save_task(sample("清空事项")).unwrap();
+        assert!(db.permanently_delete_tasks(vec![active.id]).is_err());
+        db.soft_delete(first.id).unwrap();
+        db.soft_delete(second.id).unwrap();
+        assert_eq!(db.permanently_delete_tasks(vec![first.id]).unwrap(), 1);
+        assert!(db.get_task(first.id).is_err());
+        assert_eq!(db.empty_trash().unwrap(), 1);
+        assert!(db.get_task(second.id).is_err());
+        assert_eq!(db.get_task(active.id).unwrap().title, "保留事项");
         drop(db);
         let _ = fs::remove_dir_all(root);
     }

@@ -1,27 +1,30 @@
 import { useEffect,useMemo,useRef,useState } from "react";
-import { ArrowDown,ArrowUp,BarChart3,Check,ChevronRight,ChevronUp,Eye,EyeOff,FileText,List,Pencil,PieChart,RefreshCw,RotateCcw,SlidersHorizontal,X } from "lucide-react";
+import { ArrowDown,ArrowUp,BarChart3,Check,ChevronRight,ChevronUp,ClipboardCopy,Download,Eye,EyeOff,FileText,List,Pencil,PieChart,RefreshCw,RotateCcw,SlidersHorizontal,X } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import type { StatisticsDetail,StatisticsResult } from "../types";
 import { formatDateTime,STATUS_LABELS } from "../lib/task-utils";
 import { statisticsComparisonRange,statisticsPresetRange,statisticsWeekdayLabel,type StatisticsPreset,type WeekStart } from "../lib/statistics-range";
 import { buildReportPrompt,customReportTemplateIsValid,DEFAULT_CUSTOM_REPORT_TEMPLATE,REPORT_TEMPLATE_OPTIONS,type ReportTemplateMode } from "../lib/report-prompts";
 import { DEFAULT_STATISTICS_CHART_ORDER,moveStatisticsChart,normalizeHiddenStatisticsCharts,normalizeStatisticsChartOrder,normalizeTaskTypeChartMode,STATISTICS_CHARTS,type StatisticsChartId,type TaskTypeChartMode } from "../lib/statistics-charts";
+import { buildNativeReport,nativeReportTitle } from "../lib/native-report";
+import { renderStatisticsChartsPng,STATISTICS_EXPORT_DPI } from "../lib/statistics-export";
 
 const localStart=(value:string)=>new Date(`${value}T00:00:00`).toISOString();
 const nextLocalDay=(value:string)=>{const date=new Date(`${value}T00:00:00`);date.setDate(date.getDate()+1);return date.toISOString();};
 const REPORT_MODE_KEY="in-line-report-template-mode";
 const REPORT_CUSTOM_KEY="in-line-report-custom-template";
-const REPORT_CONFIRMED_VERSION_KEY="in-line-report-template-confirmed-version";
 const CHART_ORDER_KEY="in-line-statistics-chart-order";
 const CHART_HIDDEN_KEY="in-line-statistics-chart-hidden";
 const TASK_TYPE_MODE_KEY="in-line-statistics-task-type-mode";
 const PIE_COLORS=["#0b3a82","#2f69a8","#55a0a6","#78a85a","#c68a16","#ce6b54","#7d68a8","#7890aa"];
 const validMode=(value:string|null):value is ReportTemplateMode=>REPORT_TEMPLATE_OPTIONS.some(option=>option.value===value);
+type ReportChooserMode=ReportTemplateMode|"native";
 const comparisonName=(preset:StatisticsPreset)=>preset==="currentWeek"?"上周同期":preset==="previousWeek"?"上上周":preset==="month"?"再上一个月":preset==="quarter"?"再上一季度":"前一等长周期";
 const deltaText=(current:number,previous:number)=>previous===0?(current===0?"持平":"新增"): `${current>=previous?"+":""}${Math.round((current-previous)/previous*100)}%`;
 const changeTone=(current:number,previous:number)=>current>previous?"increase":current<previous?"decrease":"unchanged";
 
-export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStartsOn}:{onOpenTask:(id:number)=>void;notify:(text:string)=>void;refreshKey?:string|number;weekStartsOn:WeekStart}){
+export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStartsOn,currentOverdueCount,currentOverdueByTaskType}:{onOpenTask:(id:number)=>void;notify:(text:string)=>void;refreshKey?:string|number;weekStartsOn:WeekStart;currentOverdueCount:number;currentOverdueByTaskType:Record<string,number>}){
   const [preset,setPreset]=useState<StatisticsPreset>("currentWeek");const initial=statisticsPresetRange("currentWeek",weekStartsOn);
   const [customStart,setCustomStart]=useState(initial.start);const [customEnd,setCustomEnd]=useState(initial.end);
   const [data,setData]=useState<StatisticsResult|null>(null);const [comparisonData,setComparisonData]=useState<StatisticsResult|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
@@ -29,23 +32,49 @@ export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStar
   const storedMode=window.localStorage.getItem(REPORT_MODE_KEY);
   const [reportMode,setReportMode]=useState<ReportTemplateMode>(validMode(storedMode)?storedMode:"review");
   const [customTemplate,setCustomTemplate]=useState(()=>window.localStorage.getItem(REPORT_CUSTOM_KEY)??DEFAULT_CUSTOM_REPORT_TEMPLATE);
-  const [reportBusy,setReportBusy]=useState(false);const [chooserOpen,setChooserOpen]=useState(false);const [chooserMode,setChooserMode]=useState<ReportTemplateMode>("review");
-  const [customEditorOpen,setCustomEditorOpen]=useState(false);const [customDraft,setCustomDraft]=useState(customTemplate);const [pendingGenerate,setPendingGenerate]=useState(false);const [pendingVersion,setPendingVersion]=useState("");
+  const [reportBusy,setReportBusy]=useState(false);const [chooserOpen,setChooserOpen]=useState(false);const [chooserMode,setChooserMode]=useState<ReportChooserMode>("review");
+  const [customEditorOpen,setCustomEditorOpen]=useState(false);const [customDraft,setCustomDraft]=useState(customTemplate);const [pendingGenerate,setPendingGenerate]=useState(false);
   const [chartManagerOpen,setChartManagerOpen]=useState(false);
+  const [exportOpen,setExportOpen]=useState(false);const [exportSelection,setExportSelection]=useState<StatisticsChartId[]>([]);const [exportBusy,setExportBusy]=useState(false);
+  const [nativeReportOpen,setNativeReportOpen]=useState(false);const [nativeReportScope,setNativeReportScope]=useState("");const [nativeReportDetails,setNativeReportDetails]=useState<StatisticsDetail[]>([]);const [nativeReportBusy,setNativeReportBusy]=useState(false);const [nativeReportError,setNativeReportError]=useState("");const nativeReportRequestRef=useRef(0);
   const [chartOrder,setChartOrder]=useState<StatisticsChartId[]>(()=>normalizeStatisticsChartOrder(window.localStorage.getItem(CHART_ORDER_KEY)));
   const [hiddenCharts,setHiddenCharts]=useState<StatisticsChartId[]>(()=>normalizeHiddenStatisticsCharts(window.localStorage.getItem(CHART_HIDDEN_KEY)));
   const [taskTypeMode,setTaskTypeMode]=useState<TaskTypeChartMode>(()=>normalizeTaskTypeChartMode(window.localStorage.getItem(TASK_TYPE_MODE_KEY)));
   const range=useMemo(()=>preset==="custom"?{start:customStart,end:customEnd}:statisticsPresetRange(preset,weekStartsOn),[preset,customStart,customEnd,weekStartsOn]);
   const comparisonRange=useMemo(()=>statisticsComparisonRange(preset,range),[preset,range.start,range.end]);
+  const visibleChartIds=chartOrder.filter(id=>!hiddenCharts.includes(id));
   const load=async()=>{if(!range.start||!range.end||range.start>range.end){setError("开始日期不能晚于结束日期");setLoading(false);return;}detailsRequestRef.current+=1;setLoading(true);setError("");setSelectedType("");setDetails([]);try{const [current,comparison]=await Promise.all([api.getStatistics(localStart(range.start),nextLocalDay(range.end)),api.getStatistics(localStart(comparisonRange.start),nextLocalDay(comparisonRange.end))]);setData(current);setComparisonData(comparison);}catch(value){setError(value instanceof Error?value.message:String(value));}finally{setLoading(false);}};
   useEffect(()=>{void load();},[range.start,range.end,comparisonRange.start,comparisonRange.end,refreshKey]);
-  useEffect(()=>{if(!chooserOpen&&!customEditorOpen&&!chartManagerOpen)return;const close=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;setChooserOpen(false);setCustomEditorOpen(false);setChartManagerOpen(false);setPendingGenerate(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[chooserOpen,customEditorOpen,chartManagerOpen]);
+  useEffect(()=>{if(!chooserOpen&&!customEditorOpen&&!chartManagerOpen&&!exportOpen&&!nativeReportOpen)return;const close=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;setChooserOpen(false);setCustomEditorOpen(false);setChartManagerOpen(false);setExportOpen(false);setNativeReportOpen(false);setPendingGenerate(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[chooserOpen,customEditorOpen,chartManagerOpen,exportOpen,nativeReportOpen]);
+  useEffect(()=>{
+    const requestId=++nativeReportRequestRef.current;
+    if(!nativeReportOpen||!nativeReportScope){setNativeReportDetails([]);setNativeReportBusy(false);setNativeReportError("");return;}
+    setNativeReportBusy(true);setNativeReportError("");
+    void api.getStatisticsDetails(localStart(range.start),nextLocalDay(range.end),nativeReportScope).then(values=>{if(requestId===nativeReportRequestRef.current)setNativeReportDetails(values);}).catch(value=>{if(requestId===nativeReportRequestRef.current)setNativeReportError(value instanceof Error?value.message:String(value));}).finally(()=>{if(requestId===nativeReportRequestRef.current)setNativeReportBusy(false);});
+  },[nativeReportOpen,nativeReportScope,range.start,range.end]);
   const closeTypeDetails=()=>{detailsRequestRef.current+=1;setSelectedType("");setDetails([]);};
   const openType=async(taskType:string)=>{if(selectedType===taskType){closeTypeDetails();return;}const requestId=++detailsRequestRef.current;try{const values=await api.getStatisticsDetails(localStart(range.start),nextLocalDay(range.end),taskType);if(requestId!==detailsRequestRef.current)return;setDetails(values);setSelectedType(taskType);}catch(value){if(requestId===detailsRequestRef.current)setError(value instanceof Error?value.message:String(value));}};
   const persistChartOrder=(order:StatisticsChartId[])=>{setChartOrder(order);window.localStorage.setItem(CHART_ORDER_KEY,JSON.stringify(order));};
   const moveChart=(id:StatisticsChartId,direction:-1|1)=>persistChartOrder(moveStatisticsChart(chartOrder,id,direction));
   const toggleChart=(id:StatisticsChartId)=>{const hiding=!hiddenCharts.includes(id);const next=hiding?[...hiddenCharts,id]:hiddenCharts.filter(value=>value!==id);if(hiding&&id==="taskType")closeTypeDetails();setHiddenCharts(next);window.localStorage.setItem(CHART_HIDDEN_KEY,JSON.stringify(next));};
   const resetCharts=()=>{persistChartOrder(DEFAULT_STATISTICS_CHART_ORDER);setHiddenCharts([]);window.localStorage.removeItem(CHART_HIDDEN_KEY);notify("图表布局已恢复默认");};
+  const openChartExport=()=>{setExportSelection(visibleChartIds);setExportOpen(true);};
+  const toggleExportChart=(id:StatisticsChartId)=>setExportSelection(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id]);
+  const exportCharts=async()=>{
+    if(!exportSelection.length){notify("请至少选择一张图表");return;}
+    const path=await save({title:"导出统计图表",defaultPath:`In Line_统计图表_${range.start}_${range.end}.png`,filters:[{name:"PNG 图片",extensions:["png"]}]});
+    if(!path)return;
+    setExportBusy(true);
+    try{
+      const ordered=visibleChartIds.filter(id=>exportSelection.includes(id));
+      if(!data||!comparisonData)throw new Error("统计数据尚未载入完成");
+      const png=await renderStatisticsChartsPng(ordered,"统计图表",{data,comparisonData,range,comparisonRange,comparisonLabel:comparisonName(preset),taskTypeMode});
+      await api.saveChartExport(path,png);setExportOpen(false);notify(`已导出 ${ordered.length} 张图表（${STATISTICS_EXPORT_DPI} DPI）`);
+    }catch(value){notify("导出图表失败："+(value instanceof Error?value.message:String(value)));}
+    finally{setExportBusy(false);}
+  };
+  const nativeReportText=data?buildNativeReport({data,preset,overdueCount:nativeReportScope?(currentOverdueByTaskType[nativeReportScope]??0):currentOverdueCount,taskType:nativeReportScope,details:nativeReportDetails,displayRange:range}):"";
+  const copyNativeReport=async()=>{try{await api.copyText(`${nativeReportTitle(preset,nativeReportScope)}\n\n${nativeReportText}`);notify("原生工作报告已复制");}catch(value){notify("复制原生工作报告失败："+String(value));}};
   const changeTaskTypeMode=(mode:TaskTypeChartMode)=>{setTaskTypeMode(mode);window.localStorage.setItem(TASK_TYPE_MODE_KEY,mode);};
   const persistMode=(mode:ReportTemplateMode)=>{setReportMode(mode);window.localStorage.setItem(REPORT_MODE_KEY,mode);};
   const copyReportPrompt=async(mode:ReportTemplateMode,custom=customTemplate)=>{
@@ -54,21 +83,21 @@ export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStar
     catch(value){notify("复制报告指令失败："+String(value));}
     finally{setReportBusy(false);}
   };
-  const startGeneration=async()=>{
+  const startGeneration=()=>{
     if(!range.start||!range.end||range.start>range.end){notify("请先选择有效的统计时间范围");return;}
-    const version=await api.getVersion().catch(()=>"unknown");
-    if(window.localStorage.getItem(REPORT_CONFIRMED_VERSION_KEY)!==version){setChooserMode("review");setPendingVersion(version);setPendingGenerate(true);setChooserOpen(true);return;}
-    await copyReportPrompt(reportMode);
+    setChooserMode(reportMode);setPendingGenerate(true);setChooserOpen(true);
   };
   const confirmChooser=async()=>{
     setChooserOpen(false);
-    if(chooserMode==="custom"){setCustomDraft(customTemplate);setCustomEditorOpen(true);return;}
-    persistMode(chooserMode);window.localStorage.setItem(REPORT_CONFIRMED_VERSION_KEY,pendingVersion);setPendingGenerate(false);await copyReportPrompt(chooserMode);
+    setPendingGenerate(false);
+    if(chooserMode==="native"){setNativeReportScope("");setNativeReportOpen(true);return;}
+    if(chooserMode==="custom"&&!customReportTemplateIsValid(customTemplate)){notify("自定义模板必须保留报告类型、开始日期和结束日期三个占位符");return;}
+    persistMode(chooserMode);await copyReportPrompt(chooserMode);
   };
   const saveCustomTemplate=async()=>{
     if(!customReportTemplateIsValid(customDraft)){notify("自定义模板必须保留报告类型、开始日期和结束日期三个占位符");return;}
     setCustomTemplate(customDraft);window.localStorage.setItem(REPORT_CUSTOM_KEY,customDraft);persistMode("custom");setCustomEditorOpen(false);
-    if(pendingGenerate){window.localStorage.setItem(REPORT_CONFIRMED_VERSION_KEY,pendingVersion);setPendingGenerate(false);await copyReportPrompt("custom",customDraft);}
+    if(pendingGenerate){setPendingGenerate(false);await copyReportPrompt("custom",customDraft);}
     else notify("自定义报告模板已保存");
   };
   const changeReportMode=(mode:ReportTemplateMode)=>{persistMode(mode);if(mode==="custom"){setCustomDraft(customTemplate);setPendingGenerate(false);setCustomEditorOpen(true);}};
@@ -97,12 +126,14 @@ export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStar
       <div className="summary-grid">
         <article><span>处理事项总数</span><strong>{data.summary.handledTasks}</strong></article><article><span>已处理</span><strong>{data.summary.processed}</strong></article><article><span>已完成</span><strong>{data.summary.completed}</strong></article><article><span>待补充材料</span><strong>{data.summary.waitingMaterials}</strong></article><article><span>待内部确认</span><strong>{data.summary.waitingConfirmation}</strong></article><article><span>待对方确认</span><strong>{data.summary.waitingCounterpartyConfirmation}</strong></article><article className="rate-card"><span>{processingRate?"有效处理率":"事项办结率"}</span><strong>{Math.round(data.summary.completionRate*100)}%</strong><small>{processingRate?`有效办理 ${data.summary.rateNumerator} ÷ 应处理 ${data.summary.rateDenominator}`:`已完成 ${data.summary.rateNumerator} ÷ 实际处理 ${data.summary.rateDenominator}`}</small></article>
       </div>
-      <div className="chart-management-bar"><div><strong>统计图表</strong><span>按你的工作习惯排列，只显示需要关注的内容</span></div><button type="button" className="button secondary" onClick={()=>setChartManagerOpen(true)}><SlidersHorizontal size={15}/>管理图表</button></div>
+      <div className="chart-management-bar"><div><strong>统计图表</strong><span>按你的工作习惯排列，只显示需要关注的内容</span></div><div className="chart-management-actions"><button type="button" className="button secondary" onClick={()=>setChartManagerOpen(true)}><SlidersHorizontal size={15}/>管理图表</button><button type="button" className="button secondary chart-export-button" disabled={!visibleChartIds.length} onClick={openChartExport}><Download size={15}/>导出图表</button></div></div>
       {chartOrder.some(id=>!hiddenCharts.includes(id))?<div className="statistics-charts-grid">{chartOrder.filter(id=>!hiddenCharts.includes(id)).map(renderChart)}</div>:<div className="charts-empty"><EyeOff size={24}/><div><strong>所有图表均已隐藏</strong><span>在“管理图表”中重新开启需要的图表。</span></div><button className="button secondary" onClick={()=>setChartManagerOpen(true)}>管理图表</button></div>}
       {selectedType&&<section className="stat-card details-card"><div className="section-heading"><div><h2>{selectedType} · 事项明细</h2><small>同一事项仅显示一行</small></div><div className="details-heading-actions"><b>{details.length} 项</b><button type="button" className="button secondary small" onClick={closeTypeDetails}><ChevronUp size={15}/>收起明细</button></div></div><div className="statistics-table-wrap"><table className="statistics-table"><thead><tr><th>事项编号</th><th>事项标题</th><th>部门 / 团队</th><th>对接人</th><th>最终结果</th><th>首次处理</th><th>最后处理</th><th>次数</th></tr></thead><tbody>{details.map(item=><tr key={item.taskId} onClick={()=>onOpenTask(item.taskId)}><td>{item.permanentNumber}</td><td><strong>{item.title}</strong></td><td>{item.department}</td><td>{item.contact}</td><td>{STATUS_LABELS[item.resultStatus]}</td><td>{formatDateTime(item.firstHandledAt)}</td><td>{formatDateTime(item.lastHandledAt)}</td><td>{item.handlingCount}</td></tr>)}</tbody></table></div></section>}
     </>}
+    {nativeReportOpen&&data&&<div className="modal-layer nested-modal" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setNativeReportOpen(false);}}><section className="native-report-dialog" role="dialog" aria-modal="true" aria-labelledby="native-report-title"><header><div><span>本机直接生成</span><h2 id="native-report-title">{nativeReportTitle(preset,nativeReportScope)}</h2></div><button className="icon-button" onClick={()=>setNativeReportOpen(false)} aria-label="关闭"><X size={18}/></button></header><div className="native-report-toolbar"><label><span>报告范围</span><select value={nativeReportScope} onChange={event=>setNativeReportScope(event.target.value)}><option value="">全部事项</option>{data.byTaskType.map(item=><option key={item.taskType} value={item.taskType}>{item.taskType}</option>)}</select></label><small>{range.start} 至 {range.end}</small></div><div className="native-report-paper">{nativeReportBusy?<p className="native-report-loading">正在整理该事项类型…</p>:nativeReportError?<p className="native-report-failed">{nativeReportError}</p>:<><h3>{nativeReportTitle(preset,nativeReportScope)}</h3>{nativeReportText.split("\n\n").map(paragraph=><p key={paragraph}>{paragraph}</p>)}</>}</div><footer><span>基于统计中心现有数据生成，不调用 MCP 或外部 AI。</span><div><button className="button secondary" onClick={()=>setNativeReportOpen(false)}>关闭</button><button className="button primary" disabled={nativeReportBusy||Boolean(nativeReportError)} onClick={()=>void copyNativeReport()}><ClipboardCopy size={15}/>复制报告</button></div></footer></section></div>}
+    {exportOpen&&<div className="modal-layer nested-modal" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!exportBusy)setExportOpen(false);}}><section className="chart-export-dialog" role="dialog" aria-modal="true" aria-labelledby="chart-export-title"><header><div><span>高清图片输出</span><h2 id="chart-export-title">导出统计图表</h2></div><button className="icon-button" disabled={exportBusy} onClick={()=>setExportOpen(false)} aria-label="关闭"><X size={18}/></button></header><p>选择本次需要导出的当前图表。所选内容会按当前顺序合并为一张 {STATISTICS_EXPORT_DPI} DPI PNG 图片。</p><div className="chart-export-list">{visibleChartIds.map((id,index)=>{const chart=STATISTICS_CHARTS.find(item=>item.id===id)!;const checked=exportSelection.includes(id);return <label key={id} className={checked?"checked":""}><input type="checkbox" checked={checked} onChange={()=>toggleExportChart(id)}/><span className="chart-export-check">{checked&&<Check size={15}/>}</span><span><strong>{String(index+1).padStart(2,"0")} · {chart.label}</strong><small>{chart.description}</small></span></label>;})}</div><footer><span>已选择 {exportSelection.length} / {visibleChartIds.length} 张</span><div><button className="button secondary" disabled={exportBusy} onClick={()=>setExportSelection(exportSelection.length===visibleChartIds.length?[]:visibleChartIds)}>{exportSelection.length===visibleChartIds.length?"取消全选":"全选"}</button><button className="button primary" disabled={exportBusy||!exportSelection.length} onClick={()=>void exportCharts()}><Download size={15}/>{exportBusy?"正在导出…":`导出 ${STATISTICS_EXPORT_DPI} DPI PNG`}</button></div></footer></section></div>}
     {chartManagerOpen&&<div className="modal-layer nested-modal" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setChartManagerOpen(false);}}><section className="chart-manager-dialog" role="dialog" aria-modal="true" aria-labelledby="chart-manager-title"><header><div><span>统计工作台</span><h2 id="chart-manager-title">管理图表</h2></div><button className="icon-button" onClick={()=>setChartManagerOpen(false)} aria-label="关闭"><X size={18}/></button></header><p>使用上下按钮调整显示顺序；隐藏图表不会删除数据，随时可以重新显示。</p><div className="chart-manager-list">{chartOrder.map((id,index)=>{const chart=STATISTICS_CHARTS.find(item=>item.id===id)!;const hidden=hiddenCharts.includes(id);return <article key={id} className={hidden?"hidden":""}><span className="chart-order-number">{String(index+1).padStart(2,"0")}</span><div><strong>{chart.label}</strong><small>{chart.description}</small></div><div className="chart-order-actions"><button type="button" className="icon-button" disabled={index===0} onClick={()=>moveChart(id,-1)} title="上移" aria-label={`上移 ${chart.label}`}><ArrowUp size={16}/></button><button type="button" className="icon-button" disabled={index===chartOrder.length-1} onClick={()=>moveChart(id,1)} title="下移" aria-label={`下移 ${chart.label}`}><ArrowDown size={16}/></button><button type="button" className={`chart-visibility-button ${hidden?"":"visible"}`} onClick={()=>toggleChart(id)}>{hidden?<><EyeOff size={15}/>已隐藏</>:<><Eye size={15}/>显示中</>}</button></div></article>;})}</div><footer><button className="button secondary" onClick={resetCharts}><RotateCcw size={15}/>恢复默认</button><button className="button primary" onClick={()=>setChartManagerOpen(false)}>完成</button></footer></section></div>}
-    {chooserOpen&&<div className="modal-layer nested-modal" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget){setChooserOpen(false);setPendingGenerate(false);}}}><section className="report-template-dialog" role="dialog" aria-modal="true" aria-labelledby="report-template-title"><header><div><span>首次生成报告</span><h2 id="report-template-title">选择报告结构</h2></div><button className="icon-button" onClick={()=>{setChooserOpen(false);setPendingGenerate(false);}} aria-label="关闭"><X size={18}/></button></header><p className="report-mcp-notice">生成报告前，请先在“软件设置 → AI MCP 接入”中复制通用接入信息，并让当前 AI 工具完成 MCP 配置。</p><div className="report-template-options">{REPORT_TEMPLATE_OPTIONS.map(option=><button type="button" key={option.value} className={chooserMode===option.value?"active":""} onClick={()=>setChooserMode(option.value)}><span>{chooserMode===option.value&&<Check size={15}/>}</span><strong>{option.label}</strong><small>{option.description}</small></button>)}</div><footer><button className="button secondary" onClick={()=>{setChooserOpen(false);setPendingGenerate(false);}}>取消</button><button className="button primary" onClick={()=>void confirmChooser()}>{chooserMode==="custom"?"编辑模板":"确认并生成"}</button></footer></section></div>}
+    {chooserOpen&&<div className="modal-layer nested-modal" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget){setChooserOpen(false);setPendingGenerate(false);}}}><section className="report-template-dialog" role="dialog" aria-modal="true" aria-labelledby="report-template-title"><header><div><span>生成工作报告</span><h2 id="report-template-title">选择报告结构</h2></div><button className="icon-button" onClick={()=>{setChooserOpen(false);setPendingGenerate(false);}} aria-label="关闭"><X size={18}/></button></header>{chooserMode!=="native"&&<p className="report-mcp-notice">AI 报告需要先在“软件设置 → AI MCP 接入”中复制通用接入信息，并让当前 AI 工具完成 MCP 配置。</p>}<div className="report-template-options">{REPORT_TEMPLATE_OPTIONS.map(option=><button type="button" key={option.value} className={chooserMode===option.value?"active":""} onClick={()=>setChooserMode(option.value)}><span>{chooserMode===option.value&&<Check size={15}/>}</span><strong>{option.label}</strong><small>{option.description}</small></button>)}<button type="button" className={chooserMode==="native"?"active":""} onClick={()=>setChooserMode("native")}><span>{chooserMode==="native"&&<Check size={15}/>}</span><strong>原生工作报告</strong><small>第五种选项；无需 MCP 或外部 AI，直接生成详细报告并支持按事项类型细分。</small></button></div><footer><button className="button secondary" onClick={()=>{setChooserOpen(false);setPendingGenerate(false);}}>取消</button>{chooserMode==="custom"&&<button className="button secondary" onClick={()=>{setCustomDraft(customTemplate);setChooserOpen(false);setCustomEditorOpen(true);}}>编辑模板</button>}<button className="button primary" onClick={()=>void confirmChooser()}>{chooserMode==="native"?"预览报告":"确认并生成"}</button></footer></section></div>}
     {customEditorOpen&&<div className="modal-layer nested-modal" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget){setCustomEditorOpen(false);setPendingGenerate(false);}}}><section className="report-custom-dialog" role="dialog" aria-modal="true" aria-labelledby="report-custom-title"><header><div><span>自定义报告结构</span><h2 id="report-custom-title">编辑指令模板</h2></div><button className="icon-button" onClick={()=>{setCustomEditorOpen(false);setPendingGenerate(false);}} aria-label="关闭"><X size={18}/></button></header><div className="report-custom-body"><p>软件只替换报告类型和日期，占位符必须保留；其他内容将完全按你的模板复制。</p><textarea value={customDraft} onChange={event=>setCustomDraft(event.target.value)} aria-label="自定义报告指令模板"/><small>必须保留：{`{{报告类型}}`}、{`{{开始日期}}`}、{`{{结束日期}}`}</small></div><footer><button className="button secondary" onClick={()=>{setCustomEditorOpen(false);setPendingGenerate(false);}}>取消</button><button className="button primary" onClick={()=>void saveCustomTemplate()}>{pendingGenerate?"保存并生成":"保存模板"}</button></footer></section></div>}
   </section>;
 }

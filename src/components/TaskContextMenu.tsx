@@ -2,14 +2,14 @@ import { Archive,CheckCircle2,Edit3,Eye,Flame,ListPlus,PlayCircle,RotateCcw,Tras
 import type { LegalTask,TaskView } from "../types";
 import { isDeferredStatus } from "../lib/task-utils";
 
-export interface ContextAction{type:"view"|"edit"|"status"|"urgent"|"process"|"complete"|"enqueue"|"reopen"|"archive"|"delete"|"restore";task:LegalTask}
+export interface ContextAction{type:"view"|"edit"|"status"|"urgent"|"process"|"complete"|"enqueue"|"reopen"|"archive"|"delete"|"restore"|"permanentDelete";task:LegalTask}
 export default function TaskContextMenu({task,view,x,y,onAction,onClose}:{task:LegalTask;view:TaskView;x:number;y:number;onAction:(action:ContextAction)=>void;onClose:()=>void}){
   const fire=(type:ContextAction["type"])=>{onAction({type,task});onClose();};
   const terminal=task.status==="completed"||task.status==="archived"||Boolean(task.archivedAt);
   const canWork=!terminal&&task.status!=="cancelled";
   return <div className="context-backdrop" onPointerDown={onClose} onContextMenu={event=>{event.preventDefault();onClose();}}>
     <div className="context-menu" style={{left:Math.min(x,window.innerWidth-250),top:Math.min(y,window.innerHeight-470)}} onPointerDown={event=>event.stopPropagation()} role="menu">
-      {view==="trash"?<button onClick={()=>fire("restore")}><RotateCcw size={16}/>恢复并加入今日队列</button>:<>
+      {view==="trash"?<><button onClick={()=>fire("restore")}><RotateCcw size={16}/>恢复并加入今日队列</button><span/><button className="danger" onClick={()=>fire("permanentDelete")}><Trash2 size={16}/>永久删除</button></>:<>
         <button onClick={()=>fire("view")}><Eye size={16}/>查看详情</button>
         <button onClick={()=>fire("edit")}><Edit3 size={16}/>编辑事项</button>
         {!terminal&&<button onClick={()=>fire("status")}><CheckCircle2 size={16}/>修改状态</button>}

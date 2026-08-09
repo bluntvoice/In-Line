@@ -1,8 +1,9 @@
 import { useEffect,useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AlertTriangle,ChevronRight,Copy,DatabaseBackup,FileInput,FolderOpen,MonitorUp,Plug,RefreshCw,RotateCcw,Trash2,X } from "lucide-react";
+import { AlertTriangle,CheckCircle2,ChevronRight,Copy,DatabaseBackup,FileInput,FolderOpen,Keyboard,MonitorUp,Plug,RefreshCw,RotateCcw,Trash2,X } from "lucide-react";
 import { api } from "../api";
 import type { BackupConflictItem,BackupInfo } from "../types";
+import { shortcutFromKeyboardEvent,shortcutUsageHint } from "../lib/global-shortcut";
 
 type McpDialog={title:string;summary:string;scenario:string;usage:string;content:string}|null;
 
@@ -10,6 +11,9 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
   const [launch,setLaunch]=useState(false);
   const [weekStart,setWeekStart]=useState<"monday"|"sunday">(settings.week_start_day==="sunday"?"sunday":"monday");
   const [rateMode,setRateMode]=useState<"closure"|"processing">(settings.statistics_rate_mode==="closure"?"closure":"processing");
+  const [shortcut,setShortcut]=useState(settings.global_shortcut??"Alt+I");
+  const [shortcutRecording,setShortcutRecording]=useState(false);
+  const [shortcutFeedback,setShortcutFeedback]=useState<{tone:"idle"|"checking"|"success"|"error";message:string}>({tone:"idle",message:"点击输入框，然后直接按下新的组合键"});
   const [visibleBackups,setVisibleBackups]=useState(backups);
   const [busy,setBusy]=useState("");
   const [mcpDialog,setMcpDialog]=useState<McpDialog>(null);
@@ -18,6 +22,7 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
   useEffect(()=>{void api.launchAtLogin().then(setLaunch);},[]);
   useEffect(()=>setWeekStart(settings.week_start_day==="sunday"?"sunday":"monday"),[settings]);
   useEffect(()=>setRateMode(settings.statistics_rate_mode==="closure"?"closure":"processing"),[settings]);
+  useEffect(()=>setShortcut(settings.global_shortcut??"Alt+I"),[settings]);
   useEffect(()=>setVisibleBackups(backups),[backups]);
   useEffect(()=>{
     let active=true;
@@ -86,6 +91,15 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
   };
   const saveWeekStart=async(value:"monday"|"sunday")=>{try{await api.setSetting("week_start_day",value);setWeekStart(value);}catch(error){notify("设置保存失败："+String(error));}};
   const saveRateMode=async(value:"closure"|"processing")=>{try{await api.setSetting("statistics_rate_mode",value);setRateMode(value);}catch(error){notify("设置保存失败："+String(error));}};
+  const saveShortcut=async(value:string)=>{setBusy("shortcut");setShortcutFeedback({tone:"checking",message:`正在检查 ${value} 是否可用…`});try{await api.setGlobalShortcut(value);setShortcut(value);setShortcutFeedback({tone:"success",message:shortcutUsageHint(value)});notify(`全局快捷键已更新为 ${value}`);onChanged();}catch(error){const message=String(error);setShortcutFeedback({tone:"error",message:`存在冲突：${message}`});notify("快捷键设置失败："+message);}finally{setBusy("");setShortcutRecording(false);}};
+  const captureShortcut=(event:React.KeyboardEvent<HTMLInputElement>)=>{
+    event.preventDefault();event.stopPropagation();
+    if(event.key==="Escape"){setShortcutRecording(false);setShortcutFeedback({tone:"idle",message:"已取消录入，继续使用原快捷键"});event.currentTarget.blur();return;}
+    const result=shortcutFromKeyboardEvent(event.nativeEvent);
+    if(result.error){setShortcutFeedback({tone:"error",message:result.error});return;}
+    if(!result.shortcut){setShortcutFeedback({tone:"idle",message:"请继续按下字母、数字或功能键"});return;}
+    void saveShortcut(result.shortcut);
+  };
   const showMcpContent=async(dialog:Omit<NonNullable<McpDialog>,"content">,load:()=>Promise<string>)=>{
     setBusy("mcp");
     try{setMcpDialog({...dialog,content:await load()});}
@@ -102,6 +116,7 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
     <div className="setting-row"><div><strong>桌面悬浮窗</strong><span>关闭主界面后默认显示，也可在此手动显示或隐藏</span></div><button className="button secondary" onClick={()=>void api.toggleFloating()}><MonitorUp size={16}/>显示 / 隐藏</button></div>
     <div className="setting-row"><div><strong>每周起始日</strong><span>用于统计中心“本周”和“上一周”的日期范围</span></div><div className="week-start-options" role="group" aria-label="每周起始日"><button type="button" className={weekStart==="monday"?"active":""} onClick={()=>void saveWeekStart("monday")}>周一</button><button type="button" className={weekStart==="sunday"?"active":""} onClick={()=>void saveWeekStart("sunday")}>周日</button></div></div>
     <div className="setting-row"><div><strong>统计比例口径</strong><span>{rateMode==="processing"?"有效处理率：有效办理事项 ÷ 周期内应处理事项":"事项办结率：已完成事项 ÷ 周期内实际处理事项"}</span></div><div className="week-start-options rate-mode-options" role="group" aria-label="统计比例口径"><button type="button" className={rateMode==="processing"?"active":""} onClick={()=>void saveRateMode("processing")}>有效处理率</button><button type="button" className={rateMode==="closure"?"active":""} onClick={()=>void saveRateMode("closure")}>事项办结率</button></div></div>
+    <div className="setting-row shortcut-setting-row"><div><strong>全局快捷新增</strong><span>直接录入自定义组合；注册成功才会保存，发生系统占用时继续使用原快捷键</span></div><div className="shortcut-editor"><label className={`shortcut-recorder ${shortcutRecording?"recording":""}`}><Keyboard size={16}/><input readOnly value={busy==="shortcut"?"正在检查…":shortcut} disabled={busy==="shortcut"} onFocus={()=>{setShortcutRecording(true);setShortcutFeedback({tone:"idle",message:"请按住 Ctrl 或 Alt，再按一个字母、数字或功能键；Esc 取消"});}} onBlur={()=>setShortcutRecording(false)} onKeyDown={captureShortcut} aria-label="录入全局快捷新增组合"/></label><button type="button" className="button secondary small" disabled={busy==="shortcut"||shortcut==="Alt+I"} onClick={()=>void saveShortcut("Alt+I")}>恢复默认</button><p className={`shortcut-feedback ${shortcutFeedback.tone}`}>{shortcutFeedback.tone==="success"?<CheckCircle2 size={14}/>:shortcutFeedback.tone==="error"?<AlertTriangle size={14}/>:<Keyboard size={14}/>}<span>{shortcutFeedback.message}</span></p></div></div>
     <div className="setting-row"><div><strong>开机自动启动</strong><span>登录 Windows 后启动 In Line</span></div><label className="switch"><input type="checkbox" checked={launch} onChange={async event=>{const value=event.target.checked;await api.setLaunchAtLogin(value);setLaunch(value);}}/><span/></label></div>
     <div className="setting-row"><div><strong>AI MCP 接入</strong><span>复制通用接入信息，可直接交给 Codex 等 AI 客户端完成配置</span></div><div className="mcp-actions"><button className="button secondary" disabled={busy==="mcp"} onClick={()=>void showMcpContent({title:"通用 MCP 接入",summary:"一份适用于 stdio MCP 客户端的接入指令，包含本机程序路径、工具清单和只读权限范围。",scenario:"首次在 Codex 等 AI 客户端接入 In Line，安装路径改变后重新配置，或排查 MCP 启动问题时使用。",usage:"复制后交给目标客户端，按其中的启动命令完成接入。"},api.mcpConnectionGuide)}><Plug size={16}/>通用接入</button></div></div>
     <div className="setting-row"><div><strong>数据备份</strong><span>事项、办理记录和软件设置会统一写入本地数据库备份</span></div><button className="button secondary" disabled={busy!==""} onClick={()=>void backup()}><DatabaseBackup size={16}/>{busy==="backup"?"备份中…":"立即备份"}</button></div>

@@ -3,11 +3,46 @@ pub mod models;
 
 use database::Database;
 use models::*;
+use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_window_state::StateFlags;
+
+struct GlobalShortcutStatus(Mutex<GlobalShortcutConfig>);
+struct GlobalShortcutConfig {
+    shortcut: String,
+    available: bool,
+}
+const DEFAULT_GLOBAL_SHORTCUT: &str = "Alt+I";
+
+fn validate_global_shortcut(value: &str) -> Result<(), String> {
+    if value.len() > 64 || !value.is_ascii() {
+        return Err("快捷键格式无效".into());
+    }
+    let shortcut = value
+        .parse::<Shortcut>()
+        .map_err(|_| "无法识别该快捷键组合".to_string())?;
+    if shortcut.mods.contains(Modifiers::SUPER) {
+        return Err("Windows 键组合由系统保留，请改用 Ctrl 或 Alt".into());
+    }
+    if !shortcut
+        .mods
+        .intersects(Modifiers::CONTROL | Modifiers::ALT)
+    {
+        return Err("全局快捷键必须包含 Ctrl 或 Alt".into());
+    }
+    if shortcut.mods.contains(Modifiers::ALT) && shortcut.key == Code::F4 {
+        return Err("Alt+F4 是 Windows 关闭窗口快捷键，不能使用".into());
+    }
+    Ok(())
+}
+
+fn valid_global_shortcut(value: &str) -> bool {
+    validate_global_shortcut(value).is_ok()
+}
 
 fn emit_change(app: &tauri::AppHandle) -> Result<(), String> {
     app.emit("data-changed", ())
@@ -86,6 +121,22 @@ fn delete_task(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<()
 fn restore_task(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(), String> {
     db.restore(id)?;
     emit_change(&app)
+}
+#[tauri::command]
+fn permanently_delete_tasks(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    ids: Vec<i64>,
+) -> Result<usize, String> {
+    let deleted = db.permanently_delete_tasks(ids)?;
+    emit_change(&app)?;
+    Ok(deleted)
+}
+#[tauri::command]
+fn empty_trash(app: tauri::AppHandle, db: State<Database>) -> Result<usize, String> {
+    let deleted = db.empty_trash()?;
+    emit_change(&app)?;
+    Ok(deleted)
 }
 #[tauri::command]
 fn archive_task(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(), String> {
@@ -426,8 +477,75 @@ fn request_new_task(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn global_shortcut_available(status: State<GlobalShortcutStatus>) -> bool {
+    status
+        .0
+        .lock()
+        .map(|value| value.available)
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+fn set_global_shortcut(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    status: State<GlobalShortcutStatus>,
+    shortcut: String,
+) -> Result<(), String> {
+    validate_global_shortcut(&shortcut)?;
+    let mut current = status.0.lock().map_err(|_| "快捷键状态暂时不可用")?;
+    if current.shortcut == shortcut && current.available {
+        return Ok(());
+    }
+    let previous = current.shortcut.clone();
+    let previous_available = current.available;
+    if previous_available {
+        app.global_shortcut()
+            .unregister(previous.as_str())
+            .map_err(|error| error.to_string())?;
+    }
+    if let Err(error) = app.global_shortcut().register(shortcut.as_str()) {
+        current.available =
+            previous_available && app.global_shortcut().register(previous.as_str()).is_ok();
+        return Err(format!(
+            "快捷键 {shortcut} 已被其他程序占用或无法注册：{error}"
+        ));
+    }
+    if let Err(error) = db.set_setting("global_shortcut".into(), shortcut.clone()) {
+        let _ = app.global_shortcut().unregister(shortcut.as_str());
+        current.available = app.global_shortcut().register(previous.as_str()).is_ok();
+        return Err(format!("保存快捷键设置失败：{error}"));
+    }
+    current.shortcut = shortcut;
+    current.available = true;
+    emit_change(&app)
+}
+
+#[tauri::command]
+fn save_chart_export(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    let target = std::path::PathBuf::from(path);
+    let is_png = target
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value.eq_ignore_ascii_case("png"));
+    if !is_png {
+        return Err("统计图表只能保存为 PNG 文件".into());
+    }
+    if bytes.len() < 8 || bytes[..8] != [137, 80, 78, 71, 13, 10, 26, 10] {
+        return Err("统计图表文件无效".into());
+    }
+    std::fs::write(&target, bytes).map_err(|error| format!("保存统计图表失败：{error}"))
+}
+
 pub fn run() {
     let database = Database::open().expect("In Line 数据库初始化失败");
+    let initial_shortcut = database
+        .settings()
+        .ok()
+        .and_then(|values| values.get("global_shortcut").cloned())
+        .filter(|value| valid_global_shortcut(value))
+        .unwrap_or_else(|| DEFAULT_GLOBAL_SHORTCUT.into());
     tauri::Builder::default()
         .manage(database)
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -436,13 +554,34 @@ pub fn run() {
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _, event| {
+                    if event.state == ShortcutState::Pressed {
+                        show_quick_add(app);
+                    }
+                })
+                .build(),
+        )
         .plugin(tauri_plugin_notification::init())
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(persisted_window_state_flags())
                 .build(),
         )
-        .setup(|app| {
+        .setup(move |app| {
+            let shortcut_available = match app.global_shortcut().register(initial_shortcut.as_str())
+            {
+                Ok(()) => true,
+                Err(error) => {
+                    eprintln!("无法注册全局快捷键 {initial_shortcut}：{error}");
+                    false
+                }
+            };
+            app.manage(GlobalShortcutStatus(Mutex::new(GlobalShortcutConfig {
+                shortcut: initial_shortcut.clone(),
+                available: shortcut_available,
+            })));
             let open = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
             let add = MenuItem::with_id(app, "add", "新增事项", true, None::<&str>)?;
             let float = MenuItem::with_id(app, "floating", "显示悬浮窗", true, None::<&str>)?;
@@ -519,6 +658,8 @@ pub fn run() {
             move_task,
             delete_task,
             restore_task,
+            permanently_delete_tasks,
+            empty_trash,
             archive_task,
             merge_tasks,
             resolve_import_conflict,
@@ -555,7 +696,10 @@ pub fn run() {
             open_task_action,
             toggle_floating,
             show_main_window,
-            request_new_task
+            request_new_task,
+            global_shortcut_available,
+            set_global_shortcut,
+            save_chart_export
         ])
         .run(tauri::generate_context!())
         .expect("In Line 启动失败");
@@ -568,5 +712,28 @@ mod tests {
     #[test]
     fn window_visibility_is_not_restored_on_startup() {
         assert!(!persisted_window_state_flags().contains(StateFlags::VISIBLE));
+    }
+
+    #[test]
+    fn global_shortcut_validation_accepts_custom_combinations_and_rejects_reserved_ones() {
+        assert!(valid_global_shortcut("Ctrl+Alt+K"));
+        assert!(valid_global_shortcut("Alt+Shift+8"));
+        assert!(valid_global_shortcut("Ctrl+F10"));
+        assert!(!valid_global_shortcut("I"));
+        assert!(!valid_global_shortcut("Shift+I"));
+        assert!(!valid_global_shortcut("Super+I"));
+        assert!(!valid_global_shortcut("Alt+F4"));
+    }
+
+    #[test]
+    fn chart_export_only_writes_png_data_to_png_paths() {
+        let path =
+            std::env::temp_dir().join(format!("in-line-chart-export-{}.png", std::process::id()));
+        let png = vec![137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3];
+        save_chart_export(path.to_string_lossy().into_owned(), png.clone()).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), png);
+        std::fs::remove_file(path).unwrap();
+        assert!(save_chart_export("report.txt".into(), vec![1, 2, 3]).is_err());
+        assert!(save_chart_export("report.png".into(), vec![1, 2, 3]).is_err());
     }
 }

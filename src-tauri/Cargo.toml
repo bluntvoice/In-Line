@@ -1,6 +1,6 @@
 [package]
 name = "in-line"
-version = "0.2.0"
+version = "0.2.1"
 description = "In Line - a general-purpose task queue"
 authors = ["bluntvoice"]
 edition = "2021"
@@ -26,6 +26,7 @@ tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-global-shortcut = "=2.3.0"
 tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
