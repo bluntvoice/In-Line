@@ -29,6 +29,12 @@ describe("取号和人工顺位",()=>{
     expect(historyTimestamp(archived)).toBe("2026-07-20T10:00:00");
     expect(displayTicket(archived,"2027-08-04")).toBe("C04");
   });
+  it("进入暂缓队列后固定号码，重新进入待办队列后恢复变化",()=>{
+    const deferred={ticketDate:"2026-07-17",dailySequence:3,status:"waiting_materials" as const,deferredEnteredAt:"2026-07-19T10:00:00Z",updatedAt:"2026-08-04T10:00:00Z"};
+    expect(displayTicket(deferred,"2026-08-04")).toBe("B03");
+    expect(displayTicket(deferred,"2027-08-04")).toBe("B03");
+    expect(displayTicket({...deferred,status:"pending"},"2026-07-21")).toBe("D03");
+  });
   it("系统时间倒退不产生负天数",()=>expect(dayDifference("2026-07-17","2026-07-16")).toBe(0));
   it("加急不覆盖人工顺位",()=>{const first={...task(1,2),isUrgent:true,priority:"critical" as const};const second=task(2,1);expect(sortQueue([first,second]).map(value=>value.id)).toEqual([2,1]);});
   it("已逾期事项优先显示，同组内仍保持人工顺位",()=>{

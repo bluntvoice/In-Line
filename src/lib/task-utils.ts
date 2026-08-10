@@ -19,7 +19,7 @@ export function alphaPrefix(days:number){
   while(value>0){value-=1;output=String.fromCharCode(65+(value%26))+output;value=Math.floor(value/26);}
   return output;
 }
-type HistoryTask=Partial<Pick<LegalTask,"archivedAt"|"completedAt"|"deletedAt"|"updatedAt"|"status">>;
+type HistoryTask=Partial<Pick<LegalTask,"archivedAt"|"completedAt"|"deferredEnteredAt"|"deletedAt"|"updatedAt"|"status">>;
 export function historyTimestamp(task:HistoryTask){
   if(task.deletedAt)return task.deletedAt;
   if(task.archivedAt)return task.archivedAt;
@@ -30,10 +30,10 @@ export function historyTimestamp(task:HistoryTask){
 type TicketDisplayTask=Pick<LegalTask,"ticketDate"|"dailySequence">&HistoryTask;
 export function displayTicket(task:TicketDisplayTask,today?:string){
   let referenceDate=today;
-  const historyTime=historyTimestamp(task);
-  if(historyTime){
-    const archivedAt=new Date(historyTime);
-    if(!Number.isNaN(archivedAt.getTime()))referenceDate=dateOnly(archivedAt);
+  const frozenAt=historyTimestamp(task)??(task.status&&isDeferredStatus(task.status)?task.deferredEnteredAt??task.updatedAt??null:null);
+  if(frozenAt){
+    const frozenDate=new Date(frozenAt);
+    if(!Number.isNaN(frozenDate.getTime()))referenceDate=dateOnly(frozenDate);
   }
   return `${alphaPrefix(dayDifference(task.ticketDate,referenceDate))}${String(task.dailySequence).padStart(2,"0")}`;
 }
