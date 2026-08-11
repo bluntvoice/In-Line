@@ -1,5 +1,6 @@
 export type WeekStart = "monday" | "sunday";
 export type StatisticsPreset = "currentWeek" | "previousWeek" | "month" | "quarter" | "custom";
+export type StatisticsTrendPoint = { periodStart: string; handledTasks: number };
 
 const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const;
 
@@ -50,6 +51,37 @@ export function statisticsPresetRange(
 function parseDateInput(value: string) {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(year, month - 1, day);
+}
+
+export function statisticsDisplayTrend(
+  trend: StatisticsTrendPoint[],
+  granularity: "day" | "week",
+  range: { start: string; end: string },
+  preset: StatisticsPreset
+) {
+  if (granularity !== "day") return trend;
+  const start = parseDateInput(range.start);
+  const rangeEnd = parseDateInput(range.end);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(rangeEnd.getTime()) || start > rangeEnd) return trend;
+
+  const end = new Date(rangeEnd);
+  if (preset === "currentWeek") {
+    const firstMonday = new Date(start);
+    firstMonday.setDate(firstMonday.getDate() + ((8 - firstMonday.getDay()) % 7));
+    const friday = new Date(firstMonday);
+    friday.setDate(friday.getDate() + 4);
+    if (friday > end) end.setTime(friday.getTime());
+  }
+
+  const values = new Map(trend.map(point => [point.periodStart, point.handledTasks]));
+  const display: StatisticsTrendPoint[] = [];
+  for (const date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+    const periodStart = dateInput(date);
+    const handledTasks = values.get(periodStart) ?? 0;
+    const weekday = date.getDay();
+    if ((weekday >= 1 && weekday <= 5) || handledTasks > 0) display.push({ periodStart, handledTasks });
+  }
+  return display;
 }
 
 export function statisticsComparisonRange(

@@ -2,7 +2,7 @@ import { describe,expect,it } from "vitest";
 import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortDeferredQueue,sortQueue,taskDetailView,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
-import { statisticsComparisonRange,statisticsPresetRange,statisticsWeekdayLabel } from "../src/lib/statistics-range";
+import { statisticsComparisonRange,statisticsDisplayTrend,statisticsPresetRange,statisticsWeekdayLabel } from "../src/lib/statistics-range";
 import { buildReportPrompt,customReportTemplateIsValid,DEFAULT_CUSTOM_REPORT_TEMPLATE,reportTypeForPreset } from "../src/lib/report-prompts";
 import { DEFAULT_STATISTICS_CHART_ORDER,moveStatisticsChart,normalizeHiddenStatisticsCharts,normalizeStatisticsChartOrder,normalizeTaskTypeChartMode } from "../src/lib/statistics-charts";
 import { isMiniFloatingHeight } from "../src/lib/floating-window";
@@ -158,6 +158,30 @@ describe("统计周期",()=>{
   it("为趋势日期生成中文星期标识",()=>{
     expect(statisticsWeekdayLabel("2026-08-03")).toBe("周一");
     expect(statisticsWeekdayLabel("2026-08-09")).toBe("周日");
+  });
+  it("本周日视图提前补齐至周五，空白工作日不生成工作量",()=>{
+    expect(statisticsDisplayTrend([
+      {periodStart:"2026-08-10",handledTasks:2},
+      {periodStart:"2026-08-11",handledTasks:1}
+    ],"day",{start:"2026-08-10",end:"2026-08-11"},"currentWeek")).toEqual([
+      {periodStart:"2026-08-10",handledTasks:2},
+      {periodStart:"2026-08-11",handledTasks:1},
+      {periodStart:"2026-08-12",handledTasks:0},
+      {periodStart:"2026-08-13",handledTasks:0},
+      {periodStart:"2026-08-14",handledTasks:0}
+    ]);
+  });
+  it("日视图固定显示工作日，周末仅在有工作量时显示",()=>{
+    const display=statisticsDisplayTrend([
+      {periodStart:"2026-08-11",handledTasks:3},
+      {periodStart:"2026-08-15",handledTasks:2}
+    ],"day",{start:"2026-08-10",end:"2026-08-16"},"previousWeek");
+    expect(display.map(point=>point.periodStart)).toEqual(["2026-08-10","2026-08-11","2026-08-12","2026-08-13","2026-08-14","2026-08-15"]);
+    expect(display.map(point=>point.handledTasks)).toEqual([0,3,0,0,0,2]);
+  });
+  it("按周趋势保持后端统计周期不变",()=>{
+    const trend=[{periodStart:"2026-08-03",handledTasks:4}];
+    expect(statisticsDisplayTrend(trend,"week",{start:"2026-08-01",end:"2026-08-31"},"month")).toBe(trend);
   });
   it("本周对比上周同期，完整自然周期对比前一周期",()=>{
     expect(statisticsComparisonRange("currentWeek",{start:"2026-08-03",end:"2026-08-05"})).toEqual({start:"2026-07-27",end:"2026-07-29"});
