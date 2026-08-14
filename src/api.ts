@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkEventInput,WorkEventUpdateInput } from "./types";
+import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -40,8 +40,6 @@ export const api={
   resolveImportConflict:(id:number)=>invoke<void>("resolve_import_conflict",{id}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   getWorkEvents:(taskId:number)=>invoke<TaskWorkEvent[]>("get_work_events",{taskId}),
-  recordWorkEvent:(input:WorkEventInput)=>invoke<void>("record_work_event",{input}),
-  updateWorkEvent:(input:WorkEventUpdateInput)=>invoke<void>("update_work_event",{input}),
   voidWorkEvent:(id:number,confirmHistoricalImpact=false)=>invoke<void>("void_work_event",{id,confirmHistoricalImpact}),
   processRound:(id:number)=>invoke<void>("process_round",{id}),
   completeRound:(id:number)=>invoke<void>("complete_round",{id}),

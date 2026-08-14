@@ -1569,7 +1569,6 @@ impl Database {
                         result_status: row.get(2)?,
                         handled_at: row.get(3)?,
                         task_type_snapshot: row.get(4)?,
-                        can_delete: source == "manual",
                         source,
                         note: row.get(6)?,
                         created_at: row.get(7)?,
@@ -1584,73 +1583,17 @@ impl Database {
         })
     }
 
-    pub fn update_work_event(&self, input: WorkEventUpdateInput) -> Result<(), String> {
-        if !is_work_event_status(&input.result_status) {
-            return Err("处理结果无效".into());
-        }
-        validate_handled_at(&input.handled_at)?;
-        self.with_transaction(|tx| {
-            let current: (i64, String, String, String) = tx
-                .query_row(
-                    "SELECT task_id,result_status,handled_at,source FROM task_work_events
-                     WHERE id=? AND voided_at IS NULL",
-                    [input.id],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-                )
-                .optional()
-                .map_err(display_error)?
-                .ok_or("处理活动不存在")?;
-            if current.3 != "manual" && current.1 != input.result_status {
-                return Err("自动处理活动不能修改处理结果".into());
-            }
-            let first_id: i64 = tx
-                .query_row(
-                    "SELECT id FROM task_work_events WHERE task_id=? AND voided_at IS NULL
-                     ORDER BY strftime('%s',handled_at),id LIMIT 1",
-                    [current.0],
-                    |row| row.get(0),
-                )
-                .map_err(display_error)?;
-            if first_id == input.id
-                && current.2 != input.handled_at
-                && !input.confirm_historical_impact
-            {
-                return Err("此操作将改变该事项的统计归属期间，并可能影响历史周报、月报或季度统计。是否继续？".into());
-            }
-            tx.execute(
-                "UPDATE task_work_events SET result_status=?,handled_at=?,note=?,updated_at=? WHERE id=?",
-                params![
-                    input.result_status,
-                    input.handled_at,
-                    input.note.trim(),
-                    now(),
-                    input.id
-                ],
-            )
-            .map_err(display_error)?;
-            tx.execute(
-                "UPDATE tasks SET updated_at=? WHERE id=?",
-                params![now(), current.0],
-            )
-            .map_err(display_error)?;
-            add_log(tx, current.0, "audit", "调整结构化处理活动")
-        })
-    }
-
     pub fn void_work_event(&self, id: i64, confirm_historical_impact: bool) -> Result<(), String> {
         self.with_transaction(|tx| {
-            let (task_id, source): (i64, String) = tx
+            let task_id: i64 = tx
                 .query_row(
-                    "SELECT task_id,source FROM task_work_events WHERE id=? AND voided_at IS NULL",
+                    "SELECT task_id FROM task_work_events WHERE id=? AND voided_at IS NULL",
                     [id],
-                    |row| Ok((row.get(0)?, row.get(1)?)),
+                    |row| row.get(0),
                 )
                 .optional()
                 .map_err(display_error)?
                 .ok_or("处理活动不存在")?;
-            if source != "manual" {
-                return Err("自动生成的处理活动不能删除".into());
-            }
             let first_id: i64 = tx
                 .query_row(
                     "SELECT id FROM task_work_events WHERE task_id=? AND voided_at IS NULL
@@ -3942,25 +3885,9 @@ mod tests {
             .into_iter()
             .find(|event| event.is_first_valid)
             .unwrap();
-        let changed_time = (Utc::now() - chrono::Duration::hours(2)).to_rfc3339();
-        assert!(db
-            .update_work_event(WorkEventUpdateInput {
-                id: first.id,
-                result_status: first.result_status.clone(),
-                handled_at: changed_time.clone(),
-                note: first.note.clone(),
-                confirm_historical_impact: false,
-            })
-            .is_err());
-        db.update_work_event(WorkEventUpdateInput {
-            id: first.id,
-            result_status: first.result_status,
-            handled_at: changed_time,
-            note: first.note,
-            confirm_historical_impact: true,
-        })
-        .unwrap();
-        assert!(db.void_work_event(first.id, true).is_err());
+        db.void_work_event(first.id, true).unwrap();
+        assert_eq!(db.list_work_events(created.id).unwrap().len(), 2);
+        assert_eq!(db.get_task(created.id).unwrap().processing_rounds, 2);
 
         db.soft_delete(created.id).unwrap();
         assert_eq!(

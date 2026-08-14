@@ -106,7 +106,6 @@ pub struct TaskWorkEvent {
     pub created_at: String,
     pub updated_at: String,
     pub is_first_valid: bool,
-    pub can_delete: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -119,18 +118,6 @@ pub struct WorkEventInput {
     pub note: String,
     #[serde(default)]
     pub sync_status: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkEventUpdateInput {
-    pub id: i64,
-    pub result_status: String,
-    pub handled_at: String,
-    #[serde(default)]
-    pub note: String,
-    #[serde(default)]
-    pub confirm_historical_impact: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

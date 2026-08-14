@@ -16,10 +16,8 @@ export interface TaskInput{
   workload:Workload;isUrgent:boolean;urgentRequester:string;urgentReason:string;requestedDeadline:string|null;requestedDeadlineLabel:string|null;internalNotes:string;
 }
 export interface TaskLog{id:number;taskId:number;logType:string;content:string;createdAt:string}
-export interface TaskWorkEvent{id:number;taskId:number;resultStatus:WorkResult;handledAt:string;taskTypeSnapshot:string;source:string;note:string;createdAt:string;updatedAt:string;isFirstValid:boolean;canDelete:boolean}
+export interface TaskWorkEvent{id:number;taskId:number;resultStatus:WorkResult;handledAt:string;taskTypeSnapshot:string;source:string;note:string;createdAt:string;updatedAt:string;isFirstValid:boolean}
 export type WorkResult="processed"|"completed"|"waiting_materials"|"waiting_confirmation"|"waiting_counterparty_confirmation";
-export interface WorkEventInput{taskId:number;resultStatus:WorkResult;handledAt:string;note:string;syncStatus:boolean}
-export interface WorkEventUpdateInput{id:number;resultStatus:WorkResult;handledAt:string;note:string;confirmHistoricalImpact:boolean}
 export interface QueueInput{id:number;inheritDeadline:boolean;reason:string}
 export interface MergeTaskInput{targetTaskId:number;sourceTaskId:number;deduplicateRecords:boolean;trashSource:boolean}
 export interface TicketSnapshot{task:LegalTask;queueAhead:number}

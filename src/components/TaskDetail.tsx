@@ -6,22 +6,21 @@ import { formatDateTime,formatDeadline,isDeferredStatus,isOverdue,localizeStatus
 import StatusBadge from "./StatusBadge";
 import TicketNumber from "./TicketNumber";
 import QueueDialog from "./QueueDialog";
-import WorkEventDialog from "./WorkEventDialog";
 import MergeTaskDialog from "./MergeTaskDialog";
 
-const historyWarning="此操作将改变该事项的统计归属期间，并可能影响历史周报、月报或季度统计。是否继续？";
+const historyWarning="这是该事项最早的有效办理记录，删除后可能改变历史周报、月报或季度统计。";
 const sourceLabel=(source:string)=>source==="manual"?"手动记录":source==="quick_action"?"快捷处理":"状态变化自动记录";
 
 export default function TaskDetail({task,view,mergeCandidates,onClose,onEdit,onChanged,notify=()=>undefined}:{task:LegalTask;view:TaskView;mergeCandidates:LegalTask[];onClose:()=>void;onEdit:()=>void;onChanged:()=>void;notify?:(message:string)=>void}){
   const [logs,setLogs]=useState<TaskLog[]>([]);const [events,setEvents]=useState<TaskWorkEvent[]>([]);const [note,setNote]=useState("");
   const [editingLog,setEditingLog]=useState<number|null>(null);const [editingContent,setEditingContent]=useState("");
-  const [workDialog,setWorkDialog]=useState<TaskWorkEvent|null|undefined>(undefined);const [queueDialog,setQueueDialog]=useState<"enqueue"|"reopen"|null>(null);const [mergeDialog,setMergeDialog]=useState(false);
+  const [queueDialog,setQueueDialog]=useState<"enqueue"|"reopen"|null>(null);const [mergeDialog,setMergeDialog]=useState(false);
   const refresh=async()=>{const [nextLogs,nextEvents]=await Promise.all([api.getLogs(task.id),api.getWorkEvents(task.id)]);setLogs(nextLogs);setEvents(nextEvents);};
   useEffect(()=>{void refresh();},[task.id]);
   const add=async()=>{if(!note.trim())return;await api.addLog(task.id,note);setNote("");await refresh();};
   const saveLog=async()=>{if(editingLog===null||!editingContent.trim())return;await api.updateLog(editingLog,editingContent);setEditingLog(null);setEditingContent("");await refresh();};
   const removeLog=async(id:number)=>{if(!window.confirm("删除这条普通处理备注？"))return;await api.deleteLog(id);await refresh();};
-  const removeEvent=async(event:TaskWorkEvent)=>{if(!event.canDelete)return;const message=event.isFirstValid?historyWarning:"作废这条结构化处理活动？原记录仍会保留在审计数据中。";if(!window.confirm(message))return;await api.voidWorkEvent(event.id,event.isFirstValid);await refresh();onChanged();};
+  const removeEvent=async(event:TaskWorkEvent)=>{const impact=event.isFirstValid?`${historyWarning}\n\n`:"";if(!window.confirm(`${impact}删除这条办理记录？删除后将不再计入处理轮次和统计，但不会自动回退事项当前状态。`))return;await api.voidWorkEvent(event.id,event.isFirstValid);notify("办理记录已删除，事项当前状态未改变");await refresh();onChanged();};
   const process=async()=>{await api.processRound(task.id);notify("已记录本轮处理，事项已进入暂缓队列");onChanged();};
   const complete=async()=>{await api.completeRound(task.id);notify("已记录本轮完成，事项整体结束");onChanged();};
   const terminal=task.status==="completed"||task.status==="archived"||Boolean(task.archivedAt);
@@ -51,15 +50,14 @@ export default function TaskDetail({task,view,mergeCandidates,onClose,onEdit,onC
     <section><h3>事项详情</h3><p className={task.details?"detail-copy":"muted"}>{task.details||"未填写"}</p></section>
     {task.isUrgent&&<section className="urgent-box"><h3>加急信息</h3><p><strong>{task.urgentRequester}</strong>：{task.urgentReason}</p></section>}
     {task.internalNotes&&<section><h3>内部备注</h3><p className="detail-copy">{task.internalNotes}</p></section>}
-    {view!=="trash"&&<section className="work-events"><div className="section-heading"><div><h3>办理记录</h3></div><button className="button secondary small" onClick={()=>setWorkDialog(null)}><ListPlus size={15}/>新增记录</button></div>
-      {events.map(event=><article className="work-event" key={event.id}><div><StatusBadge status={event.resultStatus}/><time>{formatDateTime(event.handledAt)}</time><small>{sourceLabel(event.source)} · {event.taskTypeSnapshot}</small></div>{event.note&&<p>{event.note}</p>}<span className="timeline-actions"><button title="编辑处理活动" onClick={()=>setWorkDialog(event)}><Pencil size={14}/></button>{event.canDelete&&<button className="danger" title="作废处理活动" onClick={()=>void removeEvent(event)}><Trash2 size={14}/></button>}</span></article>)}
+    {view!=="trash"&&<section className="work-events"><div className="section-heading"><div><h3>办理记录</h3></div></div>
+      {events.map(event=><article className="work-event" key={event.id}><div><StatusBadge status={event.resultStatus}/><time>{formatDateTime(event.handledAt)}</time><small>{sourceLabel(event.source)} · {event.taskTypeSnapshot}</small></div>{event.note&&<p>{event.note}</p>}<span className="timeline-actions"><button className="danger" title="删除办理记录" onClick={()=>void removeEvent(event)}><Trash2 size={14}/></button></span></article>)}
       {!events.length&&<p className="muted">暂无办理记录</p>}
     </section>}
     <section className="timeline"><h3>事项时间线</h3><div className="log-compose"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="补充一条普通处理备注"/><button onClick={()=>void add()}>添加</button></div>
       {logs.map(log=><article key={log.id} className="timeline-entry"><div className="timeline-meta"><time>{formatDateTime(log.createdAt)}</time>{log.logType==="note"&&<span className="timeline-actions">{editingLog===log.id?<><button title="保存" onClick={()=>void saveLog()}><Check size={14}/></button><button title="取消" onClick={()=>{setEditingLog(null);setEditingContent("");}}><X size={14}/></button></>:<><button title="编辑" onClick={()=>{setEditingLog(log.id);setEditingContent(log.content);}}><Pencil size={14}/></button><button className="danger" title="删除" onClick={()=>void removeLog(log.id)}><Trash2 size={14}/></button></>}</span>}</div>{editingLog===log.id?<textarea className="log-edit" rows={3} maxLength={2000} value={editingContent} onChange={event=>setEditingContent(event.target.value)}/>:<p>{localizeStatusText(log.content)}</p>}</article>)}
       {!logs.length&&<p className="muted">暂无时间线记录</p>}
     </section>
-    {workDialog!==undefined&&<WorkEventDialog task={task} event={workDialog??undefined} onClose={()=>setWorkDialog(undefined)} onSaved={()=>{setWorkDialog(undefined);notify("处理活动已保存");void refresh();onChanged();}}/>}
     {queueDialog&&<QueueDialog task={task} reopen={queueDialog==="reopen"} onClose={()=>setQueueDialog(null)} onSaved={()=>{setQueueDialog(null);notify(queueDialog==="reopen"?"事项已重新开启并加入今日队列":"事项已加入今日队列");onChanged();}}/>}
     {mergeDialog&&<MergeTaskDialog target={task} candidates={mergeCandidates} onClose={()=>setMergeDialog(false)} onMerged={()=>{setMergeDialog(false);notify("事项已合并，相关记录已保留");onChanged();}}/>}
   </aside>;

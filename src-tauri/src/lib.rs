@@ -178,24 +178,6 @@ fn get_work_events(db: State<Database>, task_id: i64) -> Result<Vec<TaskWorkEven
     db.list_work_events(task_id)
 }
 #[tauri::command]
-fn record_work_event(
-    app: tauri::AppHandle,
-    db: State<Database>,
-    input: WorkEventInput,
-) -> Result<(), String> {
-    db.record_work_event(input)?;
-    emit_change(&app)
-}
-#[tauri::command]
-fn update_work_event(
-    app: tauri::AppHandle,
-    db: State<Database>,
-    input: WorkEventUpdateInput,
-) -> Result<(), String> {
-    db.update_work_event(input)?;
-    emit_change(&app)
-}
-#[tauri::command]
 fn void_work_event(
     app: tauri::AppHandle,
     db: State<Database>,
@@ -665,8 +647,6 @@ pub fn run() {
             resolve_import_conflict,
             get_logs,
             get_work_events,
-            record_work_event,
-            update_work_event,
             void_work_event,
             process_round,
             complete_round,
