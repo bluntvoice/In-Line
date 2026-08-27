@@ -1,5 +1,5 @@
 import { useEffect,useMemo,useState } from "react";
-import { Archive,ArrowDown,ArrowUp,BarChart3,BookOpen,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,RotateCcw,Search,Settings,Trash2,X } from "lucide-react";
+import { Archive,ArrowDown,ArrowUp,BarChart3,BookOpen,CalendarDays,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,RotateCcw,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
 import { commonContacts,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortDeferredQueue,taskDetailView,visibleQueueTasks } from "./lib/task-utils";
@@ -12,6 +12,7 @@ import SettingsPanel from "./components/SettingsPanel";
 import AboutPanel from "./components/AboutPanel";
 import StatisticsPanel from "./components/StatisticsPanel";
 import HelpPanel from "./components/HelpPanel";
+import WorkCalendarPanel from "./components/WorkCalendarPanel";
 import QueueDialog from "./components/QueueDialog";
 import { DeadlineFilterHeader,ValueFilterHeader } from "./components/TaskTableFilter";
 import { activeFilterCount,applyTaskFilters,EMPTY_TASK_FILTERS,uniqueValues,type TaskFilters } from "./lib/task-filters";
@@ -31,6 +32,7 @@ export default function App(){
   const [settings,setSettings]=useState(false);
   const [about,setAbout]=useState(false);
   const [statistics,setStatistics]=useState(false);
+  const [workCalendar,setWorkCalendar]=useState(false);
   const [help,setHelp]=useState(false);
   const [menu,setMenu]=useState<MenuState>(null);
   const [queueAction,setQueueAction]=useState<{task:LegalTask;reopen:boolean}|null>(null);
@@ -45,6 +47,7 @@ export default function App(){
     setSettings(false);
     setAbout(false);
     setStatistics(false);
+    setWorkCalendar(false);
     setHelp(false);
     setView(taskDetailView(task));
     setSelected(task);
@@ -146,27 +149,28 @@ export default function App(){
   const deferredOverdue=deferred.filter(task=>isOverdue(task)).length;
   const frequentContacts=commonContacts([...data.queue,...data.archive].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt)));
   const actionView:TaskView=view==="deferred"?"queue":view;
-  const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setHelp(false);setSelected(null);setView(next);};
+  const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);setSelected(null);setView(next);};
 
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><img src="/inline-mark.svg"/><div><strong>In Line</strong><span>排着呢</span></div></div>
       <button className="new-ticket" onClick={()=>setEditing(null)}><Plus size={18}/>新增取号<kbd>{data.settings.global_shortcut??"Alt+I"}</kbd></button>
       <nav>
-        <button className={!settings&&!about&&!statistics&&!help&&view==="queue"?"active":""} onClick={()=>openView("queue")}><Inbox size={18}/><span>待办队列</span><b>{queueCount}</b></button>
-        <button className={!settings&&!about&&!statistics&&!help&&view==="deferred"?"active":""} onClick={()=>openView("deferred")}><PauseCircle size={18}/><span>暂缓事项</span><span className="nav-counts"><b>{deferred.length}</b>{deferredOverdue>0&&<em title={`${deferredOverdue} 项已逾期`}><ClockAlert size={12}/>{deferredOverdue}</em>}</span></button>
-        <button className={!settings&&!about&&!statistics&&!help&&view==="archive"?"active":""} onClick={()=>openView("archive")}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
-        <button className={!settings&&!about&&!statistics&&!help&&view==="trash"?"active":""} onClick={()=>openView("trash")}><Trash2 size={18}/><span>回收站</span><b>{data.trash.length}</b></button>
-        <button className={statistics?"active":""} onClick={()=>{setStatistics(true);setHelp(false);setSettings(false);setAbout(false);setSelected(null);}}><BarChart3 size={18}/><span>统计中心</span></button>
-        <button className={help?"active":""} onClick={()=>{setHelp(true);setStatistics(false);setSettings(false);setAbout(false);setSelected(null);}}><BookOpen size={18}/><span>使用说明</span></button>
+        <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="queue"?"active":""} onClick={()=>openView("queue")}><Inbox size={18}/><span>待办队列</span><b>{queueCount}</b></button>
+        <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="deferred"?"active":""} onClick={()=>openView("deferred")}><PauseCircle size={18}/><span>暂缓事项</span><span className="nav-counts"><b>{deferred.length}</b>{deferredOverdue>0&&<em title={`${deferredOverdue} 项已逾期`}><ClockAlert size={12}/>{deferredOverdue}</em>}</span></button>
+        <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="archive"?"active":""} onClick={()=>openView("archive")}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
+        <button className={workCalendar?"active":""} onClick={()=>{setWorkCalendar(true);setStatistics(false);setHelp(false);setSettings(false);setAbout(false);setSelected(null);}}><CalendarDays size={18}/><span>工作日历</span></button>
+        <button className={statistics?"active":""} onClick={()=>{setStatistics(true);setWorkCalendar(false);setHelp(false);setSettings(false);setAbout(false);setSelected(null);}}><BarChart3 size={18}/><span>统计中心</span></button>
+        <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="trash"?"active":""} onClick={()=>openView("trash")}><Trash2 size={18}/><span>回收站</span></button>
+        <button className={help?"active":""} onClick={()=>{setHelp(true);setStatistics(false);setWorkCalendar(false);setSettings(false);setAbout(false);setSelected(null);}}><BookOpen size={18}/><span>使用说明</span></button>
       </nav>
       <div className="sidebar-summary"><div><span>加急</span><b>{urgent}</b></div><div><span>逾期</span><b>{overdue}</b></div></div>
-      <button className={settings?"settings-button active":"settings-button"} onClick={()=>{setSettings(true);setAbout(false);setStatistics(false);setHelp(false);}}><Settings size={18}/>软件设置</button>
-      <button className={about?"settings-button active":"settings-button"} onClick={()=>{setAbout(true);setSettings(false);setStatistics(false);setHelp(false);}}><Info size={18}/>关于</button>
+      <button className={settings?"settings-button active":"settings-button"} onClick={()=>{setSettings(true);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);}}><Settings size={18}/>软件设置</button>
+      <button className={about?"settings-button active":"settings-button"} onClick={()=>{setAbout(true);setSettings(false);setStatistics(false);setWorkCalendar(false);setHelp(false);}}><Info size={18}/>关于</button>
       <small className="app-version">{version?`v${version}`:""}</small>
     </aside>
     <main className="workspace">
-      {help?<HelpPanel/>:about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} onChanged={()=>void refresh()} onOpenTask={id=>{void api.getTask(id).then(showTaskDetails).catch(error=>toast(String(error)));}} notify={toast}/>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} currentOverdueCount={data.queue.filter(task=>isOverdue(task)).length} currentOverdueByTaskType={Object.fromEntries([...new Set(data.queue.map(task=>task.taskType))].map(type=>[type,data.queue.filter(task=>task.taskType===type&&isOverdue(task)).length]))} notify={toast} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:<>
+      {help?<HelpPanel/>:about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} onChanged={()=>void refresh()} onOpenTask={id=>{void api.getTask(id).then(showTaskDetails).catch(error=>toast(String(error)));}} notify={toast}/>:workCalendar?<div className={selected?"queue-layout calendar-layout with-detail":"queue-layout calendar-layout"}><WorkCalendarPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} notify={toast} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} currentOverdueCount={data.queue.filter(task=>isOverdue(task)).length} currentOverdueByTaskType={Object.fromEntries([...new Set(data.queue.map(task=>task.taskType))].map(type=>[type,data.queue.filter(task=>task.taskType===type&&isOverdue(task)).length]))} notify={toast} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:<>
         <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="deferred"?"暂缓事项":view==="archive"?"历史归档":"回收站"}</h1></div>
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>

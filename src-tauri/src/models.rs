@@ -213,6 +213,66 @@ pub struct StatisticsDetail {
     pub handling_count: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkCalendarRange {
+    pub start: String,
+    pub end: String,
+    pub generated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkCalendarSummary {
+    pub handled_tasks: i64,
+    pub handling_rounds: i64,
+    pub completed_tasks: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkCalendarInterval {
+    pub queue_entry_id: i64,
+    pub enqueued_at: String,
+    pub closed_at: Option<String>,
+    pub round_index: i64,
+    pub result_status: Option<String>,
+    pub handled_at: Option<String>,
+    pub current_active: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkCalendarEvent {
+    pub event_id: i64,
+    pub task_id: i64,
+    pub permanent_number: String,
+    pub title: String,
+    pub task_type: String,
+    pub result_status: String,
+    pub handled_at: String,
+    pub round_index: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkCalendarTask {
+    pub task_id: i64,
+    pub permanent_number: String,
+    pub title: String,
+    pub task_type: String,
+    pub intervals: Vec<WorkCalendarInterval>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkCalendarResult {
+    pub range: WorkCalendarRange,
+    pub summary: WorkCalendarSummary,
+    pub tasks: Vec<WorkCalendarTask>,
+    pub events: Vec<WorkCalendarEvent>,
+}
+
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReportWorkEvent {

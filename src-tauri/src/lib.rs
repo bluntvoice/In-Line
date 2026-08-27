@@ -225,6 +225,14 @@ fn get_statistics(
     db.statistics(start, end, timezone_offset_minutes)
 }
 #[tauri::command]
+fn get_work_calendar(
+    db: State<Database>,
+    start: String,
+    end: String,
+) -> Result<WorkCalendarResult, String> {
+    db.work_calendar(start, end)
+}
+#[tauri::command]
 fn get_statistics_details(
     db: State<Database>,
     start: String,
@@ -652,6 +660,7 @@ pub fn run() {
             complete_round,
             enqueue_task,
             reopen_task,
+            get_work_calendar,
             get_statistics,
             get_statistics_details,
             add_log,

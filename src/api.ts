@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot } from "./types";
+import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkCalendarResult } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -45,6 +45,7 @@ export const api={
   completeRound:(id:number)=>invoke<void>("complete_round",{id}),
   enqueueTask:(input:QueueInput)=>invoke<void>("enqueue_task",{input}),
   reopenTask:(input:QueueInput)=>invoke<void>("reopen_task",{input}),
+  getWorkCalendar:(start:string,end:string)=>invoke<WorkCalendarResult>("get_work_calendar",{start,end}),
   getStatistics:(start:string,end:string)=>invoke<StatisticsResult>("get_statistics",{start,end,timezoneOffsetMinutes:-new Date().getTimezoneOffset()}),
   getStatisticsDetails:(start:string,end:string,taskType:string)=>invoke<StatisticsDetail[]>("get_statistics_details",{start,end,taskType}),
   addLog:(taskId:number,content:string)=>invoke<void>("add_log",{taskId,content}),

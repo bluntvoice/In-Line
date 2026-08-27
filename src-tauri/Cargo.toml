@@ -1,6 +1,6 @@
 [package]
 name = "in-line"
-version = "0.2.1"
+version = "0.2.2"
 description = "In Line - a general-purpose task queue"
 authors = ["bluntvoice"]
 edition = "2021"

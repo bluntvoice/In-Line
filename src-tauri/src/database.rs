@@ -1621,6 +1621,236 @@ impl Database {
 }
 
 impl Database {
+    pub fn work_calendar(&self, start: String, end: String) -> Result<WorkCalendarResult, String> {
+        let start_time = chrono::DateTime::parse_from_rfc3339(&start)
+            .map_err(|_| "日历开始时间格式无效".to_string())?;
+        let end_time = chrono::DateTime::parse_from_rfc3339(&end)
+            .map_err(|_| "日历结束时间格式无效".to_string())?;
+        if end_time <= start_time {
+            return Err("日历结束时间必须晚于开始时间".into());
+        }
+        if (end_time - start_time).num_days() > 370 {
+            return Err("单次日历查询范围不能超过 370 天".into());
+        }
+        let start_millis = start_time.timestamp_millis();
+        let end_millis = end_time.timestamp_millis();
+        let generated_at = now();
+        self.with_conn(|connection| {
+            #[derive(Clone)]
+            struct CalendarQueueRow {
+                task_id: i64,
+                permanent_number: String,
+                title: String,
+                task_type: String,
+                queue_entry_id: i64,
+                enqueued_at: String,
+                closed_at: Option<String>,
+                close_reason: String,
+                round_index: i64,
+            }
+
+            let mut queue_statement = connection
+                .prepare(
+                    "WITH ranked AS (
+                       SELECT entry.id AS queue_entry_id,entry.task_id,entry.enqueued_at,entry.closed_at,
+                              entry.close_reason,tasks.permanent_number,tasks.title,tasks.task_type,
+                              ROW_NUMBER() OVER(
+                                PARTITION BY entry.task_id
+                                ORDER BY strftime('%s',entry.enqueued_at),entry.id
+                              ) AS round_index
+                       FROM task_queue_entries entry
+                       JOIN tasks ON tasks.id=entry.task_id
+                       WHERE tasks.deleted_at IS NULL
+                     )
+                     SELECT task_id,permanent_number,title,task_type,queue_entry_id,enqueued_at,
+                            closed_at,close_reason,round_index
+                     FROM ranked
+                     WHERE strftime('%s',enqueued_at)<strftime('%s',?2)
+                       AND (closed_at IS NULL OR strftime('%s',closed_at)>strftime('%s',?1))
+                     ORDER BY strftime('%s',enqueued_at),queue_entry_id",
+                )
+                .map_err(display_error)?;
+            let queue_rows = queue_statement
+                .query_map(params![start, end], |row| {
+                    Ok(CalendarQueueRow {
+                        task_id: row.get(0)?,
+                        permanent_number: row.get(1)?,
+                        title: row.get(2)?,
+                        task_type: row.get(3)?,
+                        queue_entry_id: row.get(4)?,
+                        enqueued_at: row.get(5)?,
+                        closed_at: row.get(6)?,
+                        close_reason: row.get(7)?,
+                        round_index: row.get(8)?,
+                    })
+                })
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+
+            let mut event_statement = connection
+                .prepare(
+                    "SELECT event.id,event.task_id,tasks.permanent_number,tasks.title,tasks.task_type,
+                            event.result_status,event.handled_at
+                     FROM task_work_events event
+                     JOIN tasks ON tasks.id=event.task_id
+                     WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                       AND strftime('%s',event.handled_at)>=strftime('%s',?1)
+                       AND strftime('%s',event.handled_at)<strftime('%s',?2)
+                     ORDER BY strftime('%s',event.handled_at),event.id",
+                )
+                .map_err(display_error)?;
+            let raw_events = event_statement
+                .query_map(params![start, end], |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, String>(4)?,
+                        row.get::<_, String>(5)?,
+                        row.get::<_, String>(6)?,
+                    ))
+                })
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+
+            let parse_stamp = |value: &str| {
+                chrono::DateTime::parse_from_rfc3339(value)
+                    .map(|stamp| stamp.timestamp_millis())
+                    .ok()
+            };
+            let association_events = raw_events
+                .into_iter()
+                .map(
+                    |(event_id, task_id, permanent_number, title, task_type, result_status, handled_at)| {
+                        let handled_stamp = parse_stamp(&handled_at);
+                        let round_index = queue_rows
+                            .iter()
+                            .filter(|entry| entry.task_id == task_id)
+                            .filter(|entry| {
+                                let (Some(handled), Some(enqueued)) =
+                                    (handled_stamp, parse_stamp(&entry.enqueued_at))
+                                else {
+                                    return false;
+                                };
+                                let closed = entry.closed_at.as_deref().and_then(parse_stamp);
+                                handled >= enqueued && closed.is_none_or(|value| handled <= value)
+                            })
+                            .max_by_key(|entry| parse_stamp(&entry.enqueued_at))
+                            .map(|entry| entry.round_index);
+                        WorkCalendarEvent {
+                            event_id,
+                            task_id,
+                            permanent_number,
+                            title,
+                            task_type,
+                            result_status,
+                            handled_at,
+                            round_index,
+                        }
+                    },
+                )
+                .collect::<Vec<_>>();
+            let events = association_events
+                .iter()
+                .filter(|event| {
+                    parse_stamp(&event.handled_at)
+                        .is_some_and(|stamp| stamp >= start_millis && stamp < end_millis)
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
+            let result_close_reasons = [
+                "本轮已处理",
+                "本轮已完成",
+                "记录本次处理并同步状态",
+                "deferred",
+                "completed",
+            ];
+            let mut tasks = BTreeMap::<i64, WorkCalendarTask>::new();
+            for entry in queue_rows {
+                let (result_status, handled_at) = if entry.closed_at.is_some()
+                    && result_close_reasons.contains(&entry.close_reason.as_str())
+                {
+                    let end_stamp = entry.closed_at.as_deref().and_then(parse_stamp);
+                    let start_stamp = parse_stamp(&entry.enqueued_at);
+                    association_events
+                        .iter()
+                        .filter(|event| event.task_id == entry.task_id)
+                        .filter(|event| {
+                            let (Some(handled), Some(enqueued)) =
+                                (parse_stamp(&event.handled_at), start_stamp)
+                            else {
+                                return false;
+                            };
+                            handled >= enqueued && end_stamp.is_none_or(|closed| handled <= closed)
+                        })
+                        .max_by_key(|event| parse_stamp(&event.handled_at))
+                        .map(|event| {
+                            (
+                                Some(event.result_status.clone()),
+                                Some(event.handled_at.clone()),
+                            )
+                        })
+                        .unwrap_or((None, None))
+                } else {
+                    (None, None)
+                };
+                tasks
+                    .entry(entry.task_id)
+                    .or_insert_with(|| WorkCalendarTask {
+                        task_id: entry.task_id,
+                        permanent_number: entry.permanent_number,
+                        title: entry.title,
+                        task_type: entry.task_type,
+                        intervals: Vec::new(),
+                    })
+                    .intervals
+                    .push(WorkCalendarInterval {
+                        queue_entry_id: entry.queue_entry_id,
+                        enqueued_at: entry.enqueued_at,
+                        current_active: entry.closed_at.is_none(),
+                        closed_at: entry.closed_at,
+                        round_index: entry.round_index,
+                        result_status,
+                        handled_at,
+                    });
+            }
+
+            let mut latest_events = HashMap::<i64, &WorkCalendarEvent>::new();
+            for event in &events {
+                let replace = latest_events.get(&event.task_id).is_none_or(|current| {
+                    (parse_stamp(&event.handled_at), event.event_id)
+                        > (parse_stamp(&current.handled_at), current.event_id)
+                });
+                if replace {
+                    latest_events.insert(event.task_id, event);
+                }
+            }
+            let summary = WorkCalendarSummary {
+                handled_tasks: latest_events.len() as i64,
+                handling_rounds: events.len() as i64,
+                completed_tasks: latest_events
+                    .values()
+                    .filter(|event| event.result_status == "completed")
+                    .count() as i64,
+            };
+
+            Ok(WorkCalendarResult {
+                range: WorkCalendarRange {
+                    start,
+                    end,
+                    generated_at,
+                },
+                summary,
+                tasks: tasks.into_values().collect(),
+                events,
+            })
+        })
+    }
+
     pub fn statistics(
         &self,
         start: String,
@@ -3523,6 +3753,174 @@ mod tests {
             .unwrap()
             .iter()
             .any(|task| task.id == source.id));
+        let calendar = db
+            .work_calendar(
+                (Utc::now() - chrono::Duration::hours(1)).to_rfc3339(),
+                (Utc::now() + chrono::Duration::hours(2)).to_rfc3339(),
+            )
+            .unwrap();
+        assert!(calendar
+            .tasks
+            .iter()
+            .any(|task| task.task_id == target.id && task.intervals.len() == 2));
+        assert!(!calendar.tasks.iter().any(|task| task.task_id == source.id));
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn work_calendar_uses_real_queue_rounds_and_effective_events() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-calendar-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let task = db.save_task(sample("三轮事项")).unwrap();
+        let active = db.save_task(sample("当前活动事项")).unwrap();
+        let corrected = db.save_task(sample("已纠错事项")).unwrap();
+        let cross_month = db.save_task(sample("跨月事项")).unwrap();
+
+        db.with_conn(|connection| {
+            let first_id: i64 = connection
+                .query_row(
+                    "SELECT id FROM task_queue_entries WHERE task_id=?",
+                    [task.id],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            connection
+                .execute(
+                    "UPDATE task_queue_entries SET enqueued_at=?,closed_at=?,close_reason='本轮已处理' WHERE id=?",
+                    params!["2026-08-24T09:00:00+08:00", "2026-08-26T11:00:00+08:00", first_id],
+                )
+                .map_err(display_error)?;
+            for (queue_date, sequence, enqueued_at, closed_at, reason) in [
+                ("2026-08-27", 91, "2026-08-27T09:30:00+08:00", Some("2026-08-27T12:00:00+08:00"), "本轮已处理"),
+                ("2026-08-28", 92, "2026-08-28T13:00:00+08:00", Some("2026-08-28T16:00:00+08:00"), "本轮已完成"),
+            ] {
+                connection.execute(
+                    "INSERT INTO task_queue_entries(task_id,queue_date,daily_sequence,enqueued_at,closed_at,close_reason,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+                    params![task.id,queue_date,sequence,enqueued_at,closed_at,reason,enqueued_at,closed_at.unwrap()],
+                ).map_err(display_error)?;
+            }
+            for (status, handled_at) in [
+                ("waiting_materials", "2026-08-26T10:59:00+08:00"),
+                ("processed", "2026-08-27T11:59:00+08:00"),
+                ("completed", "2026-08-28T15:59:00+08:00"),
+            ] {
+                connection.execute(
+                    "INSERT INTO task_work_events(task_id,result_status,handled_at,task_type_snapshot,source,note,created_at,updated_at) VALUES(?,?,?,?, 'quick_action','',?,?)",
+                    params![task.id,status,handled_at,"任务处理",handled_at,handled_at],
+                ).map_err(display_error)?;
+            }
+            connection.execute(
+                "UPDATE task_queue_entries SET enqueued_at='2026-08-27T08:00:00+08:00' WHERE task_id=?",
+                [active.id],
+            ).map_err(display_error)?;
+            let corrected_entry: i64 = connection.query_row(
+                "SELECT id FROM task_queue_entries WHERE task_id=?",[corrected.id],|row|row.get(0),
+            ).map_err(display_error)?;
+            connection.execute(
+                "UPDATE task_queue_entries SET enqueued_at='2026-08-29T09:00:00+08:00',closed_at='2026-08-29T10:00:00+08:00',close_reason='本轮已处理' WHERE id=?",
+                [corrected_entry],
+            ).map_err(display_error)?;
+            connection.execute(
+                "INSERT INTO task_work_events(task_id,result_status,handled_at,task_type_snapshot,source,note,created_at,updated_at,voided_at) VALUES(?,'processed','2026-08-29T09:59:00+08:00','任务处理','quick_action','','2026-08-29T09:59:00+08:00','2026-08-29T10:01:00+08:00','2026-08-29T10:01:00+08:00')",
+                [corrected.id],
+            ).map_err(display_error)?;
+            connection.execute(
+                "UPDATE task_queue_entries SET enqueued_at='2026-07-31T16:00:00+08:00',closed_at='2026-08-02T10:00:00+08:00',close_reason='本轮已处理' WHERE task_id=?",
+                [cross_month.id],
+            ).map_err(display_error)?;
+            connection.execute(
+                "INSERT INTO task_work_events(task_id,result_status,handled_at,task_type_snapshot,source,note,created_at,updated_at) VALUES(?,'processed','2026-08-02T09:59:00+08:00','任务处理','quick_action','','2026-08-02T09:59:00+08:00','2026-08-02T09:59:00+08:00')",
+                [cross_month.id],
+            ).map_err(display_error)?;
+            Ok(())
+        }).unwrap();
+
+        let calendar = db
+            .work_calendar(
+                "2026-08-24T00:00:00+08:00".into(),
+                "2026-08-31T00:00:00+08:00".into(),
+            )
+            .unwrap();
+        assert_eq!(calendar.summary.handled_tasks, 1);
+        assert_eq!(calendar.summary.handling_rounds, 3);
+        assert_eq!(calendar.summary.completed_tasks, 1);
+        let rounds = calendar
+            .tasks
+            .iter()
+            .find(|row| row.task_id == task.id)
+            .unwrap();
+        assert_eq!(rounds.intervals.len(), 3);
+        assert_eq!(
+            rounds
+                .intervals
+                .iter()
+                .map(|entry| entry.round_index)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            rounds.intervals[0].result_status.as_deref(),
+            Some("waiting_materials")
+        );
+        assert_eq!(
+            rounds.intervals[2].result_status.as_deref(),
+            Some("completed")
+        );
+        assert!(
+            calendar
+                .tasks
+                .iter()
+                .find(|row| row.task_id == active.id)
+                .unwrap()
+                .intervals[0]
+                .current_active
+        );
+        assert!(calendar
+            .tasks
+            .iter()
+            .find(|row| row.task_id == corrected.id)
+            .unwrap()
+            .intervals[0]
+            .result_status
+            .is_none());
+
+        let cross_week = db
+            .work_calendar(
+                "2026-08-25T00:00:00+08:00".into(),
+                "2026-08-27T00:00:00+08:00".into(),
+            )
+            .unwrap();
+        assert_eq!(
+            cross_week
+                .tasks
+                .iter()
+                .find(|row| row.task_id == task.id)
+                .unwrap()
+                .intervals[0]
+                .round_index,
+            1
+        );
+        let month_boundary = db
+            .work_calendar(
+                "2026-08-01T00:00:00+08:00".into(),
+                "2026-08-03T00:00:00+08:00".into(),
+            )
+            .unwrap();
+        assert_eq!(
+            month_boundary
+                .tasks
+                .iter()
+                .find(|row| row.task_id == cross_month.id)
+                .unwrap()
+                .intervals[0]
+                .round_index,
+            1
+        );
         drop(db);
         let _ = fs::remove_dir_all(root);
     }
@@ -3965,6 +4363,17 @@ mod tests {
         let events = migrated.list_work_events(created.id).unwrap();
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].result_status, "waiting_materials");
+        let migrated_calendar = migrated
+            .work_calendar(
+                (Utc::now() - chrono::Duration::days(1)).to_rfc3339(),
+                (Utc::now() + chrono::Duration::days(1)).to_rfc3339(),
+            )
+            .unwrap();
+        assert_eq!(migrated_calendar.summary.handling_rounds, 1);
+        assert!(migrated_calendar
+            .tasks
+            .iter()
+            .any(|row| row.task_id == created.id && row.intervals[0].round_index == 1));
 
         drop(migrated);
         let _ = fs::remove_dir_all(root);

@@ -38,3 +38,12 @@ export interface StatisticsResult{
   trendGranularity:"day"|"week";
 }
 export interface StatisticsDetail{taskId:number;permanentNumber:string;title:string;department:string;contact:string;resultStatus:WorkResult;firstHandledAt:string;lastHandledAt:string;handlingCount:number}
+export interface WorkCalendarInterval{queueEntryId:number;enqueuedAt:string;closedAt:string|null;roundIndex:number;resultStatus:WorkResult|null;handledAt:string|null;currentActive:boolean}
+export interface WorkCalendarTask{taskId:number;permanentNumber:string;title:string;taskType:string;intervals:WorkCalendarInterval[]}
+export interface WorkCalendarEvent{eventId:number;taskId:number;permanentNumber:string;title:string;taskType:string;resultStatus:WorkResult;handledAt:string;roundIndex:number|null}
+export interface WorkCalendarResult{
+  range:{start:string;end:string;generatedAt:string};
+  summary:{handledTasks:number;handlingRounds:number;completedTasks:number};
+  tasks:WorkCalendarTask[];
+  events:WorkCalendarEvent[];
+}

@@ -4,6 +4,25 @@
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-27
+
+### Added
+
+- 侧栏新增一级“工作日历”，默认进入周视图，并支持上一周期、下一周期、回到今天及周 / 月切换；周起始日继续沿用软件设置。
+- 周视图新增轻量甘特时间轴：每个事项只占一行，每次真实入队至本轮结束显示为独立区间，并按实际时间比例展示跨日、多轮和当前活动区间。
+- 月视图新增传统日历、每日已处理 / 已完成数量、事项摘要、工作热度及右侧办理明细抽屉。
+- 工作日历新增事项数、有效处理轮次和完成项摘要，并支持按首次入队、最近处理、处理轮次、事项类型和永久编号排序。
+- 新增只读 `get_work_calendar` 聚合接口，统一返回事项、真实队列区间、有效办理结果和历史轮次索引。
+
+### Changed
+
+- 无实际入队区间或办理记录的周末默认隐藏，有记录的周六、周日自动加入周时间轴。
+- 已处理结果使用橙色终点、已完成结果使用绿色终点；待材料、待内部确认和待对方确认保持真实结果文案，但统一归入“已处理”视觉类别。
+- 当前仍在队列中的区间延伸至查询时刻并使用渐隐开口；等待状态之间不绘制连接线。
+- 作废的办理记录不再作为有效日历结果或工作量计数，但对应真实队列区间继续保留；合并事项后的历史按迁移后的主事项展示。
+- 侧栏“回收站”不再显示事项数量徽标，具体数量继续在回收站页面内展示。
+- 开发版本更新为 `v0.2.2`。本版本不新增数据库 schema 或 migration，不改变统计中心及办理记录审计口径。
+
 ## [0.2.1] - 2026-08-15
 
 ### Added
@@ -328,7 +347,10 @@
 - Tauri capability 仅开放实际所需权限；应用默认无遥测、无外部网络访问。
 - 备份恢复前执行 SQLite 完整性校验，并先备份当前数据库；日志不记录完整敏感文本。
 
-[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/bluntvoice/in-line/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/bluntvoice/in-line/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/bluntvoice/in-line/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/bluntvoice/in-line/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/bluntvoice/in-line/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/bluntvoice/in-line/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/bluntvoice/in-line/compare/v0.1.1...v0.1.2
