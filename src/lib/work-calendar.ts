@@ -1,6 +1,6 @@
 import type { WorkCalendarResult,WorkCalendarTask } from "../types";
 
-export type CalendarView="week"|"month";
+export type CalendarView="week"|"fortnight"|"month";
 export type CalendarSort="firstEnqueued"|"latestHandled"|"rounds"|"taskType"|"permanentNumber";
 export type WeekStart="monday"|"sunday";
 
@@ -13,16 +13,16 @@ export const weekStart=(value:Date,mode:WeekStart)=>{
 };
 export const monthStart=(value:Date)=>new Date(value.getFullYear(),value.getMonth(),1);
 export const calendarRange=(anchor:Date,view:CalendarView,mode:WeekStart)=>{
-  const start=view==="week"?weekStart(anchor,mode):monthStart(anchor);
-  const end=view==="week"?addDays(start,7):new Date(start.getFullYear(),start.getMonth()+1,1);
+  const start=view==="month"?monthStart(anchor):weekStart(anchor,mode);
+  const end=view==="month"?new Date(start.getFullYear(),start.getMonth()+1,1):addDays(start,view==="fortnight"?14:7);
   return{start,end,startIso:start.toISOString(),endIso:end.toISOString()};
 };
-export const shiftCalendar=(anchor:Date,view:CalendarView,direction:-1|1)=>view==="week"?addDays(anchor,7*direction):new Date(anchor.getFullYear(),anchor.getMonth()+direction,1);
+export const shiftCalendar=(anchor:Date,view:CalendarView,direction:-1|1)=>view==="month"?new Date(anchor.getFullYear(),anchor.getMonth()+direction,1):addDays(anchor,(view==="fortnight"?14:7)*direction);
 
 const overlaps=(start:number,end:number,day:Date)=>start<addDays(day,1).getTime()&&end>day.getTime();
-export const visibleWeekDays=(result:WorkCalendarResult,start:Date)=>{
+export const visiblePeriodDays=(result:WorkCalendarResult,start:Date,length=7)=>{
   const generated=new Date(result.range.generatedAt).getTime();
-  return Array.from({length:7},(_,index)=>addDays(start,index)).filter(day=>{
+  return Array.from({length},(_,index)=>addDays(start,index)).filter(day=>{
     const weekday=day.getDay();if(weekday!==0&&weekday!==6)return true;
     const eventOnDay=result.events.some(event=>dateKey(new Date(event.handledAt))===dateKey(day));
     const intervalOnDay=result.tasks.some(task=>task.intervals.some(interval=>overlaps(new Date(interval.enqueuedAt).getTime(),interval.closedAt?new Date(interval.closedAt).getTime():generated,day)));
