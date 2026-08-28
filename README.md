@@ -247,6 +247,8 @@ MCP 只返回事项标题、部门、类型、当前状态、工作量、完成�
 
 Windows x64 安装包采用 NSIS 格式，使用系统 WebView2，不捆绑完整浏览器运行时。源码仓库不提交安装包二进制；正式安装包通过 GitHub Releases 提供。
 
+开发测试安装包可在 GitHub 的 **Actions → Development Windows Installer → Run workflow** 手动构建，仅作为保留 14 天的 Artifact，不创建 Tag 或 Release。`vX.Y.Z-alpha.N`、`vX.Y.Z-beta.N` 和 `vX.Y.Z-rc.N` Tag 会发布为 Pre-release；`vX.Y.Z` 发布为正式 Latest。完整规则见 [版本发布与测试规范](docs/prd/release-testing.md)。
+
 v0.1.4 正式安装包：
 
 - [`In.Line_0.1.4_x64-setup.exe`](https://github.com/bluntvoice/In-Line/releases/download/v0.1.4/In.Line_0.1.4_x64-setup.exe)
