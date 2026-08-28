@@ -54,6 +54,19 @@
         "visible": false,
         "resizable": true,
         "skipTaskbar": true
+      },
+      {
+        "label": "update-progress",
+        "title": "In Line 更新",
+        "url": "index.html#/update-progress",
+        "width": 360,
+        "height": 188,
+        "visible": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": true
       }
     ]
   },

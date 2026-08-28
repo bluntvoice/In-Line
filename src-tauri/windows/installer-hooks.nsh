@@ -4,6 +4,9 @@
   DetailPrint "正在关闭 In Line MCP 伴随程序..."
   nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /T /IM "in-line-mcp.exe"'
   Sleep 800
+  ; AI 客户端可能在伴随进程异常退出后立即重启它；只做一次有界复查，不关闭客户端本体。
+  nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /T /IM "in-line-mcp.exe"'
+  Sleep 350
 !macroend
 
 !macro NSIS_HOOK_PREINSTALL

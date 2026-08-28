@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,WorkCalendarResult } from "./types";
+import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,UpdateCheckResponse,UpdateProgress,WorkCalendarResult } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -68,6 +68,10 @@ export const api={
   globalShortcutAvailable:()=>invoke<boolean>("global_shortcut_available"),
   setGlobalShortcut:(shortcut:string)=>invoke<void>("set_global_shortcut",{shortcut}),
   saveChartExport:(path:string,bytes:Uint8Array)=>invoke<void>("save_chart_export",{path,bytes:Array.from(bytes)}),
+  checkForUpdate:()=>invoke<UpdateCheckResponse>("check_for_update"),
+  getUpdateProgress:()=>invoke<UpdateProgress>("get_update_progress"),
+  showUpdateProgress:()=>invoke<void>("show_update_progress"),
+  hideUpdateProgress:()=>invoke<void>("hide_update_progress"),
   openTaskAction:(id:number,action:TaskUiAction["action"]|"complete"|"archive"|"delete"|"restore")=>invoke<void>("open_task_action",{request:{id,action}}),
   getTask:(id:number)=>invoke<LegalTask>("copy_ticket_card",{id}),
   getVersion,
@@ -92,6 +96,14 @@ export const api={
     let dispose:(()=>void)|undefined;
     let disposed=false;
     void listen<TaskUiAction>("task-ui-action",event=>callback(event.payload)).then((value)=>{
+      if(disposed)value();else dispose=value;
+    });
+    return()=>{disposed=true;dispose?.();};
+  },
+  onUpdateProgress:(callback:(progress:UpdateProgress)=>void)=>{
+    let dispose:(()=>void)|undefined;
+    let disposed=false;
+    void listen<UpdateProgress>("update-progress",event=>callback(event.payload)).then((value)=>{
       if(disposed)value();else dispose=value;
     });
     return()=>{disposed=true;dispose?.();};

@@ -1,5 +1,6 @@
 pub mod database;
 pub mod models;
+pub mod updater;
 
 use database::Database;
 use models::*;
@@ -538,6 +539,7 @@ pub fn run() {
         .unwrap_or_else(|| DEFAULT_GLOBAL_SHORTCUT.into());
     tauri::Builder::default()
         .manage(database)
+        .manage(updater::UpdateManager::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             show_main(app)
         }))
@@ -589,6 +591,9 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("quick-add") {
                     window.set_icon(icon.clone())?;
                 }
+                if let Some(window) = app.get_webview_window("update-progress") {
+                    window.set_icon(icon.clone())?;
+                }
             }
             let mut tray_builder = TrayIconBuilder::new();
             if let Some(icon) = app_icon {
@@ -634,6 +639,12 @@ pub fn run() {
                 }
             }
             if window.label() == "quick-add" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
+            if window.label() == "update-progress" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
@@ -688,7 +699,11 @@ pub fn run() {
             request_new_task,
             global_shortcut_available,
             set_global_shortcut,
-            save_chart_export
+            save_chart_export,
+            updater::check_for_update,
+            updater::get_update_progress,
+            updater::show_update_progress,
+            updater::hide_update_progress
         ])
         .run(tauri::generate_context!())
         .expect("In Line 启动失败");

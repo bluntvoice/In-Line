@@ -25,6 +25,28 @@ jobs:
         shell: pwsh
         run: ./scripts/check-github-actions-runtime.ps1
 
+      - name: Verify release version consistency
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tag must use vMAJOR.MINOR.PATCH format: $env:GITHUB_REF_NAME"
+          }
+          $tagVersion = $Matches.version
+          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $cargoMatch = Select-String -Path src-tauri/Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+          $cargoVersion = $cargoMatch.Matches[0].Groups[1].Value
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $versions = [ordered]@{
+            tag = $tagVersion
+            package = $packageVersion
+            cargo = $cargoVersion
+            tauri = $tauriVersion
+          }
+          $versions.GetEnumerator() | ForEach-Object { Write-Host "$($_.Key): $($_.Value)" }
+          if (@($versions.Values | Select-Object -Unique).Count -ne 1) {
+            throw "Release version mismatch. Tag, package.json, Cargo.toml and tauri.conf.json must match."
+          }
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:

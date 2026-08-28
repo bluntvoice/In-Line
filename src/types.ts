@@ -47,3 +47,5 @@ export interface WorkCalendarResult{
   tasks:WorkCalendarTask[];
   events:WorkCalendarEvent[];
 }
+export interface UpdateCheckResponse{status:"up_to_date"|"downloading";localVersion:string;remoteVersion:string|null}
+export interface UpdateProgress{phase:"idle"|"checking"|"downloading"|"verifying"|"launching"|"failed";version:string|null;downloadedBytes:number;totalBytes:number|null;percent:number|null;message:string|null}
