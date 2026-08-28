@@ -26,26 +26,41 @@ jobs:
         run: ./scripts/check-github-actions-runtime.ps1
 
       - name: Verify release version consistency
+        id: version
         shell: pwsh
         run: |
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          [Console]::InputEncoding = $utf8
+          [Console]::OutputEncoding = $utf8
+          $OutputEncoding = $utf8
           if ($env:GITHUB_REF_NAME -notmatch '^v(?<version>\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?)$') {
             throw "Release tag must use vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-(alpha|beta|rc).N format: $env:GITHUB_REF_NAME"
           }
           $tagVersion = $Matches.version
-          $packageVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          $cargoMatch = Select-String -Path src-tauri/Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
+          $packageVersion = (Get-Content package.json -Raw -Encoding UTF8 | ConvertFrom-Json).version
+          $packageLockVersion = (Get-Content package-lock.json -Raw -Encoding UTF8 | ConvertFrom-Json -AsHashtable)["version"]
+          $cargoMatch = Select-String -Path src-tauri/Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' -Encoding UTF8 | Select-Object -First 1
           $cargoVersion = $cargoMatch.Matches[0].Groups[1].Value
-          $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargoLockText = Get-Content src-tauri/Cargo.lock -Raw -Encoding UTF8
+          $cargoLockMatch = [regex]::Match($cargoLockText, '(?ms)^\[\[package\]\]\r?\nname = "in-line"\r?\nversion = "([^"]+)"')
+          if (-not $cargoLockMatch.Success) {
+            throw "Could not find the in-line package version in src-tauri/Cargo.lock."
+          }
+          $cargoLockVersion = $cargoLockMatch.Groups[1].Value
+          $tauriVersion = (Get-Content src-tauri/tauri.conf.json -Raw -Encoding UTF8 | ConvertFrom-Json).version
           $versions = [ordered]@{
             tag = $tagVersion
             package = $packageVersion
+            packageLock = $packageLockVersion
             cargo = $cargoVersion
+            cargoLock = $cargoLockVersion
             tauri = $tauriVersion
           }
           $versions.GetEnumerator() | ForEach-Object { Write-Host "$($_.Key): $($_.Value)" }
           if (@($versions.Values | Select-Object -Unique).Count -ne 1) {
-            throw "Release version mismatch. Tag, package.json, Cargo.toml and tauri.conf.json must match."
+            throw "Release version mismatch. Tag, package.json, package-lock.json, Cargo.toml, Cargo.lock and tauri.conf.json must match."
           }
+          "release_version=$tagVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -55,6 +70,8 @@ jobs:
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
@@ -67,10 +84,40 @@ jobs:
       - name: Run tests
         run: |
           npm test
+          npm run build
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
           cargo test --locked --manifest-path src-tauri/Cargo.toml
 
       - name: Build NSIS installer
         run: npm run dist
+
+      - name: Prepare updater-compatible release asset
+        id: asset
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.release_version }}
+        run: |
+          $utf8 = [System.Text.UTF8Encoding]::new($false)
+          [Console]::InputEncoding = $utf8
+          [Console]::OutputEncoding = $utf8
+          $OutputEncoding = $utf8
+          $installers = @(Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*.exe" -File)
+          if ($installers.Count -ne 1) {
+            throw "Expected exactly one NSIS installer, found $($installers.Count)."
+          }
+          $assetName = "In.Line_$($env:RELEASE_VERSION)_x64-setup.exe"
+          $assetDirectory = "release-artifacts"
+          $assetPath = "$assetDirectory/$assetName"
+          New-Item -ItemType Directory -Path $assetDirectory -Force | Out-Null
+          Copy-Item -LiteralPath $installers[0].FullName -Destination $assetPath
+          $header = [System.Text.Encoding]::ASCII.GetString((Get-Content -LiteralPath $assetPath -AsByteStream -TotalCount 2))
+          if ($header -ne "MZ") {
+            throw "Release asset does not have a valid Windows MZ header."
+          }
+          $hash = (Get-FileHash -LiteralPath $assetPath -Algorithm SHA256).Hash
+          Write-Host "Release asset: $assetPath"
+          Write-Host "SHA-256: $hash"
+          "asset_path=$assetPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
@@ -81,4 +128,4 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-alpha.') || contains(github.ref_name, '-beta.') || contains(github.ref_name, '-rc.') }}
           make_latest: ${{ (contains(github.ref_name, '-alpha.') || contains(github.ref_name, '-beta.') || contains(github.ref_name, '-rc.')) && 'false' || 'true' }}
           fail_on_unmatched_files: true
-          files: src-tauri/target/release/bundle/nsis/*.exe
+          files: ${{ steps.asset.outputs.asset_path }}
