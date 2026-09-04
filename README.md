@@ -2,6 +2,9 @@
 
 In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合个人或内部支持岗位记录任务、展示排队顺序、发送取号卡片，适合业务量较大的职能部门使用。
 
+[![GitHub Release](https://img.shields.io/github/v/release/bluntvoice/In-Line)](https://github.com/bluntvoice/In-Line/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/bluntvoice/In-Line/total)](https://github.com/bluntvoice/In-Line/releases)
+
 当前版本：`v0.2.2`（2026-08-28）。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 主要功能
