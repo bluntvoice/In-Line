@@ -10,6 +10,7 @@
   - `docs/prd/work-calendar.md`：工作日历是基于真实历史的只读回顾视图，不是未来排期工具。
   - `docs/prd/app-update.md`：只有用户主动检查时访问 GitHub；只接受正式 Release，并强制校验 GitHub Asset 的 SHA-256 digest。
   - `docs/prd/release-testing.md`：开发构建、预发布和正式发布必须分层，开发安装包不得污染 Release。
+  - `docs/prd/backup-restore.md`：备份导入采用一步校验与非破坏性恢复，结果必须可见、可跳转、可重试。
 
 ## 2. Git 与任务边界
 

@@ -2,12 +2,15 @@ import { useEffect,useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { AlertTriangle,CheckCircle2,ChevronRight,Copy,DatabaseBackup,FileInput,FolderOpen,Keyboard,MonitorUp,Plug,RefreshCw,RotateCcw,Trash2,X } from "lucide-react";
 import { api } from "../api";
-import type { BackupConflictItem,BackupInfo } from "../types";
+import type { BackupConflictItem,BackupInfo,BackupMergeResult } from "../types";
+import { backupFailureGuidance,prioritizeBackups } from "../lib/backup-ux";
 import { shortcutFromKeyboardEvent,shortcutUsageHint } from "../lib/global-shortcut";
 
 type McpDialog={title:string;summary:string;scenario:string;usage:string;content:string}|null;
+type BackupDestination="queue"|"deferred"|"archive";
+type BackupNotice={tone:"success"|"error";title:string;message:string;recommendation:string;result?:BackupMergeResult}|null;
 
-export default function SettingsPanel({backups,settings,onChanged,onOpenTask,notify}:{backups:BackupInfo[];settings:Record<string,string>;onChanged:()=>void;onOpenTask:(id:number)=>void;notify:(text:string)=>void}){
+export default function SettingsPanel({backups,settings,isDatabaseEmpty,onChanged,onOpenTask,onNavigateBackupResult,notify}:{backups:BackupInfo[];settings:Record<string,string>;isDatabaseEmpty:boolean;onChanged:()=>void;onOpenTask:(id:number)=>void;onNavigateBackupResult:(view:BackupDestination)=>void;notify:(text:string)=>void}){
   const [launch,setLaunch]=useState(false);
   const [weekStart,setWeekStart]=useState<"monday"|"sunday">(settings.week_start_day==="sunday"?"sunday":"monday");
   const [rateMode,setRateMode]=useState<"closure"|"processing">(settings.statistics_rate_mode==="closure"?"closure":"processing");
@@ -18,19 +21,22 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
   const [busy,setBusy]=useState("");
   const [mcpDialog,setMcpDialog]=useState<McpDialog>(null);
   const [importConflicts,setImportConflicts]=useState<BackupConflictItem[]>([]);
+  const [highlightedBackup,setHighlightedBackup]=useState<string|null>(null);
+  const [backupNotice,setBackupNotice]=useState<BackupNotice>(null);
+  const [retryBackup,setRetryBackup]=useState<BackupInfo|null>(null);
 
   useEffect(()=>{void api.launchAtLogin().then(setLaunch);},[]);
   useEffect(()=>setWeekStart(settings.week_start_day==="sunday"?"sunday":"monday"),[settings]);
   useEffect(()=>setRateMode(settings.statistics_rate_mode==="closure"?"closure":"processing"),[settings]);
   useEffect(()=>setShortcut(settings.global_shortcut??"Alt+I"),[settings]);
-  useEffect(()=>setVisibleBackups(backups),[backups]);
+  useEffect(()=>setVisibleBackups(prioritizeBackups(backups,highlightedBackup)),[backups,highlightedBackup]);
   useEffect(()=>{
     let active=true;
-    const sync=()=>void api.listBackups().then(values=>{if(active)setVisibleBackups(values);}).catch(()=>undefined);
+    const sync=()=>void api.listBackups().then(values=>{if(active)setVisibleBackups(prioritizeBackups(values,highlightedBackup));}).catch(()=>undefined);
     sync();
     const timer=window.setInterval(sync,2500);
     return()=>{active=false;window.clearInterval(timer);};
-  },[]);
+  },[highlightedBackup]);
   useEffect(()=>{
     if(!mcpDialog&&!importConflicts.length)return;
     const close=(event:KeyboardEvent)=>{if(event.key==="Escape"){setMcpDialog(null);setImportConflicts([]);}};
@@ -38,9 +44,9 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
     return()=>window.removeEventListener("keydown",close);
   },[mcpDialog,importConflicts.length]);
 
-  const refreshBackups=async(showMessage=false)=>{
+  const refreshBackups=async(showMessage=false,pinnedPath=highlightedBackup)=>{
     const values=await api.listBackups();
-    setVisibleBackups(values);
+    setVisibleBackups(prioritizeBackups(values,pinnedPath));
     if(showMessage)notify("备份列表已刷新");
   };
   const manualRefresh=async()=>{
@@ -58,34 +64,62 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
     }catch(error){notify("备份失败："+String(error));}
     finally{setBusy("");}
   };
-  const importBackup=async()=>{
+  const showRestoreSuccess=(result:BackupMergeResult)=>{
+    setRetryBackup(null);
+    setBackupNotice({
+      tone:"success",
+      title:"备份数据已成功导入",
+      message:`新增 ${result.addedTasks} 项，合并 ${result.mergedTasks} 项，冲突保留 ${result.conflictTasks} 项。`,
+      recommendation:"数据会按原状态分别显示在待办队列、暂缓事项和历史归档中，可直接跳转查看。",
+      result
+    });
+  };
+  const showBackupFailure=(error:unknown,stage:"import"|"restore",value:BackupInfo|null=null)=>{
+    const guidance=backupFailureGuidance(error,stage);
+    setRetryBackup(stage==="restore"?value:null);
+    setBackupNotice({
+      tone:"error",
+      title:stage==="restore"?(value?.name.includes("-import")?"备份已导入，但数据恢复失败":"备份数据恢复失败"):"备份导入失败",
+      message:`原因：${guidance.reason}`,
+      recommendation:`建议：${guidance.recommendation}`
+    });
+  };
+  const mergeBackup=async(value:BackupInfo)=>{
+    setBusy(value.path);
+    try{
+      const result=await api.restoreBackup(value.path);
+      showRestoreSuccess(result);
+      if(result.conflicts.length)setImportConflicts(result.conflicts);
+      const pinnedPath=value.name.includes("-import")?value.path:highlightedBackup;
+      await refreshBackups(false,pinnedPath).catch(()=>undefined);
+      onChanged();
+    }catch(error){
+      showBackupFailure(error,"restore",value);
+      await refreshBackups(false,highlightedBackup).catch(()=>undefined);
+    }finally{setBusy("");}
+  };
+  const importAndRestore=async()=>{
     try{
       const selected=await open({multiple:false,directory:false,filters:[{name:"In Line 数据库备份",extensions:["db"]}]});
       const path=Array.isArray(selected)?selected[0]:selected;
       if(!path)return;
+      if(!window.confirm(isDatabaseEmpty?"将校验所选备份并恢复到当前空数据库。恢复前仍会自动创建安全备份，是否继续？":"将校验所选备份并与当前数据安全合并：相同事项合并记录，不同内容保留为冲突事项，备份中的软件设置会覆盖当前设置。恢复前会自动备份当前数据，是否继续？"))return;
       setBusy("import");
       const value=await api.importBackup(path);
-      notify("备份已导入："+value.name);
-      await refreshBackups();
-    }catch(error){notify("导入失败："+String(error));}
-    finally{setBusy("");}
+      setHighlightedBackup(value.path);
+      setVisibleBackups(current=>prioritizeBackups([value,...current],value.path));
+      setBusy("");
+      await mergeBackup(value);
+    }catch(error){showBackupFailure(error,"import");setBusy("");}
   };
   const restore=async(value:BackupInfo)=>{
     if(!window.confirm("将所选备份与当前数据合并：相同事项合并记录，不同内容保留为“冲突”事项；备份中的软件设置会覆盖当前设置。系统会先自动备份当前数据，是否继续？"))return;
-    setBusy(value.path);
-    try{
-      const result=await api.restoreBackup(value.path);
-      notify(`合并完成：新增 ${result.addedTasks} 项，合并 ${result.mergedTasks} 项，冲突保留 ${result.conflictTasks} 项`);
-      if(result.conflicts.length)setImportConflicts(result.conflicts);
-      await refreshBackups();
-      onChanged();
-    }catch(error){notify("恢复失败："+String(error));}
-    finally{setBusy("");}
+    await mergeBackup(value);
   };
   const remove=async(value:BackupInfo)=>{
     if(!window.confirm(`确定删除备份“${value.name}”吗？删除后无法恢复。`))return;
     setBusy(value.path);
-    try{await api.deleteBackup(value.path);notify("备份已删除");await refreshBackups();}
+    try{await api.deleteBackup(value.path);if(highlightedBackup===value.path)setHighlightedBackup(null);notify("备份已删除");await refreshBackups(false,highlightedBackup===value.path?null:highlightedBackup);}
     catch(error){notify("删除失败："+String(error));}
     finally{setBusy("");}
   };
@@ -120,8 +154,13 @@ export default function SettingsPanel({backups,settings,onChanged,onOpenTask,not
     <div className="setting-row"><div><strong>开机自动启动</strong><span>登录 Windows 后启动 In Line</span></div><label className="switch"><input type="checkbox" checked={launch} onChange={async event=>{const value=event.target.checked;await api.setLaunchAtLogin(value);setLaunch(value);}}/><span/></label></div>
     <div className="setting-row"><div><strong>AI MCP 接入</strong><span>复制通用接入信息，可直接交给 Codex 等 AI 客户端完成配置</span></div><div className="mcp-actions"><button className="button secondary" disabled={busy==="mcp"} onClick={()=>void showMcpContent({title:"通用 MCP 接入",summary:"一份适用于 stdio MCP 客户端的接入指令，包含本机程序路径、工具清单和只读权限范围。",scenario:"首次在 Codex 等 AI 客户端接入 In Line，安装路径改变后重新配置，或排查 MCP 启动问题时使用。",usage:"复制后交给目标客户端，按其中的启动命令完成接入。"},api.mcpConnectionGuide)}><Plug size={16}/>通用接入</button></div></div>
     <div className="setting-row"><div><strong>数据备份</strong><span>事项、办理记录和软件设置会统一写入本地数据库备份</span></div><button className="button secondary" disabled={busy!==""} onClick={()=>void backup()}><DatabaseBackup size={16}/>{busy==="backup"?"备份中…":"立即备份"}</button></div>
-    <div className="backup-list"><div className="backup-list-header"><h2>可恢复备份</h2><div className="backup-toolbar"><button className="button secondary" disabled={busy!==""} onClick={()=>void importBackup()}><FileInput size={16}/>{busy==="import"?"导入中…":"导入备份"}</button><button className="button secondary" disabled={busy!==""} onClick={()=>void manualRefresh()}><RefreshCw className={busy==="refresh"?"spin":""} size={16}/>{busy==="refresh"?"刷新中…":"刷新"}</button><button className="button secondary" onClick={()=>void api.openBackupDirectory().catch(error=>notify("打开备份目录失败："+String(error)))}><FolderOpen size={16}/>备份目录</button></div></div>{visibleBackups.slice(0,12).map(value=><article key={value.path}><div><strong>{value.name}</strong><span>{new Date(value.modifiedAt).toLocaleString("zh-CN")} · {(value.size/1024).toFixed(0)} KB</span></div><div className="backup-actions"><button className="icon-button" disabled={busy!==""} aria-busy={busy===value.path} onClick={()=>void restore(value)} title="合并此备份" aria-label={`合并备份 ${value.name}`}><RotateCcw className={busy===value.path?"spin":""} size={16}/></button><button className="icon-button danger" disabled={busy!==""} onClick={()=>void remove(value)} title="删除此备份" aria-label={`删除备份 ${value.name}`}><Trash2 size={16}/></button></div></article>)}{!visibleBackups.length&&<p className="muted">暂无备份，可立即备份或导入 .db 文件。</p>}</div>
+    <div className="backup-list">
+      <div className="backup-list-header"><div><h2>可恢复备份 <span>{visibleBackups.length}</span></h2><small>列表显示全部备份；新导入文件会置顶并高亮。</small></div><div className="backup-toolbar"><button className="button primary" disabled={busy!==""} onClick={()=>void importAndRestore()}><FileInput size={16}/>{busy==="import"?"正在校验…":"导入并恢复"}</button><button className="button secondary" disabled={busy!==""} onClick={()=>void manualRefresh()}><RefreshCw className={busy==="refresh"?"spin":""} size={16}/>{busy==="refresh"?"刷新中…":"刷新列表"}</button><button className="button secondary" onClick={()=>void api.openBackupDirectory().catch(error=>notify("打开备份目录失败："+String(error)))}><FolderOpen size={16}/>备份目录</button></div></div>
+      {isDatabaseEmpty&&<div className="backup-empty-guide"><DatabaseBackup size={18}/><div><strong>当前数据库为空</strong><span>选择备份后将自动校验并恢复，恢复前仍会创建安全备份。</span></div></div>}
+      {visibleBackups.map(value=><article key={value.path} className={highlightedBackup===value.path?"latest-import":""}><div><strong>{value.name}{highlightedBackup===value.path&&<em>刚刚导入</em>}</strong><span>{new Date(value.modifiedAt).toLocaleString("zh-CN")} · {(value.size/1024).toFixed(0)} KB</span></div><div className="backup-actions"><button className="button secondary small restore-backup-button" disabled={busy!==""} aria-busy={busy===value.path} onClick={()=>void restore(value)}><RotateCcw className={busy===value.path?"spin":""} size={15}/>{busy===value.path?"恢复中…":"恢复数据"}</button><button className="icon-button danger" disabled={busy!==""} onClick={()=>void remove(value)} title="删除此备份" aria-label={`删除备份 ${value.name}`}><Trash2 size={16}/></button></div></article>)}{!visibleBackups.length&&<p className="muted">暂无备份，可立即备份或使用“导入并恢复”。</p>}
+    </div>
     {mcpDialog&&<div className="modal-layer nested-modal" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setMcpDialog(null);}}><section className="mcp-content-dialog" role="dialog" aria-modal="true" aria-labelledby="mcp-dialog-title"><header><div><span>AI MCP 接入</span><h2 id="mcp-dialog-title">{mcpDialog.title}</h2></div><button className="icon-button" onClick={()=>setMcpDialog(null)} aria-label="关闭"><X size={18}/></button></header><div className="mcp-content-body"><dl className="mcp-content-help"><div><dt>简要解释</dt><dd>{mcpDialog.summary}</dd></div><div><dt>适用场景</dt><dd>{mcpDialog.scenario}</dd></div><div><dt>怎么使用</dt><dd>{mcpDialog.usage}</dd></div></dl><textarea readOnly value={mcpDialog.content} aria-label={mcpDialog.title}/></div><footer><button className="button secondary" onClick={()=>setMcpDialog(null)}>关闭</button><button className="button primary" onClick={()=>void copyMcpContent()}><Copy size={16}/>复制内容</button></footer></section></div>}
     {importConflicts.length>0&&<div className="modal-layer nested-modal" role="presentation"><section className="import-conflict-dialog" role="dialog" aria-modal="true" aria-labelledby="import-conflict-title"><header><div><span>备份合并完成</span><h2 id="import-conflict-title"><AlertTriangle size={19}/>发现 {importConflicts.length} 项导入冲突</h2></div><button className="icon-button" onClick={()=>setImportConflicts([])} aria-label="关闭"><X size={18}/></button></header><p>这些备份事项与当前数据同名但内容不同，已安全保留并添加“导入冲突”标识。请逐项查看后合并，或在确认无需处理时解除标识。</p><div className="import-conflict-list">{importConflicts.map(item=><button type="button" key={item.taskId} onClick={()=>{setImportConflicts([]);onOpenTask(item.taskId);}}><span><strong>{item.importedTitle}</strong><small>{item.permanentNumber} · 原始标题：{item.sourceTitle}</small></span><ChevronRight size={17}/></button>)}</div><footer><button className="button primary" onClick={()=>setImportConflicts([])}>知道了，稍后处理</button></footer></section></div>}
+    {backupNotice&&<aside className={`backup-result-notice ${backupNotice.tone}`} role={backupNotice.tone==="error"?"alert":"status"} aria-live="polite"><header><span>{backupNotice.tone==="success"?<CheckCircle2 size={19}/>:<AlertTriangle size={19}/>}</span><div><small>{backupNotice.tone==="success"?"备份恢复完成":"需要处理"}</small><strong>{backupNotice.title}</strong></div><button type="button" onClick={()=>setBackupNotice(null)} aria-label="关闭通知"><X size={16}/></button></header><p>{backupNotice.message}</p><small>{backupNotice.recommendation}</small><footer>{backupNotice.tone==="success"?<><button type="button" onClick={()=>onNavigateBackupResult("queue")}>查看待办</button><button type="button" onClick={()=>onNavigateBackupResult("deferred")}>查看暂缓</button><button type="button" onClick={()=>onNavigateBackupResult("archive")}>查看归档</button></>:retryBackup&&<button type="button" disabled={busy!==""} onClick={()=>void mergeBackup(retryBackup)}><RotateCcw size={14}/>重试恢复</button>}</footer></aside>}
   </section>;
 }

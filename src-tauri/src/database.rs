@@ -5,7 +5,7 @@ use rusqlite::{
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fs,
+    fs, io,
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -2723,7 +2723,16 @@ impl Database {
         let source = fs::canonicalize(raw_path).map_err(|_| "找不到所选备份".to_string())?;
         Self::validate_backup_file(&source)?;
         let target = self.unique_backup_path("import");
-        fs::copy(&source, &target).map_err(display_error)?;
+        let copy_result = (|| -> Result<(), String> {
+            let mut input = fs::File::open(&source).map_err(display_error)?;
+            let mut output = fs::File::create(&target).map_err(display_error)?;
+            io::copy(&mut input, &mut output).map_err(display_error)?;
+            output.sync_all().map_err(display_error)
+        })();
+        if let Err(error) = copy_result {
+            let _ = fs::remove_file(&target);
+            return Err(error);
+        }
         if let Err(error) = Self::validate_backup_file(&target) {
             let _ = fs::remove_file(&target);
             return Err(error);
@@ -3626,6 +3635,39 @@ mod tests {
         db.delete_backup(backup.path).unwrap();
         drop(db);
         let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn imported_backup_uses_import_time_and_is_listed_first() {
+        let source_root = std::env::temp_dir().join(format!(
+            "inline-import-source-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let target_root = std::env::temp_dir().join(format!(
+            "inline-import-target-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&source_root).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        let source = Database::open_at(source_root.join("inline.db")).unwrap();
+        source.save_task(sample("待导入事项")).unwrap();
+        let source_backup = source.create_backup("manual").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+
+        let target = Database::open_at(target_root.join("inline.db")).unwrap();
+        target.create_backup("manual").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let imported = target.import_backup(source_backup.path).unwrap();
+        let listed = target.list_backups().unwrap();
+        assert_eq!(
+            listed.first().map(|backup| backup.path.as_str()),
+            Some(imported.path.as_str())
+        );
+        assert!(imported.name.ends_with("-import.db"));
+
+        drop(source);
+        drop(target);
+        let _ = fs::remove_dir_all(source_root);
+        let _ = fs::remove_dir_all(target_root);
     }
     #[test]
     fn permanent_delete_is_limited_to_trash_and_empty_trash_is_scoped() {
