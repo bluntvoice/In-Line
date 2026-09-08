@@ -7,6 +7,14 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 当前正式版本：`v0.2.2`（2026-08-28）；当前测试版本：`v0.3.0-beta.1`。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
 
+## 主界面
+
+![待办队列](docs/images/main-queue.png)
+
+![工作日历](docs/images/work-calendar.png)
+
+![统计中心](docs/images/statistics-center.png)
+
 ## 主要功能
 
 - **事项登记**：登记事项后自动编号，支持部门/团队、多人对接、事项类型、优先级、状态和截止时间。
