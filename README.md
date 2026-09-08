@@ -5,7 +5,7 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 [![GitHub Release](https://img.shields.io/github/v/release/bluntvoice/In-Line)](https://github.com/bluntvoice/In-Line/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/bluntvoice/In-Line/total)](https://github.com/bluntvoice/In-Line/releases)
 
-当前正式版本：`v0.2.2`（2026-08-28）；当前测试版本：`v0.3.0-beta.1`。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本：`v0.3.0`（2026-09-08）。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 主界面
 
@@ -33,9 +33,14 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 以下记录公开版本。更完整的技术变更见 [CHANGELOG.md](CHANGELOG.md)。
 
-### v0.3.0-beta.1 · 测试版本
+### [v0.3.0](https://github.com/bluntvoice/In-Line/releases/tag/v0.3.0) · 2026-09-08
 
-本测试版本重做备份导入体验：选择文件后一次完成校验、导入和安全合并；新导入项置顶，备份列表不再只显示前 12 条，恢复结果通过右下角通知明确展示并可直接跳转查看。失败时保留当前数据，显示实际原因、推荐处理方案，并在文件已导入时提供重试恢复。
+本版本重做备份导入与恢复体验：选择文件后一次完成校验、导入、安全备份和非破坏性合并，恢复结果清楚可见，失败后可以按建议处理或直接重试。
+
+1. **新增** “导入并恢复”一体化流程，成功后显示新增、合并和冲突数量，并可直接跳转待办、暂缓与历史归档。
+2. **修复** 备份导入后还需寻找恢复图标再次操作、容易误判数据没有导入的问题。
+3. **修复** 备份超过 12 条时部分记录被隐藏，以及新导入文件可能因旧修改时间不在列表顶部的问题。
+4. **优化** 失败通知显示实际原因、对应处理建议和可用的重试入口；恢复前继续自动创建安全备份，失败不覆盖当前数据。
 
 ### [v0.2.2](https://github.com/bluntvoice/In-Line/releases/tag/v0.2.2) · 2026-08-28
 
@@ -220,7 +225,7 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 ## 数据兼容与位置
 
-v0.3.0-beta.1 继续使用原有数据位置：
+v0.3.0 继续使用原有数据位置：
 
 `%APPDATA%\in-line\inline.db`
 
