@@ -5,7 +5,7 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 [![GitHub Release](https://img.shields.io/github/v/release/bluntvoice/In-Line)](https://github.com/bluntvoice/In-Line/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/bluntvoice/In-Line/total)](https://github.com/bluntvoice/In-Line/releases)
 
-当前版本：`v0.3.1`（2026-09-21）。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本：v0.3.1（2026-09-22）。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 主界面
 
@@ -31,16 +31,17 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 ## 版本记录
 
-以下记录包含待发布版本与公开版本。更完整的技术变更见 [CHANGELOG.md](CHANGELOG.md)。
+以下记录公开版本。更完整的技术变更见 [CHANGELOG.md](CHANGELOG.md)。
 
-### v0.3.1 · 2026-09-21
+### [v0.3.1](https://github.com/bluntvoice/In-Line/releases/tag/v0.3.1) · 2026-09-22
 
-本版本优化事项快捷操作和新增取号体验；当前仅完成代码与本地构建准备，尚未创建 Tag 或 GitHub Release。
+本版本重点优化事项快捷操作与新增取号体验，让状态修改、加急设置和常用部门选择更加直接。
 
-1. **优化** 右键“修改状态”改用轻量快捷弹窗，只显示当前状态和目标状态，继续保留历史记录与队列流转。
-2. **优化** 右键“设置加急 / 取消加急”改用专用快捷弹窗，设置时仅填写加急申请人与原因。
-3. **新增** 新增取号时显示使用频率最高的三个常用部门 / 团队，同频时优先最近使用项。
-4. **优化** 部门 / 团队与对接人的标签、选择框和常用项区域保持一致对齐。
+1. **优化** 右键“修改状态”改用独立快捷弹窗，仅显示当前状态和目标状态，无需再进入完整事项编辑界面。
+2. **优化** 右键“设置加急 / 取消加急”改用专用快捷弹窗，设置加急时仅填写申请人与原因，减少无关操作。
+3. **新增** 新增取号时支持显示历史使用频率最高的三个常用部门 / 团队，同频时优先最近使用项。
+4. **优化** 部门 / 团队与对接人的选择框、常用项及提示信息统一布局和对齐，提升新增取号页面的一致性。
+5. **优化** 快捷状态和加急操作继续沿用原有历史记录、队列流转和统计规则，不影响现有事项数据。
 
 ### [v0.3.0](https://github.com/bluntvoice/In-Line/releases/tag/v0.3.0) · 2026-09-08
 
