@@ -104,6 +104,18 @@ fn set_task_status(
     emit_change(&app)
 }
 #[tauri::command]
+fn set_task_urgent(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    id: i64,
+    is_urgent: bool,
+    requester: String,
+    reason: String,
+) -> Result<(), String> {
+    db.set_urgent(id, is_urgent, requester, reason)?;
+    emit_change(&app)
+}
+#[tauri::command]
 fn move_task(
     app: tauri::AppHandle,
     db: State<Database>,
@@ -656,6 +668,7 @@ pub fn run() {
             list_tasks,
             save_task,
             set_task_status,
+            set_task_urgent,
             move_task,
             delete_task,
             restore_task,

@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 interface Props {
   values: string[];
   options: string[];
-  commonContacts?: string[];
+  commonOptions?: string[];
   itemLabel?: string;
   placeholder?: string;
   onChange: (values: string[]) => void;
@@ -13,7 +13,7 @@ interface Props {
 
 const cleanValues = (values: string[]) => [...new Set(values.map(value => value.trim()).filter(Boolean))];
 
-export default function MultiContactInput({ values, options, commonContacts = [], itemLabel = "对接人", placeholder, onChange, onDelete }: Props) {
+export default function MultiContactInput({ values, options, commonOptions = [], itemLabel = "对接人", placeholder, onChange, onDelete }: Props) {
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState("");
@@ -80,6 +80,6 @@ export default function MultiContactInput({ values, options, commonContacts = []
       {isNewValue && <button type="button" className="multi-contact-add" onPointerDown={event => event.preventDefault()} onClick={() => add(draft)}>添加“{draft.trim()}”</button>}
       {!visible.length && !isNewValue && <div className="combo-empty">暂无可选项，可直接输入新{itemLabel}</div>}
     </div>}
-    {commonContacts.length > 0 && <span className="recent-contacts">{commonContacts.map(name => <button type="button" disabled={selected.includes(name)} key={name} onClick={() => add(name)}>{name}</button>)}</span>}
+    {commonOptions.length > 0 && <span className="recent-options">{commonOptions.map(name => <button type="button" disabled={selected.includes(name)} key={name} onClick={() => add(name)}>{name}</button>)}</span>}
   </div>;
 }

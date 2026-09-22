@@ -60,10 +60,9 @@ export function sortDeferredQueue(tasks:LegalTask[]){
 export function visibleQueueTasks(tasks:LegalTask[],now=new Date()){
   return sortQueue(tasks.filter(task=>task.hasActiveQueue&&(task.status==="pending"||task.status==="processing")),now);
 }
-export function commonContacts(tasks:Pick<LegalTask,"contact"|"contacts">[],limit=3){
+function commonNames(groups:string[][],limit=3){
   const counts=new Map<string,{count:number;lastIndex:number}>();
-  tasks.forEach((task,index)=>{
-    const names=task.contacts?.length?task.contacts:[task.contact];
+  groups.forEach((names,index)=>{
     names.forEach(value=>{
       const name=value.trim();if(!name)return;
       const current=counts.get(name);counts.set(name,{count:(current?.count??0)+1,lastIndex:index});
@@ -71,6 +70,12 @@ export function commonContacts(tasks:Pick<LegalTask,"contact"|"contacts">[],limi
   });
   return [...counts.entries()].sort((a,b)=>b[1].count-a[1].count||b[1].lastIndex-a[1].lastIndex||a[0].localeCompare(b[0],"zh-CN"))
     .slice(0,limit).map(([name])=>name);
+}
+export function commonContacts(tasks:Pick<LegalTask,"contact"|"contacts">[],limit=3){
+  return commonNames(tasks.map(task=>task.contacts?.length?task.contacts:[task.contact]),limit);
+}
+export function commonDepartments(tasks:Pick<LegalTask,"department"|"departments">[],limit=3){
+  return commonNames(tasks.map(task=>task.departments?.length?task.departments:[task.department]),limit);
 }
 export function formatDateTime(value:string|null){
   if(!value)return"未设置";

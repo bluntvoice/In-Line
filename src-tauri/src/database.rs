@@ -1113,7 +1113,10 @@ impl Database {
                     id,
                     &status,
                     false,
-                    Some((None, None)),
+                    Some((
+                        task.requested_deadline.clone(),
+                        task.requested_deadline_label.clone(),
+                    )),
                     "修改状态并加入今日队列",
                     false,
                 )?;
@@ -1156,6 +1159,48 @@ impl Database {
             }
             if clears_urgent_status(&status) {
                 clear_urgent_on(transaction, id, "事项已完成或进入暂缓队列")?;
+            }
+            Ok(())
+        })
+    }
+
+    pub fn set_urgent(
+        &self,
+        id: i64,
+        is_urgent: bool,
+        requester: String,
+        reason: String,
+    ) -> Result<(), String> {
+        self.with_transaction(|transaction| {
+            let task = get_task_on(transaction, id)?;
+            if is_urgent && clears_urgent_status(&task.status) {
+                return Err("已完成或暂缓事项不能设置加急".into());
+            }
+            let requester = requester.trim();
+            let reason = reason.trim();
+            if is_urgent && (requester.is_empty() || reason.is_empty()) {
+                return Err("加急事项需要填写加急申请人和加急原因".into());
+            }
+            let stamp = now();
+            transaction
+                .execute(
+                    "UPDATE tasks SET is_urgent=?,urgent_requester=?,urgent_reason=?,updated_at=? WHERE id=?",
+                    params![is_urgent as i64, if is_urgent { requester } else { "" }, if is_urgent { reason } else { "" }, stamp, id],
+                )
+                .map_err(display_error)?;
+            if is_urgent && !task.is_urgent {
+                record_urgent_values(
+                    transaction,
+                    id,
+                    requester,
+                    reason,
+                    task.requested_deadline.as_deref(),
+                )?;
+                promote_one(transaction, id)?;
+            } else if is_urgent && (task.urgent_requester != requester || task.urgent_reason != reason) {
+                add_log(transaction, id, "urgent", "更新加急信息")?;
+            } else if !is_urgent && task.is_urgent {
+                cancel_urgent_records(transaction, id, "")?;
             }
             Ok(())
         })
@@ -2335,14 +2380,25 @@ fn add_status(
         params![id,old,new,reason,now()]).map_err(display_error)?;
     Ok(())
 }
-fn record_urgent(connection: &Connection, id: i64, input: &TaskInput) -> Result<(), String> {
+fn record_urgent_values(
+    connection: &Connection,
+    id: i64,
+    requester: &str,
+    reason: &str,
+    requested_deadline: Option<&str>,
+) -> Result<(), String> {
     connection.execute("INSERT INTO urgent_records(task_id,requester,reason,requested_deadline,requested_at,confirmation_status,confirmed_at)
-            VALUES(?,?,?,?,?,'confirmed',?)",params![id,input.urgent_requester.trim(),input.urgent_reason.trim(),input.requested_deadline,now(),now()]).map_err(display_error)?;
-    add_log(
+            VALUES(?,?,?,?,?,'confirmed',?)",params![id,requester,reason,requested_deadline,now(),now()]).map_err(display_error)?;
+    add_log(connection, id, "urgent", &format!("标记加急：{requester}"))
+}
+
+fn record_urgent(connection: &Connection, id: i64, input: &TaskInput) -> Result<(), String> {
+    record_urgent_values(
         connection,
         id,
-        "urgent",
-        &format!("标记加急：{}", input.urgent_requester.trim()),
+        input.urgent_requester.trim(),
+        input.urgent_reason.trim(),
+        input.requested_deadline.as_deref(),
     )
 }
 
@@ -4210,6 +4266,71 @@ mod tests {
             })
             .unwrap();
         assert_eq!(active_urgent_records, 0);
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn quick_status_and_urgent_actions_preserve_business_rules() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-quick-actions-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let mut input = sample("快捷操作事项");
+        input.requested_deadline = Some("2026-10-01T10:00:00Z".into());
+        input.requested_deadline_label = Some("国庆前".into());
+        let created = db.save_task(input).unwrap();
+
+        db.set_urgent(created.id, true, "测试申请人".into(), "需要优先处理".into())
+            .unwrap();
+        let urgent = db.get_task(created.id).unwrap();
+        assert!(urgent.is_urgent);
+        assert_eq!(urgent.urgent_requester, "测试申请人");
+        assert_eq!(urgent.urgent_reason, "需要优先处理");
+
+        db.set_status(created.id, "waiting_confirmation".into())
+            .unwrap();
+        let deferred = db.get_task(created.id).unwrap();
+        assert!(!deferred.is_urgent);
+        assert!(!deferred.has_active_queue);
+
+        db.set_status(created.id, "pending".into()).unwrap();
+        let requeued = db.get_task(created.id).unwrap();
+        assert!(requeued.has_active_queue);
+        assert_eq!(
+            requeued.requested_deadline.as_deref(),
+            Some("2026-10-01T10:00:00Z")
+        );
+        assert_eq!(requeued.requested_deadline_label.as_deref(), Some("国庆前"));
+
+        db.set_urgent(created.id, true, "再次申请".into(), "仍需优先处理".into())
+            .unwrap();
+        db.set_urgent(created.id, false, "".into(), "".into())
+            .unwrap();
+        let normal = db.get_task(created.id).unwrap();
+        assert!(!normal.is_urgent);
+        assert!(normal.urgent_requester.is_empty());
+        assert!(normal.urgent_reason.is_empty());
+
+        let active_urgent_records: i64 = db
+            .with_conn(|connection| {
+                connection
+                    .query_row(
+                        "SELECT count(*) FROM urgent_records WHERE task_id=? AND cancelled_at IS NULL",
+                        [created.id],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)
+            })
+            .unwrap();
+        assert_eq!(active_urgent_records, 0);
+        assert!(db
+            .set_urgent(created.id, true, "".into(), "".into())
+            .is_err());
 
         drop(db);
         let _ = fs::remove_dir_all(root);

@@ -10,6 +10,7 @@ import MultiContactInput from "./MultiContactInput";
 interface Props {
   task: LegalTask | null;
   masters: MasterData;
+  commonDepartments: string[];
   commonContacts: string[];
   onClose: () => void;
   onSaved: () => void;
@@ -60,7 +61,7 @@ function toInput(task: LegalTask | null, defaultTaskType: string): TaskInput {
   };
 }
 
-export default function TaskForm({ task, masters, commonContacts, onClose, onSaved }: Props) {
+export default function TaskForm({ task, masters, commonDepartments, commonContacts, onClose, onSaved }: Props) {
   const [form, setForm] = useState<TaskInput>(() => toInput(task, masters.taskTypes[0] ?? ""));
   const [localMasters, setLocalMasters] = useState(masters);
   const [error, setError] = useState("");
@@ -72,6 +73,7 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
     }
   }, [masters, task]);
   const title = task ? `编辑 ${task.permanentNumber}` : "新增取号";
+  const quickDepartments = useMemo(() => [...new Set(commonDepartments)].slice(0, 3), [commonDepartments]);
   const quickContacts = useMemo(() => [...new Set(commonContacts)].slice(0, 3), [commonContacts]);
 
   const update = <K extends keyof TaskInput>(key: K, value: TaskInput[K]) => {
@@ -136,13 +138,13 @@ export default function TaskForm({ task, masters, commonContacts, onClose, onSav
           <div className="form-grid">
             <label className="paired-control-field">
               <span>部门 / 团队 *</span>
-              <MultiContactInput values={form.departments} options={localMasters.departments} itemLabel="部门 / 团队" placeholder="输入或选择部门 / 团队"
+              <MultiContactInput values={form.departments} options={localMasters.departments} commonOptions={quickDepartments} itemLabel="部门 / 团队" placeholder="输入或选择部门 / 团队"
                 onChange={(departments) => setForm(current => ({ ...current, departments, department: departments.join("、") }))}
                 onDelete={(value) => removeMaster("department", value)} />
             </label>
             <label className="paired-control-field">
               <span>对接人 *</span>
-              <MultiContactInput values={form.contacts} options={localMasters.contacts} commonContacts={quickContacts}
+              <MultiContactInput values={form.contacts} options={localMasters.contacts} commonOptions={quickContacts}
                 onChange={(contacts) => setForm(current => ({ ...current, contacts, contact: contacts.join("、") }))}
                 onDelete={(value) => removeMaster("contact", value)} />
             </label>

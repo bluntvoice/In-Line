@@ -2,7 +2,7 @@ import { useEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,BarChart3,BookOpen,CalendarDays,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,RotateCcw,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
-import { commonContacts,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortDeferredQueue,taskDetailView,visibleQueueTasks } from "./lib/task-utils";
+import { commonContacts,commonDepartments,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortDeferredQueue,taskDetailView,visibleQueueTasks } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
@@ -14,6 +14,7 @@ import StatisticsPanel from "./components/StatisticsPanel";
 import HelpPanel from "./components/HelpPanel";
 import WorkCalendarPanel from "./components/WorkCalendarPanel";
 import QueueDialog from "./components/QueueDialog";
+import TaskQuickActionDialog,{type QuickActionMode} from "./components/TaskQuickActionDialog";
 import { DeadlineFilterHeader,ValueFilterHeader } from "./components/TaskTableFilter";
 import { activeFilterCount,applyTaskFilters,EMPTY_TASK_FILTERS,uniqueValues,type TaskFilters } from "./lib/task-filters";
 import { STATUS_LABELS } from "./lib/task-utils";
@@ -35,6 +36,7 @@ export default function App(){
   const [workCalendar,setWorkCalendar]=useState(false);
   const [help,setHelp]=useState(false);
   const [menu,setMenu]=useState<MenuState>(null);
+  const [quickAction,setQuickAction]=useState<{task:LegalTask;mode:QuickActionMode}|null>(null);
   const [queueAction,setQueueAction]=useState<{task:LegalTask;reopen:boolean}|null>(null);
   const [message,setMessage]=useState("");
   const [startupError,setStartupError]=useState("");
@@ -70,7 +72,9 @@ export default function App(){
     const offNew=api.onNewTask(()=>setEditing(null));
     const offTaskUi=api.onTaskUiAction(({id,action})=>{
       void api.getTask(id).then(task=>{
-        if(action==="view")showTaskDetails(task);else setEditing(task);
+        if(action==="view")showTaskDetails(task);
+        else if(action==="edit")setEditing(task);
+        else setQuickAction({task,mode:action});
       }).catch(error=>toast("无法打开事项："+String(error)));
     });
     void api.getVersion().then(setVersion).catch(()=>undefined);
@@ -104,8 +108,8 @@ export default function App(){
   const handleAction=async(action:ContextAction)=>{
     const {task,type}=action;
     if(type==="view"){setSelected(task);return;}
-    if(type==="edit"||type==="status"){setEditing(task);return;}
-    if(type==="urgent"){if(!task.isUrgent){setEditing(task);return;}await api.saveTask({...task,id:task.id,isUrgent:false,urgentRequester:"",urgentReason:""});}
+    if(type==="edit"){setEditing(task);return;}
+    if(type==="status"||type==="urgent"){setQuickAction({task,mode:type});return;}
     if(type==="process"){await api.processRound(task.id);toast("已记录本轮处理，事项已进入暂缓队列");return;}
     if(type==="complete"){await api.completeRound(task.id);toast("已记录本轮完成，事项整体结束");return;}
     if(type==="enqueue"){setQueueAction({task,reopen:false});return;}
@@ -138,7 +142,7 @@ export default function App(){
   };
 
   if(!data)return <div className="app-loading"><img src="/inline-mark.svg"/>{startupError?<section className="startup-error" role="alert"><h1>队列暂时无法载入</h1><p>{startupError}</p><div><button className="button primary" onClick={()=>void refresh()}>重新载入</button><button className="button secondary" onClick={()=>setEditing(null)}>直接新增取号</button></div><small>数据仍保存在本机，程序不会自动清空数据库。</small></section>:<p>正在整理队列…</p>}
-    {editing!==undefined&&<TaskForm task={editing} masters={emptyMasters} commonContacts={[]} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {editing!==undefined&&<TaskForm task={editing} masters={emptyMasters} commonDepartments={[]} commonContacts={[]} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
     {message&&<div className="toast">{message}</div>}
   </div>;
   const activeQueue=data.queue.filter(task=>task.hasActiveQueue);
@@ -147,7 +151,9 @@ export default function App(){
   const deferred=data.queue.filter(task=>isDeferredStatus(task.status));
   const queueCount=activeQueue.length;
   const deferredOverdue=deferred.filter(task=>isOverdue(task)).length;
-  const frequentContacts=commonContacts([...data.queue,...data.archive].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt)));
+  const taskHistory=[...data.queue,...data.archive].sort((a,b)=>a.updatedAt.localeCompare(b.updatedAt));
+  const frequentDepartments=commonDepartments(taskHistory);
+  const frequentContacts=commonContacts(taskHistory);
   const actionView:TaskView=view==="deferred"?"queue":view;
   const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);setSelected(null);setView(next);};
 
@@ -195,7 +201,8 @@ export default function App(){
         </div>
       </>}
     </main>
-    {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} commonContacts={frequentContacts} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} commonDepartments={frequentDepartments} commonContacts={frequentContacts} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {quickAction&&<TaskQuickActionDialog task={quickAction.task} mode={quickAction.mode} onClose={()=>setQuickAction(null)} onSaved={()=>{toast(quickAction.mode==="status"?"事项状态已更新":quickAction.task.isUrgent?"已取消加急":"事项已设为加急");setQuickAction(null);void refresh();}}/>}
     {menu&&<TaskContextMenu {...menu} view={actionView} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
     {queueAction&&<QueueDialog task={queueAction.task} reopen={queueAction.reopen} onClose={()=>setQueueAction(null)} onSaved={()=>{toast(queueAction.reopen?"事项已重新开启并加入今日队列":"事项已加入今日队列");setQueueAction(null);void refresh();}}/>}
     {message&&<div className="toast">{message}</div>}

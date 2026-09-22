@@ -30,6 +30,7 @@ export const api={
   listTasks:(view:TaskView)=>withTimeout(invoke<LegalTask[]>("list_tasks",{view}),"队列载入"),
   saveTask:(task:TaskInput)=>invoke<LegalTask>("save_task",{task}),
   setTaskStatus:(id:number,status:TaskStatus)=>invoke<void>("set_task_status",{id,status}),
+  setTaskUrgent:(id:number,isUrgent:boolean,requester:string,reason:string)=>invoke<void>("set_task_urgent",{id,isUrgent,requester,reason}),
   moveTask:(id:number,direction:MoveDirection)=>invoke<void>("move_task",{id,direction}),
   deleteTask:(id:number)=>invoke<void>("delete_task",{id}),
   restoreTask:(id:number)=>invoke<void>("restore_task",{id}),

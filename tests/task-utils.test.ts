@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { alphaPrefix,commonContacts,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortDeferredQueue,sortQueue,taskDetailView,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
+import { alphaPrefix,commonContacts,commonDepartments,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortDeferredQueue,sortQueue,taskDetailView,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
 import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import { statisticsComparisonRange,statisticsDisplayTrend,statisticsPresetRange,statisticsWeekdayLabel } from "../src/lib/statistics-range";
@@ -86,6 +86,19 @@ describe("常用对接人",()=>{
   it("按使用频次选出三个联系人，同频时优先最近出现的人",()=>{
     const contacts=["小林","小周","小林","小陈","小周","小吴"].map(contact=>({contact,contacts:[contact]}));
     expect(commonContacts(contacts)).toEqual(["小周","小林","小吴"]);
+  });
+});
+
+describe("常用部门或团队",()=>{
+  it("与常用对接人复用频次和同频最近优先规则，且最多返回三个",()=>{
+    const departments=["产品组","法务组","产品组","行政组","法务组","市场组"].map(department=>({department,departments:[department]}));
+    expect(commonDepartments(departments)).toEqual(["法务组","产品组","市场组"]);
+  });
+  it("多部门事项按每个已选部门分别计次",()=>{
+    expect(commonDepartments([
+      {department:"产品组、法务组",departments:["产品组","法务组"]},
+      {department:"法务组",departments:["法务组"]}
+    ])).toEqual(["法务组","产品组"]);
   });
 });
 
