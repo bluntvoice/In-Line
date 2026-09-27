@@ -63,6 +63,99 @@ pub struct ReorderSubtasksInput {
     pub task_ids: Vec<i64>,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSubtaskInput {
+    pub parent_task_id: i64,
+    pub title: String,
+    #[serde(default)]
+    pub details: String,
+    #[serde(default)]
+    pub task_type: Option<String>,
+    #[serde(default)]
+    pub departments: Option<Vec<String>>,
+    #[serde(default)]
+    pub contacts: Option<Vec<String>>,
+    #[serde(default)]
+    pub priority: Option<String>,
+    #[serde(default)]
+    pub workload: Option<String>,
+    #[serde(default)]
+    pub is_urgent: bool,
+    #[serde(default)]
+    pub urgent_requester: String,
+    #[serde(default)]
+    pub urgent_reason: String,
+    #[serde(default)]
+    pub requested_deadline: Option<String>,
+    #[serde(default)]
+    pub requested_deadline_label: Option<String>,
+    #[serde(default)]
+    pub internal_notes: String,
+    #[serde(default = "default_true")]
+    pub enqueue_today: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubtaskCompletionState {
+    pub parent_task_id: i64,
+    pub total_subtasks: i64,
+    pub completed_subtasks: i64,
+    pub eligible_subtasks: i64,
+    pub completed_eligible_subtasks: i64,
+    pub all_eligible_subtasks_completed: bool,
+    pub parent_can_be_completed: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompleteTaskInput {
+    pub task_id: i64,
+    #[serde(default)]
+    pub include_eligible_subtasks: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompleteTaskResult {
+    pub completed_task_ids: Vec<i64>,
+    pub completion_state: Option<SubtaskCompletionState>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveTaskInput {
+    pub task_id: i64,
+    #[serde(default)]
+    pub include_completed_subtasks: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArchiveTaskResult {
+    pub archived_task_ids: Vec<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteTaskInput {
+    pub task_id: i64,
+    #[serde(default)]
+    pub include_subtasks: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteTaskResult {
+    pub trashed_task_ids: Vec<i64>,
+    pub detached_subtask_ids: Vec<i64>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskInput {

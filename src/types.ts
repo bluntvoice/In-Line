@@ -22,6 +22,17 @@ export type WorkResult="processed"|"completed"|"waiting_materials"|"waiting_conf
 export interface QueueInput{id:number;inheritDeadline:boolean;reason:string}
 export interface MergeTaskInput{targetTaskId:number;sourceTaskId:number;deduplicateRecords:boolean;trashSource:boolean}
 export interface ReorderSubtasksInput{parentTaskId:number;taskIds:number[]}
+export interface CreateSubtaskInput{
+  parentTaskId:number;title:string;details?:string;taskType?:string;departments?:string[];contacts?:string[];priority?:Priority;workload?:Workload;
+  isUrgent?:boolean;urgentRequester?:string;urgentReason?:string;requestedDeadline?:string|null;requestedDeadlineLabel?:string|null;internalNotes?:string;enqueueToday?:boolean;
+}
+export interface SubtaskCompletionState{parentTaskId:number;totalSubtasks:number;completedSubtasks:number;eligibleSubtasks:number;completedEligibleSubtasks:number;allEligibleSubtasksCompleted:boolean;parentCanBeCompleted:boolean}
+export interface CompleteTaskInput{taskId:number;includeEligibleSubtasks:boolean}
+export interface CompleteTaskResult{completedTaskIds:number[];completionState:SubtaskCompletionState|null}
+export interface ArchiveTaskInput{taskId:number;includeCompletedSubtasks:boolean}
+export interface ArchiveTaskResult{archivedTaskIds:number[]}
+export interface DeleteTaskInput{taskId:number;includeSubtasks:boolean}
+export interface DeleteTaskResult{trashedTaskIds:number[];detachedSubtaskIds:number[]}
 export interface TicketSnapshot{task:LegalTask;queueAhead:number}
 export interface MasterData{departments:string[];taskTypes:string[];contacts:string[]}
 export interface BackupInfo{name:string;path:string;size:number;modifiedAt:string}

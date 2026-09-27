@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,ReorderSubtasksInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,UpdateCheckResponse,UpdateProgress,WorkCalendarResult } from "./types";
+import type { ArchiveTaskInput,ArchiveTaskResult,BackupInfo,BackupMergeResult,BootstrapData,CompleteTaskInput,CompleteTaskResult,CreateSubtaskInput,DeleteTaskInput,DeleteTaskResult,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,ReorderSubtasksInput,StatisticsDetail,StatisticsResult,SubtaskCompletionState,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,UpdateCheckResponse,UpdateProgress,WorkCalendarResult } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -29,6 +29,7 @@ export const api={
   bootstrap:()=>withTimeout(invoke<BootstrapData>("bootstrap"),"队列初始化"),
   listTasks:(view:TaskView)=>withTimeout(invoke<LegalTask[]>("list_tasks",{view}),"队列载入"),
   saveTask:(task:TaskInput)=>invoke<LegalTask>("save_task",{task}),
+  createSubtask:(input:CreateSubtaskInput)=>invoke<LegalTask>("create_subtask",{input}),
   setTaskStatus:(id:number,status:TaskStatus)=>invoke<void>("set_task_status",{id,status}),
   setTaskUrgent:(id:number,isUrgent:boolean,requester:string,reason:string)=>invoke<void>("set_task_urgent",{id,isUrgent,requester,reason}),
   moveTask:(id:number,direction:MoveDirection)=>invoke<void>("move_task",{id,direction}),
@@ -43,6 +44,10 @@ export const api={
   listSubtasks:(parentTaskId:number)=>invoke<LegalTask[]>("list_subtasks",{parentTaskId}),
   setParentTask:(taskId:number,parentTaskId:number|null)=>invoke<void>("set_parent_task",{taskId,parentTaskId}),
   reorderSubtasks:(input:ReorderSubtasksInput)=>invoke<void>("reorder_subtasks",{input}),
+  getSubtaskCompletionState:(taskId:number)=>invoke<SubtaskCompletionState|null>("get_subtask_completion_state",{taskId}),
+  completeTask:(input:CompleteTaskInput)=>invoke<CompleteTaskResult>("complete_task",{input}),
+  archiveTaskGroup:(input:ArchiveTaskInput)=>invoke<ArchiveTaskResult>("archive_task_group",{input}),
+  deleteTaskGroup:(input:DeleteTaskInput)=>invoke<DeleteTaskResult>("delete_task_group",{input}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   getWorkEvents:(taskId:number)=>invoke<TaskWorkEvent[]>("get_work_events",{taskId}),
   voidWorkEvent:(id:number,confirmHistoricalImpact=false)=>invoke<void>("void_work_event",{id,confirmHistoricalImpact}),

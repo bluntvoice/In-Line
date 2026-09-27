@@ -962,6 +962,160 @@ fn validate_parent_assignment(
     Ok((task, parent))
 }
 
+fn child_ids_on(connection: &Connection, parent_task_id: i64) -> Result<Vec<i64>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT id FROM tasks WHERE parent_task_id=?
+             ORDER BY subtask_sort_order,id",
+        )
+        .map_err(display_error)?;
+    let rows = statement
+        .query_map([parent_task_id], |row| row.get::<_, i64>(0))
+        .map_err(display_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(display_error)?;
+    Ok(rows)
+}
+
+fn incomplete_subtask_count(connection: &Connection, parent_task_id: i64) -> Result<i64, String> {
+    connection
+        .query_row(
+            "SELECT count(*) FROM tasks
+             WHERE parent_task_id=? AND deleted_at IS NULL AND archived_at IS NULL
+               AND status NOT IN ('completed','cancelled','archived')",
+            [parent_task_id],
+            |row| row.get(0),
+        )
+        .map_err(display_error)
+}
+
+fn ensure_direct_completion_allowed(connection: &Connection, task_id: i64) -> Result<(), String> {
+    if incomplete_subtask_count(connection, task_id)? > 0 {
+        return Err("该事项仍有未完成子任务，请先选择仅完成父任务或同时完成全部子任务".into());
+    }
+    Ok(())
+}
+
+fn subtask_completion_state_on(
+    connection: &Connection,
+    task_id: i64,
+) -> Result<Option<SubtaskCompletionState>, String> {
+    let task = get_task_on(connection, task_id)?;
+    let parent_task_id = if let Some(parent_task_id) = task.parent_task_id {
+        parent_task_id
+    } else if !child_ids_on(connection, task.id)?.is_empty() {
+        task.id
+    } else {
+        return Ok(None);
+    };
+    let parent = get_task_on(connection, parent_task_id)?;
+    let (total_subtasks, completed_subtasks, eligible_subtasks, completed_eligible_subtasks) =
+        connection
+            .query_row(
+                "SELECT count(*),
+                        sum(CASE WHEN status='completed' THEN 1 ELSE 0 END),
+                        sum(CASE WHEN deleted_at IS NULL AND archived_at IS NULL
+                                      AND status NOT IN ('cancelled','archived') THEN 1 ELSE 0 END),
+                        sum(CASE WHEN deleted_at IS NULL AND archived_at IS NULL
+                                      AND status='completed' THEN 1 ELSE 0 END)
+                 FROM tasks WHERE parent_task_id=?",
+                [parent_task_id],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                        row.get::<_, i64>(3)?,
+                    ))
+                },
+            )
+            .map_err(display_error)?;
+    Ok(Some(SubtaskCompletionState {
+        parent_task_id,
+        total_subtasks,
+        completed_subtasks,
+        eligible_subtasks,
+        completed_eligible_subtasks,
+        all_eligible_subtasks_completed: eligible_subtasks > 0
+            && eligible_subtasks == completed_eligible_subtasks,
+        parent_can_be_completed: parent.deleted_at.is_none()
+            && parent.archived_at.is_none()
+            && !matches!(
+                parent.status.as_str(),
+                "completed" | "cancelled" | "archived"
+            ),
+    }))
+}
+
+fn complete_task_on(connection: &Connection, id: i64, reason: &str) -> Result<(), String> {
+    let task = get_task_on(connection, id)?;
+    if task.deleted_at.is_some()
+        || task.archived_at.is_some()
+        || matches!(task.status.as_str(), "completed" | "cancelled" | "archived")
+    {
+        return Err("该事项已经完成、取消或归档".into());
+    }
+    let stamp = now();
+    connection
+        .execute(
+            "UPDATE tasks SET status='completed',completed_at=?,updated_at=? WHERE id=?",
+            params![stamp, stamp, id],
+        )
+        .map_err(display_error)?;
+    clear_urgent_on(connection, id, "事项已完成")?;
+    add_status(connection, id, Some(&task.status), "completed", reason)?;
+    close_active_queue(connection, id, reason)?;
+    record_work_event_on(
+        connection,
+        id,
+        "completed",
+        &stamp,
+        &task.task_type,
+        "quick_action",
+        "",
+    )?;
+    add_log(connection, id, "work", "本轮已完成，事项整体结束")
+}
+
+fn archive_task_on(connection: &Connection, id: i64, reason: &str) -> Result<bool, String> {
+    let task = get_task_on(connection, id)?;
+    if task.deleted_at.is_some() {
+        return Err("回收站事项不能归档".into());
+    }
+    if task.archived_at.is_some() || task.status == "archived" {
+        return Ok(false);
+    }
+    let stamp = now();
+    connection
+        .execute(
+            "UPDATE tasks SET status='archived',archived_at=?,updated_at=? WHERE id=?",
+            params![stamp, stamp, id],
+        )
+        .map_err(display_error)?;
+    close_active_queue(connection, id, reason)?;
+    add_status(connection, id, Some(&task.status), "archived", reason)?;
+    add_log(connection, id, "archived", "事项已归档")?;
+    Ok(true)
+}
+
+fn soft_delete_task_on(connection: &Connection, id: i64, reason: &str) -> Result<bool, String> {
+    let task = get_task_on(connection, id)?;
+    if task.deleted_at.is_some() {
+        return Ok(false);
+    }
+    let stamp = now();
+    connection
+        .execute(
+            "UPDATE tasks SET deleted_at=?,updated_at=? WHERE id=?",
+            params![stamp, stamp, id],
+        )
+        .map_err(display_error)?;
+    clear_urgent_on(connection, id, reason)?;
+    close_active_queue(connection, id, reason)?;
+    add_log(connection, id, "deleted", "事项移入回收站")?;
+    Ok(true)
+}
+
 impl Database {
     pub fn save_task(&self, input: TaskInput) -> Result<LegalTask, String> {
         validate_task_input(&input)?;
@@ -987,6 +1141,9 @@ impl Database {
                 && input.status != previous.status
             {
                 return Err("已归档事项请先使用“重新开启并加入今日队列”".into());
+            }
+            if previous.status != input.status && input.status == "completed" {
+                ensure_direct_completion_allowed(&transaction, id)?;
             }
             let started = if input.status == "processing" && previous.started_at.is_none() {
                 Some(stamp.clone())
@@ -1190,6 +1347,162 @@ impl Database {
         get_task_on(connection, id)
     }
 
+    pub fn create_subtask(&self, input: CreateSubtaskInput) -> Result<LegalTask, String> {
+        self.with_transaction(|transaction| {
+            let parent = get_task_on(transaction, input.parent_task_id)?;
+            if parent.deleted_at.is_some() {
+                return Err("回收站中的事项不能新增子任务".into());
+            }
+            if parent.parent_task_id.is_some() {
+                return Err("子任务不能继续新增下级任务，当前仅支持两级结构".into());
+            }
+
+            let departments = input
+                .departments
+                .clone()
+                .unwrap_or_else(|| parent.departments.clone());
+            let contacts = input
+                .contacts
+                .clone()
+                .unwrap_or_else(|| parent.contacts.clone());
+            let task = TaskInput {
+                id: None,
+                department: departments.first().cloned().unwrap_or_default(),
+                departments,
+                contact: contacts.first().cloned().unwrap_or_default(),
+                contacts,
+                task_type: input
+                    .task_type
+                    .clone()
+                    .unwrap_or_else(|| parent.task_type.clone()),
+                title: input.title.clone(),
+                details: input.details.clone(),
+                status: "pending".into(),
+                priority: input.priority.clone().unwrap_or_else(|| "normal".into()),
+                workload: input
+                    .workload
+                    .clone()
+                    .unwrap_or_else(|| "standard".into()),
+                is_urgent: input.is_urgent,
+                urgent_requester: input.urgent_requester.clone(),
+                urgent_reason: input.urgent_reason.clone(),
+                requested_deadline: input.requested_deadline.clone(),
+                requested_deadline_label: input.requested_deadline_label.clone(),
+                internal_notes: input.internal_notes.clone(),
+            };
+            validate_task_input(&task)?;
+            let contacts = normalized_contacts(&task);
+            let departments = normalized_departments(&task);
+            let stored_contacts = contact_storage(&contacts)?;
+            let stored_departments = contact_storage(&departments)?;
+            let date = today();
+            let sequence = next_daily_sequence(transaction, &date)?;
+            let permanent = format!("{}-{:02}", date.replace('-', ""), sequence);
+            let custom_order: i64 = transaction
+                .query_row(
+                    "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            let subtask_order: i64 = transaction
+                .query_row(
+                    "SELECT COALESCE(MAX(subtask_sort_order),0)+1 FROM tasks WHERE parent_task_id=?",
+                    [parent.id],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            let stamp = now();
+            transaction
+                .execute(
+                    "INSERT INTO tasks(
+                       permanent_number,daily_sequence,ticket_date,department,contact,task_type,title,details,
+                       status,priority,workload,is_urgent,urgent_requester,urgent_reason,requested_deadline,
+                       requested_deadline_label,internal_notes,created_at,updated_at,custom_sort_order,
+                       parent_task_id,subtask_sort_order
+                     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    params![
+                        permanent,
+                        sequence,
+                        date,
+                        stored_departments,
+                        stored_contacts,
+                        task.task_type.trim(),
+                        task.title.trim(),
+                        task.details.trim(),
+                        task.status,
+                        task.priority,
+                        task.workload,
+                        task.is_urgent as i64,
+                        task.urgent_requester.trim(),
+                        task.urgent_reason.trim(),
+                        task.requested_deadline,
+                        task.requested_deadline_label,
+                        task.internal_notes.trim(),
+                        stamp,
+                        stamp,
+                        custom_order,
+                        parent.id,
+                        subtask_order
+                    ],
+                )
+                .map_err(display_error)?;
+            let id = transaction.last_insert_rowid();
+            if input.enqueue_today {
+                transaction
+                    .execute(
+                        "INSERT INTO task_queue_entries(
+                           task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+                           enqueued_at,created_at,updated_at
+                         ) VALUES(?,?,?,?,?,?,?,?)",
+                        params![
+                            id,
+                            date,
+                            sequence,
+                            task.requested_deadline,
+                            task.requested_deadline_label,
+                            stamp,
+                            stamp,
+                            stamp
+                        ],
+                    )
+                    .map_err(display_error)?;
+            }
+            add_log(
+                transaction,
+                id,
+                "created",
+                &if input.enqueue_today {
+                    format!("创建子任务并取号：{permanent}")
+                } else {
+                    format!("创建子任务（未加入今日队列）：{permanent}")
+                },
+            )?;
+            add_log(
+                transaction,
+                id,
+                "relation",
+                &format!("设置所属任务：{}", parent.title),
+            )?;
+            add_status(transaction, id, None, "pending", "创建子任务")?;
+            if task.is_urgent {
+                record_urgent(transaction, id, &task)?;
+                promote_one(transaction, id)?;
+            }
+            ensure_master(transaction, "task_type", &task.task_type)?;
+            bump_master_use(transaction, "task_type", &task.task_type)?;
+            for department in &departments {
+                ensure_master(transaction, "department", department)?;
+                bump_master_use(transaction, "department", department)?;
+            }
+            for contact in &contacts {
+                ensure_master(transaction, "contact", contact)?;
+                bump_master_use(transaction, "contact", contact)?;
+            }
+            get_task_on(transaction, id)
+        })
+    }
+
     fn with_transaction<T>(
         &self,
         operation: impl FnOnce(&Transaction<'_>) -> Result<T, String>,
@@ -1347,6 +1660,131 @@ impl Database {
 }
 
 impl Database {
+    pub fn subtask_completion_state(
+        &self,
+        task_id: i64,
+    ) -> Result<Option<SubtaskCompletionState>, String> {
+        self.with_conn(|connection| subtask_completion_state_on(connection, task_id))
+    }
+
+    pub fn complete_task(&self, input: CompleteTaskInput) -> Result<CompleteTaskResult, String> {
+        self.with_transaction(|transaction| {
+            let task = get_task_on(transaction, input.task_id)?;
+            let mut completed_task_ids = Vec::new();
+            if input.include_eligible_subtasks && task.parent_task_id.is_none() {
+                let child_ids = {
+                    let mut statement = transaction
+                        .prepare(
+                            "SELECT id FROM tasks
+                             WHERE parent_task_id=? AND deleted_at IS NULL AND archived_at IS NULL
+                               AND status NOT IN ('completed','cancelled','archived')
+                             ORDER BY subtask_sort_order,id",
+                        )
+                        .map_err(display_error)?;
+                    let rows = statement
+                        .query_map([task.id], |row| row.get::<_, i64>(0))
+                        .map_err(display_error)?
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(display_error)?;
+                    rows
+                };
+                for child_id in child_ids {
+                    complete_task_on(transaction, child_id, "随所属任务一并完成")?;
+                    completed_task_ids.push(child_id);
+                }
+            }
+            complete_task_on(transaction, task.id, "本轮已完成")?;
+            completed_task_ids.push(task.id);
+            let completion_state = subtask_completion_state_on(transaction, task.id)?;
+            Ok(CompleteTaskResult {
+                completed_task_ids,
+                completion_state,
+            })
+        })
+    }
+
+    pub fn archive_task_group(&self, input: ArchiveTaskInput) -> Result<ArchiveTaskResult, String> {
+        self.with_transaction(|transaction| {
+            let task = get_task_on(transaction, input.task_id)?;
+            let mut archived_task_ids = Vec::new();
+            if input.include_completed_subtasks && task.parent_task_id.is_none() {
+                let child_ids = {
+                    let mut statement = transaction
+                        .prepare(
+                            "SELECT id FROM tasks
+                             WHERE parent_task_id=? AND deleted_at IS NULL AND archived_at IS NULL
+                               AND status='completed'
+                             ORDER BY subtask_sort_order,id",
+                        )
+                        .map_err(display_error)?;
+                    let rows = statement
+                        .query_map([task.id], |row| row.get::<_, i64>(0))
+                        .map_err(display_error)?
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(display_error)?;
+                    rows
+                };
+                for child_id in child_ids {
+                    if archive_task_on(transaction, child_id, "随所属任务一并归档")? {
+                        archived_task_ids.push(child_id);
+                    }
+                }
+            }
+            if archive_task_on(transaction, task.id, "事项归档")? {
+                archived_task_ids.push(task.id);
+            }
+            Ok(ArchiveTaskResult { archived_task_ids })
+        })
+    }
+
+    pub fn delete_task_group(&self, input: DeleteTaskInput) -> Result<DeleteTaskResult, String> {
+        self.with_transaction(|transaction| {
+            let task = get_task_on(transaction, input.task_id)?;
+            if task.deleted_at.is_some() {
+                return Ok(DeleteTaskResult {
+                    trashed_task_ids: Vec::new(),
+                    detached_subtask_ids: Vec::new(),
+                });
+            }
+            let child_ids = child_ids_on(transaction, task.id)?;
+            let mut trashed_task_ids = Vec::new();
+            let mut detached_subtask_ids = Vec::new();
+            if !child_ids.is_empty() {
+                if input.include_subtasks {
+                    for child_id in &child_ids {
+                        if soft_delete_task_on(transaction, *child_id, "随所属任务移入回收站")? {
+                            trashed_task_ids.push(*child_id);
+                        }
+                    }
+                } else {
+                    let stamp = now();
+                    for child_id in &child_ids {
+                        transaction
+                            .execute(
+                                "UPDATE tasks SET parent_task_id=NULL,subtask_sort_order=0,updated_at=? WHERE id=?",
+                                params![stamp, child_id],
+                            )
+                            .map_err(display_error)?;
+                        add_log(
+                            transaction,
+                            *child_id,
+                            "relation",
+                            &format!("所属任务《{}》移入回收站，已自动解除所属关系", task.title),
+                        )?;
+                        detached_subtask_ids.push(*child_id);
+                    }
+                }
+            }
+            if soft_delete_task_on(transaction, task.id, "事项移入回收站")? {
+                trashed_task_ids.push(task.id);
+            }
+            Ok(DeleteTaskResult {
+                trashed_task_ids,
+                detached_subtask_ids,
+            })
+        })
+    }
+
     pub fn set_status(&self, id: i64, status: String) -> Result<(), String> {
         if !ALL_STATUSES.contains(&status.as_str()) {
             return Err("事项状态无效".into());
@@ -1358,6 +1796,9 @@ impl Database {
                     clear_urgent_on(transaction, id, "事项已完成或进入暂缓队列")?;
                 }
                 return Ok(());
+            }
+            if status == "completed" {
+                ensure_direct_completion_allowed(transaction, id)?;
             }
             if matches!(status.as_str(), "pending" | "processing") && !task.has_active_queue {
                 enqueue_on(
@@ -1480,32 +1921,18 @@ impl Database {
     }
 
     pub fn soft_delete(&self, id: i64) -> Result<(), String> {
-        self.with_transaction(|tx| {
-            get_task_on(tx, id)?;
-            let stamp = now();
-            tx.execute(
-                "UPDATE tasks SET deleted_at=?,updated_at=? WHERE id=?",
-                params![stamp, stamp, id],
-            )
-            .map_err(display_error)?;
-            clear_urgent_on(tx, id, "事项移入回收站")?;
-            close_active_queue(tx, id, "移入回收站")?;
-            add_log(tx, id, "deleted", "事项移入回收站")
-        })
+        self.delete_task_group(DeleteTaskInput {
+            task_id: id,
+            include_subtasks: false,
+        })?;
+        Ok(())
     }
     pub fn archive(&self, id: i64) -> Result<(), String> {
-        self.with_transaction(|tx| {
-            let old = get_task_on(tx, id)?;
-            let stamp = now();
-            tx.execute(
-                "UPDATE tasks SET status='archived',archived_at=?,updated_at=? WHERE id=?",
-                params![stamp, stamp, id],
-            )
-            .map_err(display_error)?;
-            close_active_queue(tx, id, "事项归档")?;
-            add_status(tx, id, Some(&old.status), "archived", "归档事项")?;
-            add_log(tx, id, "archived", "事项已归档")
-        })
+        self.archive_task_group(ArchiveTaskInput {
+            task_id: id,
+            include_completed_subtasks: false,
+        })?;
+        Ok(())
     }
 
     pub fn merge_tasks(&self, input: MergeTaskInput) -> Result<(), String> {
@@ -1517,6 +1944,11 @@ impl Database {
             let source = get_task_on(tx, input.source_task_id)?;
             if target.deleted_at.is_some() || source.deleted_at.is_some() {
                 return Err("回收站中的事项不能参与合并，请先恢复".into());
+            }
+
+            let source_child_ids = child_ids_on(tx, source.id)?;
+            if !source_child_ids.is_empty() && target.parent_task_id.is_some() {
+                return Err("包含子任务的事项只能合并到顶层事项".into());
             }
 
             close_active_queue(tx, source.id, "合并至其他事项")?;
@@ -1573,6 +2005,33 @@ impl Database {
                 params![stamp, target.id],
             )
             .map_err(display_error)?;
+
+            if !source_child_ids.is_empty() {
+                let mut next_order: i64 = tx
+                    .query_row(
+                        "SELECT COALESCE(MAX(subtask_sort_order),0) FROM tasks WHERE parent_task_id=?",
+                        [target.id],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)?;
+                for child_id in source_child_ids {
+                    next_order += 1;
+                    tx.execute(
+                        "UPDATE tasks SET parent_task_id=?,subtask_sort_order=?,updated_at=? WHERE id=?",
+                        params![target.id, next_order, stamp, child_id],
+                    )
+                    .map_err(display_error)?;
+                    add_log(
+                        tx,
+                        child_id,
+                        "relation",
+                        &format!(
+                            "所属任务因合并更换：{} → {}",
+                            source.title, target.title
+                        ),
+                    )?;
+                }
+            }
             add_log(
                 tx,
                 target.id,
@@ -1636,16 +2095,41 @@ impl Database {
         })
     }
 
-    pub fn permanently_delete_tasks(&self, ids: Vec<i64>) -> Result<usize, String> {
+    pub fn permanently_delete_tasks(&self, mut ids: Vec<i64>) -> Result<usize, String> {
         if ids.is_empty() {
             return Err("未选择需要永久删除的事项".into());
         }
+        ids.sort_unstable();
+        ids.dedup();
         self.with_transaction(|tx| {
             for id in &ids {
                 let task = get_task_on(tx, *id)?;
                 if task.deleted_at.is_none() {
                     return Err(format!("事项 {} 不在回收站中", task.permanent_number));
                 }
+            }
+            let deleting_ids = ids.iter().copied().collect::<HashSet<_>>();
+            let stamp = now();
+            for id in &ids {
+                let parent = get_task_on(tx, *id)?;
+                for child_id in child_ids_on(tx, *id)? {
+                    if !deleting_ids.contains(&child_id) {
+                        add_log(
+                            tx,
+                            child_id,
+                            "relation",
+                            &format!(
+                                "所属任务《{}》已永久删除，已自动解除所属关系",
+                                parent.title
+                            ),
+                        )?;
+                    }
+                }
+                tx.execute(
+                    "UPDATE tasks SET parent_task_id=NULL,subtask_sort_order=0,updated_at=? WHERE parent_task_id=?",
+                    params![stamp, id],
+                )
+                .map_err(display_error)?;
             }
             let mut deleted = 0;
             for id in ids {
@@ -1662,6 +2146,41 @@ impl Database {
 
     pub fn empty_trash(&self) -> Result<usize, String> {
         self.with_transaction(|tx| {
+            let detached_children = {
+                let mut statement = tx
+                    .prepare(
+                        "SELECT child.id,parent.title FROM tasks child
+                         JOIN tasks parent ON parent.id=child.parent_task_id
+                         WHERE parent.deleted_at IS NOT NULL AND child.deleted_at IS NULL
+                         ORDER BY child.id",
+                    )
+                    .map_err(display_error)?;
+                let rows = statement
+                    .query_map([], |row| {
+                        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+                    })
+                    .map_err(display_error)?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(display_error)?;
+                rows
+            };
+            for (child_id, parent_title) in detached_children {
+                add_log(
+                    tx,
+                    child_id,
+                    "relation",
+                    &format!(
+                        "所属任务《{}》已从回收站永久删除，已自动解除所属关系",
+                        parent_title
+                    ),
+                )?;
+            }
+            tx.execute(
+                "UPDATE tasks SET parent_task_id=NULL,subtask_sort_order=0,updated_at=?
+                 WHERE parent_task_id IN (SELECT id FROM tasks WHERE deleted_at IS NOT NULL)",
+                [now()],
+            )
+            .map_err(display_error)?;
             tx.execute("DELETE FROM tasks WHERE deleted_at IS NOT NULL", [])
                 .map_err(display_error)
         })
@@ -1749,32 +2268,8 @@ impl Database {
 
     pub fn complete_round(&self, id: i64) -> Result<(), String> {
         self.with_transaction(|tx| {
-            let task = get_task_on(tx, id)?;
-            if task.deleted_at.is_some()
-                || task.archived_at.is_some()
-                || matches!(task.status.as_str(), "completed" | "archived")
-            {
-                return Err("该事项已经完成或归档".into());
-            }
-            let stamp = now();
-            tx.execute(
-                "UPDATE tasks SET status='completed',completed_at=?,updated_at=? WHERE id=?",
-                params![stamp, stamp, id],
-            )
-            .map_err(display_error)?;
-            clear_urgent_on(tx, id, "事项已完成")?;
-            add_status(tx, id, Some(&task.status), "completed", "本轮已完成")?;
-            close_active_queue(tx, id, "本轮已完成")?;
-            record_work_event_on(
-                tx,
-                id,
-                "completed",
-                &stamp,
-                &task.task_type,
-                "quick_action",
-                "",
-            )?;
-            add_log(tx, id, "work", "本轮已完成，事项整体结束")
+            ensure_direct_completion_allowed(tx, id)?;
+            complete_task_on(tx, id, "本轮已完成")
         })
     }
 
@@ -1794,6 +2289,9 @@ impl Database {
                 );
             }
             if input.sync_status && task.status != input.result_status {
+                if input.result_status == "completed" {
+                    ensure_direct_completion_allowed(tx, task.id)?;
+                }
                 let completed_at = if input.result_status == "completed" {
                     Some(input.handled_at.clone())
                 } else {
@@ -3944,6 +4442,26 @@ mod tests {
         input
     }
 
+    fn subtask_sample(parent_task_id: i64, title: &str) -> CreateSubtaskInput {
+        CreateSubtaskInput {
+            parent_task_id,
+            title: title.into(),
+            details: "子任务测试".into(),
+            task_type: None,
+            departments: None,
+            contacts: None,
+            priority: None,
+            workload: None,
+            is_urgent: false,
+            urgent_requester: String::new(),
+            urgent_reason: String::new(),
+            requested_deadline: None,
+            requested_deadline_label: None,
+            internal_notes: String::new(),
+            enqueue_today: true,
+        }
+    }
+
     #[derive(Debug, PartialEq)]
     struct RelationInvariantSnapshot {
         status: String,
@@ -4225,7 +4743,11 @@ mod tests {
             .is_err());
 
         db.set_parent_task(first.id, Some(other_parent.id)).unwrap();
-        db.soft_delete(other_parent.id).unwrap();
+        db.delete_task_group(DeleteTaskInput {
+            task_id: other_parent.id,
+            include_subtasks: true,
+        })
+        .unwrap();
         assert_eq!(
             db.get_task(first.id).unwrap().parent_task_id,
             Some(other_parent.id)
@@ -5380,5 +5902,385 @@ mod tests {
         drop(target);
         let _ = fs::remove_dir_all(source_root);
         let _ = fs::remove_dir_all(target_root);
+    }
+
+    #[test]
+    fn create_subtask_inherits_defaults_but_keeps_queue_deadline_and_urgency_independent() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-create-subtask-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let mut parent_input = sample("所属任务");
+        parent_input.departments = vec!["产品组".into(), "法务组".into()];
+        parent_input.contacts = vec!["小林".into(), "小周".into()];
+        parent_input.task_type = "沟通协调".into();
+        parent_input.is_urgent = true;
+        parent_input.urgent_requester = "负责人".into();
+        parent_input.urgent_reason = "父任务加急".into();
+        parent_input.requested_deadline = Some("2026-10-01T09:00:00+08:00".into());
+        let parent = db.save_task(parent_input).unwrap();
+
+        let mut first_input = subtask_sample(parent.id, "默认继承子任务");
+        first_input.enqueue_today = false;
+        let first = db.create_subtask(first_input).unwrap();
+        assert_eq!(first.parent_task_id, Some(parent.id));
+        assert_eq!(first.subtask_sort_order, 1);
+        assert_eq!(first.departments, parent.departments);
+        assert_eq!(first.contacts, parent.contacts);
+        assert_eq!(first.task_type, parent.task_type);
+        assert_eq!(first.priority, "normal");
+        assert_eq!(first.workload, "standard");
+        assert!(!first.is_urgent);
+        assert_eq!(first.requested_deadline, None);
+        assert!(!first.has_active_queue);
+
+        let mut second_input = subtask_sample(parent.id, "独立配置子任务");
+        second_input.task_type = Some("文本起草".into());
+        second_input.departments = Some(vec!["外部团队".into()]);
+        second_input.contacts = Some(vec!["小郑".into()]);
+        second_input.priority = Some("critical".into());
+        second_input.workload = Some("major".into());
+        second_input.is_urgent = true;
+        second_input.urgent_requester = "小郑".into();
+        second_input.urgent_reason = "单独加急".into();
+        second_input.requested_deadline = Some("2026-10-02T18:00:00+08:00".into());
+        second_input.requested_deadline_label = Some("独立期限".into());
+        let second = db.create_subtask(second_input).unwrap();
+        assert_eq!(second.subtask_sort_order, 2);
+        assert_eq!(second.departments, vec!["外部团队"]);
+        assert_eq!(second.contacts, vec!["小郑"]);
+        assert_eq!(second.task_type, "文本起草");
+        assert_eq!(second.priority, "critical");
+        assert_eq!(second.workload, "major");
+        assert!(second.is_urgent);
+        assert!(second.has_active_queue);
+        assert_eq!(
+            second.requested_deadline.as_deref(),
+            Some("2026-10-02T18:00:00+08:00")
+        );
+        assert!(db
+            .create_subtask(subtask_sample(first.id, "非法第三级"))
+            .is_err());
+        assert!(db
+            .get_logs(first.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.log_type == "relation"));
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn completion_requires_an_explicit_parent_choice_and_reports_aggregate_state() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-subtask-completion-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let parent_only = db.save_task(sample("仅完成父任务")).unwrap();
+        let child = db
+            .create_subtask(subtask_sample(parent_only.id, "仍待处理子任务"))
+            .unwrap();
+        assert!(db.complete_round(parent_only.id).is_err());
+        assert!(db.set_status(parent_only.id, "completed".into()).is_err());
+        let mut edited_parent = sample("仅完成父任务");
+        edited_parent.id = Some(parent_only.id);
+        edited_parent.status = "completed".into();
+        assert!(db.save_task(edited_parent).is_err());
+        assert!(db
+            .record_work_event(WorkEventInput {
+                task_id: parent_only.id,
+                result_status: "completed".into(),
+                handled_at: now(),
+                note: "直接补录完成".into(),
+                sync_status: true,
+            })
+            .is_err());
+        let parent_only_result = db
+            .complete_task(CompleteTaskInput {
+                task_id: parent_only.id,
+                include_eligible_subtasks: false,
+            })
+            .unwrap();
+        assert_eq!(parent_only_result.completed_task_ids, vec![parent_only.id]);
+        assert_eq!(db.get_task(child.id).unwrap().status, "pending");
+
+        let parent = db.save_task(sample("批量完成父任务")).unwrap();
+        let active = db
+            .create_subtask(subtask_sample(parent.id, "有效待办"))
+            .unwrap();
+        let deferred = db
+            .create_subtask(subtask_sample(parent.id, "有效暂缓"))
+            .unwrap();
+        db.set_status(deferred.id, "waiting_materials".into())
+            .unwrap();
+        let completed = db
+            .create_subtask(subtask_sample(parent.id, "已完成"))
+            .unwrap();
+        db.complete_round(completed.id).unwrap();
+        let cancelled = db
+            .create_subtask(subtask_sample(parent.id, "已取消"))
+            .unwrap();
+        db.set_status(cancelled.id, "cancelled".into()).unwrap();
+        let archived = db
+            .create_subtask(subtask_sample(parent.id, "已归档"))
+            .unwrap();
+        db.archive(archived.id).unwrap();
+        let deleted = db
+            .create_subtask(subtask_sample(parent.id, "已删除"))
+            .unwrap();
+        db.soft_delete(deleted.id).unwrap();
+
+        let before = db.subtask_completion_state(parent.id).unwrap().unwrap();
+        assert_eq!(before.total_subtasks, 6);
+        assert_eq!(before.completed_subtasks, 1);
+        assert_eq!(before.eligible_subtasks, 3);
+        assert_eq!(before.completed_eligible_subtasks, 1);
+        assert!(!before.all_eligible_subtasks_completed);
+        assert!(before.parent_can_be_completed);
+
+        let result = db
+            .complete_task(CompleteTaskInput {
+                task_id: parent.id,
+                include_eligible_subtasks: true,
+            })
+            .unwrap();
+        assert_eq!(
+            result.completed_task_ids,
+            vec![active.id, deferred.id, parent.id]
+        );
+        assert_eq!(db.get_task(active.id).unwrap().status, "completed");
+        assert_eq!(db.get_task(deferred.id).unwrap().status, "completed");
+        assert_eq!(db.get_task(completed.id).unwrap().status, "completed");
+        assert_eq!(db.get_task(cancelled.id).unwrap().status, "cancelled");
+        assert_eq!(db.get_task(archived.id).unwrap().status, "archived");
+        assert!(db.get_task(deleted.id).unwrap().deleted_at.is_some());
+        let after = result.completion_state.unwrap();
+        assert!(after.all_eligible_subtasks_completed);
+        assert!(!after.parent_can_be_completed);
+
+        let prompt_parent = db.save_task(sample("完成提示父任务")).unwrap();
+        let prompt_child = db
+            .create_subtask(subtask_sample(prompt_parent.id, "最后一个子任务"))
+            .unwrap();
+        let prompt = db
+            .complete_task(CompleteTaskInput {
+                task_id: prompt_child.id,
+                include_eligible_subtasks: false,
+            })
+            .unwrap()
+            .completion_state
+            .unwrap();
+        assert_eq!(prompt.parent_task_id, prompt_parent.id);
+        assert!(prompt.all_eligible_subtasks_completed);
+        assert!(prompt.parent_can_be_completed);
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn archive_delete_restore_and_permanent_cleanup_apply_only_the_selected_scope() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-subtask-lifecycle-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let archive_parent = db.save_task(sample("归档父任务")).unwrap();
+        let completed_child = db
+            .create_subtask(subtask_sample(archive_parent.id, "已完成子任务"))
+            .unwrap();
+        db.complete_round(completed_child.id).unwrap();
+        let active_child = db
+            .create_subtask(subtask_sample(archive_parent.id, "未完成子任务"))
+            .unwrap();
+        let archived = db
+            .archive_task_group(ArchiveTaskInput {
+                task_id: archive_parent.id,
+                include_completed_subtasks: true,
+            })
+            .unwrap();
+        assert_eq!(
+            archived.archived_task_ids,
+            vec![completed_child.id, archive_parent.id]
+        );
+        assert_eq!(db.get_task(active_child.id).unwrap().status, "pending");
+        assert_eq!(
+            db.get_task(active_child.id).unwrap().parent_task_id,
+            Some(archive_parent.id)
+        );
+
+        let detach_parent = db.save_task(sample("仅删除父任务")).unwrap();
+        let detached_child = db
+            .create_subtask(subtask_sample(detach_parent.id, "保留子任务"))
+            .unwrap();
+        let deleted = db
+            .delete_task_group(DeleteTaskInput {
+                task_id: detach_parent.id,
+                include_subtasks: false,
+            })
+            .unwrap();
+        assert_eq!(deleted.trashed_task_ids, vec![detach_parent.id]);
+        assert_eq!(deleted.detached_subtask_ids, vec![detached_child.id]);
+        let detached = db.get_task(detached_child.id).unwrap();
+        assert_eq!(detached.parent_task_id, None);
+        assert_eq!(detached.subtask_sort_order, 0);
+        assert!(detached.deleted_at.is_none());
+
+        let grouped_parent = db.save_task(sample("整组删除父任务")).unwrap();
+        let grouped_child = db
+            .create_subtask(subtask_sample(grouped_parent.id, "整组删除子任务"))
+            .unwrap();
+        let grouped = db
+            .delete_task_group(DeleteTaskInput {
+                task_id: grouped_parent.id,
+                include_subtasks: true,
+            })
+            .unwrap();
+        assert_eq!(
+            grouped.trashed_task_ids,
+            vec![grouped_child.id, grouped_parent.id]
+        );
+        assert!(grouped.detached_subtask_ids.is_empty());
+        assert_eq!(
+            db.get_task(grouped_child.id).unwrap().parent_task_id,
+            Some(grouped_parent.id)
+        );
+        db.restore(grouped_child.id).unwrap();
+        assert!(db.get_task(grouped_parent.id).unwrap().deleted_at.is_some());
+        assert_eq!(
+            db.get_task(grouped_child.id).unwrap().parent_task_id,
+            Some(grouped_parent.id)
+        );
+        db.permanently_delete_tasks(vec![grouped_parent.id])
+            .unwrap();
+        let cleaned_child = db.get_task(grouped_child.id).unwrap();
+        assert_eq!(cleaned_child.parent_task_id, None);
+        assert_eq!(cleaned_child.subtask_sort_order, 0);
+        assert!(db
+            .get_logs(grouped_child.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.content.contains("已永久删除")));
+
+        let restore_parent = db.save_task(sample("仅恢复父任务")).unwrap();
+        let still_trashed_child = db
+            .create_subtask(subtask_sample(restore_parent.id, "仍在回收站的子任务"))
+            .unwrap();
+        db.delete_task_group(DeleteTaskInput {
+            task_id: restore_parent.id,
+            include_subtasks: true,
+        })
+        .unwrap();
+        db.restore(restore_parent.id).unwrap();
+        assert!(db.get_task(restore_parent.id).unwrap().deleted_at.is_none());
+        assert!(db
+            .get_task(still_trashed_child.id)
+            .unwrap()
+            .deleted_at
+            .is_some());
+
+        let empty_parent = db.save_task(sample("清空回收站父任务")).unwrap();
+        let empty_restored_child = db
+            .create_subtask(subtask_sample(empty_parent.id, "清空前恢复的子任务"))
+            .unwrap();
+        db.delete_task_group(DeleteTaskInput {
+            task_id: empty_parent.id,
+            include_subtasks: true,
+        })
+        .unwrap();
+        db.restore(empty_restored_child.id).unwrap();
+        db.empty_trash().unwrap();
+        assert!(db.get_task(still_trashed_child.id).is_err());
+        let empty_cleaned_child = db.get_task(empty_restored_child.id).unwrap();
+        assert_eq!(empty_cleaned_child.parent_task_id, None);
+        assert_eq!(empty_cleaned_child.subtask_sort_order, 0);
+        assert!(db
+            .get_logs(empty_restored_child.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.content.contains("从回收站永久删除")));
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn merging_a_parent_appends_its_children_and_rejects_a_child_target() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-subtask-merge-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let target = db.save_task(sample("合并目标")).unwrap();
+        let existing = db
+            .create_subtask(subtask_sample(target.id, "目标原子任务"))
+            .unwrap();
+        let source = db.save_task(sample("合并来源")).unwrap();
+        let first = db
+            .create_subtask(subtask_sample(source.id, "来源子任务一"))
+            .unwrap();
+        let second = db
+            .create_subtask(subtask_sample(source.id, "来源子任务二"))
+            .unwrap();
+        db.merge_tasks(MergeTaskInput {
+            target_task_id: target.id,
+            source_task_id: source.id,
+            deduplicate_records: true,
+            trash_source: false,
+        })
+        .unwrap();
+        let children = db.list_subtasks(target.id).unwrap();
+        assert_eq!(
+            children.iter().map(|task| task.id).collect::<Vec<_>>(),
+            vec![existing.id, first.id, second.id]
+        );
+        assert_eq!(
+            children
+                .iter()
+                .map(|task| task.subtask_sort_order)
+                .collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert!(db.list_subtasks(source.id).unwrap().is_empty());
+        assert_eq!(db.get_task(source.id).unwrap().status, "archived");
+        assert!(db
+            .get_logs(first.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.content.starts_with("所属任务因合并更换")));
+
+        let blocked_source = db.save_task(sample("不可合并来源")).unwrap();
+        let blocked_source_child = db
+            .create_subtask(subtask_sample(blocked_source.id, "不可合并来源子任务"))
+            .unwrap();
+        let child_target_parent = db.save_task(sample("子目标所属任务")).unwrap();
+        let child_target = db
+            .create_subtask(subtask_sample(child_target_parent.id, "非法子目标"))
+            .unwrap();
+        assert!(db
+            .merge_tasks(MergeTaskInput {
+                target_task_id: child_target.id,
+                source_task_id: blocked_source.id,
+                deduplicate_records: false,
+                trash_source: true,
+            })
+            .is_err());
+        assert_eq!(db.get_task(blocked_source.id).unwrap().status, "pending");
+        assert_eq!(
+            db.get_task(blocked_source_child.id).unwrap().parent_task_id,
+            Some(blocked_source.id)
+        );
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
     }
 }

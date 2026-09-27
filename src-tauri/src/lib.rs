@@ -94,6 +94,16 @@ fn save_task(
     Ok(value)
 }
 #[tauri::command]
+fn create_subtask(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: CreateSubtaskInput,
+) -> Result<LegalTask, String> {
+    let task = db.create_subtask(input)?;
+    emit_change(&app)?;
+    Ok(task)
+}
+#[tauri::command]
 fn set_task_status(
     app: tauri::AppHandle,
     db: State<Database>,
@@ -155,6 +165,47 @@ fn empty_trash(app: tauri::AppHandle, db: State<Database>) -> Result<usize, Stri
 fn archive_task(app: tauri::AppHandle, db: State<Database>, id: i64) -> Result<(), String> {
     db.archive(id)?;
     emit_change(&app)
+}
+
+#[tauri::command]
+fn get_subtask_completion_state(
+    db: State<Database>,
+    task_id: i64,
+) -> Result<Option<SubtaskCompletionState>, String> {
+    db.subtask_completion_state(task_id)
+}
+
+#[tauri::command]
+fn complete_task(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: CompleteTaskInput,
+) -> Result<CompleteTaskResult, String> {
+    let result = db.complete_task(input)?;
+    emit_change(&app)?;
+    Ok(result)
+}
+
+#[tauri::command]
+fn archive_task_group(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: ArchiveTaskInput,
+) -> Result<ArchiveTaskResult, String> {
+    let result = db.archive_task_group(input)?;
+    emit_change(&app)?;
+    Ok(result)
+}
+
+#[tauri::command]
+fn delete_task_group(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: DeleteTaskInput,
+) -> Result<DeleteTaskResult, String> {
+    let result = db.delete_task_group(input)?;
+    emit_change(&app)?;
+    Ok(result)
 }
 
 fn persisted_window_state_flags() -> StateFlags {
@@ -697,6 +748,7 @@ pub fn run() {
             bootstrap,
             list_tasks,
             save_task,
+            create_subtask,
             set_task_status,
             set_task_urgent,
             move_task,
@@ -705,6 +757,10 @@ pub fn run() {
             permanently_delete_tasks,
             empty_trash,
             archive_task,
+            get_subtask_completion_state,
+            complete_task,
+            archive_task_group,
+            delete_task_group,
             merge_tasks,
             resolve_import_conflict,
             list_parent_task_candidates,
