@@ -183,6 +183,36 @@ fn resolve_import_conflict(
     emit_change(&app)
 }
 #[tauri::command]
+fn list_parent_task_candidates(
+    db: State<Database>,
+    task_id: i64,
+) -> Result<Vec<LegalTask>, String> {
+    db.list_parent_task_candidates(task_id)
+}
+#[tauri::command]
+fn list_subtasks(db: State<Database>, parent_task_id: i64) -> Result<Vec<LegalTask>, String> {
+    db.list_subtasks(parent_task_id)
+}
+#[tauri::command]
+fn set_parent_task(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    task_id: i64,
+    parent_task_id: Option<i64>,
+) -> Result<(), String> {
+    db.set_parent_task(task_id, parent_task_id)?;
+    emit_change(&app)
+}
+#[tauri::command]
+fn reorder_subtasks(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    input: ReorderSubtasksInput,
+) -> Result<(), String> {
+    db.reorder_subtasks(input)?;
+    emit_change(&app)
+}
+#[tauri::command]
 fn get_logs(db: State<Database>, task_id: i64) -> Result<Vec<TaskLog>, String> {
     db.get_logs(task_id)
 }
@@ -677,6 +707,10 @@ pub fn run() {
             archive_task,
             merge_tasks,
             resolve_import_conflict,
+            list_parent_task_candidates,
+            list_subtasks,
+            set_parent_task,
+            reorder_subtasks,
             get_logs,
             get_work_events,
             void_work_event,

@@ -17,7 +17,7 @@ const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ti
      WHERE history.task_id=tasks.id
        AND history.new_status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed')
        AND (history.old_status IS NULL OR history.old_status NOT IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed'))
-     ORDER BY history.id DESC LIMIT 1), is_import_conflict
+     ORDER BY history.id DESC LIMIT 1), is_import_conflict, parent_task_id, subtask_sort_order
     FROM tasks";
 const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
@@ -38,7 +38,7 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 7 {
+        if existed && Self::schema_version(&connection)? < 8 {
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
         }
@@ -84,7 +84,7 @@ impl Database {
         connection
             .execute_batch("PRAGMA query_only=ON; PRAGMA busy_timeout=5000;")
             .map_err(display_error)?;
-        if Self::schema_version(&connection)? < 5 {
+        if Self::schema_version(&connection)? < 8 {
             return Err("数据库版本过旧，请先启动 In Line 完成升级".into());
         }
         let backup_dir = path.parent().ok_or("数据库路径无效")?.join("backups");
@@ -157,6 +157,9 @@ impl Database {
                updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT, archived_at TEXT,
                deleted_at TEXT, custom_sort_order INTEGER NOT NULL DEFAULT 0,
                is_import_conflict INTEGER NOT NULL DEFAULT 0,
+               parent_task_id INTEGER,
+               subtask_sort_order INTEGER NOT NULL DEFAULT 0,
+               FOREIGN KEY(parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
                UNIQUE(ticket_date,daily_sequence));
              CREATE TABLE IF NOT EXISTS task_logs(
                id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL, log_type TEXT NOT NULL,
@@ -425,6 +428,46 @@ impl Database {
                 )
                 .map_err(display_error)?;
         }
+        if version < 8 {
+            let has_parent_task_id: i64 = transaction
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('tasks') WHERE name='parent_task_id'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if has_parent_task_id == 0 {
+                transaction
+                    .execute(
+                        "ALTER TABLE tasks ADD COLUMN parent_task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL",
+                        [],
+                    )
+                    .map_err(display_error)?;
+            }
+            let has_subtask_sort_order: i64 = transaction
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('tasks') WHERE name='subtask_sort_order'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if has_subtask_sort_order == 0 {
+                transaction
+                    .execute(
+                        "ALTER TABLE tasks ADD COLUMN subtask_sort_order INTEGER NOT NULL DEFAULT 0",
+                        [],
+                    )
+                    .map_err(display_error)?;
+            }
+            transaction
+                .execute_batch(
+                    "CREATE INDEX IF NOT EXISTS idx_tasks_parent
+                       ON tasks(parent_task_id,subtask_sort_order,id);
+                     DELETE FROM schema_meta;
+                     INSERT INTO schema_meta(version) VALUES(8);",
+                )
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -515,6 +558,8 @@ impl Database {
             has_active_queue: row.get::<_, i64>(26)? != 0,
             deferred_entered_at: row.get(27)?,
             is_import_conflict: row.get::<_, i64>(28)? != 0,
+            parent_task_id: row.get(29)?,
+            subtask_sort_order: row.get(30)?,
         })
     }
 
@@ -847,6 +892,76 @@ fn enqueue_on(
     Ok((date, sequence))
 }
 
+fn normalize_subtask_order(connection: &Connection, parent_task_id: i64) -> Result<(), String> {
+    let ids = {
+        let mut statement = connection
+            .prepare(
+                "SELECT id FROM tasks WHERE parent_task_id=?
+                 ORDER BY subtask_sort_order,id",
+            )
+            .map_err(display_error)?;
+        let rows = statement
+            .query_map([parent_task_id], |row| row.get::<_, i64>(0))
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        rows
+    };
+    for (index, id) in ids.into_iter().enumerate() {
+        connection
+            .execute(
+                "UPDATE tasks SET subtask_sort_order=? WHERE id=?",
+                params![index as i64 + 1, id],
+            )
+            .map_err(display_error)?;
+    }
+    Ok(())
+}
+
+fn validate_parent_assignment(
+    connection: &Connection,
+    task_id: i64,
+    parent_task_id: i64,
+) -> Result<(LegalTask, LegalTask), String> {
+    if task_id == parent_task_id {
+        return Err("事项不能设为自己的子任务".into());
+    }
+    let task = get_task_on(connection, task_id)?;
+    let parent = get_task_on(connection, parent_task_id)?;
+    if task.deleted_at.is_some() || parent.deleted_at.is_some() {
+        return Err("回收站中的事项不能新建或更换所属关系".into());
+    }
+    if parent.parent_task_id.is_some() {
+        return Err("子任务不能继续作为所属任务，当前仅支持两级结构".into());
+    }
+    let child_count: i64 = connection
+        .query_row(
+            "SELECT count(*) FROM tasks WHERE parent_task_id=?",
+            [task_id],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    if child_count > 0 {
+        return Err("已有子任务的事项不能再设为其他事项的子任务".into());
+    }
+    let would_cycle: i64 = connection
+        .query_row(
+            "WITH RECURSIVE descendants(id) AS (
+               SELECT id FROM tasks WHERE parent_task_id=?
+               UNION ALL
+               SELECT tasks.id FROM tasks JOIN descendants ON tasks.parent_task_id=descendants.id
+             )
+             SELECT EXISTS(SELECT 1 FROM descendants WHERE id=?)",
+            params![task_id, parent_task_id],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    if would_cycle != 0 {
+        return Err("所属关系会形成循环".into());
+    }
+    Ok((task, parent))
+}
+
 impl Database {
     pub fn save_task(&self, input: TaskInput) -> Result<LegalTask, String> {
         validate_task_input(&input)?;
@@ -1091,6 +1206,143 @@ impl Database {
         let result = operation(&tx)?;
         tx.commit().map_err(display_error)?;
         Ok(result)
+    }
+
+    pub fn list_parent_task_candidates(&self, task_id: i64) -> Result<Vec<LegalTask>, String> {
+        self.with_conn(|connection| {
+            let task = get_task_on(connection, task_id)?;
+            let child_count: i64 = connection
+                .query_row(
+                    "SELECT count(*) FROM tasks WHERE parent_task_id=?",
+                    [task_id],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if task.deleted_at.is_some() || child_count > 0 {
+                return Ok(Vec::new());
+            }
+            let mut statement = connection
+                .prepare(&format!(
+                    "{SELECT_TASK} WHERE tasks.id<>? AND parent_task_id IS NULL
+                     AND deleted_at IS NULL ORDER BY updated_at DESC,id DESC"
+                ))
+                .map_err(display_error)?;
+            let rows = statement
+                .query_map([task_id], Self::row_task)
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            Ok(rows)
+        })
+    }
+
+    pub fn list_subtasks(&self, parent_task_id: i64) -> Result<Vec<LegalTask>, String> {
+        self.with_conn(|connection| {
+            get_task_on(connection, parent_task_id)?;
+            let mut statement = connection
+                .prepare(&format!(
+                    "{SELECT_TASK} WHERE parent_task_id=? ORDER BY subtask_sort_order,id"
+                ))
+                .map_err(display_error)?;
+            let rows = statement
+                .query_map([parent_task_id], Self::row_task)
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            Ok(rows)
+        })
+    }
+
+    pub fn set_parent_task(&self, task_id: i64, parent_task_id: Option<i64>) -> Result<(), String> {
+        self.with_transaction(|transaction| {
+            let task = get_task_on(transaction, task_id)?;
+            if task.parent_task_id == parent_task_id {
+                return Ok(());
+            }
+            let old_parent = task
+                .parent_task_id
+                .map(|id| get_task_on(transaction, id))
+                .transpose()?;
+            let stamp = now();
+            let log_content = if let Some(parent_task_id) = parent_task_id {
+                let (_, parent) =
+                    validate_parent_assignment(transaction, task_id, parent_task_id)?;
+                let next_order: i64 = transaction
+                    .query_row(
+                        "SELECT COALESCE(MAX(subtask_sort_order),0)+1
+                         FROM tasks WHERE parent_task_id=?",
+                        [parent_task_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)?;
+                transaction
+                    .execute(
+                        "UPDATE tasks SET parent_task_id=?,subtask_sort_order=?,updated_at=? WHERE id=?",
+                        params![parent_task_id, next_order, stamp, task_id],
+                    )
+                    .map_err(display_error)?;
+                if let Some(old_parent) = old_parent.as_ref() {
+                    format!(
+                        "更换所属任务：{} → {}",
+                        old_parent.title, parent.title
+                    )
+                } else {
+                    format!("设置所属任务：{}", parent.title)
+                }
+            } else {
+                transaction
+                    .execute(
+                        "UPDATE tasks SET parent_task_id=NULL,subtask_sort_order=0,updated_at=? WHERE id=?",
+                        params![stamp, task_id],
+                    )
+                    .map_err(display_error)?;
+                format!(
+                    "解除所属任务：{}",
+                    old_parent
+                        .as_ref()
+                        .map(|parent| parent.title.as_str())
+                        .unwrap_or("未知事项")
+                )
+            };
+            if let Some(old_parent_id) = task.parent_task_id {
+                normalize_subtask_order(transaction, old_parent_id)?;
+            }
+            add_log(transaction, task_id, "relation", &log_content)
+        })
+    }
+
+    pub fn reorder_subtasks(&self, input: ReorderSubtasksInput) -> Result<(), String> {
+        self.with_transaction(|transaction| {
+            get_task_on(transaction, input.parent_task_id)?;
+            let current = {
+                let mut statement = transaction
+                    .prepare(
+                        "SELECT id FROM tasks WHERE parent_task_id=?
+                         ORDER BY subtask_sort_order,id",
+                    )
+                    .map_err(display_error)?;
+                let rows = statement
+                    .query_map([input.parent_task_id], |row| row.get::<_, i64>(0))
+                    .map_err(display_error)?
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(display_error)?;
+                rows
+            };
+            let requested = input.task_ids.iter().copied().collect::<HashSet<_>>();
+            let existing = current.iter().copied().collect::<HashSet<_>>();
+            if input.task_ids.len() != requested.len() || requested != existing {
+                return Err("子任务排序列表与当前所属关系不一致，请刷新后重试".into());
+            }
+            for (index, id) in input.task_ids.iter().enumerate() {
+                transaction
+                    .execute(
+                        "UPDATE tasks SET subtask_sort_order=? WHERE id=? AND parent_task_id=?",
+                        params![index as i64 + 1, id, input.parent_task_id],
+                    )
+                    .map_err(display_error)?;
+            }
+            Ok(())
+        })
     }
 }
 
@@ -2769,7 +3021,7 @@ impl Database {
             }
         }
         let version = Self::schema_version(&connection)?;
-        if version > 7 {
+        if version > 8 {
             return Err("该备份来自更高版本的 In Line，请先升级软件".into());
         }
         Ok(())
@@ -2844,6 +3096,16 @@ impl Database {
             let mut source = Self::connect(&staged)?;
             Self::migrate(&mut source)?;
             let source_tasks = load_all_tasks(&source)?;
+            let mut source_relations = source_tasks
+                .iter()
+                .filter_map(|task| {
+                    task.parent_task_id
+                        .map(|parent_task_id| (task.id, parent_task_id, task.subtask_sort_order))
+                })
+                .collect::<Vec<_>>();
+            source_relations.sort_by_key(|(task_id, parent_task_id, order)| {
+                (*parent_task_id, *order, *task_id)
+            });
 
             let emergency = self.unique_backup_path("before-restore");
             self.with_conn(|connection| Self::backup_connection(connection, &emergency))?;
@@ -2861,6 +3123,7 @@ impl Database {
                 applied_settings: 0,
                 conflicts: Vec::new(),
             };
+            let mut imported_task_ids = HashMap::new();
 
             for mut source_task in source_tasks {
                 source_task.task_type = canonical_task_type(&transaction, &source_task.task_type)?;
@@ -2897,6 +3160,7 @@ impl Database {
                         imported_title: imported.title,
                     });
                 }
+                imported_task_ids.insert(source_task.id, target_id);
 
                 for (table, columns) in [
                     ("task_logs", &["log_type", "content", "created_at"][..]),
@@ -2941,6 +3205,42 @@ impl Database {
                     )?;
                 }
                 copy_queue_entries(&source, &transaction, source_task.id, target_id, inserted)?;
+            }
+
+            for (source_task_id, source_parent_id, _) in source_relations {
+                let (Some(&target_task_id), Some(&target_parent_id)) = (
+                    imported_task_ids.get(&source_task_id),
+                    imported_task_ids.get(&source_parent_id),
+                ) else {
+                    continue;
+                };
+                let current_parent: Option<i64> = transaction
+                    .query_row(
+                        "SELECT parent_task_id FROM tasks WHERE id=?",
+                        [target_task_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)?;
+                if current_parent.is_some()
+                    || validate_parent_assignment(&transaction, target_task_id, target_parent_id)
+                        .is_err()
+                {
+                    continue;
+                }
+                let next_order: i64 = transaction
+                    .query_row(
+                        "SELECT COALESCE(MAX(subtask_sort_order),0)+1
+                         FROM tasks WHERE parent_task_id=?",
+                        [target_parent_id],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)?;
+                transaction
+                    .execute(
+                        "UPDATE tasks SET parent_task_id=?,subtask_sort_order=? WHERE id=?",
+                        params![target_parent_id, next_order, target_task_id],
+                    )
+                    .map_err(display_error)?;
             }
 
             merge_master_values(&source, &transaction)?;
@@ -3565,6 +3865,56 @@ fn backup_info(path: &Path) -> Result<BackupInfo, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn create_v7_database(path: &Path) {
+        let connection = Connection::open(path).unwrap();
+        connection
+            .execute_batch(
+                "PRAGMA foreign_keys=ON;
+                 CREATE TABLE schema_meta(version INTEGER NOT NULL);
+                 INSERT INTO schema_meta(version) VALUES(7);
+                 CREATE TABLE daily_sequences(ticket_date TEXT PRIMARY KEY,last_sequence INTEGER NOT NULL);
+                 CREATE TABLE tasks(
+                   id INTEGER PRIMARY KEY AUTOINCREMENT, permanent_number TEXT NOT NULL UNIQUE,
+                   daily_sequence INTEGER NOT NULL, ticket_date TEXT NOT NULL, department TEXT NOT NULL,
+                   contact TEXT NOT NULL, task_type TEXT NOT NULL, title TEXT NOT NULL, details TEXT NOT NULL,
+                   status TEXT NOT NULL DEFAULT 'pending', priority TEXT NOT NULL DEFAULT 'normal',
+                   workload TEXT NOT NULL DEFAULT 'standard', is_urgent INTEGER NOT NULL DEFAULT 0,
+                   urgent_requester TEXT NOT NULL DEFAULT '', urgent_reason TEXT NOT NULL DEFAULT '',
+                   requested_deadline TEXT, internal_notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL,
+                   updated_at TEXT NOT NULL, started_at TEXT, completed_at TEXT, archived_at TEXT,
+                   deleted_at TEXT, custom_sort_order INTEGER NOT NULL DEFAULT 0,
+                   requested_deadline_label TEXT, is_import_conflict INTEGER NOT NULL DEFAULT 0,
+                   UNIQUE(ticket_date,daily_sequence));
+                 CREATE TABLE task_queue_entries(
+                   id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL,
+                   queue_date TEXT NOT NULL,daily_sequence INTEGER NOT NULL,requested_deadline TEXT,
+                   requested_deadline_label TEXT,enqueued_at TEXT NOT NULL,closed_at TEXT,
+                   close_reason TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,
+                   FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+                   UNIQUE(queue_date,daily_sequence));
+                 CREATE TABLE task_work_events(
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,task_id INTEGER NOT NULL,result_status TEXT NOT NULL,
+                   handled_at TEXT NOT NULL,task_type_snapshot TEXT NOT NULL,source TEXT NOT NULL,
+                   note TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,voided_at TEXT,
+                   FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE);
+                 INSERT INTO tasks(
+                   permanent_number,daily_sequence,ticket_date,department,contact,task_type,title,details,
+                   status,priority,workload,created_at,updated_at,custom_sort_order,requested_deadline_label,
+                   is_import_conflict
+                 ) VALUES(
+                   '20260927-01',1,'2026-09-27','产品组','小林','任务处理','v7 事项','旧数据',
+                   'pending','normal','standard','2026-09-27T09:00:00+08:00',
+                   '2026-09-27T09:00:00+08:00',1,NULL,0
+                 );
+                 INSERT INTO task_queue_entries(
+                   task_id,queue_date,daily_sequence,enqueued_at,created_at,updated_at
+                 ) VALUES(1,'2026-09-27',1,'2026-09-27T09:00:00+08:00',
+                   '2026-09-27T09:00:00+08:00','2026-09-27T09:00:00+08:00');",
+            )
+            .unwrap();
+    }
+
     fn sample(title: &str) -> TaskInput {
         TaskInput {
             id: None,
@@ -3592,6 +3942,299 @@ mod tests {
         input.urgent_requester = "测试人".into();
         input.urgent_reason = "需要优先处理".into();
         input
+    }
+
+    #[derive(Debug, PartialEq)]
+    struct RelationInvariantSnapshot {
+        status: String,
+        daily_sequence: i64,
+        ticket_date: String,
+        custom_sort_order: i64,
+        requested_deadline: Option<String>,
+        requested_deadline_label: Option<String>,
+        is_urgent: i64,
+        urgent_requester: String,
+        urgent_reason: String,
+        department: String,
+        contact: String,
+        task_type: String,
+        queue_date: String,
+        queue_daily_sequence: i64,
+        enqueued_at: String,
+        queue_deadline: Option<String>,
+        queue_deadline_label: Option<String>,
+        queue_closed_at: Option<String>,
+    }
+
+    fn relation_invariant_snapshot(db: &Database, task_id: i64) -> RelationInvariantSnapshot {
+        db.with_conn(|connection| {
+            connection
+                .query_row(
+                    "SELECT tasks.status,tasks.daily_sequence,tasks.ticket_date,
+                            tasks.custom_sort_order,tasks.requested_deadline,
+                            tasks.requested_deadline_label,tasks.is_urgent,tasks.urgent_requester,
+                            tasks.urgent_reason,tasks.department,tasks.contact,tasks.task_type,
+                            queue.queue_date,queue.daily_sequence,queue.enqueued_at,
+                            queue.requested_deadline,queue.requested_deadline_label,queue.closed_at
+                     FROM tasks JOIN task_queue_entries queue ON queue.task_id=tasks.id
+                     WHERE tasks.id=? AND queue.closed_at IS NULL",
+                    [task_id],
+                    |row| {
+                        Ok(RelationInvariantSnapshot {
+                            status: row.get(0)?,
+                            daily_sequence: row.get(1)?,
+                            ticket_date: row.get(2)?,
+                            custom_sort_order: row.get(3)?,
+                            requested_deadline: row.get(4)?,
+                            requested_deadline_label: row.get(5)?,
+                            is_urgent: row.get(6)?,
+                            urgent_requester: row.get(7)?,
+                            urgent_reason: row.get(8)?,
+                            department: row.get(9)?,
+                            contact: row.get(10)?,
+                            task_type: row.get(11)?,
+                            queue_date: row.get(12)?,
+                            queue_daily_sequence: row.get(13)?,
+                            enqueued_at: row.get(14)?,
+                            queue_deadline: row.get(15)?,
+                            queue_deadline_label: row.get(16)?,
+                            queue_closed_at: row.get(17)?,
+                        })
+                    },
+                )
+                .map_err(display_error)
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn migration_v8_adds_self_reference_and_rolls_back_atomically() {
+        let nonce = Utc::now().timestamp_nanos_opt().unwrap();
+        let upgraded_root = std::env::temp_dir().join(format!("inline-v8-upgrade-{nonce}"));
+        fs::create_dir_all(&upgraded_root).unwrap();
+        let upgraded_path = upgraded_root.join("inline.db");
+        create_v7_database(&upgraded_path);
+
+        let upgraded = Database::open_at(upgraded_path.clone()).unwrap();
+        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 8);
+        let task = upgraded.get_task(1).unwrap();
+        assert_eq!(task.parent_task_id, None);
+        assert_eq!(task.subtask_sort_order, 0);
+        upgraded
+            .with_conn(|connection| {
+                let foreign_key = {
+                    let mut statement = connection
+                        .prepare("PRAGMA foreign_key_list('tasks')")
+                        .map_err(display_error)?;
+                    let rows = statement
+                        .query_map([], |row| {
+                            Ok((row.get::<_, String>(3)?, row.get::<_, String>(6)?))
+                        })
+                        .map_err(display_error)?
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(display_error)?;
+                    rows
+                };
+                assert!(foreign_key.iter().any(
+                    |(column, on_delete)| column == "parent_task_id" && on_delete == "SET NULL"
+                ));
+                let index_exists: i64 = connection
+                    .query_row(
+                        "SELECT count(*) FROM sqlite_master
+                         WHERE type='index' AND name='idx_tasks_parent'",
+                        [],
+                        |row| row.get(0),
+                    )
+                    .map_err(display_error)?;
+                assert_eq!(index_exists, 1);
+                let integrity: String = connection
+                    .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+                    .map_err(display_error)?;
+                assert_eq!(integrity, "ok");
+                let foreign_key_errors: i64 = connection
+                    .query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
+                        row.get(0)
+                    })
+                    .map_err(display_error)?;
+                assert_eq!(foreign_key_errors, 0);
+                Ok(())
+            })
+            .unwrap();
+        drop(upgraded);
+
+        let rollback_root = std::env::temp_dir().join(format!("inline-v8-rollback-{nonce}"));
+        fs::create_dir_all(&rollback_root).unwrap();
+        let rollback_path = rollback_root.join("inline.db");
+        create_v7_database(&rollback_path);
+        let connection = Connection::open(&rollback_path).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TRIGGER reject_v8 BEFORE INSERT ON schema_meta
+                 WHEN NEW.version=8 BEGIN SELECT RAISE(ABORT,'blocked v8'); END;",
+            )
+            .unwrap();
+        drop(connection);
+        assert!(Database::open_at(rollback_path.clone()).is_err());
+        let rolled_back = Connection::open(rollback_path).unwrap();
+        let version: i64 = rolled_back
+            .query_row("SELECT max(version) FROM schema_meta", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(version, 7);
+        let new_columns: i64 = rolled_back
+            .query_row(
+                "SELECT count(*) FROM pragma_table_info('tasks')
+                 WHERE name IN ('parent_task_id','subtask_sort_order')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(new_columns, 0);
+        drop(rolled_back);
+
+        let _ = fs::remove_dir_all(upgraded_root);
+        let _ = fs::remove_dir_all(rollback_root);
+    }
+
+    #[test]
+    fn parent_relationships_enforce_two_levels_preserve_queue_and_support_ordering() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-parent-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let parent = db.save_task(sample("父任务 A")).unwrap();
+        let other_parent = db.save_task(sample("父任务 B")).unwrap();
+        let mut archived_input = sample("已归档父任务");
+        archived_input.status = "archived".into();
+        let archived_parent = db.save_task(archived_input).unwrap();
+        let trashed_parent = db.save_task(sample("回收站父任务")).unwrap();
+        db.soft_delete(trashed_parent.id).unwrap();
+        let mut first_input = urgent_sample("子任务一");
+        first_input.requested_deadline = Some("2026-10-10T09:00:00+08:00".into());
+        first_input.requested_deadline_label = Some("约定期限".into());
+        let first = db.save_task(first_input).unwrap();
+        let second = db.save_task(sample("子任务二")).unwrap();
+
+        let queue_snapshot = relation_invariant_snapshot(&db, first.id);
+
+        let candidates = db.list_parent_task_candidates(first.id).unwrap();
+        assert!(candidates.iter().any(|task| task.id == parent.id));
+        assert!(candidates.iter().any(|task| task.id == other_parent.id));
+        assert!(candidates.iter().any(|task| task.id == archived_parent.id));
+        assert!(!candidates.iter().any(|task| task.id == trashed_parent.id));
+        assert!(!candidates.iter().any(|task| task.id == first.id));
+
+        assert!(db.set_parent_task(first.id, Some(first.id)).is_err());
+        db.set_parent_task(first.id, Some(parent.id)).unwrap();
+        db.set_parent_task(first.id, Some(parent.id)).unwrap();
+        db.set_parent_task(second.id, Some(parent.id)).unwrap();
+        assert!(db
+            .set_parent_task(parent.id, Some(other_parent.id))
+            .is_err());
+        assert!(db.set_parent_task(parent.id, Some(first.id)).is_err());
+        assert!(db.set_parent_task(other_parent.id, Some(first.id)).is_err());
+        assert!(db
+            .list_parent_task_candidates(parent.id)
+            .unwrap()
+            .is_empty());
+
+        db.reorder_subtasks(ReorderSubtasksInput {
+            parent_task_id: parent.id,
+            task_ids: vec![second.id, first.id],
+        })
+        .unwrap();
+        let reordered = db.list_subtasks(parent.id).unwrap();
+        assert_eq!(
+            reordered.iter().map(|task| task.id).collect::<Vec<_>>(),
+            vec![second.id, first.id]
+        );
+        assert_eq!(reordered[0].subtask_sort_order, 1);
+        assert_eq!(reordered[1].subtask_sort_order, 2);
+        assert!(db
+            .reorder_subtasks(ReorderSubtasksInput {
+                parent_task_id: parent.id,
+                task_ids: vec![first.id],
+            })
+            .is_err());
+
+        db.set_parent_task(first.id, Some(other_parent.id)).unwrap();
+        assert_eq!(
+            db.list_subtasks(parent.id).unwrap()[0].subtask_sort_order,
+            1
+        );
+        db.set_parent_task(first.id, None).unwrap();
+        let relationship_logs = db
+            .get_logs(first.id)
+            .unwrap()
+            .into_iter()
+            .filter(|log| log.log_type == "relation")
+            .map(|log| log.content)
+            .collect::<Vec<_>>();
+        assert_eq!(relationship_logs.len(), 3);
+        assert!(relationship_logs
+            .iter()
+            .any(|value| value.starts_with("设置所属任务")));
+        assert!(relationship_logs
+            .iter()
+            .any(|value| value.starts_with("更换所属任务")));
+        assert!(relationship_logs
+            .iter()
+            .any(|value| value.starts_with("解除所属任务")));
+        let (status_history_count, work_event_count) = db
+            .with_conn(|connection| {
+                Ok((
+                    connection
+                        .query_row(
+                            "SELECT count(*) FROM status_history WHERE task_id=?",
+                            [first.id],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .map_err(display_error)?,
+                    connection
+                        .query_row(
+                            "SELECT count(*) FROM task_work_events WHERE task_id=?",
+                            [first.id],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .map_err(display_error)?,
+                ))
+            })
+            .unwrap();
+        assert_eq!(status_history_count, 1);
+        assert_eq!(work_event_count, 0);
+        assert!(db
+            .get_logs(first.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.log_type == "created"));
+
+        let unchanged_queue = relation_invariant_snapshot(&db, first.id);
+        assert_eq!(unchanged_queue, queue_snapshot);
+
+        assert!(db
+            .with_conn(|connection| {
+                connection
+                    .execute(
+                        "UPDATE tasks SET parent_task_id=999999 WHERE id=?",
+                        [first.id],
+                    )
+                    .map(|_| ())
+                    .map_err(display_error)
+            })
+            .is_err());
+
+        db.set_parent_task(first.id, Some(other_parent.id)).unwrap();
+        db.soft_delete(other_parent.id).unwrap();
+        assert_eq!(
+            db.get_task(first.id).unwrap().parent_task_id,
+            Some(other_parent.id)
+        );
+        db.permanently_delete_tasks(vec![other_parent.id]).unwrap();
+        assert_eq!(db.get_task(first.id).unwrap().parent_task_id, None);
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
     }
     #[test]
     fn sequence_and_manual_order_are_persistent() {
@@ -4463,7 +5106,7 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
     #[test]
-    fn migration_v7_backfills_queue_events_and_clears_handled_urgency() {
+    fn migration_to_v8_backfills_queue_events_and_clears_handled_urgency() {
         let root = std::env::temp_dir().join(format!(
             "inline-migration-test-{}",
             Utc::now().timestamp_nanos_opt().unwrap()
@@ -4506,7 +5149,7 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 7);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 8);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);
@@ -4540,6 +5183,73 @@ mod tests {
 
         drop(migrated);
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn backup_restore_maps_parent_ids_in_two_passes_without_overwriting_current_relation() {
+        let nonce = Utc::now().timestamp_nanos_opt().unwrap();
+        let source_root = std::env::temp_dir().join(format!("inline-relation-source-{nonce}"));
+        let target_root = std::env::temp_dir().join(format!("inline-relation-target-{nonce}"));
+        fs::create_dir_all(&source_root).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+
+        let source = Database::open_at(source_root.join("inline.db")).unwrap();
+        let source_parent = source.save_task(sample("备份父任务")).unwrap();
+        let source_first = source.save_task(sample("共享子任务")).unwrap();
+        let source_second = source.save_task(sample("仅备份子任务")).unwrap();
+        source
+            .set_parent_task(source_first.id, Some(source_parent.id))
+            .unwrap();
+        source
+            .set_parent_task(source_second.id, Some(source_parent.id))
+            .unwrap();
+        source
+            .reorder_subtasks(ReorderSubtasksInput {
+                parent_task_id: source_parent.id,
+                task_ids: vec![source_second.id, source_first.id],
+            })
+            .unwrap();
+        let source_backup = source.create_backup("manual").unwrap();
+        drop(source);
+
+        let target = Database::open_at(target_root.join("inline.db")).unwrap();
+        let target_parent = target.save_task(sample("备份父任务")).unwrap();
+        let current_parent = target.save_task(sample("现库所属任务")).unwrap();
+        let target_first = target.save_task(sample("共享子任务")).unwrap();
+        target
+            .set_parent_task(target_first.id, Some(current_parent.id))
+            .unwrap();
+
+        let imported = target.import_backup(source_backup.path).unwrap();
+        let result = target.restore_backup(imported.path).unwrap();
+        assert_eq!(result.added_tasks, 1);
+        assert_eq!(result.merged_tasks, 2);
+        assert_eq!(
+            target.get_task(target_first.id).unwrap().parent_task_id,
+            Some(current_parent.id),
+            "现库已有关系必须优先"
+        );
+        let imported_child = target
+            .list_tasks(TaskView::Queue)
+            .unwrap()
+            .into_iter()
+            .find(|task| task.title == "仅备份子任务")
+            .unwrap();
+        assert_eq!(imported_child.parent_task_id, Some(target_parent.id));
+        assert_eq!(imported_child.subtask_sort_order, 1);
+        assert_eq!(
+            target
+                .list_subtasks(target_parent.id)
+                .unwrap()
+                .iter()
+                .map(|task| task.id)
+                .collect::<Vec<_>>(),
+            vec![imported_child.id]
+        );
+
+        drop(target);
+        let _ = fs::remove_dir_all(source_root);
+        let _ = fs::remove_dir_all(target_root);
     }
 
     #[test]

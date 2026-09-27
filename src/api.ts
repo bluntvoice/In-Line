@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { Image } from "@tauri-apps/api/image";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,UpdateCheckResponse,UpdateProgress,WorkCalendarResult } from "./types";
+import type { BackupInfo,BackupMergeResult,BootstrapData,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,ReorderSubtasksInput,StatisticsDetail,StatisticsResult,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,UpdateCheckResponse,UpdateProgress,WorkCalendarResult } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
 
 let pngImageSupported=true;
@@ -39,6 +39,10 @@ export const api={
   archiveTask:(id:number)=>invoke<void>("archive_task",{id}),
   mergeTasks:(input:MergeTaskInput)=>invoke<void>("merge_tasks",{input}),
   resolveImportConflict:(id:number)=>invoke<void>("resolve_import_conflict",{id}),
+  listParentTaskCandidates:(taskId:number)=>invoke<LegalTask[]>("list_parent_task_candidates",{taskId}),
+  listSubtasks:(parentTaskId:number)=>invoke<LegalTask[]>("list_subtasks",{parentTaskId}),
+  setParentTask:(taskId:number,parentTaskId:number|null)=>invoke<void>("set_parent_task",{taskId,parentTaskId}),
+  reorderSubtasks:(input:ReorderSubtasksInput)=>invoke<void>("reorder_subtasks",{input}),
   getLogs:(taskId:number)=>invoke<TaskLog[]>("get_logs",{taskId}),
   getWorkEvents:(taskId:number)=>invoke<TaskWorkEvent[]>("get_work_events",{taskId}),
   voidWorkEvent:(id:number,confirmHistoricalImpact=false)=>invoke<void>("void_work_event",{id,confirmHistoricalImpact}),

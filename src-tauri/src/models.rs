@@ -52,6 +52,15 @@ pub struct LegalTask {
     pub has_active_queue: bool,
     pub deferred_entered_at: Option<String>,
     pub is_import_conflict: bool,
+    pub parent_task_id: Option<i64>,
+    pub subtask_sort_order: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderSubtasksInput {
+    pub parent_task_id: i64,
+    pub task_ids: Vec<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

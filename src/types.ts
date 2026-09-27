@@ -10,6 +10,7 @@ export interface LegalTask{
   urgentRequester:string;urgentReason:string;requestedDeadline:string|null;requestedDeadlineLabel:string|null;internalNotes:string;createdAt:string;
   updatedAt:string;startedAt:string|null;completedAt:string|null;archivedAt:string|null;deletedAt:string|null;customSortOrder:number;
   processingRounds:number;hasActiveQueue:boolean;deferredEnteredAt:string|null;isImportConflict:boolean;
+  parentTaskId:number|null;subtaskSortOrder:number;
 }
 export interface TaskInput{
   id?:number;department:string;departments:string[];contact:string;contacts:string[];taskType:string;title:string;details:string;status:TaskStatus;priority:Priority;
@@ -20,6 +21,7 @@ export interface TaskWorkEvent{id:number;taskId:number;resultStatus:WorkResult;h
 export type WorkResult="processed"|"completed"|"waiting_materials"|"waiting_confirmation"|"waiting_counterparty_confirmation";
 export interface QueueInput{id:number;inheritDeadline:boolean;reason:string}
 export interface MergeTaskInput{targetTaskId:number;sourceTaskId:number;deduplicateRecords:boolean;trashSource:boolean}
+export interface ReorderSubtasksInput{parentTaskId:number;taskIds:number[]}
 export interface TicketSnapshot{task:LegalTask;queueAhead:number}
 export interface MasterData{departments:string[];taskTypes:string[];contacts:string[]}
 export interface BackupInfo{name:string;path:string;size:number;modifiedAt:string}
