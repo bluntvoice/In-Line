@@ -5,7 +5,7 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 [![GitHub Release](https://img.shields.io/github/v/release/bluntvoice/In-Line)](https://github.com/bluntvoice/In-Line/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/bluntvoice/In-Line/total)](https://github.com/bluntvoice/In-Line/releases)
 
-当前版本：v0.3.1（2026-09-22）。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
+当前正式版：v0.3.1（2026-09-22）；开发测试版本：v0.4.0。完整变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 主界面
 
