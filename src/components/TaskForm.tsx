@@ -14,6 +14,7 @@ interface Props {
   commonContacts: string[];
   onClose: () => void;
   onSaved: () => void;
+  onCompleteRequested?: (task: LegalTask) => Promise<void>;
 }
 
 type MasterKind = "department" | "task_type" | "contact";
@@ -61,7 +62,7 @@ function toInput(task: LegalTask | null, defaultTaskType: string): TaskInput {
   };
 }
 
-export default function TaskForm({ task, masters, commonDepartments, commonContacts, onClose, onSaved }: Props) {
+export default function TaskForm({ task, masters, commonDepartments, commonContacts, onClose, onSaved, onCompleteRequested }: Props) {
   const [form, setForm] = useState<TaskInput>(() => toInput(task, masters.taskTypes[0] ?? ""));
   const [localMasters, setLocalMasters] = useState(masters);
   const [error, setError] = useState("");
@@ -108,7 +109,12 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
     setSaving(true);
     setError("");
     try {
-      await api.saveTask(form);
+      if (task && form.status === "completed" && task.status !== "completed" && onCompleteRequested) {
+        const saved = await api.saveTask({ ...form, status: task.status });
+        await onCompleteRequested(saved);
+      } else {
+        await api.saveTask(form);
+      }
       onSaved();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));

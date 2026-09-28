@@ -25,11 +25,12 @@ interface Props {
   onAddSubtask:(parent:LegalTask)=>void;
   onOpenTask:(task:LegalTask)=>void;
   onQuickAction:(task:LegalTask,mode:QuickActionMode)=>void;
+  onCompleteTask:(task:LegalTask)=>Promise<void>;
   onOpenContext:(task:LegalTask,x:number,y:number)=>void;
   notify?:(message:string)=>void;
 }
 
-export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey=0,onClose,onEdit,onChanged,onRelationshipChanged,onAddSubtask,onOpenTask,onQuickAction,onOpenContext,notify=()=>undefined}:Props){
+export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey=0,onClose,onEdit,onChanged,onRelationshipChanged,onAddSubtask,onOpenTask,onQuickAction,onCompleteTask,onOpenContext,notify=()=>undefined}:Props){
   const [logs,setLogs]=useState<TaskLog[]>([]);const [events,setEvents]=useState<TaskWorkEvent[]>([]);const [note,setNote]=useState("");
   const [editingLog,setEditingLog]=useState<number|null>(null);const [editingContent,setEditingContent]=useState("");
   const [queueDialog,setQueueDialog]=useState<"enqueue"|"reopen"|null>(null);const [mergeDialog,setMergeDialog]=useState(false);
@@ -56,7 +57,7 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
   const removeLog=async(id:number)=>{if(!window.confirm("删除这条普通处理备注？"))return;await api.deleteLog(id);await refresh();};
   const removeEvent=async(event:TaskWorkEvent)=>{const impact=event.isFirstValid?`${historyWarning}\n\n`:"";if(!window.confirm(`${impact}删除这条办理记录？删除后将不再计入处理轮次和统计，但不会自动回退事项当前状态。`))return;await api.voidWorkEvent(event.id,event.isFirstValid);notify("办理记录已删除，事项当前状态未改变");await refresh();onChanged();};
   const process=async()=>{await api.processRound(task.id);notify("已记录本轮处理，事项已进入暂缓队列");onChanged();};
-  const complete=async()=>{await api.completeRound(task.id);notify("已记录本轮完成，事项整体结束");onChanged();};
+  const complete=async()=>{try{await onCompleteTask(task);}catch(error){notify("完成失败："+(error instanceof Error?error.message:String(error)));}};
   const changeParent=async(value:string)=>{
     const nextId=value?Number(value):null;
     setRelationSaving(true);setRelationError("");

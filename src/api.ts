@@ -82,7 +82,7 @@ export const api={
   getUpdateProgress:()=>invoke<UpdateProgress>("get_update_progress"),
   showUpdateProgress:()=>invoke<void>("show_update_progress"),
   hideUpdateProgress:()=>invoke<void>("hide_update_progress"),
-  openTaskAction:(id:number,action:TaskUiAction["action"]|"complete"|"archive"|"delete"|"restore")=>invoke<void>("open_task_action",{request:{id,action}}),
+  openTaskAction:(id:number,action:TaskUiAction["action"]|"archive"|"delete"|"restore")=>invoke<void>("open_task_action",{request:{id,action}}),
   getTask:(id:number)=>invoke<LegalTask>("copy_ticket_card",{id}),
   getVersion,
   copyText:(value:string)=>writeText(value),

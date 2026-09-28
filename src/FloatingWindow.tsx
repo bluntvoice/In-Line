@@ -1,4 +1,4 @@
-import { useEffect,useState } from "react";
+import { useEffect,useMemo,useState } from "react";
 import { ArrowDown,ArrowUp,ClockAlert,Copy,ExternalLink,Grip,Maximize2,Minimize2,Plus,X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { LogicalSize } from "@tauri-apps/api/dpi";
@@ -9,13 +9,15 @@ import { isMiniFloatingHeight } from "./lib/floating-window";
 import StatusBadge from "./components/StatusBadge";
 import TaskContextMenu,{type ContextAction} from "./components/TaskContextMenu";
 import TicketNumber from "./components/TicketNumber";
+import SubtaskProgressControl from "./components/SubtaskProgressControl";
+import { groupSubtasks } from "./lib/subtask-progress";
 
 export default function FloatingWindow(){
-  const [tasks,setTasks]=useState<LegalTask[]>([]);const [mini,setMini]=useState(()=>isMiniFloatingHeight(window.innerHeight));const [message,setMessage]=useState("");const [menu,setMenu]=useState<{task:LegalTask;x:number;y:number}|null>(null);
+  const [tasks,setTasks]=useState<LegalTask[]>([]);const [structureTasks,setStructureTasks]=useState<LegalTask[]>([]);const [mini,setMini]=useState(()=>isMiniFloatingHeight(window.innerHeight));const [message,setMessage]=useState("");const [menu,setMenu]=useState<{task:LegalTask;x:number;y:number}|null>(null);
   const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState("");
   const refresh=async()=>{
     setLoading(true);setLoadError("");
-    try{const data=await api.bootstrap();setTasks(visibleQueueTasks(data.queue));}
+    try{const data=await api.bootstrap();setTasks(visibleQueueTasks(data.queue));setStructureTasks([...data.queue,...data.archive,...data.trash]);}
     catch(error){setLoadError(error instanceof Error?error.message:String(error));}
     finally{setLoading(false);}
   };
@@ -39,8 +41,9 @@ export default function FloatingWindow(){
       await api.openTaskAction(value.task.id,value.type as "view"|"edit"|"status"|"urgent");
       return;
     }
+    if(value.type==="addSubtask"){await api.openTaskAction(value.task.id,"addSubtask");return;}
     if(value.type==="process")await api.processRound(value.task.id);
-    if(value.type==="complete")await api.completeRound(value.task.id);
+    if(value.type==="complete"){await api.openTaskAction(value.task.id,"complete");return;}
     if(value.type==="enqueue"||value.type==="reopen"){
       await api.openTaskAction(value.task.id,"view");toast("请在事项详情中确认是否继承截止时间");return;
     }
@@ -65,6 +68,12 @@ export default function FloatingWindow(){
     if(event.target===event.currentTarget)startDrag(event);
   };
   const firstTask=tasks[0];
+  const taskById=useMemo(()=>new Map(structureTasks.map(task=>[task.id,task])),[structureTasks]);
+  const subtasksByParent=useMemo(()=>groupSubtasks(structureTasks),[structureTasks]);
+  const toggleSubtaskCompletion=async(task:LegalTask)=>{
+    if(task.status==="completed"){await api.setTaskStatus(task.id,"pending");toast("已取消完成并重新加入今日队列");return;}
+    await api.openTaskAction(task.id,"complete");
+  };
   const toolbar=<header className="floating-toolbar">
     <button className="floating-drag-handle" onMouseDown={startDrag} title="拖动悬浮窗" aria-label="拖动悬浮窗"><Grip size={16}/></button>
     <div className="floating-toolbar-content">
@@ -82,8 +91,8 @@ export default function FloatingWindow(){
   }
   return <div className="floating-expanded">
     {toolbar}
-    <div className="floating-list" onMouseDown={startBlankDrag}>{loadError?<div className="floating-error" role="alert"><strong>队列载入失败</strong><p>{loadError}</p><button onClick={()=>void refresh()}>重新载入</button></div>:tasks.slice(0,12).map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=index>0&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=index<tasks.length-1&&isOverdue(tasks[index+1])===taskOverdue;return <article key={task.id} className={`floating-card${task.isUrgent?" urgent":""}${taskOverdue?" overdue":""}`} onClick={()=>void openDetails(task)} onContextMenu={event=>{event.preventDefault();setMenu({task,x:event.clientX,y:event.clientY});}}>
-      <TicketNumber task={task}/><div className="floating-copy"><strong>{task.title}</strong><span>{task.department} · {task.contact}{isOverdue(task)&&<i className="floating-overdue"><ClockAlert size={11}/>已逾期</i>}{task.isImportConflict&&<i className="floating-conflict">导入冲突</i>}</span></div>
+    <div className="floating-list" onMouseDown={startBlankDrag}>{loadError?<div className="floating-error" role="alert"><strong>队列载入失败</strong><p>{loadError}</p><button onClick={()=>void refresh()}>重新载入</button></div>:tasks.slice(0,12).map((task,index)=>{const taskOverdue=isOverdue(task);const parent=task.parentTaskId===null?null:taskById.get(task.parentTaskId)??null;const subtasks=subtasksByParent.get(task.id)??[];const canMoveUp=index>0&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=index<tasks.length-1&&isOverdue(tasks[index+1])===taskOverdue;return <article key={task.id} className={`floating-card${task.isUrgent?" urgent":""}${taskOverdue?" overdue":""}`} onClick={()=>void openDetails(task)} onContextMenu={event=>{event.preventDefault();setMenu({task,x:event.clientX,y:event.clientY});}}>
+      <TicketNumber task={task}/><div className="floating-copy"><div className="floating-title-line"><strong title={task.title}>{task.title}</strong>{subtasks.length>0&&<SubtaskProgressControl parent={task} subtasks={subtasks} onOpenTask={child=>void openDetails(child)} onAddSubtask={value=>void api.openTaskAction(value.id,"addSubtask").catch(error=>toast(String(error)))} onToggleCompletion={toggleSubtaskCompletion}/>}</div><span className={parent?"floating-parent-line":undefined}>{parent?<><button type="button" title={parent.title} onClick={event=>{event.stopPropagation();void openDetails(parent);}}>所属：{parent.title}</button>{(parent.archivedAt||parent.status==="archived")&&<em>已归档</em>}</>:<>{task.department} · {task.contact}</>}{isOverdue(task)&&<i className="floating-overdue"><ClockAlert size={11}/>已逾期</i>}{task.isImportConflict&&<i className="floating-conflict">导入冲突</i>}</span></div>
       <div className="float-row-actions"><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制"><Copy size={15}/></button><button disabled={!canMoveUp} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={15}/></button><button disabled={!canMoveDown} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={15}/></button></div>
     </article>})}{!loadError&&!loading&&!tasks.length&&<div className="floating-empty" onMouseDown={startDrag}><img src="/inline-mark.svg" alt=""/><p>目前没有排队事项</p></div>}</div>
     <footer className="floating-footer" onMouseDown={startBlankDrag}><button onClick={()=>void api.requestNewTask().catch(error=>toast("无法新增："+String(error)))}><Plus size={15}/>新增取号</button><span>单击查看详情 · 右键管理</span></footer>{menu&&<TaskContextMenu {...menu} view="queue" onAction={value=>void action(value).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>} {message&&<div className="float-toast expanded">{message}</div>}

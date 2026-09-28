@@ -12,7 +12,7 @@ const SWITCHABLE_STATUSES:TaskStatus[]=[
   "waiting_counterparty_confirmation","paused","processed","completed","cancelled"
 ];
 
-export default function TaskQuickActionDialog({task,mode,onClose,onSaved}:{task:LegalTask;mode:QuickActionMode;onClose:()=>void;onSaved:()=>void}){
+export default function TaskQuickActionDialog({task,mode,onClose,onSaved,onCompleteRequested}:{task:LegalTask;mode:QuickActionMode;onClose:()=>void;onSaved:()=>void;onCompleteRequested:(task:LegalTask)=>Promise<void>}){
   const [status,setStatus]=useState<TaskStatus>(task.status);
   const [requester,setRequester]=useState(task.urgentRequester);
   const [reason,setReason]=useState(task.urgentReason);
@@ -31,6 +31,11 @@ export default function TaskQuickActionDialog({task,mode,onClose,onSaved}:{task:
     event?.preventDefault();
     setSaving(true);setError("");
     try{
+      if(mode==="status"&&status==="completed"){
+        await onCompleteRequested(task);
+        onClose();
+        return;
+      }
       if(mode==="status")await api.setTaskStatus(task.id,status);
       else await api.setTaskUrgent(task.id,!task.isUrgent,requester,reason);
       onSaved();

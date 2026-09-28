@@ -1,7 +1,7 @@
 import { useEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,BarChart3,BookOpen,CalendarDays,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,RotateCcw,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
-import type { BootstrapData,LegalTask,MasterData,TaskView } from "./types";
+import type { BootstrapData,LegalTask,MasterData,SubtaskCompletionState,TaskView } from "./types";
 import { commonContacts,commonDepartments,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortDeferredQueue,taskDetailView,visibleQueueTasks } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
 import TicketNumber from "./components/TicketNumber";
@@ -16,9 +16,13 @@ import WorkCalendarPanel from "./components/WorkCalendarPanel";
 import QueueDialog from "./components/QueueDialog";
 import TaskQuickActionDialog,{type QuickActionMode} from "./components/TaskQuickActionDialog";
 import SubtaskCreateDialog from "./components/SubtaskCreateDialog";
+import SubtaskProgressControl from "./components/SubtaskProgressControl";
+import TaskCompletionDialog from "./components/TaskCompletionDialog";
+import SubtaskCompletionNotice from "./components/SubtaskCompletionNotice";
 import { DeadlineFilterHeader,ValueFilterHeader } from "./components/TaskTableFilter";
 import { activeFilterCount,applyTaskFilters,EMPTY_TASK_FILTERS,uniqueValues,type TaskFilters } from "./lib/task-filters";
 import { STATUS_LABELS } from "./lib/task-utils";
+import { groupSubtasks,needsParentCompletionChoice,shouldOfferParentCompletion } from "./lib/subtask-progress";
 
 const emptyMasters:MasterData={departments:[],taskTypes:[],contacts:[]};
 type MenuState={task:LegalTask;view:TaskView;x:number;y:number}|null;
@@ -41,6 +45,8 @@ export default function App(){
   const [queueAction,setQueueAction]=useState<{task:LegalTask;reopen:boolean}|null>(null);
   const [subtaskParent,setSubtaskParent]=useState<LegalTask|null>(null);
   const [relationRefreshKey,setRelationRefreshKey]=useState(0);
+  const [completionPrompt,setCompletionPrompt]=useState<{task:LegalTask;state:SubtaskCompletionState}|null>(null);
+  const [completionNotice,setCompletionNotice]=useState<LegalTask|null>(null);
   const [message,setMessage]=useState("");
   const [startupError,setStartupError]=useState("");
   const [version,setVersion]=useState("");
@@ -64,10 +70,42 @@ export default function App(){
       setData(next);
       setSelectedTrashIds(current=>current.filter(id=>next.trash.some(task=>task.id===id)));
       setSelected(current=>current?[...next.queue,...next.archive,...next.trash].find(value=>value.id===current.id)??null:null);
+      setCompletionNotice(current=>{
+        if(!current)return null;
+        const latest=[...next.queue,...next.archive,...next.trash].find(task=>task.id===current.id);
+        return latest&&!latest.deletedAt&&!latest.archivedAt&&!["completed","cancelled","archived"].includes(latest.status)?latest:null;
+      });
     }catch(error){
       const detail=error instanceof Error?error.message:String(error);
       setStartupError(detail||"初始化失败，请重试");
     }
+  };
+  const performCompletion=async(task:LegalTask,includeSubtasks:boolean)=>{
+    const result=await api.completeTask({taskId:task.id,includeEligibleSubtasks:includeSubtasks});
+    const state=result.completionState;
+    if(shouldOfferParentCompletion(task.id,state)){
+      try{setCompletionNotice(await api.getTask(state.parentTaskId));}catch{setCompletionNotice(null);}
+    }
+    toast(result.completedTaskIds.length>1?`已完成父任务及 ${result.completedTaskIds.length-1} 个子任务`:"已记录本轮完成，事项整体结束");
+    await refresh();
+  };
+  const requestCompletion=async(task:LegalTask)=>{
+    const state=await api.getSubtaskCompletionState(task.id);
+    if(needsParentCompletionChoice(task.id,state)){
+      setCompletionPrompt({task,state});
+      return;
+    }
+    await performCompletion(task,false);
+  };
+  const toggleSubtaskCompletion=async(task:LegalTask)=>{
+    if(task.status==="completed"){
+      await api.setTaskStatus(task.id,"pending");
+      setCompletionNotice(null);
+      toast("已取消完成并恢复为待处理，已加入今日队列");
+      await refresh();
+      return;
+    }
+    await requestCompletion(task);
   };
   useEffect(()=>{
     void refresh();
@@ -77,6 +115,8 @@ export default function App(){
       void api.getTask(id).then(task=>{
         if(action==="view")showTaskDetails(task);
         else if(action==="edit")setEditing(task);
+        else if(action==="complete")return requestCompletion(task);
+        else if(action==="addSubtask")setSubtaskParent(task);
         else setQuickAction({task,mode:action});
       }).catch(error=>toast("无法打开事项："+String(error)));
     });
@@ -105,6 +145,9 @@ export default function App(){
     return filtered.filter(task=>[task.permanentNumber,task.department,task.contact,task.taskType,task.title,task.details,task.internalNotes]
       .some(value=>value.toLocaleLowerCase("zh-CN").includes(key)));
   },[source,query,filters]);
+  const structureTasks=useMemo(()=>data?[...data.queue,...data.archive,...data.trash]:[],[data]);
+  const taskById=useMemo(()=>new Map(structureTasks.map(task=>[task.id,task])),[structureTasks]);
+  const subtasksByParent=useMemo(()=>groupSubtasks(structureTasks),[structureTasks]);
 
   const copy=async(task:LegalTask)=>{try{await api.copyTicketImage(task);toast("已复制："+displayTicket(task));}catch(error){toast("复制失败："+String(error));}};
   const move=async(event:React.MouseEvent,task:LegalTask,direction:"up"|"down")=>{event.stopPropagation();try{await api.moveTask(task.id,direction);}catch(error){toast("调整失败："+String(error));}};
@@ -115,7 +158,7 @@ export default function App(){
     if(type==="addSubtask"){setSubtaskParent(task);return;}
     if(type==="status"||type==="urgent"){setQuickAction({task,mode:type});return;}
     if(type==="process"){await api.processRound(task.id);toast("已记录本轮处理，事项已进入暂缓队列");return;}
-    if(type==="complete"){await api.completeRound(task.id);toast("已记录本轮完成，事项整体结束");return;}
+    if(type==="complete"){await requestCompletion(task);return;}
     if(type==="enqueue"){setQueueAction({task,reopen:false});return;}
     if(type==="reopen"){setQueueAction({task,reopen:true});return;}
     if(type==="archive")await api.archiveTask(task.id);
@@ -141,6 +184,7 @@ export default function App(){
   };
   const context=(task:LegalTask,x:number,y:number)=>{const detailView=taskDetailView(task);setMenu({task,view:detailView==="deferred"?"queue":detailView,x,y});};
   const contextKey=(event:React.KeyboardEvent,task:LegalTask)=>{
+    if(event.target!==event.currentTarget)return;
     if(event.shiftKey&&event.key==="F10"){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();context(task,rect.left+120,rect.top+32);}
     else if(event.key==="Enter"){event.preventDefault();showTaskDetails(task);}
   };
@@ -162,7 +206,7 @@ export default function App(){
   const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);setSelected(null);setView(next);};
   const renderTaskDetail=(detailView:TaskView)=>selected&&<TaskDetail key={selected.id} task={selected} view={detailView} mergeCandidates={[...data.queue,...data.archive]} relationRefreshKey={relationRefreshKey}
     onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} onRelationshipChanged={()=>void refresh()}
-    onAddSubtask={setSubtaskParent} onOpenTask={showTaskDetails} onQuickAction={(task,mode)=>setQuickAction({task,mode})} onOpenContext={context} notify={toast}/>;
+    onAddSubtask={setSubtaskParent} onOpenTask={showTaskDetails} onQuickAction={(task,mode)=>setQuickAction({task,mode})} onCompleteTask={requestCompletion} onOpenContext={context} notify={toast}/>;
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -195,8 +239,8 @@ export default function App(){
               <th><ValueFilterHeader label="事项类型" values={filterOptions.taskTypes} selected={filters.taskTypes} onChange={taskTypes=>updateFilters({taskTypes})}/></th>
               <th><ValueFilterHeader label="当前状态" values={filterOptions.statuses} selected={filters.statuses} renderLabel={status=>STATUS_LABELS[status]} onChange={statuses=>updateFilters({statuses})}/></th>
               <th>{view==="archive"?"完成时间":<DeadlineFilterHeader date={filters.deadlineDate} periods={filters.deadlinePeriods} onChange={(deadlineDate,deadlinePeriods)=>updateFilters({deadlineDate,deadlinePeriods})}/>}</th><th>操作</th></tr></thead>
-              <tbody>{tasks.map((task,index)=>{const taskOverdue=isOverdue(task);const canMoveUp=view==="queue"&&task.hasActiveQueue&&index>0&&tasks[index-1].hasActiveQueue&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=view==="queue"&&task.hasActiveQueue&&index<tasks.length-1&&tasks[index+1].hasActiveQueue&&isOverdue(tasks[index+1])===taskOverdue;return <tr key={task.id} className={taskOverdue?"overdue-row":undefined} tabIndex={0} onClick={()=>setSelected(task)} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
-                <td><span className="ticket-cell">{view==="trash"&&<input type="checkbox" checked={selectedTrashIds.includes(task.id)} aria-label={`选择 ${task.title}`} onClick={event=>event.stopPropagation()} onChange={event=>setSelectedTrashIds(current=>event.target.checked?[...current,task.id]:current.filter(id=>id!==task.id))}/>}<TicketNumber task={task}/></span></td><td><strong>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}{task.isImportConflict&&<span className="conflict-mark">导入冲突</span>}</td>
+              <tbody>{tasks.map((task,index)=>{const taskOverdue=isOverdue(task);const parent=task.parentTaskId===null?null:taskById.get(task.parentTaskId)??null;const subtasks=subtasksByParent.get(task.id)??[];const canMoveUp=view==="queue"&&task.hasActiveQueue&&index>0&&tasks[index-1].hasActiveQueue&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=view==="queue"&&task.hasActiveQueue&&index<tasks.length-1&&tasks[index+1].hasActiveQueue&&isOverdue(tasks[index+1])===taskOverdue;return <tr key={task.id} className={`${taskOverdue?"overdue-row ":""}${parent||subtasks.length?"structured-task-row":""}`.trim()||undefined} tabIndex={0} onClick={()=>setSelected(task)} onContextMenu={event=>{event.preventDefault();context(task,event.clientX,event.clientY);}} onKeyDown={event=>contextKey(event,task)}>
+                <td><span className="ticket-cell">{view==="trash"&&<input type="checkbox" checked={selectedTrashIds.includes(task.id)} aria-label={`选择 ${task.title}`} onClick={event=>event.stopPropagation()} onChange={event=>setSelectedTrashIds(current=>event.target.checked?[...current,task.id]:current.filter(id=>id!==task.id))}/>}<TicketNumber task={task}/></span></td><td><div className="task-title-structure"><div className="task-title-line"><strong title={task.title}>{task.title}</strong>{task.isUrgent&&<span className="urgent-mark">加急</span>}{task.isImportConflict&&<span className="conflict-mark">导入冲突</span>}{subtasks.length>0&&view!=="trash"&&<SubtaskProgressControl parent={task} subtasks={subtasks} onOpenTask={showTaskDetails} onAddSubtask={setSubtaskParent} onToggleCompletion={toggleSubtaskCompletion}/>}</div>{parent&&<span className="parent-task-line"><button type="button" title={parent.title} onClick={event=>{event.stopPropagation();showTaskDetails(parent);}}>所属：{parent.title}</button>{(parent.archivedAt||parent.status==="archived")&&<em>已归档</em>}</span>}</div></td>
                 <td>{task.department}</td><td>{task.contact}</td><td>{task.taskType}</td><td><StatusBadge status={task.status} overdue={taskOverdue}/></td>
                 <td className={taskOverdue?"deadline overdue":"deadline"}>{view==="archive"?formatDateTime(historyTimestamp(task)):formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
                 <td><div className="row-actions">{view==="trash"?<><button onClick={event=>{event.stopPropagation();void api.restoreTask(task.id).then(()=>toast("事项已恢复并加入今日队列")).catch(error=>toast(String(error)));}} title="恢复"><RotateCcw size={17}/></button><button className="danger" onClick={event=>{event.stopPropagation();void handleAction({type:"permanentDelete",task}).catch(error=>toast(String(error)));}} title="永久删除"><Trash2 size={17}/></button></>:<><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制取号图片"><Copy size={17}/></button><button disabled={!canMoveUp} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={17}/></button><button disabled={!canMoveDown} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={17}/></button></>}</div></td>
@@ -208,11 +252,13 @@ export default function App(){
         </div>
       </>}
     </main>
-    {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} commonDepartments={frequentDepartments} commonContacts={frequentContacts} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} commonDepartments={frequentDepartments} commonContacts={frequentContacts} onClose={()=>setEditing(undefined)} onCompleteRequested={requestCompletion} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
     {subtaskParent&&<SubtaskCreateDialog parent={subtaskParent} masters={data.masters??emptyMasters} commonDepartments={frequentDepartments} commonContacts={frequentContacts} onClose={()=>setSubtaskParent(null)} onSaved={task=>{setSubtaskParent(null);setRelationRefreshKey(current=>current+1);toast(`子任务已创建：${displayTicket(task)}`);void refresh();}}/>}
-    {quickAction&&<TaskQuickActionDialog task={quickAction.task} mode={quickAction.mode} onClose={()=>setQuickAction(null)} onSaved={()=>{toast(quickAction.mode==="status"?"事项状态已更新":quickAction.task.isUrgent?"已取消加急":"事项已设为加急");setQuickAction(null);void refresh();}}/>}
+    {quickAction&&<TaskQuickActionDialog task={quickAction.task} mode={quickAction.mode} onClose={()=>setQuickAction(null)} onCompleteRequested={requestCompletion} onSaved={()=>{toast(quickAction.mode==="status"?"事项状态已更新":quickAction.task.isUrgent?"已取消加急":"事项已设为加急");setQuickAction(null);void refresh();}}/>}
+    {completionPrompt&&<TaskCompletionDialog task={completionPrompt.task} state={completionPrompt.state} onClose={()=>setCompletionPrompt(null)} onComplete={async includeSubtasks=>{await performCompletion(completionPrompt.task,includeSubtasks);setCompletionPrompt(null);}}/>}
     {menu&&<TaskContextMenu {...menu} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
     {queueAction&&<QueueDialog task={queueAction.task} reopen={queueAction.reopen} onClose={()=>setQueueAction(null)} onSaved={()=>{toast(queueAction.reopen?"事项已重新开启并加入今日队列":"事项已加入今日队列");setQueueAction(null);void refresh();}}/>}
+    {completionNotice&&<SubtaskCompletionNotice parent={completionNotice} onClose={()=>setCompletionNotice(null)} onCompleteParent={async()=>{try{await performCompletion(completionNotice,false);setCompletionNotice(null);}catch(error){toast("完成父任务失败："+String(error));}}}/>}
     {message&&<div className="toast">{message}</div>}
   </div>;
 }

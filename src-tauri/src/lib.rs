@@ -524,14 +524,13 @@ fn open_task_action(
     request: OpenTaskAction,
 ) -> Result<(), String> {
     match request.action.as_str() {
-        "view" | "edit" | "status" | "urgent" => {
+        "view" | "edit" | "status" | "urgent" | "complete" | "addSubtask" => {
             db.get_task(request.id)?;
             show_main(&app);
             app.emit("task-ui-action", request)
                 .map_err(|error| error.to_string())?;
             return Ok(());
         }
-        "complete" => db.complete_round(request.id)?,
         "archive" => db.archive(request.id)?,
         "delete" => db.soft_delete(request.id)?,
         "restore" => db.restore(request.id)?,
