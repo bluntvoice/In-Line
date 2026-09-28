@@ -47,14 +47,14 @@ export default function SubtaskProgressControl({parent,subtasks,onOpenTask,onAdd
   };
 
   return <>
-    <button type="button" className="subtask-progress-trigger" onClick={open} aria-haspopup="dialog" aria-expanded={Boolean(position)} aria-label={`查看子任务，已完成 ${progress.completed} 项，共 ${progress.total} 项`} title={`子任务 ${progress.completed}/${progress.total}`}>
+    <button type="button" className="subtask-progress-trigger" onClick={open} aria-haspopup="dialog" aria-expanded={Boolean(position)} aria-label={`查看子任务，已完成或已处理 ${progress.handled} 项，共 ${progress.total} 项`} title={`子任务 ${progress.handled}/${progress.total}`}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle className="progress-track" cx="12" cy="12" r="9"/><circle className="progress-value" cx="12" cy="12" r="9" pathLength="100" strokeDasharray={`${progress.percentage} 100`}/></svg>
-      <span>子任务 <b>{progress.completed}/{progress.total}</b></span>
+      <span>子任务 <b>{progress.handled}/{progress.total}</b></span>
     </button>
-    {position&&createPortal(<div className="subtask-popover-layer" onPointerDown={()=>setPosition(null)}>
+    {position&&createPortal(<div className="subtask-popover-layer" onClick={event=>{event.stopPropagation();if(event.target===event.currentTarget)setPosition(null);}}>
       <section ref={panelRef} tabIndex={-1} className="subtask-popover" role="dialog" aria-label={`${parent.title}的子任务`} style={position} onPointerDown={event=>event.stopPropagation()}>
-        <header><div><span>子任务进度</span><strong>{parent.title}</strong></div><button type="button" aria-label="关闭" onClick={()=>setPosition(null)}><X size={16}/></button></header>
-        <div className="subtask-popover-summary"><span><b>{progress.completed}</b> 项已完成</span><span>共 {progress.total} 项</span></div>
+        <header><div><span>子任务进度</span><strong>{parent.title}</strong></div><button type="button" aria-label="关闭" onClick={event=>{event.stopPropagation();setPosition(null);}}><X size={16}/></button></header>
+        <div className="subtask-popover-summary"><span><b>{progress.handled}</b> 项已完成或已处理</span><span>共 {progress.total} 项</span></div>
         {error&&<div className="relation-error"><AlertTriangle size={14}/>{error}</div>}
         <div className="subtask-popover-list">
           {subtasks.map(task=>{const completed=task.status==="completed";const disabled=Boolean(task.deletedAt)||task.status==="cancelled"||task.status==="archived"||Boolean(task.archivedAt);return <article key={task.id}>

@@ -2,7 +2,7 @@ import type { LegalTask,SubtaskCompletionState } from "../types";
 
 export interface SubtaskProgressValue {
   total:number;
-  completed:number;
+  handled:number;
   percentage:number;
 }
 
@@ -20,8 +20,8 @@ export function groupSubtasks(tasks:LegalTask[]) {
 
 export function subtaskProgress(subtasks:Pick<LegalTask,"status">[]):SubtaskProgressValue {
   const total=subtasks.length;
-  const completed=subtasks.filter(task=>task.status==="completed").length;
-  return {total,completed,percentage:total?Math.round(completed/total*100):0};
+  const handled=subtasks.filter(task=>task.status==="completed"||task.status==="processed").length;
+  return {total,handled,percentage:total?Math.round(handled/total*100):0};
 }
 
 export function needsParentCompletionChoice(taskId:number,state:SubtaskCompletionState|null):state is SubtaskCompletionState {

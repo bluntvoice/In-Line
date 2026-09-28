@@ -1,4 +1,4 @@
-import { useEffect,useMemo,useState } from "react";
+import { useEffect,useLayoutEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,BarChart3,BookOpen,CalendarDays,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,RotateCcw,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
 import type { BootstrapData,LegalTask,MasterData,SubtaskCompletionState,TaskView } from "./types";
@@ -24,7 +24,7 @@ import { DeadlineFilterHeader,StructureFilterHeader,ValueFilterHeader } from "./
 import { activeFilterCount,applyTaskFilters,EMPTY_TASK_FILTERS,matchesTaskSearch,uniqueValues,type TaskFilters } from "./lib/task-filters";
 import { STATUS_LABELS } from "./lib/task-utils";
 import { groupSubtasks,needsParentCompletionChoice,shouldOfferParentCompletion } from "./lib/subtask-progress";
-import { defaultTaskColumnLayouts,normalizeTaskColumnLayouts,normalizeTaskColumnWidth,serializeTaskColumnLayouts,TASK_COLUMN_DEFINITIONS,type TaskColumnId,type TaskTablePage } from "./lib/column-widths";
+import { defaultTaskColumnLayouts,fitTaskColumnWidths,normalizeTaskColumnLayouts,normalizeTaskColumnWidth,serializeTaskColumnLayouts,TASK_COLUMN_DEFINITIONS,type TaskColumnId,type TaskTablePage } from "./lib/column-widths";
 
 const emptyMasters:MasterData={departments:[],taskTypes:[],contacts:[]};
 type MenuState={task:LegalTask;view:TaskView;x:number;y:number}|null;
@@ -58,8 +58,22 @@ export default function App(){
   const [filtersByView,setFiltersByView]=useState<Record<PageView,TaskFilters>>({queue:newFilters(),deferred:newFilters(),archive:newFilters(),trash:newFilters()});
   const [selectedTrashIds,setSelectedTrashIds]=useState<number[]>([]);
   const [columnLayouts,setColumnLayouts]=useState(()=>{try{return normalizeTaskColumnLayouts(window.localStorage.getItem(COLUMN_LAYOUT_KEY)??"");}catch{return defaultTaskColumnLayouts();}});
+  const [tableScrollElement,setTableScrollElement]=useState<HTMLDivElement|null>(null);
+  const [tableViewportWidth,setTableViewportWidth]=useState(0);
 
   useEffect(()=>{try{window.localStorage.setItem(COLUMN_LAYOUT_KEY,serializeTaskColumnLayouts(columnLayouts));}catch{/* 界面配置写入失败不应阻断队列 */}},[columnLayouts]);
+  useLayoutEffect(()=>{
+    if(!tableScrollElement)return;
+    const measure=()=>setTableViewportWidth(tableScrollElement.clientWidth);
+    measure();
+    if(typeof ResizeObserver==="undefined"){
+      window.addEventListener("resize",measure);
+      return()=>window.removeEventListener("resize",measure);
+    }
+    const observer=new ResizeObserver(measure);
+    observer.observe(tableScrollElement);
+    return()=>observer.disconnect();
+  },[tableScrollElement]);
 
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),2300);};
   const showTaskDetails=(task:LegalTask)=>{
@@ -210,7 +224,8 @@ export default function App(){
   const frequentContacts=commonContacts(taskHistory);
   const actionView:TaskView=view==="deferred"?"queue":view;
   const columnWidths=columnLayouts[view];
-  const totalColumnWidth=TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+columnWidths[column.id],0);
+  const visibleColumnWidths=fitTaskColumnWidths(columnWidths,tableViewportWidth-1);
+  const totalColumnWidth=TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+visibleColumnWidths[column.id],0);
   const updateColumnWidth=(columnId:TaskColumnId,width:number)=>setColumnLayouts(current=>({...current,[view]:{...current[view],[columnId]:normalizeTaskColumnWidth(columnId,width)}}));
   const resizeHandle=(columnId:TaskColumnId)=>{const column=TASK_COLUMN_DEFINITIONS.find(item=>item.id===columnId)!;return <ColumnResizeHandle label={column.label} width={columnWidths[columnId]} minWidth={column.minWidth} maxWidth={column.maxWidth} onResize={width=>updateColumnWidth(columnId,width)}/>;};
   const resetColumnWidths=()=>{setColumnLayouts(current=>({...current,[view]:defaultTaskColumnLayouts()[view]}));setColumnMenu(null);toast("已恢复当前页面默认列宽");};
@@ -244,7 +259,7 @@ export default function App(){
         </header>
         <div className={selected?"queue-layout with-detail":"queue-layout"}>
           <section className="table-panel"><div className={`table-meta ${view==="trash"?"trash-table-meta":""}`}><span>共 {tasks.length} 项{activeFilterCount(filters)>0&&<><b> · 已启用 {activeFilterCount(filters)} 项筛选</b><button type="button" onClick={()=>setFiltersByView(current=>({...current,[view]:newFilters()}))}>清除筛选</button></>}</span>{view==="trash"?<div className="trash-bulk-actions"><button type="button" className="button secondary small" disabled={!tasks.length} onClick={()=>setSelectedTrashIds(tasks.every(task=>selectedTrashIds.includes(task.id))?[]:tasks.map(task=>task.id))}>{tasks.length>0&&tasks.every(task=>selectedTrashIds.includes(task.id))?"取消全选":"全选当前列表"}</button><button type="button" className="button secondary small danger" disabled={!selectedTrashIds.length} onClick={()=>void permanentlyDeleteSelected().catch(error=>toast("批量删除失败："+String(error)))}><Trash2 size={14}/>永久删除选中项（{selectedTrashIds.length}）</button><button type="button" className="button secondary small danger" disabled={!data.trash.length} onClick={()=>void emptyTrash().catch(error=>toast("清空回收站失败："+String(error)))}>清空回收站</button></div>:<span>单击查看详情 · 右键管理事项 · 拖动表头边界调列宽</span>}</div>
-            <div className="table-scroll"><table className="task-table" style={{width:`max(100%, ${totalColumnWidth}px)`}}><colgroup>{TASK_COLUMN_DEFINITIONS.map(column=><col key={column.id} style={{width:columnWidths[column.id]}}/>)}</colgroup><thead title="拖动列边界调整宽度；右键恢复当前页面默认列宽" onContextMenu={event=>{if((event.target as HTMLElement).closest(".table-filter-popover"))return;event.preventDefault();setMenu(null);setColumnMenu({x:event.clientX,y:event.clientY});}}><tr><th>号码{resizeHandle("number")}</th><th><StructureFilterHeader value={filters.structure} onChange={structure=>updateFilters({structure})}/>{resizeHandle("title")}</th>
+            <div className="table-scroll" ref={setTableScrollElement}><table className="task-table" style={{width:`max(100%, ${totalColumnWidth}px)`}}><colgroup>{TASK_COLUMN_DEFINITIONS.map(column=><col key={column.id} style={{width:visibleColumnWidths[column.id]}}/>)}</colgroup><thead title="拖动列边界调整宽度；右键恢复当前页面默认列宽" onContextMenu={event=>{if((event.target as HTMLElement).closest(".table-filter-popover"))return;event.preventDefault();setMenu(null);setColumnMenu({x:event.clientX,y:event.clientY});}}><tr><th>号码{resizeHandle("number")}</th><th><StructureFilterHeader value={filters.structure} onChange={structure=>updateFilters({structure})}/>{resizeHandle("title")}</th>
               <th><ValueFilterHeader label="部门 / 团队" values={filterOptions.departments} selected={filters.departments} onChange={departments=>updateFilters({departments})}/>{resizeHandle("department")}</th>
               <th><ValueFilterHeader label="对接人" values={filterOptions.contacts} selected={filters.contacts} onChange={contacts=>updateFilters({contacts})}/>{resizeHandle("contact")}</th>
               <th><ValueFilterHeader label="事项类型" values={filterOptions.taskTypes} selected={filters.taskTypes} onChange={taskTypes=>updateFilters({taskTypes})}/>{resizeHandle("taskType")}</th>

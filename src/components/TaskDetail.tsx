@@ -86,8 +86,12 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
   const canWork=!terminal&&task.status!=="cancelled";
   const relationOptions=parentTask&&!parentCandidates.some(candidate=>candidate.id===parentTask.id)?[parentTask,...parentCandidates]:parentCandidates;
   const canManageRelations=view!=="trash";
+  const copyTitle=async()=>{
+    try{await api.copyText(task.title);notify("已复制事项标题");}
+    catch(error){notify(`复制标题失败：${error instanceof Error?error.message:String(error)}`);}
+  };
   return <aside className="detail-panel">
-    <header><div><TicketNumber task={task}/><h2>{task.title}</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18}/></button></header>
+    <header><div><TicketNumber task={task}/><h2><button type="button" className="detail-title-copy" onClick={()=>void copyTitle()} title="点击复制事项标题" aria-label={`复制事项标题：${task.title}`}>{task.title}</button></h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18}/></button></header>
     {task.isImportConflict&&<div className="import-conflict-banner"><AlertTriangle size={18}/><div><strong>导入冲突待复核</strong><span>此事项由备份导入，存在同名但内容不同的当前事项。可以使用“合并”处理重复数据；如果两项都应保留，请在核对后解除标识。</span></div><button className="button secondary small" onClick={async()=>{if(!window.confirm("确认此事项与当前同名事项无需合并，并解除“导入冲突”标识？"))return;await api.resolveImportConflict(task.id);notify("导入冲突标识已解除");onChanged();}}><ShieldCheck size={15}/>已复核</button></div>}
     <div className="detail-actions">
       {view==="trash"?<><button className="button primary" onClick={async()=>{await api.restoreTask(task.id);notify("事项已恢复并加入今日队列");onChanged();}}><RotateCcw size={16}/>恢复</button><button className="button secondary danger" onClick={async()=>{if(!window.confirm(`永久删除“${task.title}”？事项及其全部办理记录将不可恢复。`))return;await api.permanentlyDeleteTasks([task.id]);notify("事项已永久删除");onChanged();}}><Trash2 size={16}/>永久删除</button></>:<>

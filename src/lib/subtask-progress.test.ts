@@ -5,13 +5,13 @@ import { groupSubtasks,needsParentCompletionChoice,shouldOfferParentCompletion,s
 const task=(id:number,parentTaskId:number|null,status:LegalTask["status"],subtaskSortOrder=0)=>({id,parentTaskId,status,subtaskSortOrder}) as LegalTask;
 
 describe("subtask progress",()=>{
-  it("counts every existing child but only completed status in the numerator",()=>{
+  it("counts completed and processed children in the displayed progress",()=>{
     expect(subtaskProgress([
       task(2,1,"completed"),
       task(3,1,"processed"),
       task(4,1,"cancelled"),
       task(5,1,"archived")
-    ])).toEqual({total:4,completed:1,percentage:25});
+    ])).toEqual({total:4,handled:2,percentage:50});
   });
 
   it("groups and orders children without mixing queue order into relationship order",()=>{

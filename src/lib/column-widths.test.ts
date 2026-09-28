@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import { defaultTaskColumnLayouts,normalizeTaskColumnLayouts,normalizeTaskColumnWidth,serializeTaskColumnLayouts } from "./column-widths";
+import { defaultTaskColumnLayouts,fitTaskColumnWidths,normalizeTaskColumnLayouts,normalizeTaskColumnWidth,serializeTaskColumnLayouts,TASK_COLUMN_DEFINITIONS } from "./column-widths";
 
 describe("task table column widths",()=>{
   it("keeps layouts independent for each page",()=>{
@@ -27,5 +27,25 @@ describe("task table column widths",()=>{
     expect(restored.queue.status).toBe(defaults.queue.status);
     expect(restored.queue.number).toBe(defaults.queue.number);
     expect(normalizeTaskColumnWidth("title",420.4)).toBe(420);
+  });
+
+  it("fits a modestly overflowing table while preserving saved widths",()=>{
+    const saved=defaultTaskColumnLayouts().queue;
+    const fitted=fitTaskColumnWidths(saved,920);
+    expect(TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+fitted[column.id],0)).toBe(920);
+    expect(TASK_COLUMN_DEFINITIONS.every(column=>fitted[column.id]>=column.minWidth)).toBe(true);
+    expect(saved.title).toBe(255);
+    expect(fitTaskColumnWidths(saved,1200)).toBe(saved);
+  });
+
+  it("keeps horizontal scrolling possible when the viewport is narrower than all minimums",()=>{
+    const fitted=fitTaskColumnWidths(defaultTaskColumnLayouts().queue,700);
+    expect(TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+fitted[column.id],0)).toBeGreaterThan(700);
+  });
+
+  it("preserves intentional wide column layouts and their horizontal scrolling",()=>{
+    const saved=defaultTaskColumnLayouts().queue;
+    saved.title+=160;
+    expect(fitTaskColumnWidths(saved,920)).toBe(saved);
   });
 });

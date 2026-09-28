@@ -235,5 +235,18 @@ html,body,#root{background:transparent!important}
 /* 浏览器默认的 small 会缩小继承字号；应用内文字至少保持 12px。 */
 small{font-size:12px}
 
+/* 子任务详情、统计卡片与可点击标题的布局修正。 */
+.relation-heading>div{flex:1}
+.relation-heading .button.small{flex:0 0 auto;white-space:nowrap}
+.detail-panel>header>div{min-width:0}
+.detail-title-copy{display:block;max-width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;line-height:inherit;text-align:left;overflow-wrap:anywhere;cursor:copy}
+.detail-title-copy:hover{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.summary-grid{grid-template-columns:repeat(8,minmax(0,1fr))}
+.summary-grid .structure-summary-card{grid-column:span 2;grid-template-columns:minmax(0,1fr) max-content;align-items:center;gap:8px}
+.structure-summary-main{display:grid;min-width:0;gap:1px}
+.structure-summary-card small{justify-self:end;white-space:nowrap;line-height:1.35}
+.statistics-layout.with-detail .summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:1250px){.summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
 /* 阶段 6：按页面保存的可拖动列宽。 */
 .task-table{min-width:100%!important}.task-table th{width:auto!important}.column-resize-handle{position:absolute;z-index:4;top:0;right:-5px;width:10px;height:100%;cursor:col-resize;touch-action:none}.column-resize-handle:after{content:"";position:absolute;top:7px;bottom:7px;left:4px;width:2px;border-radius:2px;background:transparent}.column-resize-handle:hover:after,.column-resize-handle:focus-visible:after{background:#ffb000}.column-resize-handle:focus-visible{outline:0}.column-layout-menu{width:218px}

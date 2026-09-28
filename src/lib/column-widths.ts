@@ -22,6 +22,35 @@ export function defaultTaskColumnWidths(): TaskColumnWidths {
   return Object.fromEntries(TASK_COLUMN_DEFINITIONS.map(column => [column.id, column.defaultWidth])) as TaskColumnWidths;
 }
 
+export function fitTaskColumnWidths(widths: TaskColumnWidths, availableWidth: number): TaskColumnWidths {
+  const available = Math.floor(availableWidth);
+  const total = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + widths[column.id], 0);
+  if (!Number.isFinite(available) || available <= 0 || total <= available) return widths;
+  const defaultTotal = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + column.defaultWidth, 0);
+  // 只吸收默认布局附近的小幅溢出；显著加宽的自定义布局仍允许横向滚动。
+  if (total > defaultTotal + 96) return widths;
+
+  const minimum = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + column.minWidth, 0);
+  if (available <= minimum) {
+    return Object.fromEntries(TASK_COLUMN_DEFINITIONS.map(column => [column.id, column.minWidth])) as TaskColumnWidths;
+  }
+
+  const ratio = (available - minimum) / (total - minimum);
+  const fitted = Object.fromEntries(TASK_COLUMN_DEFINITIONS.map(column => {
+    const width = column.minWidth + Math.floor((widths[column.id] - column.minWidth) * ratio);
+    return [column.id, width];
+  })) as TaskColumnWidths;
+  let remainder = available - TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + fitted[column.id], 0);
+  for (const column of TASK_COLUMN_DEFINITIONS) {
+    if (remainder === 0) break;
+    if (fitted[column.id] < widths[column.id]) {
+      fitted[column.id] += 1;
+      remainder -= 1;
+    }
+  }
+  return fitted;
+}
+
 export function defaultTaskColumnLayouts(): TaskColumnLayouts {
   return Object.fromEntries(TASK_TABLE_PAGES.map(page => [page, defaultTaskColumnWidths()])) as TaskColumnLayouts;
 }
