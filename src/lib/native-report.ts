@@ -38,7 +38,7 @@ export function buildNativeReport({data,preset,overdueCount,taskType="",details=
   const rateLabel=selected?"事项完成占比":data.summary.rateMode==="processing"?"有效处理率":"事项办结率";
   const rate=selected?(handled?Math.round(completed/handled*100):0):Math.round(data.summary.completionRate*100);
   const paragraphs=[
-    `一、总体情况\n统计期间为 ${start} 至 ${end}。${period.subject}共处理 ${handled} 项${scope}，其中完成 ${completed} 项、已处理待跟进 ${processed} 项、暂缓 ${deferred} 项；${rateLabel}为 ${rate}%。`
+    `一、总体情况\n统计期间为 ${start} 至 ${end}。${period.subject}共处理 ${handled} 项${scope}，其中完成 ${completed} 项、已处理待跟进 ${processed} 项、暂缓 ${deferred} 项；${taskType?"":`普通 / 父任务 ${data.summary.topLevelTasks} 项、子任务 ${data.summary.subtasks} 项；`}${rateLabel}为 ${rate}%。`
   ];
 
   if(taskType){

@@ -1,6 +1,6 @@
 import { describe,expect,it } from "vitest";
 import { alphaPrefix,commonContacts,commonDepartments,dayDifference,deadlineShortcut,displayTicket,formatDeadline,fromDateTimeLocalValue,historyTimestamp,isDeferredStatus,localizeStatusText,queueAheadMessage,sortDeferredQueue,sortQueue,taskDetailView,toDateTimeLocalValue,visibleQueueTasks } from "../src/lib/task-utils";
-import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,type TaskFilters } from "../src/lib/task-filters";
+import { activeFilterCount,applyTaskFilters,deadlinePeriod,EMPTY_TASK_FILTERS,matchesTaskSearch,type TaskFilters } from "../src/lib/task-filters";
 import { fitTextLines,ticketRenderKey } from "../src/lib/ticket-image";
 import { statisticsComparisonRange,statisticsDisplayTrend,statisticsPresetRange,statisticsWeekdayLabel } from "../src/lib/statistics-range";
 import { buildReportPrompt,customReportTemplateIsValid,DEFAULT_CUSTOM_REPORT_TEMPLATE,reportTypeForPreset } from "../src/lib/report-prompts";
@@ -120,6 +120,21 @@ describe("队列表头筛选",()=>{
     expect(deadlinePeriod(morning)).toBe("morning");
     expect(deadlinePeriod(evening)).toBe("evening");
     expect(applyTaskFilters(tasks,filters).map(value=>value.id)).toEqual([1]);
+  });
+  it("按顶层事项和子任务结构筛选",()=>{
+    const tasks=[task(1,1),{...task(2,2),parentTaskId:1,subtaskSortOrder:1}];
+    const topLevel:TaskFilters={...EMPTY_TASK_FILTERS,structure:"top-level",deadlinePeriods:[]};
+    const subtasks:TaskFilters={...EMPTY_TASK_FILTERS,structure:"subtask",deadlinePeriods:[]};
+    expect(applyTaskFilters(tasks,topLevel).map(value=>value.id)).toEqual([1]);
+    expect(applyTaskFilters(tasks,subtasks).map(value=>value.id)).toEqual([2]);
+    expect(activeFilterCount(subtasks)).toBe(1);
+  });
+  it("子任务可由父任务名称命中但不会扩展父任务",()=>{
+    const parent={...task(1,1),title:"年度合同总项目"};
+    const child={...task(2,2),title:"核对盖章页",parentTaskId:1,subtaskSortOrder:1};
+    expect(matchesTaskSearch(child,"合同总项目",parent.title)).toBe(true);
+    expect(matchesTaskSearch(parent,"核对盖章页")).toBe(false);
+    expect(matchesTaskSearch(child,"盖章页",parent.title)).toBe(true);
   });
 });
 

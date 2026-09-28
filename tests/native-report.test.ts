@@ -4,7 +4,7 @@ import type {StatisticsResult} from "../src/types";
 
 const data:StatisticsResult={
   range:{start:"2026-08-03T00:00:00+08:00",end:"2026-08-10T00:00:00+08:00"},
-  summary:{handledTasks:32,processed:9,completed:18,waitingMaterials:2,waitingConfirmation:2,waitingCounterpartyConfirmation:1,rateMode:"processing",rateNumerator:32,rateDenominator:35,completionRate:32/35},
+  summary:{handledTasks:32,topLevelTasks:24,subtasks:8,processed:9,completed:18,waitingMaterials:2,waitingConfirmation:2,waitingCounterpartyConfirmation:1,rateMode:"processing",rateNumerator:32,rateDenominator:35,completionRate:32/35},
   byTaskType:[{taskType:"合同审核",handledTasks:14,completed:9,pendingFollowUp:5},{taskType:"咨询",handledTasks:8,completed:5,pendingFollowUp:3},{taskType:"函件",handledTasks:6,completed:3,pendingFollowUp:3},{taskType:"其他",handledTasks:4,completed:1,pendingFollowUp:3}],
   byDepartment:[],trend:[],trendGranularity:"day"
 };
@@ -13,6 +13,7 @@ describe("native report",()=>{
   it("creates an overall weekly report with type and overdue summaries",()=>{
     const report=buildNativeReport({data,preset:"currentWeek",overdueCount:3});
     expect(report).toContain("本周共处理 32 项，其中完成 18 项、已处理待跟进 9 项、暂缓 5 项");
+    expect(report).toContain("普通 / 父任务 24 项、子任务 8 项");
     expect(report).toContain("合同审核 14 项（完成 9 项、待跟进 5 项）");
     expect(report).toContain("截至当前仍有 3 项逾期");
     expect(report).toContain("六、下一步建议");

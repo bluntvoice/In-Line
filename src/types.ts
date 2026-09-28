@@ -44,7 +44,7 @@ export interface BootstrapData{
 }
 export interface StatisticsResult{
   range:{start:string;end:string};
-  summary:{handledTasks:number;processed:number;completed:number;waitingMaterials:number;waitingConfirmation:number;waitingCounterpartyConfirmation:number;rateMode:"closure"|"processing";rateNumerator:number;rateDenominator:number;completionRate:number};
+  summary:{handledTasks:number;topLevelTasks:number;subtasks:number;processed:number;completed:number;waitingMaterials:number;waitingConfirmation:number;waitingCounterpartyConfirmation:number;rateMode:"closure"|"processing";rateNumerator:number;rateDenominator:number;completionRate:number};
   byTaskType:Array<{taskType:string;handledTasks:number;completed:number;pendingFollowUp:number}>;
   byDepartment:Array<{department:string;handledTasks:number;completed:number;pendingFollowUp:number}>;
   trend:Array<{periodStart:string;handledTasks:number}>;

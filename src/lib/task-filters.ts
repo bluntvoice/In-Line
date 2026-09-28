@@ -3,12 +3,14 @@ import { dateOnly } from "./task-utils";
 
 export type DeadlinePeriod = "morning" | "noon" | "afternoon" | "evening";
 export type ValueSelection<T extends string = string> = T[] | null;
+export type TaskStructureFilter = "all" | "top-level" | "subtask";
 
 export interface TaskFilters {
   departments: ValueSelection;
   contacts: ValueSelection;
   taskTypes: ValueSelection;
   statuses: ValueSelection<TaskStatus>;
+  structure: TaskStructureFilter;
   deadlineDate: string;
   deadlinePeriods: DeadlinePeriod[];
 }
@@ -18,6 +20,7 @@ export const EMPTY_TASK_FILTERS: TaskFilters = {
   contacts: null,
   taskTypes: null,
   statuses: null,
+  structure: "all",
   deadlineDate: "",
   deadlinePeriods: []
 };
@@ -49,6 +52,8 @@ export function applyTaskFilters(tasks: LegalTask[], filters: TaskFilters) {
     if (filters.contacts !== null && !(task.contacts?.length ? task.contacts : [task.contact]).some(contact => filters.contacts?.includes(contact))) return false;
     if (!matchesSelection(task.taskType, filters.taskTypes)) return false;
     if (!matchesSelection(task.status, filters.statuses)) return false;
+    if (filters.structure === "top-level" && task.parentTaskId !== null) return false;
+    if (filters.structure === "subtask" && task.parentTaskId === null) return false;
 
     const hasDeadlineFilter = Boolean(filters.deadlineDate || filters.deadlinePeriods.length);
     if (!hasDeadlineFilter) return true;
@@ -67,10 +72,18 @@ export function activeFilterCount(filters: TaskFilters) {
     filters.contacts !== null,
     filters.taskTypes !== null,
     filters.statuses !== null,
+    filters.structure !== "all",
     Boolean(filters.deadlineDate || filters.deadlinePeriods.length)
   ].filter(Boolean).length;
 }
 
 export function uniqueValues(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+}
+
+export function matchesTaskSearch(task: LegalTask, query: string, parentTitle?: string) {
+  const key = query.trim().toLocaleLowerCase("zh-CN");
+  if (!key) return true;
+  return [task.permanentNumber, task.department, task.contact, task.taskType, task.title, task.details, task.internalNotes, parentTitle ?? ""]
+    .some(value => value.toLocaleLowerCase("zh-CN").includes(key));
 }

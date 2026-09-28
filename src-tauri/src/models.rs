@@ -254,6 +254,8 @@ pub struct StatisticsRange {
 #[serde(rename_all = "camelCase")]
 pub struct StatisticsSummary {
     pub handled_tasks: i64,
+    pub top_level_tasks: i64,
+    pub subtasks: i64,
     pub processed: i64,
     pub completed: i64,
     pub waiting_materials: i64,

@@ -2665,7 +2665,8 @@ impl Database {
         self.with_conn(|connection| {
             let cte = "WITH ranged AS (
                 SELECT event.id,event.task_id,event.result_status,event.handled_at,
-                       tasks.task_type AS current_task_type,tasks.department AS current_department
+                       tasks.task_type AS current_task_type,tasks.department AS current_department,
+                       tasks.parent_task_id AS current_parent_task_id
                 FROM task_work_events event
                 JOIN tasks ON tasks.id=event.task_id
                 WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
@@ -2680,6 +2681,8 @@ impl Database {
             let summary_sql = format!(
                 "{cte}
                  SELECT count(*),
+                   COALESCE(sum(current_parent_task_id IS NULL),0),
+                   COALESCE(sum(current_parent_task_id IS NOT NULL),0),
                    COALESCE(sum(result_status='processed'),0),
                    COALESCE(sum(result_status='completed'),0),
                    COALESCE(sum(result_status='waiting_materials'),0),
@@ -2687,7 +2690,7 @@ impl Database {
                    COALESCE(sum(result_status='waiting_counterparty_confirmation'),0)
                  FROM ranked WHERE position=1"
             );
-            let values: (i64, i64, i64, i64, i64, i64) = connection
+            let values: (i64, i64, i64, i64, i64, i64, i64, i64) = connection
                 .query_row(&summary_sql, params![start, end], |row| {
                     Ok((
                         row.get(0)?,
@@ -2696,6 +2699,8 @@ impl Database {
                         row.get(3)?,
                         row.get(4)?,
                         row.get(5)?,
+                        row.get(6)?,
+                        row.get(7)?,
                     ))
                 })
                 .map_err(display_error)?;
@@ -2741,15 +2746,17 @@ impl Database {
             let (rate_numerator, rate_denominator) = if rate_mode == "processing" {
                 (values.0, eligible_tasks)
             } else {
-                (values.2, values.0)
+                (values.4, values.0)
             };
             let summary = StatisticsSummary {
                 handled_tasks: values.0,
-                processed: values.1,
-                completed: values.2,
-                waiting_materials: values.3,
-                waiting_confirmation: values.4,
-                waiting_counterparty_confirmation: values.5,
+                top_level_tasks: values.1,
+                subtasks: values.2,
+                processed: values.3,
+                completed: values.4,
+                waiting_materials: values.5,
+                waiting_confirmation: values.6,
+                waiting_counterparty_confirmation: values.7,
                 rate_mode,
                 rate_numerator,
                 rate_denominator,
@@ -5623,6 +5630,32 @@ mod tests {
                 .handled_tasks,
             0
         );
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn statistics_distinguish_top_level_tasks_and_subtasks() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-statistics-structure-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+
+        let parent = db.save_task(sample("统计父任务")).unwrap();
+        let child = db
+            .create_subtask(subtask_sample(parent.id, "统计子任务"))
+            .unwrap();
+        db.process_round(parent.id).unwrap();
+        db.process_round(child.id).unwrap();
+
+        let start = (Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        let end = (Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        let statistics = db.statistics(start, end, 480).unwrap();
+        assert_eq!(statistics.summary.handled_tasks, 2);
+        assert_eq!(statistics.summary.top_level_tasks, 1);
+        assert_eq!(statistics.summary.subtasks, 1);
 
         drop(db);
         let _ = fs::remove_dir_all(root);

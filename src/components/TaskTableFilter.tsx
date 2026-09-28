@@ -1,6 +1,6 @@
 import { Check, Filter, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { DEADLINE_PERIOD_LABELS, type DeadlinePeriod, type ValueSelection } from "../lib/task-filters";
+import { DEADLINE_PERIOD_LABELS, type DeadlinePeriod, type TaskStructureFilter, type ValueSelection } from "../lib/task-filters";
 
 interface ShellProps {
   label: string;
@@ -85,6 +85,22 @@ export function DeadlineFilterHeader({ date, periods: selected, onChange }: Dead
       return <label key={period}><input type="checkbox" checked={checked} onChange={() => toggle(period)} /><span className="filter-check">{checked && <Check size={12} />}</span><span>{DEADLINE_PERIOD_LABELS[period]}</span></label>;
     })}</fieldset>
     <p className="filter-note">上午 05–11 时；中午 11–14 时；下午 14–18 时；其余归入晚上。</p>
+    <button type="button" className="filter-done" onClick={close}>完成</button>
+  </>}</FilterShell>;
+}
+
+const structureOptions: Array<{value: TaskStructureFilter; label: string; description: string}> = [
+  { value: "all", label: "全部", description: "显示当前页面的全部事项" },
+  { value: "top-level", label: "普通 / 父任务", description: "显示没有所属任务的顶层事项" },
+  { value: "subtask", label: "子任务", description: "只显示已有父任务归属的事项" }
+];
+
+export function StructureFilterHeader({ value, onChange }: {value: TaskStructureFilter; onChange: (value: TaskStructureFilter) => void}) {
+  return <FilterShell label="事项标题" active={value !== "all"}>{(close) => <>
+    <div className="filter-popover-heading"><strong>任务结构</strong><button type="button" onClick={() => onChange("all")}><RotateCcw size={13} />重置</button></div>
+    <div className="structure-filter-options" role="radiogroup" aria-label="任务结构">
+      {structureOptions.map(option => <button type="button" role="radio" aria-checked={value === option.value} className={value === option.value ? "active" : ""} key={option.value} onClick={() => onChange(option.value)}><span>{value === option.value && <Check size={12} />}</span><strong>{option.label}</strong><small>{option.description}</small></button>)}
+    </div>
     <button type="button" className="filter-done" onClick={close}>完成</button>
   </>}</FilterShell>;
 }
