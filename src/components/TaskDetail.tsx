@@ -2,7 +2,7 @@ import { useEffect,useState } from "react";
 import { AlertTriangle,Archive,ArrowDown,ArrowUp,Check,CheckCircle2,Edit3,GitMerge,GripVertical,ListPlus,MoreHorizontal,Pencil,PlayCircle,Plus,RotateCcw,ShieldCheck,Trash2,X } from "lucide-react";
 import type { LegalTask,TaskLog,TaskView,TaskWorkEvent } from "../types";
 import { api } from "../api";
-import { displayTicket,formatDateTime,formatDeadline,isDeferredStatus,isOverdue,localizeStatusText,PRIORITY_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
+import { displayTicket,formatDateTime,formatDeadline,isOverdue,localizeStatusText,PRIORITY_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
 import { moveById,reorderById } from "../lib/subtask-ui";
 import StatusBadge from "./StatusBadge";
 import TicketNumber from "./TicketNumber";
@@ -95,7 +95,7 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
         {terminal?<><button className="button primary" onClick={()=>setQueueDialog("reopen")}><RotateCcw size={16}/>重新开启并加入今日队列</button>{task.status==="completed"&&!task.archivedAt&&<button className="button secondary" onClick={async()=>{await api.archiveTask(task.id);onChanged();}}><Archive size={16}/>归档</button>}</>:<>
           {canWork&&<button className="button secondary" onClick={()=>void process()}><PlayCircle size={16}/>本轮已处理</button>}
           {canWork&&<button className="button primary" onClick={()=>void complete()}><CheckCircle2 size={16}/>本轮已完成</button>}
-          {!task.hasActiveQueue&&isDeferredStatus(task.status)&&<button className="button secondary" onClick={()=>setQueueDialog("enqueue")}><ListPlus size={16}/>加入今日队列</button>}
+          {!task.hasActiveQueue&&canWork&&<button className="button secondary" onClick={()=>setQueueDialog("enqueue")}><ListPlus size={16}/>加入今日队列</button>}
           {(task.status==="completed"||task.status==="cancelled")&&<button className="button secondary" onClick={async()=>{await api.archiveTask(task.id);onChanged();}}><Archive size={16}/>归档</button>}
         </>}
         <button className="icon-button danger" onClick={async()=>{await api.deleteTask(task.id);onChanged();}} aria-label="移入回收站"><Trash2 size={16}/></button>
@@ -109,7 +109,7 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
       <div><dt>事项编号</dt><dd>{task.permanentNumber}</dd></div><div><dt>当前排队</dt><dd>{task.hasActiveQueue?"有效队列中":"未加入有效队列"}</dd></div>
     </dl>
     <section className="task-relations" aria-busy={relationLoading}>
-      <div className="section-heading relation-heading"><div><h3>{subtasks.length?`子任务（${subtasks.length}）`:"所属任务"}</h3><small>{subtasks.length?"拖拽事项条可调整同一父任务内的显示顺序":"父子归属不影响状态、截止时间或真实排队顺序"}</small></div>{subtasks.length>0&&canManageRelations&&<button type="button" className="button secondary small" onClick={()=>onAddSubtask(task)}><Plus size={14}/>添加子任务</button>}</div>
+      <div className="section-heading relation-heading"><div><h3>{subtasks.length?`子任务（${subtasks.length}）`:"所属任务"}</h3><small>{subtasks.length?"拖拽事项条可调整同一父任务内的显示顺序":"父子归属不影响状态、截止时间或真实排队顺序"}</small></div>{subtasks.length>0&&canManageRelations&&<button type="button" className="button secondary small" onClick={()=>onAddSubtask(task)} aria-label="添加子任务" title="添加子任务"><Plus size={14}/>添加</button>}</div>
       {relationError&&<div className="relation-error"><AlertTriangle size={14}/>{relationError}</div>}
       {!subtasks.length&&<div className="parent-relation-card">
         {relationParentId!==null&&<button type="button" className="parent-task-link" disabled={!parentTask} onClick={()=>parentTask&&onOpenTask(parentTask)} title={parentTask?.title}>
