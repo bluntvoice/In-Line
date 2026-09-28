@@ -15,12 +15,13 @@ import HelpPanel from "./components/HelpPanel";
 import WorkCalendarPanel from "./components/WorkCalendarPanel";
 import QueueDialog from "./components/QueueDialog";
 import TaskQuickActionDialog,{type QuickActionMode} from "./components/TaskQuickActionDialog";
+import SubtaskCreateDialog from "./components/SubtaskCreateDialog";
 import { DeadlineFilterHeader,ValueFilterHeader } from "./components/TaskTableFilter";
 import { activeFilterCount,applyTaskFilters,EMPTY_TASK_FILTERS,uniqueValues,type TaskFilters } from "./lib/task-filters";
 import { STATUS_LABELS } from "./lib/task-utils";
 
 const emptyMasters:MasterData={departments:[],taskTypes:[],contacts:[]};
-type MenuState={task:LegalTask;x:number;y:number}|null;
+type MenuState={task:LegalTask;view:TaskView;x:number;y:number}|null;
 type PageView=TaskView|"deferred";
 const newFilters=():TaskFilters=>({...EMPTY_TASK_FILTERS,deadlinePeriods:[]});
 
@@ -38,6 +39,8 @@ export default function App(){
   const [menu,setMenu]=useState<MenuState>(null);
   const [quickAction,setQuickAction]=useState<{task:LegalTask;mode:QuickActionMode}|null>(null);
   const [queueAction,setQueueAction]=useState<{task:LegalTask;reopen:boolean}|null>(null);
+  const [subtaskParent,setSubtaskParent]=useState<LegalTask|null>(null);
+  const [relationRefreshKey,setRelationRefreshKey]=useState(0);
   const [message,setMessage]=useState("");
   const [startupError,setStartupError]=useState("");
   const [version,setVersion]=useState("");
@@ -107,8 +110,9 @@ export default function App(){
   const move=async(event:React.MouseEvent,task:LegalTask,direction:"up"|"down")=>{event.stopPropagation();try{await api.moveTask(task.id,direction);}catch(error){toast("调整失败："+String(error));}};
   const handleAction=async(action:ContextAction)=>{
     const {task,type}=action;
-    if(type==="view"){setSelected(task);return;}
+    if(type==="view"){showTaskDetails(task);return;}
     if(type==="edit"){setEditing(task);return;}
+    if(type==="addSubtask"){setSubtaskParent(task);return;}
     if(type==="status"||type==="urgent"){setQuickAction({task,mode:type});return;}
     if(type==="process"){await api.processRound(task.id);toast("已记录本轮处理，事项已进入暂缓队列");return;}
     if(type==="complete"){await api.completeRound(task.id);toast("已记录本轮完成，事项整体结束");return;}
@@ -135,10 +139,10 @@ export default function App(){
     if(!window.confirm(`清空回收站中的 ${data.trash.length} 项？全部事项及办理记录将不可恢复。`))return;
     const count=await api.emptyTrash();setSelectedTrashIds([]);setSelected(null);toast(`回收站已清空，共永久删除 ${count} 项`);
   };
-  const context=(task:LegalTask,x:number,y:number)=>setMenu({task,x,y});
+  const context=(task:LegalTask,x:number,y:number)=>{const detailView=taskDetailView(task);setMenu({task,view:detailView==="deferred"?"queue":detailView,x,y});};
   const contextKey=(event:React.KeyboardEvent,task:LegalTask)=>{
     if(event.shiftKey&&event.key==="F10"){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();context(task,rect.left+120,rect.top+32);}
-    else if(event.key==="Enter"){event.preventDefault();setSelected(task);}
+    else if(event.key==="Enter"){event.preventDefault();showTaskDetails(task);}
   };
 
   if(!data)return <div className="app-loading"><img src="/inline-mark.svg"/>{startupError?<section className="startup-error" role="alert"><h1>队列暂时无法载入</h1><p>{startupError}</p><div><button className="button primary" onClick={()=>void refresh()}>重新载入</button><button className="button secondary" onClick={()=>setEditing(null)}>直接新增取号</button></div><small>数据仍保存在本机，程序不会自动清空数据库。</small></section>:<p>正在整理队列…</p>}
@@ -156,6 +160,9 @@ export default function App(){
   const frequentContacts=commonContacts(taskHistory);
   const actionView:TaskView=view==="deferred"?"queue":view;
   const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);setSelected(null);setView(next);};
+  const renderTaskDetail=(detailView:TaskView)=>selected&&<TaskDetail key={selected.id} task={selected} view={detailView} mergeCandidates={[...data.queue,...data.archive]} relationRefreshKey={relationRefreshKey}
+    onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} onRelationshipChanged={()=>void refresh()}
+    onAddSubtask={setSubtaskParent} onOpenTask={showTaskDetails} onQuickAction={(task,mode)=>setQuickAction({task,mode})} onOpenContext={context} notify={toast}/>;
 
   return <div className="app-shell">
     <aside className="sidebar">
@@ -176,7 +183,7 @@ export default function App(){
       <small className="app-version">{version?`v${version}`:""}</small>
     </aside>
     <main className="workspace">
-      {help?<HelpPanel/>:about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} isDatabaseEmpty={data.queue.length+data.archive.length+data.trash.length===0} onChanged={()=>void refresh()} onOpenTask={id=>{void api.getTask(id).then(showTaskDetails).catch(error=>toast(String(error)));}} onNavigateBackupResult={next=>openView(next)} notify={toast}/>:workCalendar?<div className={selected?"queue-layout calendar-layout with-detail":"queue-layout calendar-layout"}><WorkCalendarPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} notify={toast} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} currentOverdueCount={data.queue.filter(task=>isOverdue(task)).length} currentOverdueByTaskType={Object.fromEntries([...new Set(data.queue.map(task=>task.taskType))].map(type=>[type,data.queue.filter(task=>task.taskType===type&&isOverdue(task)).length]))} notify={toast} onOpenTask={id=>{void api.getTask(id).then(setSelected).catch(error=>toast(String(error)));}}/>{selected&&<TaskDetail task={selected} view={selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue"} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}</div>:<>
+      {help?<HelpPanel/>:about?<AboutPanel version={version} onCopy={async value=>{try{await api.copyText(value);toast("GitHub 地址已复制");}catch(error){toast("复制失败："+String(error));}}}/>:settings?<SettingsPanel backups={data.backups} settings={data.settings} isDatabaseEmpty={data.queue.length+data.archive.length+data.trash.length===0} onChanged={()=>void refresh()} onOpenTask={id=>{void api.getTask(id).then(showTaskDetails).catch(error=>toast(String(error)));}} onNavigateBackupResult={next=>openView(next)} notify={toast}/>:workCalendar?<div className={selected?"queue-layout calendar-layout with-detail":"queue-layout calendar-layout"}><WorkCalendarPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} notify={toast} onOpenTask={id=>{void api.getTask(id).then(showTaskDetails).catch(error=>toast(String(error)));}}/>{renderTaskDetail(selected?selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue":"queue")}</div>:statistics?<div className={selected?"queue-layout statistics-layout with-detail":"queue-layout statistics-layout"}><StatisticsPanel weekStartsOn={data.settings.week_start_day==="sunday"?"sunday":"monday"} refreshKey={[...data.queue,...data.archive].map(task=>task.updatedAt).join("|")} currentOverdueCount={data.queue.filter(task=>isOverdue(task)).length} currentOverdueByTaskType={Object.fromEntries([...new Set(data.queue.map(task=>task.taskType))].map(type=>[type,data.queue.filter(task=>task.taskType===type&&isOverdue(task)).length]))} notify={toast} onOpenTask={id=>{void api.getTask(id).then(showTaskDetails).catch(error=>toast(String(error)));}}/>{renderTaskDetail(selected?selected.deletedAt?"trash":selected.archivedAt||["completed","cancelled","archived"].includes(selected.status)?"archive":"queue":"queue")}</div>:<>
         <header className="workspace-header"><div><p>通用事项取号与队列管理</p><h1>{view==="queue"?"待办队列":view==="deferred"?"暂缓事项":view==="archive"?"历史归档":"回收站"}</h1></div>
           <label className="search-box"><Search size={17}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜索编号、对接人或事项关键词"/>{query&&<button onClick={()=>setQuery("")}><X size={15}/></button>}</label>
         </header>
@@ -197,13 +204,14 @@ export default function App(){
               {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query||activeFilterCount(filters)>0?"没有匹配事项":view==="deferred"?"目前没有暂缓事项":view==="trash"?"回收站为空":"目前没有排队事项"}</h2><p>{query||activeFilterCount(filters)>0?"请调整关键词或列筛选条件。":view==="deferred"?"待补充材料、待内部确认、待对方确认和已暂停事项会显示在这里。":view==="trash"?"移入回收站的事项会显示在这里，可恢复或永久删除。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
             </div>
           </section>
-          {selected&&<TaskDetail task={selected} view={actionView} mergeCandidates={[...data.queue,...data.archive]} onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} notify={toast}/>}
+          {renderTaskDetail(actionView)}
         </div>
       </>}
     </main>
     {editing!==undefined&&<TaskForm task={editing} masters={data.masters??emptyMasters} commonDepartments={frequentDepartments} commonContacts={frequentContacts} onClose={()=>setEditing(undefined)} onSaved={()=>{setEditing(undefined);void refresh();}}/>}
+    {subtaskParent&&<SubtaskCreateDialog parent={subtaskParent} masters={data.masters??emptyMasters} commonDepartments={frequentDepartments} commonContacts={frequentContacts} onClose={()=>setSubtaskParent(null)} onSaved={task=>{setSubtaskParent(null);setRelationRefreshKey(current=>current+1);toast(`子任务已创建：${displayTicket(task)}`);void refresh();}}/>}
     {quickAction&&<TaskQuickActionDialog task={quickAction.task} mode={quickAction.mode} onClose={()=>setQuickAction(null)} onSaved={()=>{toast(quickAction.mode==="status"?"事项状态已更新":quickAction.task.isUrgent?"已取消加急":"事项已设为加急");setQuickAction(null);void refresh();}}/>}
-    {menu&&<TaskContextMenu {...menu} view={actionView} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
+    {menu&&<TaskContextMenu {...menu} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
     {queueAction&&<QueueDialog task={queueAction.task} reopen={queueAction.reopen} onClose={()=>setQueueAction(null)} onSaved={()=>{toast(queueAction.reopen?"事项已重新开启并加入今日队列":"事项已加入今日队列");setQueueAction(null);void refresh();}}/>}
     {message&&<div className="toast">{message}</div>}
   </div>;
