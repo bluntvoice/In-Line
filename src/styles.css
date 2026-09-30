@@ -236,15 +236,14 @@ html,body,#root{background:transparent!important}
 small{font-size:12px}
 
 /* 趋势明细复用事项类型明细；柱体保持原总量和高度比例。 */
-.trend-chart{min-height:270px}
-.trend-column{grid-template-rows:20px 140px 44px 50px;min-width:76px;height:254px}
+.trend-chart{min-height:220px}
+.trend-column{grid-template-rows:20px 140px 44px;min-width:76px;height:204px}
 .trend-total{grid-row:1;padding:0;border:0;background:transparent;font-size:12px;font-weight:700}
 .trend-bar{grid-row:2;align-self:end;width:22px;max-height:140px;padding:0;border:0;border-radius:5px 5px 0 0;background:#0b3a82}
-.trend-result-controls{grid-row:4;display:grid;align-self:stretch;gap:2px}
-.trend-result-controls button{padding:1px 4px;border:0;border-radius:4px;background:#eef4fb;font-size:12px;white-space:nowrap}
-.trend-result-controls button:last-child{background:#e6f4ec;color:#176b40}
-.trend-total:hover,.trend-result-controls button:hover{color:#0b3a82;text-decoration:underline}
+.trend-total:hover{color:#0b3a82;text-decoration:underline}
 .trend-bar:hover{background:#2f69a8}
+.details-heading-actions{flex-direction:row;flex-wrap:wrap}
+.details-heading-actions .button{white-space:nowrap}
 
 /* 子任务详情、统计卡片与可点击标题的布局修正。 */
 .relation-heading>div{flex:1}
@@ -272,6 +271,8 @@ small{font-size:12px}
 html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-symbol-font]):not([data-symbol-font] *){font-family:var(--ui-font-family)!important}
 .font-setting-trigger{flex:0 1 auto;min-width:140px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .font-setting-trigger svg{flex:0 0 auto}
+.font-setting-row .font-setting-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;min-width:0}
+.font-setting-actions .button.small{flex:0 0 auto;white-space:nowrap}
 .font-fallback-note{margin-top:4px;color:#986700;font-size:12px}
 .font-picker{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;width:min(560px,calc(100vw - 48px));height:min(650px,calc(100vh - 48px));border-radius:14px;background:#fff;box-shadow:0 22px 70px #102a5640;overflow:hidden}
 .font-picker>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 20px;border-bottom:1px solid #dfe6ef}

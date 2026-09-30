@@ -309,6 +309,8 @@ pub struct StatisticsResult {
 #[serde(rename_all = "camelCase")]
 pub struct StatisticsDetail {
     pub task_id: i64,
+    pub task_type: String,
+    pub has_processed_or_completed: bool,
     pub permanent_number: String,
     pub title: String,
     pub department: String,

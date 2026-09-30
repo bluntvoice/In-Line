@@ -2947,11 +2947,14 @@ impl Database {
                          ROW_NUMBER() OVER(PARTITION BY task_id ORDER BY strftime('%s',handled_at) DESC,id DESC) AS position,
                          FIRST_VALUE(handled_at) OVER(PARTITION BY task_id ORDER BY strftime('%s',handled_at),id) AS first_handled_at,
                          FIRST_VALUE(handled_at) OVER(PARTITION BY task_id ORDER BY strftime('%s',handled_at) DESC,id DESC) AS last_handled_at,
-                         count(*) OVER(PARTITION BY task_id) AS handling_count
+                         count(*) OVER(PARTITION BY task_id) AS handling_count,
+                         max(CASE WHEN result_status IN ('processed','completed') THEN 1 ELSE 0 END)
+                           OVER(PARTITION BY task_id) AS has_processed_or_completed
                        FROM ranged
                      )
                      SELECT tasks.id,tasks.permanent_number,tasks.title,tasks.department,tasks.contact,
-                            annotated.result_status,annotated.first_handled_at,annotated.last_handled_at,annotated.handling_count
+                            annotated.result_status,annotated.first_handled_at,annotated.last_handled_at,annotated.handling_count,
+                            tasks.task_type,annotated.has_processed_or_completed
                      FROM annotated JOIN tasks ON tasks.id=annotated.task_id
                      WHERE annotated.position=1 AND (?3 IS NULL OR tasks.task_type=?3)
                        AND (?4 IS NULL OR annotated.result_status=?4)
@@ -2964,6 +2967,8 @@ impl Database {
                     let contacts = parse_contacts(&row.get::<_, String>(4)?).join("、");
                     Ok(StatisticsDetail {
                         task_id: row.get(0)?,
+                        task_type: row.get(9)?,
+                        has_processed_or_completed: row.get(10)?,
                         permanent_number: row.get(1)?,
                         title: row.get(2)?,
                         department: departments,
@@ -5782,6 +5787,87 @@ mod tests {
         assert!(db
             .statistics_trend_details(start, end, Some("pending".into()))
             .is_err());
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn trend_copy_eligibility_uses_any_valid_result_within_the_selected_range() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-trend-copy-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let mut input = sample("处理后等待");
+        input.task_type = "法律咨询".into();
+        input.departments = vec!["产品组".into(), "业务组".into()];
+        let eligible = db.save_task(input).unwrap();
+        let waiting = db.save_task(sample("仅等待")).unwrap();
+        let outside = db.save_task(sample("范围外处理")).unwrap();
+        let voided = db.save_task(sample("已作废处理后等待")).unwrap();
+        let deleted = db.save_task(sample("回收站")).unwrap();
+        let weekly = db.save_task(sample("同周前日完成")).unwrap();
+        let end_boundary = db.save_task(sample("下一周")).unwrap();
+        db.with_conn(|connection| {
+            for (id, status, at) in [
+                (eligible.id,"processed","2026-09-22T00:00:00+08:00"),
+                (eligible.id,"completed","2026-09-22T08:00:00+08:00"),
+                (eligible.id,"waiting_confirmation","2026-09-22T10:00:00+08:00"),
+                (waiting.id,"waiting_materials","2026-09-22T10:00:00+08:00"),
+                (outside.id,"processed","2026-09-20T23:59:59+08:00"),
+                (outside.id,"waiting_materials","2026-09-22T10:00:00+08:00"),
+                (voided.id,"processed","2026-09-22T08:00:00+08:00"),
+                (voided.id,"waiting_materials","2026-09-22T10:00:00+08:00"),
+                (deleted.id,"completed","2026-09-22T10:00:00+08:00"),
+                (weekly.id,"completed","2026-09-21T09:00:00+08:00"),
+                (weekly.id,"waiting_materials","2026-09-22T10:00:00+08:00"),
+                (end_boundary.id,"completed","2026-09-28T00:00:00+08:00"),
+            ] {
+                record_work_event_on(connection,id,status,at,"任务处理","quick_action","")?;
+            }
+            connection.execute("UPDATE task_work_events SET voided_at=? WHERE task_id=? AND result_status='processed'",params![now(),voided.id]).map_err(display_error)?;
+            Ok(())
+        }).unwrap();
+        db.soft_delete(deleted.id).unwrap();
+        let day = db
+            .statistics_trend_details(
+                "2026-09-22T00:00:00+08:00".into(),
+                "2026-09-23T00:00:00+08:00".into(),
+                None,
+            )
+            .unwrap();
+        assert_eq!(day.len(), 5);
+        let copy: Vec<_> = day
+            .iter()
+            .filter(|item| item.has_processed_or_completed)
+            .collect();
+        assert_eq!(copy.len(), 1);
+        assert_eq!(copy[0].task_id, eligible.id);
+        assert_eq!(copy[0].task_type, "法律咨询");
+        assert_eq!(copy[0].department, "产品组、业务组");
+        assert_eq!(copy[0].result_status, "waiting_confirmation");
+        assert_eq!(copy[0].handling_count, 3);
+        assert_eq!(db.get_task(eligible.id).unwrap().status, "pending");
+        let week = db
+            .statistics_trend_details(
+                "2026-09-21T00:00:00+08:00".into(),
+                "2026-09-28T00:00:00+08:00".into(),
+                None,
+            )
+            .unwrap();
+        let mut ids: Vec<_> = week
+            .iter()
+            .filter(|item| item.has_processed_or_completed)
+            .map(|item| item.task_id)
+            .collect();
+        ids.sort();
+        let mut expected = vec![eligible.id, weekly.id];
+        expected.sort();
+        assert_eq!(ids, expected);
+        assert!(!week
+            .iter()
+            .any(|item| item.task_id == deleted.id || item.task_id == end_boundary.id));
         drop(db);
         let _ = fs::remove_dir_all(root);
     }

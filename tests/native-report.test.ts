@@ -24,7 +24,7 @@ describe("native report",()=>{
       {taskId:1,permanentNumber:"A",title:"A",department:"一部",contact:"甲",resultStatus:"completed" as const,firstHandledAt:"",lastHandledAt:"",handlingCount:1},
       {taskId:2,permanentNumber:"B",title:"B",department:"一部",contact:"乙",resultStatus:"processed" as const,firstHandledAt:"",lastHandledAt:"",handlingCount:1},
       {taskId:3,permanentNumber:"C",title:"C",department:"一部",contact:"丙",resultStatus:"waiting_materials" as const,firstHandledAt:"",lastHandledAt:"",handlingCount:1}
-    ];
+    ].map(item=>({...item,taskType:"合同审核",hasProcessedOrCompleted:item.resultStatus!=="waiting_materials"}));
     const report=buildNativeReport({data,preset:"month",overdueCount:1,taskType:"合同审核",details,displayRange:{start:"2026-07-01",end:"2026-07-31"}});
     expect(nativeReportTitle("month","合同审核")).toBe("月度工作报告 · 合同审核");
     expect(report).toContain("上一个月共处理 3 项“合同审核”类事项，其中完成 1 项、已处理待跟进 1 项、暂缓 1 项");

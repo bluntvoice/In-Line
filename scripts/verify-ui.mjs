@@ -20,7 +20,7 @@ const settings={week_start_day:"monday",statistics_rate_mode:"processing"};
 settings.ui_font_family=localStorage.getItem("isolated-ui-font")??"";
 const callbacks=new Set();
 window.__inlineCalls=[];
-const detail=(id,status)=>({taskId:id,permanentNumber:"IL-"+id,title:all.find(t=>t.id===id).title,department:"测试部门",contact:"测试人员",resultStatus:status,firstHandledAt:"2026-09-28T08:00:00+08:00",lastHandledAt:"2026-09-28T08:00:00+08:00",handlingCount:1});
+const detail=(id,status)=>({taskId:id,taskType:"合同审查",hasProcessedOrCompleted:true,permanentNumber:"IL-"+id,title:all.find(t=>t.id===id).title,department:"测试部门",contact:"测试人员",resultStatus:status,firstHandledAt:"2026-09-28T08:00:00+08:00",lastHandledAt:"2026-09-28T08:00:00+08:00",handlingCount:id===3?2:1});
 const details=[detail(1,"processed"),detail(2,"completed"),detail(3,"waiting_materials")];
 const specific={bootstrap:async()=>({queue,archive,trash:[],masters:{departments:["测试部门"],contacts:["测试人员"],taskTypes:["合同审查"]},settings:{...settings},backups:[]}),getVersion:async()=>"0.4.0",globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,getTask:async id=>all.find(t=>t.id===id),listParentTaskCandidates:async()=>all.filter(t=>!t.parentTaskId),listSubtasks:async id=>all.filter(t=>t.parentTaskId===id),getLogs:async()=>[],getWorkEvents:async()=>[],listBackups:async()=>[],onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},setSetting:async(key,value)=>{settings[key]=String(value);callbacks.forEach(cb=>cb())},getStatistics:async(start,end)=>({range:{start,end},summary:{handledTasks:3,topLevelTasks:2,subtasks:1,processed:1,completed:1,waitingMaterials:1,waitingConfirmation:0,waitingCounterpartyConfirmation:0,rateMode:"processing",rateNumerator:2,rateDenominator:3,completionRate:66.67},byTaskType:[{taskType:"合同审查",handledTasks:3,completed:1,pendingFollowUp:2}],byDepartment:[{department:"测试部门",handledTasks:3,completed:1,pendingFollowUp:2}],trend:[{periodStart:start.slice(0,10),handledTasks:3,processed:1,completed:1}],trendGranularity:"day"}),getStatisticsDetails:async(...args)=>{window.__inlineCalls.push(["type",...args]);return details},getStatisticsTrendDetails:async(...args)=>{window.__inlineCalls.push(["trend",...args]);return args[2]?details.filter(t=>t.resultStatus===args[2]):details}};
 const originalStatistics=specific.getStatistics;
@@ -35,8 +35,9 @@ specific.getUpdateProgress=async()=>({phase:"idle",version:null,downloadedBytes:
 specific.onUpdateProgress=()=>()=>{};
 const statisticsDays=new Set();
 const localDay=value=>{const d=new Date(value);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-specific.getStatistics=async(...args)=>{const day=localDay(args[0]);statisticsDays.add(day);const data=await originalStatistics(...args);data.trend[0].periodStart=day;return data};
+specific.getStatistics=async(...args)=>{const day=localDay(args[0]);statisticsDays.add(day);const data=await originalStatistics(...args);data.trend[0].periodStart=day;if(new Date(args[1])-new Date(args[0])>62*86400000){const monday=new Date(args[0]);monday.setDate(monday.getDate()-(monday.getDay()+6)%7);data.trendGranularity="week";data.trend[0].periodStart=localDay(monday);}return data};
 specific.getStatisticsTrendDetails=async(...args)=>{window.__inlineCalls.push(["trend",...args]);if(!statisticsDays.has(localDay(args[0])))return [];return args[2]?details.filter(t=>t.resultStatus===args[2]):details};
+specific.copyText=async text=>{if(window.__inlineCopyFail)throw new Error("隔离剪贴板失败");window.__inlineCalls.push(["copyText",text]);window.__inlineClipboard=text};
 export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async(...args)=>{window.__inlineCalls.push([key,...args]);return []})});
 `;
 const server = await createServer({ server: { port: 0, strictPort: false }, plugins: [{
@@ -51,7 +52,7 @@ try {
   const page = await mainContext.newPage();
   page.setDefaultTimeout(15000);
   page.on("pageerror", error => errors.push(error.message));
-  await page.goto(server.resolvedUrls.local[0]);
+  await page.goto(server.resolvedUrls.local[0],{waitUntil:"domcontentloaded",timeout:45000});
   await page.locator(".task-table tbody tr").first().waitFor();
   if (mode === "measure") {
     for (const width of [1440, 1280, 1200, 1920]) {
@@ -165,7 +166,8 @@ try {
       await secondary.waitForFunction(family=>document.documentElement.getAttribute("data-ui-font")===family,tall.family);
     }
     await openPicker();assert.equal(await page.getByRole("option").filter({has:page.getByText(tall.displayName,{exact:true})}).getAttribute("aria-selected"),"true");
-    await page.getByRole("option").filter({hasText:"默认字体"}).click();
+    await page.getByRole("button",{name:"关闭字体选择"}).click();
+    await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).click();
     await page.waitForFunction(()=>!document.documentElement.hasAttribute("data-ui-font"));
     await secondary.waitForFunction(()=>!document.documentElement.hasAttribute("data-ui-font"));
     await secondary.close();
@@ -173,37 +175,60 @@ try {
     await page.locator(".font-fallback-note").filter({hasText:"不可用"}).waitFor();
     assert.equal(await page.locator(".font-setting-trigger").innerText(),"默认字体");
     assert.equal(await page.evaluate(()=>document.documentElement.hasAttribute("data-ui-font")),false);
+    await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).click();
+    await page.waitForFunction(()=>localStorage.getItem("isolated-ui-font")==="");
     assert.equal((await page.evaluate(()=>window.__inlineCalls)).filter(c=>c[0]==="fonts").length,1);
+    await page.reload();await page.locator(".task-table tbody tr").first().waitFor();
+    await page.locator(".settings-button").filter({hasText:"软件设置"}).click();
+    assert.equal(await page.locator(".font-setting-trigger").innerText(),"默认字体");
+    assert.equal(await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).isDisabled(),true);
     console.log("PASS fonts:",nativeFonts.length,"native families; aliases/search/local cache/live global/default/missing/restart/auxiliary routes; 4 font row and overflow regression");
   }
   if (mode === "trend") {
     await page.locator(".sidebar nav button").filter({ hasText: "统计中心" }).click();
     const first = page.locator(".trend-column").first();
-    await first.locator(".trend-result-controls button").first().click();
-    await page.locator(".details-card .statistics-table tbody tr").waitFor();
-    assert.equal(await page.locator(".details-card tbody tr").count(), 1);
-    assert.match(await page.locator(".details-card").innerText(), /已处理/);
-    await first.locator(".trend-result-controls button").last().click();
-    await page.locator(".details-card h2").filter({ hasText: "已完成" }).waitFor();
-    assert.equal(await page.locator(".details-card tbody tr").count(), 1);
-    await first.locator(".trend-total").click();
+    await first.locator(".trend-bar").click();
     await page.locator(".details-card tbody tr").last().waitFor();
     assert.equal(await page.locator(".details-card tbody tr").count(), 3);
+    assert.equal(await page.locator(".trend-result-controls").count(),0);
+    assert.match(await page.locator(".details-card").innerText(),/待补材料/);
+    await page.getByRole("button",{name:"复制明细",exact:true}).click();
+    const copied=await page.evaluate(()=>window.__inlineClipboard);
+    assert.equal(copied,"合同审查-测试部门-隔离测试事项 1 — 长标题与父子任务布局检查\n合同审查-测试部门-隔离测试事项 2 — 长标题与父子任务布局检查\n合同审查-测试部门-隔离测试事项 3 — 长标题与父子任务布局检查\n");
+    await page.evaluate(()=>window.__inlineCopyFail=true);
+    await page.getByRole("button",{name:"复制明细",exact:true}).click();
+    await page.getByText("复制明细失败：隔离剪贴板失败",{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.__inlineClipboard),copied);
+    await page.evaluate(()=>window.__inlineCopyFail=false);
+    if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT});
     await page.getByRole("button", { name: "收起明细" }).click();
     assert.equal(await page.locator(".details-card").count(), 0);
-    await page.locator(".trend-column").nth(1).locator(".trend-result-controls button").first().click();
+    await page.locator(".trend-column").nth(1).locator(".trend-total").click();
     await page.getByText("该范围内没有对应事项。").waitFor();
+    assert.equal(await page.getByRole("button",{name:"复制明细",exact:true}).isDisabled(),true);
     // Same API fixture only returns events on the first day.
     await page.locator(".type-stats button, .task-type-pie-legend button").first().click();
     await page.locator(".details-card tbody tr").last().waitFor();
     assert.equal(await page.locator(".details-card tbody tr").count(), 3);
     const calls = await page.evaluate(() => window.__inlineCalls);
-    assert.deepEqual(calls.filter(c => c[0] === "trend").slice(0, 3).map(c => c[3]), ["processed", "completed", null]);
+    assert.equal(await page.getByRole("button",{name:"复制明细",exact:true}).count(),0);
+    assert.ok(calls.filter(c=>c[0]==="trend").every(c=>c[3]===null));
     const firstCall = calls.find(c => c[0] === "trend");
     assert.equal(new Date(firstCall[2]) - new Date(firstCall[1]), 86400000);
     await page.locator(".details-card tbody tr").first().click();
     await page.locator(".detail-panel").waitFor();
-    console.log("PASS trend: category/total/zero/type details, close, task navigation, day range");
+    await page.locator(".detail-panel>header").getByRole("button",{name:"关闭",exact:true}).click();
+    await page.locator(".sidebar nav button").filter({hasText:"统计中心"}).click();
+    await page.getByRole("button",{name:"上一季度",exact:true}).click();
+    await page.getByText("按自然周去重 · 点击数量查看明细",{exact:true}).waitFor();
+    await page.locator(".trend-column .trend-total").first().click();
+    await page.locator(".details-card tbody tr").last().waitFor();
+    await page.getByRole("button",{name:"复制明细",exact:true}).click();
+    assert.equal(await page.evaluate(()=>window.__inlineClipboard),copied);
+    const weeklyCall=(await page.evaluate(()=>window.__inlineCalls)).filter(c=>c[0]==="trend").at(-1);
+    assert.ok(new Date(weeklyCall[2])-new Date(weeklyCall[1])<=7*86400000);
+    assert.match(await page.locator(".details-card h2").innerText(),/至.*全部办理事项/);
+    console.log("PASS trend: total/bar/zero/type details, close/navigation, day/week clipped ranges, copy including later waiting/sort/newlines/failure/empty");
   }
   assert.deepEqual(errors, []);
 } catch (error) { console.error("UI failure:", error.message, errors); throw error; }
