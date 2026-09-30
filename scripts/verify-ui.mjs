@@ -12,6 +12,7 @@ const task=(id,status="pending",parentTaskId=null)=>({id,permanentNumber:"IL-"+i
 const queue=Array.from({length:30},(_,i)=>task(i+1,i%3===2?"processed":"pending",i===1?1:null));
 const archive=Array.from({length:10},(_,i)=>task(i+31,"completed",i===1?31:null));
 const all=[...queue,...archive];
+queue.find(t=>t.id===9).parentTaskId=3;
 const settings={week_start_day:"monday",statistics_rate_mode:"processing"};
 const callbacks=new Set();
 window.__inlineCalls=[];
@@ -81,6 +82,26 @@ try {
       await context.close();
     }
     console.log("PASS layout: default/resize/large/detail/custom/restart/reset/pages/DPI 125%-200%");
+  }
+  if (mode === "rows") {
+    for(const width of [1440,1280]){
+      await page.setViewportSize({width,height:900});
+      for(const label of ["待办队列","暂缓事项","历史归档"]){
+        await page.locator(".sidebar nav button").filter({hasText:label}).click();
+        await page.locator(".task-table tbody tr").first().waitFor();
+        const result=await page.locator(".task-table").evaluate(table=>{
+          const rows=[...table.querySelectorAll("tbody tr")];
+          const heights=rows.map(row=>row.getBoundingClientRect().height);
+          const clipped=rows.flatMap(row=>[...row.querySelectorAll(".ticket-number,.status-badge,.row-actions button,.task-title-line>strong,.parent-task-line")].filter(e=>{const a=e.getBoundingClientRect(),b=row.getBoundingClientRect();return a.top<b.top||a.bottom>b.bottom}).map(e=>e.className));
+          return{heights,clipped,parents:table.querySelectorAll(".parent-task-line").length};
+        });
+        assert.ok(result.heights.length>0&&result.heights.every(height=>height===64),JSON.stringify(result));
+        assert.deepEqual(result.clipped,[]);assert.ok(result.parents>0);
+      }
+    }
+    await page.reload();await page.locator(".task-table tbody tr").first().waitFor();
+    assert.equal(await page.locator(".task-table tbody tr").first().evaluate(e=>e.getBoundingClientRect().height),64);
+    console.log("PASS rows: three pages, ordinary/parent/child, text/badge/button bounds, resize/restart");
   }
   if (mode === "trend") {
     await page.locator(".sidebar nav button").filter({ hasText: "统计中心" }).click();

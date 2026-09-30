@@ -262,4 +262,8 @@ small{font-size:12px}
 /* 阶段 6：按页面保存的可拖动列宽。 */
 /* 末列拖动柄不得伸出表格 5px 制造无意义 overflow；中间列仍跨边界。 */
 .task-table th:last-child .column-resize-handle{right:0}
+/* 三个事项列表共用舒展的基础行高；table cell 的 height 是内容最小高度，
+   字体/字段确需更多空间时允许自然增长，不裁切内容来强行满足高度。 */
+.task-table{--task-row-height:64px}
+.task-table td,.task-table .structured-task-row td{height:var(--task-row-height);vertical-align:middle}
 .task-table{min-width:100%!important}.task-table th{width:auto!important}.column-resize-handle{position:absolute;z-index:4;top:0;right:-5px;width:10px;height:100%;cursor:col-resize;touch-action:none}.column-resize-handle:after{content:"";position:absolute;top:7px;bottom:7px;left:4px;width:2px;border-radius:2px;background:transparent}.column-resize-handle:hover:after,.column-resize-handle:focus-visible:after{background:#ffb000}.column-resize-handle:focus-visible{outline:0}.column-layout-menu{width:218px}
