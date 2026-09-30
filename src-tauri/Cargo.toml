@@ -37,6 +37,10 @@ tauri-plugin-window-state = "2"
 thiserror = "2"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
+[target.'cfg(windows)'.dependencies]
+# Native Windows API bindings already present transitively; no font database dependency.
+windows = { version = "0.61", features = ["Win32_Graphics_DirectWrite"] }
+
 [profile.release]
 codegen-units = 1
 lto = true

@@ -636,6 +636,7 @@ fn valid_setting(key: &str, value: &str) -> bool {
         "week_start_day" => matches!(value, "monday" | "sunday"),
         "statistics_rate_mode" => matches!(value, "closure" | "processing"),
         "global_shortcut" => value.is_ascii() && value.len() <= 64 && value.contains('+'),
+        "ui_font_family" => value.len() <= 256 && !value.chars().any(char::is_control),
         _ => false,
     }
 }
@@ -4845,6 +4846,23 @@ mod tests {
             .set_setting("statistics_rate_mode".into(), "unknown".into())
             .is_err());
         assert!(db.set_setting("unknown".into(), "true".into()).is_err());
+        db.set_setting("ui_font_family".into(), "测试字体 Family".into())
+            .unwrap();
+        assert_eq!(
+            db.settings()
+                .unwrap()
+                .get("ui_font_family")
+                .map(String::as_str),
+            Some("测试字体 Family")
+        );
+        assert!(db
+            .set_setting("ui_font_family".into(), "bad\nfont".into())
+            .is_err());
+        assert!(db
+            .set_setting("ui_font_family".into(), "a".repeat(257))
+            .is_err());
+        db.set_setting("ui_font_family".into(), String::new())
+            .unwrap();
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);
         let third = db.save_task(sample("第三项")).unwrap();
@@ -5956,6 +5974,11 @@ mod tests {
         source
             .set_setting("launch_at_login".into(), "true".into())
             .unwrap();
+        // Valid selection can be absent on a different device: storage survives,
+        // runtime resolver falls back without destructive configuration rewriting.
+        source
+            .set_setting("ui_font_family".into(), "Cross-device Missing Font".into())
+            .unwrap();
         source.save_task(sample("完全一致事项")).unwrap();
         source
             .with_conn(|connection| {
@@ -5996,7 +6019,7 @@ mod tests {
         assert_eq!(result.added_tasks, 2);
         assert_eq!(result.merged_tasks, 1);
         assert_eq!(result.conflict_tasks, 1);
-        assert_eq!(result.applied_settings, 2);
+        assert_eq!(result.applied_settings, 3);
         assert_eq!(result.conflicts.len(), 1);
 
         let all = [
@@ -6060,6 +6083,24 @@ mod tests {
             Some("true")
         );
         assert!(target.get_logs(identical.id).unwrap().len() >= 2);
+        assert_eq!(
+            target
+                .settings()
+                .unwrap()
+                .get("ui_font_family")
+                .map(String::as_str),
+            Some("Cross-device Missing Font")
+        );
+        drop(target);
+        let target = Database::open_at(target_root.join("inline.db")).unwrap();
+        assert_eq!(
+            target
+                .settings()
+                .unwrap()
+                .get("ui_font_family")
+                .map(String::as_str),
+            Some("Cross-device Missing Font")
+        );
         assert!(target
             .list_backups()
             .unwrap()

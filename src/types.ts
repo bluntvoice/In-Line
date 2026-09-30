@@ -39,6 +39,8 @@ export interface BackupInfo{name:string;path:string;size:number;modifiedAt:strin
 export interface BackupConflictItem{taskId:number;permanentNumber:string;sourceTitle:string;importedTitle:string}
 export interface BackupMergeResult{addedTasks:number;mergedTasks:number;conflictTasks:number;appliedSettings:number;conflicts:BackupConflictItem[]}
 export interface TaskUiAction{id:number;action:"view"|"edit"|"status"|"urgent"|"complete"|"addSubtask"}
+export interface SystemFont{family:string;displayName:string;aliases:string[];cjk:boolean}
+export interface UiFontSelection{requested:string;effective:string;missing:boolean}
 export interface BootstrapData{
   queue:LegalTask[];archive:LegalTask[];trash:LegalTask[];masters:MasterData;settings:Record<string,string>;backups:BackupInfo[];
 }

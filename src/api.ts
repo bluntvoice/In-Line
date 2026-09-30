@@ -27,6 +27,8 @@ const withTimeout=<T>(request:Promise<T>,label:string,timeoutMs=12000)=>new Prom
 
 export const api={
   bootstrap:()=>withTimeout(invoke<BootstrapData>("bootstrap"),"队列初始化"),
+  listSystemFonts:()=>invoke<import("./types").SystemFont[]>("list_system_fonts"),
+  getUIFontSelection:()=>invoke<import("./types").UiFontSelection>("get_ui_font_selection"),
   listTasks:(view:TaskView)=>withTimeout(invoke<LegalTask[]>("list_tasks",{view}),"队列载入"),
   saveTask:(task:TaskInput)=>invoke<LegalTask>("save_task",{task}),
   createSubtask:(input:CreateSubtaskInput)=>invoke<LegalTask>("create_subtask",{input}),
@@ -72,7 +74,7 @@ export const api={
   mcpConnectionGuide:()=>invoke<string>("mcp_connection_guide"),
   restoreBackup:(path:string)=>invoke<BackupMergeResult>("restore_backup",{path}),
   deleteBackup:(path:string)=>invoke<void>("delete_backup",{path}),
-  setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode"|"launch_at_login",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
+  setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode"|"launch_at_login"|"ui_font_family",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
   showMain:()=>invoke<void>("show_main_window"),
   requestNewTask:()=>invoke<void>("request_new_task"),

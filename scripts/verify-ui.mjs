@@ -3,10 +3,13 @@
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 import { createServer } from "vite";
+import {execFile} from "node:child_process";
+import {promisify} from "node:util";
 
 const { chromium } = await import(process.env.INLINE_PLAYWRIGHT_MODULE
   ? pathToFileURL(process.env.INLINE_PLAYWRIGHT_MODULE).href : "playwright");
 const mode = process.argv[2] ?? "trend";
+const nativeFonts=mode==="fonts"?JSON.parse((await promisify(execFile)("cargo",["run","--locked","--manifest-path","src-tauri/Cargo.toml","--example","list_system_fonts"],{maxBuffer:4*1024*1024})).stdout):[];
 const mock = `
 const task=(id,status="pending",parentTaskId=null)=>({id,permanentNumber:"IL-"+id,dailySequence:id,ticketDate:"2026-09-30",department:"测试部门",departments:["测试部门"],contact:"测试人员",contacts:["测试人员"],taskType:"合同审查",title:"隔离测试事项 "+id+" — 长标题与父子任务布局检查",details:"隔离测试详情",status,priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-09-30T08:00:00+08:00",updatedAt:"2026-09-30T08:00:00+08:00",startedAt:null,completedAt:null,archivedAt:status==="completed"?"2026-09-30T08:00:00+08:00":null,deletedAt:null,customSortOrder:id,processingRounds:1,hasActiveQueue:status==="pending",deferredEnteredAt:status==="processed"?"2026-09-30T08:00:00+08:00":null,isImportConflict:false,parentTaskId,subtaskSortOrder:id});
 const queue=Array.from({length:30},(_,i)=>task(i+1,i%3===2?"processed":"pending",i===1?1:null));
@@ -14,12 +17,22 @@ const archive=Array.from({length:10},(_,i)=>task(i+31,"completed",i===1?31:null)
 const all=[...queue,...archive];
 queue.find(t=>t.id===9).parentTaskId=3;
 const settings={week_start_day:"monday",statistics_rate_mode:"processing"};
+settings.ui_font_family=localStorage.getItem("isolated-ui-font")??"";
 const callbacks=new Set();
 window.__inlineCalls=[];
 const detail=(id,status)=>({taskId:id,permanentNumber:"IL-"+id,title:all.find(t=>t.id===id).title,department:"测试部门",contact:"测试人员",resultStatus:status,firstHandledAt:"2026-09-28T08:00:00+08:00",lastHandledAt:"2026-09-28T08:00:00+08:00",handlingCount:1});
 const details=[detail(1,"processed"),detail(2,"completed"),detail(3,"waiting_materials")];
 const specific={bootstrap:async()=>({queue,archive,trash:[],masters:{departments:["测试部门"],contacts:["测试人员"],taskTypes:["合同审查"]},settings:{...settings},backups:[]}),getVersion:async()=>"0.4.0",globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,getTask:async id=>all.find(t=>t.id===id),listParentTaskCandidates:async()=>all.filter(t=>!t.parentTaskId),listSubtasks:async id=>all.filter(t=>t.parentTaskId===id),getLogs:async()=>[],getWorkEvents:async()=>[],listBackups:async()=>[],onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},setSetting:async(key,value)=>{settings[key]=String(value);callbacks.forEach(cb=>cb())},getStatistics:async(start,end)=>({range:{start,end},summary:{handledTasks:3,topLevelTasks:2,subtasks:1,processed:1,completed:1,waitingMaterials:1,waitingConfirmation:0,waitingCounterpartyConfirmation:0,rateMode:"processing",rateNumerator:2,rateDenominator:3,completionRate:66.67},byTaskType:[{taskType:"合同审查",handledTasks:3,completed:1,pendingFollowUp:2}],byDepartment:[{department:"测试部门",handledTasks:3,completed:1,pendingFollowUp:2}],trend:[{periodStart:start.slice(0,10),handledTasks:3,processed:1,completed:1}],trendGranularity:"day"}),getStatisticsDetails:async(...args)=>{window.__inlineCalls.push(["type",...args]);return details},getStatisticsTrendDetails:async(...args)=>{window.__inlineCalls.push(["trend",...args]);return args[2]?details.filter(t=>t.resultStatus===args[2]):details}};
 const originalStatistics=specific.getStatistics;
+const fonts=${JSON.stringify(nativeFonts)};
+specific.listSystemFonts=async()=>{window.__inlineCalls.push(["fonts"]);return fonts};
+specific.getUIFontSelection=async()=>{const requested=settings.ui_font_family??"",effective=fonts.find(f=>f.family===requested)?.family??"";return{requested,effective,missing:Boolean(requested&&!effective)}};
+const originalSet=specific.setSetting;
+specific.setSetting=async(key,value)=>{if(key==="ui_font_family")localStorage.setItem("isolated-ui-font",String(value));return originalSet(key,value)};
+window.addEventListener("storage",event=>{if(event.key==="isolated-ui-font"){settings.ui_font_family=event.newValue??"";callbacks.forEach(cb=>cb())}});
+window.__inlineRestoreFont=value=>{settings.ui_font_family=value;localStorage.setItem("isolated-ui-font",value);callbacks.forEach(cb=>cb())};
+specific.getUpdateProgress=async()=>({phase:"idle",version:null,downloadedBytes:0,totalBytes:null,percent:null,message:null});
+specific.onUpdateProgress=()=>()=>{};
 const statisticsDays=new Set();
 const localDay=value=>{const d=new Date(value);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 specific.getStatistics=async(...args)=>{const day=localDay(args[0]);statisticsDays.add(day);const data=await originalStatistics(...args);data.trend[0].periodStart=day;return data};
@@ -34,7 +47,8 @@ await server.listen();
 const browser = await chromium.launch({ headless: true, executablePath: process.env.INLINE_BROWSER_PATH });
 const errors = [];
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, timezoneId: "Asia/Shanghai" });
+  const mainContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: "Asia/Shanghai" });
+  const page = await mainContext.newPage();
   page.setDefaultTimeout(15000);
   page.on("pageerror", error => errors.push(error.message));
   await page.goto(server.resolvedUrls.local[0]);
@@ -102,6 +116,65 @@ try {
     await page.reload();await page.locator(".task-table tbody tr").first().waitFor();
     assert.equal(await page.locator(".task-table tbody tr").first().evaluate(e=>e.getBoundingClientRect().height),64);
     console.log("PASS rows: three pages, ordinary/parent/child, text/badge/button bounds, resize/restart");
+  }
+  if (mode === "fonts") {
+    assert.ok(nativeFonts.length>20);assert.ok(nativeFonts[0].cjk);
+    const openPicker=async()=>{await page.locator(".settings-button").filter({hasText:"软件设置"}).click();await page.locator(".font-setting-trigger").click();await page.locator(".font-picker-list [role=option]").nth(1).waitFor();};
+    await openPicker();
+    assert.equal(await page.locator(".font-picker-list [role=option]").count(),nativeFonts.length+1);
+    if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT});
+    const chinese=nativeFonts.find(f=>f.cjk&&f.aliases.some(a=>/[\u4e00-\u9fff]/.test(a)))??nativeFonts.find(f=>f.cjk);
+    const english=nativeFonts.find(f=>f.family==="Arial")??nativeFonts.find(f=>!f.cjk);
+    const wider=nativeFonts.find(f=>/wide|black|impact/i.test(f.family))??english;
+    const tall=nativeFonts.find(f=>/cambria|times|ming/i.test(f.family))??chinese;
+    const search=page.getByRole("textbox",{name:"搜索字体名称"});
+    for(const query of [chinese.family,chinese.family.slice(-4).toUpperCase(),chinese.displayName.slice(0,2)]){
+      await search.fill(query);assert.ok(await page.locator(".font-picker-list [role=option]").count()>=2);
+    }
+    await search.fill("In-Line nonexistent 8933");await page.getByText("没有匹配的字体，请尝试其他名称。").waitFor();
+    await search.fill("");assert.equal(await page.locator(".font-picker-list [role=option]").count(),nativeFonts.length+1);
+    await page.getByRole("button",{name:"关闭字体选择"}).click();
+    for(const font of [chinese,english,wider,tall]){
+      await openPicker();await search.fill(font.family);
+      await page.getByRole("option").filter({has:page.getByText(font.displayName,{exact:true})}).click();
+      await page.waitForFunction(family=>document.documentElement.getAttribute("data-ui-font")===family,font.family);
+      const buttonFamily=await page.locator(".new-ticket").evaluate(e=>getComputedStyle(e).fontFamily);
+      assert.ok(buttonFamily.includes(font.family));
+      for(const label of ["待办队列","暂缓事项","历史归档"]){
+        await page.locator(".sidebar nav button").filter({hasText:label}).click();
+        await page.waitForFunction(()=>{const e=document.querySelector(".table-scroll");return e&&e.scrollWidth===e.clientWidth});
+        const bounds=await page.locator(".task-table tbody tr").evaluateAll(rows=>rows.map(row=>{const rect=row.getBoundingClientRect();return{height:rect.height,clipped:[...row.querySelectorAll(".task-title-line>strong,.parent-task-line,.status-badge,.row-actions button")].some(e=>{const r=e.getBoundingClientRect();return r.top<rect.top||r.bottom>rect.bottom})}}));
+        assert.ok(bounds.every(row=>row.height===64&&!row.clipped),JSON.stringify(bounds));
+      }
+      assert.ok(await page.locator(".sidebar svg path").count()>0);
+      await page.locator(".task-table tbody tr").first().click();await page.locator(".detail-panel").waitFor();
+      assert.ok((await page.locator(".detail-title-copy").evaluate(e=>getComputedStyle(e).fontFamily)).includes(font.family));
+      await page.locator(".detail-panel>header").getByRole("button",{name:"关闭",exact:true}).click();
+      await page.locator(".sidebar nav button").filter({hasText:"统计中心"}).click();
+      await page.locator(".summary-grid").waitFor();
+      assert.ok((await page.locator(".summary-grid strong").first().evaluate(e=>getComputedStyle(e).fontFamily)).includes(font.family));
+      // Check representative glyph ascenders/descenders against the ordinary line box.
+      const glyphs=await page.evaluate(()=>{const e=document.querySelector(".new-ticket"),s=getComputedStyle(e),c=document.createElement("canvas").getContext("2d");c.font=s.font;const m=c.measureText("事项 Agjy中");return{height:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent,line:parseFloat(s.lineHeight)}});
+      assert.ok(glyphs.height<=glyphs.line,JSON.stringify(glyphs));
+    }
+    await page.reload();await page.locator(".task-table tbody tr").first().waitFor();
+    await page.waitForFunction(family=>document.documentElement.getAttribute("data-ui-font")===family,tall.family);
+    const secondary=await page.context().newPage();
+    for(const hash of ["floating","quick-add","update-progress"]){
+      await secondary.goto(server.resolvedUrls.local[0]+"#"+hash);
+      await secondary.waitForFunction(family=>document.documentElement.getAttribute("data-ui-font")===family,tall.family);
+    }
+    await openPicker();assert.equal(await page.getByRole("option").filter({has:page.getByText(tall.displayName,{exact:true})}).getAttribute("aria-selected"),"true");
+    await page.getByRole("option").filter({hasText:"默认字体"}).click();
+    await page.waitForFunction(()=>!document.documentElement.hasAttribute("data-ui-font"));
+    await secondary.waitForFunction(()=>!document.documentElement.hasAttribute("data-ui-font"));
+    await secondary.close();
+    await page.evaluate(()=>window.__inlineRestoreFont("In-Line nonexistent font 8933"));
+    await page.locator(".font-fallback-note").filter({hasText:"不可用"}).waitFor();
+    assert.equal(await page.locator(".font-setting-trigger").innerText(),"默认字体");
+    assert.equal(await page.evaluate(()=>document.documentElement.hasAttribute("data-ui-font")),false);
+    assert.equal((await page.evaluate(()=>window.__inlineCalls)).filter(c=>c[0]==="fonts").length,1);
+    console.log("PASS fonts:",nativeFonts.length,"native families; aliases/search/local cache/live global/default/missing/restart/auxiliary routes; 4 font row and overflow regression");
   }
   if (mode === "trend") {
     await page.locator(".sidebar nav button").filter({ hasText: "统计中心" }).click();

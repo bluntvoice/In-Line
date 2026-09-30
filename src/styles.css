@@ -266,4 +266,23 @@ small{font-size:12px}
    字体/字段确需更多空间时允许自然增长，不裁切内容来强行满足高度。 */
 .task-table{--task-row-height:64px}
 .task-table td,.task-table .structured-task-row td{height:var(--task-row-height);vertical-align:middle}
+
+/* Explicit numeric/monospace UI text also follows an active user choice.
+   No override when default is selected; SVG and dedicated symbols are untouched. */
+html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-symbol-font]):not([data-symbol-font] *){font-family:var(--ui-font-family)!important}
+.font-setting-trigger{flex:0 1 auto;min-width:140px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.font-setting-trigger svg{flex:0 0 auto}
+.font-fallback-note{margin-top:4px;color:#986700;font-size:12px}
+.font-picker{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;width:min(560px,calc(100vw - 48px));height:min(650px,calc(100vh - 48px));border-radius:14px;background:#fff;box-shadow:0 22px 70px #102a5640;overflow:hidden}
+.font-picker>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 20px;border-bottom:1px solid #dfe6ef}
+.font-picker h2{margin:0 0 2px;font-size:20px}
+.font-picker small{color:#607086;font-size:12px}
+.font-search{display:flex;align-items:center;gap:8px;margin:13px 16px;padding:0 10px;border:1px solid #c9d8e7;border-radius:8px;background:#f7fbff}
+.font-search input{min-width:0;flex:1;height:38px;border:0;outline:0;background:transparent}
+.font-picker-list{min-height:0;overflow:auto;margin:0 16px 12px;border:1px solid #dfe6ef;border-radius:8px}
+.font-picker-list>button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:54px;padding:9px 12px;border:0;border-bottom:1px solid #e7ecf2;background:#fff;text-align:left}
+.font-picker-list>button>span{display:grid;min-width:0;gap:2px;overflow-wrap:anywhere}
+.font-picker-list>button:hover,.font-picker-list>button[aria-selected=true]{background:#eaf4fd;color:#0b3a82}
+.font-picker-list>p{margin:0;padding:18px;color:#607086}
+.font-picker>footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid #dfe6ef;color:#607086;font-size:12px}
 .task-table{min-width:100%!important}.task-table th{width:auto!important}.column-resize-handle{position:absolute;z-index:4;top:0;right:-5px;width:10px;height:100%;cursor:col-resize;touch-action:none}.column-resize-handle:after{content:"";position:absolute;top:7px;bottom:7px;left:4px;width:2px;border-radius:2px;background:transparent}.column-resize-handle:hover:after,.column-resize-handle:focus-visible:after{background:#ffb000}.column-resize-handle:focus-visible{outline:0}.column-layout-menu{width:218px}

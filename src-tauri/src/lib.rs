@@ -1,4 +1,5 @@
 pub mod database;
+pub mod fonts;
 pub mod models;
 pub mod updater;
 
@@ -453,14 +454,34 @@ fn delete_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Re
     emit_change(&app)
 }
 #[tauri::command]
-fn set_setting(
+async fn set_setting(
     app: tauri::AppHandle,
-    db: State<Database>,
+    db: State<'_, Database>,
     key: String,
     value: String,
 ) -> Result<(), String> {
+    let value = if key == "ui_font_family" {
+        tauri::async_runtime::spawn_blocking(move || fonts::validate_selection(&value))
+            .await
+            .map_err(|error| error.to_string())??
+    } else {
+        value
+    };
     db.set_setting(key, value)?;
     emit_change(&app)
+}
+#[tauri::command]
+async fn list_system_fonts() -> Result<Vec<fonts::SystemFont>, String> {
+    tauri::async_runtime::spawn_blocking(fonts::system_fonts)
+        .await
+        .map_err(|error| error.to_string())?
+}
+#[tauri::command]
+async fn get_ui_font_selection(db: State<'_, Database>) -> Result<fonts::UiFontSelection, String> {
+    let requested = db.settings()?.remove("ui_font_family").unwrap_or_default();
+    tauri::async_runtime::spawn_blocking(move || fonts::resolve_selection(requested))
+        .await
+        .map_err(|error| error.to_string())?
 }
 #[tauri::command]
 fn get_launch_at_login(app: tauri::AppHandle, db: State<Database>) -> Result<bool, String> {
@@ -801,6 +822,8 @@ pub fn run() {
             mcp_connection_guide,
             delete_backup,
             set_setting,
+            list_system_fonts,
+            get_ui_font_selection,
             get_launch_at_login,
             set_launch_at_login,
             restore_backup,
