@@ -48,4 +48,18 @@ describe("task table column widths",()=>{
     saved.title+=160;
     expect(fitTaskColumnWidths(saved,920)).toBe(saved);
   });
+
+  it("preserves even modest manual changes instead of compressing saved layouts",()=>{
+    const saved=defaultTaskColumnLayouts().queue;
+    saved.title+=8;
+    expect(fitTaskColumnWidths(saved,920)).toBe(saved);
+    expect(fitTaskColumnWidths(saved,700)).toBe(saved);
+    expect(saved.title).toBe(263);
+  });
+
+  it("fits default widths at fractional viewport boundaries without dropping minimums",()=>{
+    const fitted=fitTaskColumnWidths(defaultTaskColumnLayouts().queue,924.75);
+    expect(TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+fitted[column.id],0)).toBe(924);
+    expect(TASK_COLUMN_DEFINITIONS.every(column=>fitted[column.id]>=column.minWidth)).toBe(true);
+  });
 });

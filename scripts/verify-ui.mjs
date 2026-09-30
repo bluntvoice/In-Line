@@ -38,6 +38,50 @@ try {
   page.on("pageerror", error => errors.push(error.message));
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator(".task-table tbody tr").first().waitFor();
+  if (mode === "measure") {
+    for (const width of [1440, 1280, 1200, 1920]) {
+      await page.setViewportSize({width, height:900});
+      await page.waitForTimeout(100);
+      const dimensions=await page.locator(".table-scroll").evaluate(e=>({viewport:e.clientWidth,scroll:e.scrollWidth,table:e.querySelector("table").getBoundingClientRect().width,columns:[...e.querySelectorAll("th")].map(t=>t.getBoundingClientRect().width),lastHandle:e.querySelector("th:last-child .column-resize-handle").getBoundingClientRect().right-e.getBoundingClientRect().right}));
+      console.log("BASELINE", width, dimensions);
+    }
+    await page.setViewportSize({width:1280,height:900});
+    await page.addStyleTag({content:".task-table th:last-child .column-resize-handle{right:0}"});
+    console.log("HANDLE INSIDE",await page.locator(".table-scroll").evaluate(e=>({viewport:e.clientWidth,scroll:e.scrollWidth})));
+  }
+  if (mode === "layout") {
+    const dimensions=()=>page.locator(".table-scroll").evaluate(e=>({viewport:e.clientWidth,scroll:e.scrollWidth,table:e.querySelector("table").getBoundingClientRect().width}));
+    const noOverflow=async()=>{await page.waitForFunction(()=>{const e=document.querySelector(".table-scroll");return e&&e.scrollWidth===e.clientWidth});const d=await dimensions();assert.equal(d.scroll,d.viewport,JSON.stringify(d));};
+    for(const width of [1200,1280,1440,1920,1140]) {await page.setViewportSize({width,height:900});await noOverflow();}
+    await page.setViewportSize({width:1101,height:900});await page.waitForTimeout(80);
+    let narrow=await dimensions();assert.ok(narrow.viewport<854&&narrow.scroll>=854);
+    await page.setViewportSize({width:1440,height:900});
+    await page.locator(".task-table tbody tr").first().click();
+    await page.locator(".detail-panel").waitFor();
+    await page.waitForTimeout(80);
+    let d=await dimensions();assert.ok(d.scroll>d.viewport,JSON.stringify(d));
+    await page.locator(".detail-panel>header").getByRole("button",{name:"关闭",exact:true}).click();
+    await noOverflow();
+    // A real user resize (keyboard-accessible handle), then restart and read back storage.
+    const handle=page.getByRole("separator",{name:"调整事项标题列宽",exact:true});
+    for(let i=0;i<40;i++)await handle.press("ArrowRight");
+    const saved=await page.evaluate(()=>localStorage.getItem("in-line-task-column-layouts"));
+    await page.reload();await page.locator(".task-table tbody tr").first().waitFor();
+    await page.waitForTimeout(80);d=await dimensions();assert.ok(d.scroll>d.viewport);
+    assert.equal(await page.evaluate(()=>localStorage.getItem("in-line-task-column-layouts")),saved);
+    await page.locator(".task-table th").first().click({button:"right"});
+    await page.getByRole("menuitem",{name:"恢复本页默认列宽"}).click();
+    await noOverflow();
+    for(const label of ["暂缓事项","历史归档","待办队列"]){await page.locator(".sidebar nav button").filter({hasText:label}).click();await noOverflow();}
+    for(const scale of [1.25,1.5,2]){
+      const context=await browser.newContext({viewport:{width:1280,height:900},deviceScaleFactor:scale});
+      const scaled=await context.newPage();await scaled.goto(server.resolvedUrls.local[0]);await scaled.locator(".task-table tbody tr").first().waitFor();await scaled.waitForTimeout(80);
+      await scaled.waitForFunction(()=>{const e=document.querySelector(".table-scroll");return e&&e.scrollWidth===e.clientWidth});
+      assert.equal(await scaled.locator(".table-scroll").evaluate(e=>e.scrollWidth-e.clientWidth),0);
+      await context.close();
+    }
+    console.log("PASS layout: default/resize/large/detail/custom/restart/reset/pages/DPI 125%-200%");
+  }
   if (mode === "trend") {
     await page.locator(".sidebar nav button").filter({ hasText: "统计中心" }).click();
     const first = page.locator(".trend-column").first();

@@ -26,9 +26,8 @@ export function fitTaskColumnWidths(widths: TaskColumnWidths, availableWidth: nu
   const available = Math.floor(availableWidth);
   const total = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + widths[column.id], 0);
   if (!Number.isFinite(available) || available <= 0 || total <= available) return widths;
-  const defaultTotal = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + column.defaultWidth, 0);
-  // 只吸收默认布局附近的小幅溢出；显著加宽的自定义布局仍允许横向滚动。
-  if (total > defaultTotal + 96) return widths;
+  // 仅默认布局自适应；即使手动保存的布局只超出几像素，也不能偷偷缩窄。
+  if (TASK_COLUMN_DEFINITIONS.some(column => widths[column.id] !== column.defaultWidth)) return widths;
 
   const minimum = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + column.minWidth, 0);
   if (available <= minimum) {
