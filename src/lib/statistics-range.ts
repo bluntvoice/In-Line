@@ -1,6 +1,12 @@
 export type WeekStart = "monday" | "sunday";
 export type StatisticsPreset = "currentWeek" | "previousWeek" | "month" | "quarter" | "custom";
-export type StatisticsTrendPoint = { periodStart: string; handledTasks: number };
+export type StatisticsTrendPoint = { periodStart: string; handledTasks: number; processed?: number; completed?: number };
+
+export function statisticsTrendRange(periodStart:string,granularity:"day"|"week",range:{start:string;end:string}){
+  const end=parseDateInput(periodStart);
+  end.setDate(end.getDate()+(granularity==="week"?6:0));
+  return {start:periodStart<range.start?range.start:periodStart,end:dateInput(end)>range.end?range.end:dateInput(end)};
+}
 
 const WEEKDAY_LABELS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const;
 
@@ -73,13 +79,13 @@ export function statisticsDisplayTrend(
     if (friday > end) end.setTime(friday.getTime());
   }
 
-  const values = new Map(trend.map(point => [point.periodStart, point.handledTasks]));
+  const values = new Map(trend.map(point => [point.periodStart, point]));
   const display: StatisticsTrendPoint[] = [];
   for (const date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
     const periodStart = dateInput(date);
-    const handledTasks = values.get(periodStart) ?? 0;
+    const point = values.get(periodStart) ?? { periodStart, handledTasks: 0 };
     const weekday = date.getDay();
-    if ((weekday >= 1 && weekday <= 5) || handledTasks > 0) display.push({ periodStart, handledTasks });
+    if ((weekday >= 1 && weekday <= 5) || point.handledTasks > 0) display.push(point);
   }
   return display;
 }

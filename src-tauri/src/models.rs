@@ -290,6 +290,8 @@ pub struct DepartmentStatistics {
 pub struct TrendPoint {
     pub period_start: String,
     pub handled_tasks: i64,
+    pub processed: i64,
+    pub completed: i64,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]

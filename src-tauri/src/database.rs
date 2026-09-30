@@ -2838,7 +2838,7 @@ impl Database {
 
             let mut trend_statement = connection
                 .prepare(
-                    "SELECT event.task_id,event.handled_at
+                    "SELECT event.task_id,event.handled_at,event.result_status
                      FROM task_work_events event
                      JOIN tasks ON tasks.id=event.task_id
                      WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
@@ -2849,13 +2849,13 @@ impl Database {
                 .map_err(display_error)?;
             let raw_trend = trend_statement
                 .query_map(params![start, end], |row| {
-                    Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
                 })
                 .map_err(display_error)?
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(display_error)?;
-            let mut buckets: BTreeMap<String, HashSet<i64>> = BTreeMap::new();
-            for (task_id, handled_at) in raw_trend {
+            let mut buckets: BTreeMap<String, HashMap<i64, String>> = BTreeMap::new();
+            for (task_id, handled_at, result_status) in raw_trend {
                 let parsed = chrono::DateTime::parse_from_rfc3339(&handled_at)
                     .map_err(|_| "处理活动中存在无效时间".to_string())?
                     .with_timezone(&offset);
@@ -2868,13 +2868,15 @@ impl Database {
                 buckets
                     .entry(date.format("%Y-%m-%d").to_string())
                     .or_default()
-                    .insert(task_id);
+                    .insert(task_id, result_status);
             }
             let trend = buckets
                 .into_iter()
-                .map(|(period_start, ids)| TrendPoint {
+                .map(|(period_start, results)| TrendPoint {
                     period_start,
-                    handled_tasks: ids.len() as i64,
+                    handled_tasks: results.len() as i64,
+                    processed: results.values().filter(|status| *status == "processed").count() as i64,
+                    completed: results.values().filter(|status| *status == "completed").count() as i64,
                 })
                 .collect();
             Ok(StatisticsResult {
@@ -2896,6 +2898,31 @@ impl Database {
         start: String,
         end: String,
         task_type: String,
+    ) -> Result<Vec<StatisticsDetail>, String> {
+        self.statistics_details_filtered(start, end, Some(task_type), None)
+    }
+
+    pub fn statistics_trend_details(
+        &self,
+        start: String,
+        end: String,
+        result_status: Option<String>,
+    ) -> Result<Vec<StatisticsDetail>, String> {
+        if result_status
+            .as_deref()
+            .is_some_and(|value| !matches!(value, "processed" | "completed"))
+        {
+            return Err("趋势结果类型无效".into());
+        }
+        self.statistics_details_filtered(start, end, None, result_status)
+    }
+
+    fn statistics_details_filtered(
+        &self,
+        start: String,
+        end: String,
+        task_type: Option<String>,
+        result_status: Option<String>,
     ) -> Result<Vec<StatisticsDetail>, String> {
         let start_time = chrono::DateTime::parse_from_rfc3339(&start)
             .map_err(|_| "统计开始时间无效".to_string())?;
@@ -2925,12 +2952,13 @@ impl Database {
                      SELECT tasks.id,tasks.permanent_number,tasks.title,tasks.department,tasks.contact,
                             annotated.result_status,annotated.first_handled_at,annotated.last_handled_at,annotated.handling_count
                      FROM annotated JOIN tasks ON tasks.id=annotated.task_id
-                     WHERE annotated.position=1 AND tasks.task_type=?3
+                     WHERE annotated.position=1 AND (?3 IS NULL OR tasks.task_type=?3)
+                       AND (?4 IS NULL OR annotated.result_status=?4)
                      ORDER BY strftime('%s',annotated.last_handled_at) DESC,tasks.id DESC",
                 )
                 .map_err(display_error)?;
             let details = statement
-                .query_map(params![start, end, task_type], |row| {
+                .query_map(params![start, end, task_type, result_status], |row| {
                     let departments = parse_contacts(&row.get::<_, String>(3)?).join("、");
                     let contacts = parse_contacts(&row.get::<_, String>(4)?).join("、");
                     Ok(StatisticsDetail {
@@ -5634,6 +5662,112 @@ mod tests {
         drop(db);
         let _ = fs::remove_dir_all(root);
     }
+    #[test]
+    fn trend_details_match_bucket_counts_and_historical_results() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-trend-test-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let first = db.save_task(sample("同日重复办理")).unwrap();
+        let second = db.save_task(sample("跨日办理")).unwrap();
+        let waiting = db.save_task(sample("等待事项")).unwrap();
+        let voided = db.save_task(sample("作废记录")).unwrap();
+        let deleted = db.save_task(sample("已删除事项")).unwrap();
+        db.with_conn(|connection| {
+            for (id, status, at) in [
+                (first.id, "processed", "2026-09-20T16:00:00Z"),
+                (first.id, "completed", "2026-09-20T16:00:00Z"),
+                (second.id, "processed", "2026-09-21T23:59:59+08:00"),
+                (second.id, "completed", "2026-09-22T00:00:00+08:00"),
+                (waiting.id, "waiting_materials", "2026-09-21T13:00:00+08:00"),
+                (voided.id, "completed", "2026-09-21T13:00:00+08:00"),
+                (deleted.id, "processed", "2026-09-21T13:00:00+08:00"),
+            ] {
+                record_work_event_on(connection, id, status, at, "任务处理", "quick_action", "")?;
+            }
+            connection
+                .execute(
+                    "UPDATE task_work_events SET voided_at=? WHERE task_id=?",
+                    params![now(), voided.id],
+                )
+                .map_err(display_error)?;
+            Ok(())
+        })
+        .unwrap();
+        db.soft_delete(deleted.id).unwrap();
+        let start = "2026-09-21T00:00:00+08:00".to_string();
+        let end = "2026-09-22T00:00:00+08:00".to_string();
+        let day = db.statistics(start.clone(), end.clone(), 480).unwrap();
+        assert_eq!(day.trend[0].period_start, "2026-09-21");
+        assert_eq!(
+            (
+                day.trend[0].handled_tasks,
+                day.trend[0].processed,
+                day.trend[0].completed
+            ),
+            (3, 1, 1)
+        );
+        for (status, expected) in [(None, 3), (Some("processed"), 1), (Some("completed"), 1)] {
+            let details = db
+                .statistics_trend_details(start.clone(), end.clone(), status.map(str::to_string))
+                .unwrap();
+            assert_eq!(details.len(), expected);
+            if let Some(status) = status {
+                assert!(details.iter().all(|item| item.result_status == status));
+            }
+        }
+        let completed = db
+            .statistics_trend_details(start.clone(), end.clone(), Some("completed".into()))
+            .unwrap();
+        assert_eq!(completed[0].task_id, first.id);
+        assert_eq!(completed[0].handling_count, 2);
+        assert_eq!(db.get_task(first.id).unwrap().status, "pending");
+        assert_eq!(
+            db.statistics_details(start.clone(), end.clone(), "任务处理".into())
+                .unwrap()
+                .len(),
+            3
+        );
+        let next = db
+            .statistics_trend_details(
+                end.clone(),
+                "2026-09-23T00:00:00+08:00".into(),
+                Some("completed".into()),
+            )
+            .unwrap();
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0].task_id, second.id);
+        let weekly = db
+            .statistics(start.clone(), "2026-12-01T00:00:00+08:00".into(), 480)
+            .unwrap();
+        assert_eq!(weekly.trend_granularity, "week");
+        assert_eq!(
+            (
+                weekly.trend[0].handled_tasks,
+                weekly.trend[0].processed,
+                weekly.trend[0].completed
+            ),
+            (3, 0, 2)
+        );
+        assert_eq!(
+            db.statistics_trend_details(
+                start.clone(),
+                "2026-09-28T00:00:00+08:00".into(),
+                Some("completed".into())
+            )
+            .unwrap()
+            .len(),
+            2
+        );
+        assert!(db
+            .statistics_trend_details(start, end, Some("pending".into()))
+            .is_err());
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
     #[test]
     fn statistics_distinguish_top_level_tasks_and_subtasks() {
         let root = std::env::temp_dir().join(format!(

@@ -58,6 +58,7 @@ export const api={
   getWorkCalendar:(start:string,end:string)=>invoke<WorkCalendarResult>("get_work_calendar",{start,end}),
   getStatistics:(start:string,end:string)=>invoke<StatisticsResult>("get_statistics",{start,end,timezoneOffsetMinutes:-new Date().getTimezoneOffset()}),
   getStatisticsDetails:(start:string,end:string,taskType:string)=>invoke<StatisticsDetail[]>("get_statistics_details",{start,end,taskType}),
+  getStatisticsTrendDetails:(start:string,end:string,resultStatus:"processed"|"completed"|null)=>invoke<StatisticsDetail[]>("get_statistics_trend_details",{start,end,resultStatus}),
   addLog:(taskId:number,content:string)=>invoke<void>("add_log",{taskId,content}),
   updateLog:(logId:number,content:string)=>invoke<void>("update_log",{logId,content}),
   deleteLog:(logId:number)=>invoke<void>("delete_log",{logId}),

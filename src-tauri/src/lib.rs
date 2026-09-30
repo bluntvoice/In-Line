@@ -336,6 +336,15 @@ fn get_statistics_details(
     db.statistics_details(start, end, task_type)
 }
 #[tauri::command]
+fn get_statistics_trend_details(
+    db: State<Database>,
+    start: String,
+    end: String,
+    result_status: Option<String>,
+) -> Result<Vec<StatisticsDetail>, String> {
+    db.statistics_trend_details(start, end, result_status)
+}
+#[tauri::command]
 fn add_log(
     app: tauri::AppHandle,
     db: State<Database>,
@@ -776,6 +785,7 @@ pub fn run() {
             get_work_calendar,
             get_statistics,
             get_statistics_details,
+            get_statistics_trend_details,
             add_log,
             update_log,
             delete_log,

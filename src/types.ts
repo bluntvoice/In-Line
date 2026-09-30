@@ -47,7 +47,7 @@ export interface StatisticsResult{
   summary:{handledTasks:number;topLevelTasks:number;subtasks:number;processed:number;completed:number;waitingMaterials:number;waitingConfirmation:number;waitingCounterpartyConfirmation:number;rateMode:"closure"|"processing";rateNumerator:number;rateDenominator:number;completionRate:number};
   byTaskType:Array<{taskType:string;handledTasks:number;completed:number;pendingFollowUp:number}>;
   byDepartment:Array<{department:string;handledTasks:number;completed:number;pendingFollowUp:number}>;
-  trend:Array<{periodStart:string;handledTasks:number}>;
+  trend:Array<{periodStart:string;handledTasks:number;processed:number;completed:number}>;
   trendGranularity:"day"|"week";
 }
 export interface StatisticsDetail{taskId:number;permanentNumber:string;title:string;department:string;contact:string;resultStatus:WorkResult;firstHandledAt:string;lastHandledAt:string;handlingCount:number}
