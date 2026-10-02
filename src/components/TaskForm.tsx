@@ -107,13 +107,15 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
     }
   };
 
-  const submit = async (event?: FormEvent) => {
+  const submit = async (event?: FormEvent,forcePlan=false) => {
     event?.preventDefault();
-    const planError=validatePlannedDate(form,task);
+    const terminal=Boolean(task&&(task.archivedAt||["completed","archived"].includes(task.status)));
+    const effectiveForm=terminal&&(forcePlan||form.plannedDate!==(task?.plannedDate||task?.ticketDate))?{...form,requestedDeadline:null,requestedDeadlineLabel:null}:form;
+    const planError=validatePlannedDate(effectiveForm,task);
     if(planError){setError(planError);return;}
-    const confirmation=task?scheduleConfirmation(task,form):null;
+    const confirmation=task?scheduleConfirmation(task,effectiveForm,dateOnly(),forcePlan):null;
     if(confirmation&&!window.confirm(confirmation))return;
-    const submitted={...form,confirmScheduleChange:Boolean(confirmation)};
+    const submitted={...effectiveForm,confirmScheduleChange:Boolean(confirmation)};
     setSaving(true);
     setError("");
     try {
@@ -150,7 +152,7 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
         <form onSubmit={submit} onKeyDown={enterToSave}>
           {error && <div className="form-error"><AlertTriangle size={15} />{error}</div>}
           <div className="form-grid">
-            <label><span>加入日期 *</span><input type="date" required min={dateOnly()} value={form.plannedDate??dateOnly()} onChange={event=>update("plannedDate",event.target.value)}/></label>
+            <label><span>加入日期 *</span><input type="date" required min={task&&form.plannedDate===(task.plannedDate||task.ticketDate)&&form.plannedDate<dateOnly()?form.plannedDate:dateOnly()} value={form.plannedDate??dateOnly()} onChange={event=>update("plannedDate",event.target.value)}/>{task&&(task.archivedAt||["completed","archived"].includes(task.status))&&<button type="button" className="button secondary small" onClick={()=>void submit(undefined,true)}>重新激活并应用加入日期</button>}</label>
             <label className="paired-control-field">
               <span>部门 / 团队 *</span>
               <MultiContactInput values={form.departments} options={localMasters.departments} commonOptions={quickDepartments} itemLabel="部门 / 团队" placeholder="输入或选择部门 / 团队"

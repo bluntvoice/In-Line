@@ -1167,7 +1167,6 @@ impl Database {
         let connection = guard.as_mut().ok_or("数据库尚未打开")?;
         let transaction = connection.transaction().map_err(display_error)?;
         let stamp = now();
-        let effective_is_urgent = input.is_urgent && !clears_urgent_status(&input.status);
         let mut previous_task = input
             .id
             .map(|id| get_task_on(&transaction, id))
@@ -1184,10 +1183,19 @@ impl Database {
                 })
                 .unwrap_or_else(today)
         });
-        let plan_changed = input.planned_date.is_some()
+        let mut plan_changed = input.planned_date.is_some()
             && previous_task
                 .as_ref()
                 .is_some_and(|task| task.planned_date != plan);
+        let terminal = previous_task.as_ref().is_some_and(|task| {
+            task.archived_at.is_some() || matches!(task.status.as_str(), "completed" | "archived")
+        });
+        plan_changed = plan_changed
+            || (terminal && input.planned_date.is_some() && input.confirm_schedule_change);
+        if terminal && plan_changed {
+            input.requested_deadline = None;
+            input.requested_deadline_label = None;
+        }
         validate_plan(
             &plan,
             input.requested_deadline.as_deref(),
@@ -1197,11 +1205,6 @@ impl Database {
             let previous = previous_task.as_ref().unwrap();
             if previous.deleted_at.is_some() {
                 return Err("回收站事项请先恢复再制定计划".into());
-            }
-            if matches!(previous.status.as_str(), "completed" | "archived")
-                || previous.archived_at.is_some()
-            {
-                return Err("已完成或归档事项重新计划尚未开放".into());
             }
             if !input.confirm_schedule_change {
                 return Err("修改加入日期会作废原队列编号，请先确认".into());
@@ -1225,6 +1228,7 @@ impl Database {
         {
             previous_task = Some(enter_current_workflow_on(&transaction, input.id.unwrap())?);
         }
+        let effective_is_urgent = input.is_urgent && !clears_urgent_status(&input.status);
         let id = if let Some(previous) = previous_task.as_ref() {
             let id = previous.id;
             if (previous.archived_at.is_some() || previous.status == "archived")
@@ -4902,6 +4906,86 @@ mod tests {
             )
             .unwrap();
         assert_eq!(old_day.summary.handled_tasks, 6);
+    }
+
+    #[test]
+    fn reactivation_retains_historical_statistics_clears_deadline_and_starts_new_cycle() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-plan-reactivate-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let mut input = sample("重新激活");
+        input.details = "原详情".into();
+        input.internal_notes = "原备注".into();
+        input.priority = "critical".into();
+        input.requested_deadline = Some("2026-10-03T18:00:00+08:00".into());
+        let original = db.save_task(input.clone()).unwrap();
+        db.complete_round(original.id).unwrap();
+        db.archive(original.id).unwrap();
+        input.id = Some(original.id);
+        input.planned_date = Some("2026-10-08".into());
+        input.confirm_schedule_change = true;
+        let future = db.save_task(input.clone()).unwrap();
+        assert_eq!(future.status, "pending");
+        assert!(future.is_scheduled);
+        assert!(future.requested_deadline.is_none());
+        assert!(future.archived_at.is_none());
+        assert!(future.completed_at.is_none());
+        assert_eq!(future.permanent_number, original.permanent_number);
+        assert_eq!(future.details, original.details);
+        assert_eq!(future.internal_notes, original.internal_notes);
+        assert_eq!(future.priority, original.priority);
+        assert_eq!(future.departments, original.departments);
+        assert_eq!(
+            db.statistics(
+                "2026-10-02T00:00:00+08:00".into(),
+                "2026-10-03T00:00:00+08:00".into(),
+                480
+            )
+            .unwrap()
+            .summary
+            .completed,
+            1
+        );
+        TEST_TIME.with(|clock| {
+            *clock.borrow_mut() =
+                Some(chrono::DateTime::parse_from_rfc3339("2026-10-08T09:00:00+08:00").unwrap())
+        });
+        assert_eq!(db.activate_due_scheduled().unwrap(), 1);
+        db.complete_round(original.id).unwrap();
+        assert_eq!(db.list_work_events(original.id).unwrap().len(), 2);
+        assert_eq!(
+            db.statistics(
+                "2026-10-08T00:00:00+08:00".into(),
+                "2026-10-09T00:00:00+08:00".into(),
+                480
+            )
+            .unwrap()
+            .summary
+            .completed,
+            1
+        );
+        let reopened = db.save_task(input).unwrap();
+        assert!(reopened.has_active_queue && !reopened.is_scheduled);
+        assert_eq!(reopened.status, "pending");
+        assert_eq!(
+            db.get_logs(original.id)
+                .unwrap()
+                .iter()
+                .filter(|log| log.log_type == "scheduled_reactivated")
+                .count(),
+            2
+        );
+        db.process_round(original.id).unwrap();
+        let mut processed = sample("重新激活");
+        processed.id = Some(original.id);
+        processed.planned_date = Some("2026-10-10".into());
+        processed.confirm_schedule_change = true;
+        assert!(db.save_task(processed).unwrap().is_scheduled);
+        assert_eq!(db.list_work_events(original.id).unwrap().len(), 3);
     }
 
     #[test]

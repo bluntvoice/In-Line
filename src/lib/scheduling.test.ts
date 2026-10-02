@@ -29,5 +29,7 @@ describe("加入日期校验与确认",()=>{
     expect(scheduleConfirmation(task,{plannedDate:"2026-10-05"} as TaskInput,"2026-10-02")).toBeNull();
     const text=scheduleConfirmation(task,{plannedDate:"2026-10-08"} as TaskInput,"2026-10-02");
     expect(text).toContain("永久不回收");expect(text).toContain("2026-10-05");expect(text).toContain("2026-10-08");expect(text).toContain("移出当前待办");
+    const completed={...task,status:"completed"} as LegalTask;
+    expect(scheduleConfirmation(completed,{plannedDate:"2026-10-05"} as TaskInput,"2026-10-02",true)).toContain("原截止时间自动清空");
   });
 });

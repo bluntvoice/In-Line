@@ -144,9 +144,12 @@ pub(super) fn replan_on(
             |row| row.get(0),
         )
         .map_err(display_error)?;
-    connection.execute("UPDATE tasks SET planned_date=?,ticket_date=?,daily_sequence=?,is_scheduled=?,status='pending',requested_deadline=?,requested_deadline_label=?,schedule_action=?,schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",
+    connection.execute("UPDATE tasks SET planned_date=?,ticket_date=?,daily_sequence=?,is_scheduled=?,status='pending',archived_at=NULL,completed_at=NULL,started_at=NULL,requested_deadline=?,requested_deadline_label=?,schedule_action=?,schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",
         params![date,date,sequence,scheduled as i64,deadline,deadline_label,if old.is_scheduled&&!scheduled{"early"}else{""},if old.is_scheduled&&!scheduled{Some(now())}else{None},order,now(),id]).map_err(display_error)?;
     allocate_number_on(connection, id, date, sequence)?;
+    if old.archived_at.is_some() || matches!(old.status.as_str(), "completed" | "archived") {
+        add_log(connection,id,"scheduled_reactivated",&format!("重新激活：原状态 {}；原完成时间 {:?}；原归档时间 {:?}；新计划 {}；新队列 {}-{:02}；清空原截止时间 {:?}；此前完成、归档及统计历史永久保留",old.status,old.completed_at,old.archived_at,date,date,sequence,old.requested_deadline))?;
+    }
     add_log(
         connection,
         id,
