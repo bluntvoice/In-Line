@@ -22,6 +22,11 @@ describe("subtask ordering", () => {
 });
 
 describe("subtask creation defaults", () => {
+  it("inherits a future date without queueing today and clamps a past parent date",()=>{
+    const parent={id:1,taskType:"事项",departments:[],department:"部门",contacts:[],contact:"人员",plannedDate:"2027-01-01"};
+    expect(createSubtaskDraft(parent,"2026-12-31")).toMatchObject({plannedDate:"2027-01-01",enqueueToday:false});
+    expect(createSubtaskDraft(parent,"2027-01-03")).toMatchObject({plannedDate:"2027-01-03",enqueueToday:true});
+  });
   it("copies people and classification while keeping deadline and urgency independent", () => {
     const draft = createSubtaskDraft({
       id: 7,

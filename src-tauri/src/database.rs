@@ -34,6 +34,10 @@ impl Database {
         let root = dirs::config_dir()
             .ok_or("无法定位应用数据目录")?
             .join("in-line");
+        Self::open_root(root)
+    }
+
+    fn open_root(root: PathBuf) -> Result<Self, String> {
         fs::create_dir_all(&root).map_err(display_error)?;
         let path = root.join("inline.db");
         let backup_dir = root.join("backups");
@@ -1224,7 +1228,10 @@ impl Database {
             return Err("未来事项创建时请使用待处理状态".into());
         }
         if previous_task.as_ref().is_some_and(|task| task.is_scheduled)
-            && matches!(input.status.as_str(), "processed" | "completed")
+            && matches!(
+                input.status.as_str(),
+                "processing" | "processed" | "completed"
+            )
         {
             previous_task = Some(enter_current_workflow_on(&transaction, input.id.unwrap())?);
         }
@@ -1506,7 +1513,7 @@ impl Database {
                 .clone()
                 .unwrap_or_else(|| parent.contacts.clone());
             let task = TaskInput {
-                planned_date: None,
+                planned_date: input.planned_date.clone(),
                 confirm_schedule_change: false,
                 id: None,
                 department: departments.first().cloned().unwrap_or_default(),
@@ -1537,9 +1544,13 @@ impl Database {
             let departments = normalized_departments(&task);
             let stored_contacts = contact_storage(&contacts)?;
             let stored_departments = contact_storage(&departments)?;
-            let date = today();
-            let sequence = next_daily_sequence(transaction, &date)?;
-            let permanent = format!("{}-{:02}", date.replace('-', ""), sequence);
+            let identity_date = today();
+            let date = input.planned_date.clone().unwrap_or_else(|| parent.planned_date.clone().max(identity_date.clone()));
+            validate_plan(&date, task.requested_deadline.as_deref(), true)?;
+            let scheduled = date > identity_date;
+            let identity_sequence = next_daily_sequence(transaction, &identity_date)?;
+            let sequence = if scheduled {next_daily_sequence(transaction, &date)?} else {identity_sequence};
+            let permanent = format!("{}-{:02}", identity_date.replace('-', ""), identity_sequence);
             let custom_order: i64 = transaction
                 .query_row(
                     "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
@@ -1590,7 +1601,11 @@ impl Database {
                 )
                 .map_err(display_error)?;
             let id = transaction.last_insert_rowid();
-            if input.enqueue_today {
+            transaction.execute("UPDATE tasks SET planned_date=?,is_scheduled=? WHERE id=?",params![date,scheduled as i64,id]).map_err(display_error)?;
+            allocate_number_on(transaction,id,&date,sequence)?;
+            if scheduled {add_log(transaction,id,"scheduled_created",&format!("子任务提前取号：计划 {}，队列 {}-{:02}；未实际入队",date,date,sequence))?;}
+
+            if input.enqueue_today && !scheduled {
                 transaction
                     .execute(
                         "INSERT INTO task_queue_entries(
@@ -1610,11 +1625,12 @@ impl Database {
                     )
                     .map_err(display_error)?;
             }
+            if input.enqueue_today && !scheduled {transaction.execute("UPDATE queue_number_allocations SET activated_at=? WHERE task_id=?",params![stamp,id]).map_err(display_error)?;}
             add_log(
                 transaction,
                 id,
                 "created",
-                &if input.enqueue_today {
+                &if input.enqueue_today && !scheduled {
                     format!("创建子任务并取号：{permanent}")
                 } else {
                     format!("创建子任务（未加入今日队列）：{permanent}")
@@ -1629,7 +1645,7 @@ impl Database {
             add_status(transaction, id, None, "pending", "创建子任务")?;
             if task.is_urgent {
                 record_urgent(transaction, id, &task)?;
-                promote_one(transaction, id)?;
+                if input.enqueue_today && !scheduled {promote_one(transaction, id)?;}
             }
             ensure_master(transaction, "task_type", &task.task_type)?;
             bump_master_use(transaction, "task_type", &task.task_type)?;
@@ -1932,7 +1948,7 @@ impl Database {
             return Err("事项状态无效".into());
         }
         self.with_transaction(|transaction| {
-            let task = if matches!(status.as_str(), "processed" | "completed") {
+            let task = if matches!(status.as_str(), "processing" | "processed" | "completed") {
                 enter_current_workflow_on(transaction, id)?
             } else {
                 get_task_on(transaction, id)?
@@ -2104,6 +2120,8 @@ impl Database {
                 return Err("包含子任务的事项只能合并到顶层事项".into());
             }
 
+            stop_scheduled_on(tx,source.id,"合并至其他事项",true)?;
+            void_number_on(tx,source.id,"合并至其他事项")?;
             close_active_queue(tx, source.id, "合并至其他事项")?;
             if input.trash_source {
                 clear_urgent_on(tx, source.id, "合并后移入回收站")?;
@@ -2144,6 +2162,7 @@ impl Database {
                 "status_history",
                 "urgent_records",
                 "task_queue_entries",
+                "queue_number_allocations",
             ] {
                 tx.execute(
                     &format!("UPDATE {table} SET task_id=? WHERE task_id=?"),
@@ -2432,7 +2451,7 @@ impl Database {
         }
         validate_handled_at(&input.handled_at)?;
         self.with_transaction(|tx| {
-            let task = get_task_on(tx, input.task_id)?;
+            let mut task = get_task_on(tx, input.task_id)?;
             if task.deleted_at.is_some() {
                 return Err("回收站事项不能新增处理活动".into());
             }
@@ -2440,6 +2459,11 @@ impl Database {
                 return Err(
                     "已归档事项请先重新开启；也可以取消勾选同步状态，仅补录处理活动".into(),
                 );
+            }
+            if input.sync_status
+                && matches!(input.result_status.as_str(), "processed" | "completed")
+            {
+                task = enter_current_workflow_on(tx, input.task_id)?;
             }
             if input.sync_status && task.status != input.result_status {
                 if input.result_status == "completed" {
@@ -2464,6 +2488,16 @@ impl Database {
                 )?;
             }
             if input.sync_status {
+                if is_deferred_status(&input.result_status)
+                    || matches!(input.result_status.as_str(), "completed" | "cancelled")
+                {
+                    stop_scheduled_on(
+                        tx,
+                        input.task_id,
+                        "处理活动同步状态",
+                        matches!(input.result_status.as_str(), "completed" | "cancelled"),
+                    )?;
+                }
                 if clears_urgent_status(&input.result_status) {
                     clear_urgent_on(tx, input.task_id, "处理记录已同步事项状态")?;
                 }
@@ -3816,6 +3850,8 @@ impl Database {
                 conflicts: Vec::new(),
             };
             let mut imported_task_ids = HashMap::new();
+            let mut inserted_task_ids = HashSet::new();
+            merge_sequence_watermarks_on(&source, &transaction)?;
 
             for mut source_task in source_tasks {
                 source_task.task_type = canonical_task_type(&transaction, &source_task.task_type)?;
@@ -3853,6 +3889,9 @@ impl Database {
                     });
                 }
                 imported_task_ids.insert(source_task.id, target_id);
+                if inserted {
+                    inserted_task_ids.insert(target_id);
+                }
 
                 for (table, columns) in [
                     ("task_logs", &["log_type", "content", "created_at"][..]),
@@ -3935,6 +3974,12 @@ impl Database {
                     .map_err(display_error)?;
             }
 
+            merge_number_history_on(
+                &source,
+                &transaction,
+                &imported_task_ids,
+                &inserted_task_ids,
+            )?;
             merge_master_values(&source, &transaction)?;
             deduplicate_task_types(&transaction)?;
             result.applied_settings = merge_settings(&source, &transaction)?;
@@ -3999,6 +4044,8 @@ fn same_task_content(left: &LegalTask, right: &LegalTask) -> bool {
         && left.completed_at == right.completed_at
         && left.archived_at == right.archived_at
         && left.deleted_at == right.deleted_at
+        && left.planned_date == right.planned_date
+        && left.is_scheduled == right.is_scheduled
 }
 
 fn canonical_task_type(connection: &Connection, source: &str) -> Result<String, String> {
@@ -4064,8 +4111,9 @@ fn next_import_sequence(connection: &Connection, date: &str) -> Result<i64, Stri
                SELECT COALESCE(MAX(last_sequence),0) AS value FROM daily_sequences WHERE ticket_date=?
                UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM tasks WHERE ticket_date=?
                UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM task_queue_entries WHERE queue_date=?
+               UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM queue_number_allocations WHERE queue_date=?
              )",
-            params![date, date, date],
+            params![date, date, date,date],
             |row| row.get(0),
         )
         .map_err(display_error)?;
@@ -4080,7 +4128,7 @@ fn imported_identity(
 ) -> Result<(String, i64, String), String> {
     let pair_used: i64 = connection
         .query_row(
-            "SELECT EXISTS(SELECT 1 FROM tasks WHERE ticket_date=? AND daily_sequence=?)",
+            "SELECT EXISTS(SELECT 1 FROM tasks WHERE ticket_date=?1 AND daily_sequence=?2 UNION ALL SELECT 1 FROM queue_number_allocations WHERE queue_date=?1 AND daily_sequence=?2)",
             params![task.ticket_date, task.daily_sequence],
             |row| row.get(0),
         )
@@ -4170,7 +4218,25 @@ fn insert_imported_task(
             ],
         )
         .map_err(display_error)?;
-    Ok(connection.last_insert_rowid())
+    let id = connection.last_insert_rowid();
+    connection.execute("UPDATE tasks SET planned_date=?,is_scheduled=?,schedule_action=?,schedule_action_at=? WHERE id=?",params![task.planned_date,task.is_scheduled as i64,task.schedule_action,task.schedule_action_at,id]).map_err(display_error)?;
+    allocate_number_on(connection, id, &ticket_date, daily_sequence)?;
+    if daily_sequence != task.daily_sequence {
+        add_log(
+            connection,
+            id,
+            "backup_number_remapped",
+            &format!(
+                "备份原队列 {}-{:02} 已被占用；保留本地记录，导入队列改为 {}-{:02}，原固定编号 {}",
+                task.ticket_date,
+                task.daily_sequence,
+                ticket_date,
+                daily_sequence,
+                task.permanent_number
+            ),
+        )?;
+    }
+    Ok(id)
 }
 
 fn copy_unique_task_rows(
@@ -4317,8 +4383,8 @@ fn copy_queue_entries(
         }
         let pair_used: i64 = target
             .query_row(
-                "SELECT EXISTS(SELECT 1 FROM task_queue_entries WHERE queue_date=? AND daily_sequence=?)",
-                params![entry.queue_date, entry.daily_sequence],
+                "SELECT EXISTS(SELECT 1 FROM task_queue_entries WHERE queue_date=?1 AND daily_sequence=?2 UNION ALL SELECT 1 FROM queue_number_allocations WHERE queue_date=?1 AND daily_sequence=?2 AND (task_id IS NOT ?3 OR voided_at IS NOT NULL))",
+                params![entry.queue_date, entry.daily_sequence,target_task_id],
                 |row| row.get(0),
             )
             .map_err(display_error)?;
@@ -4348,6 +4414,8 @@ fn copy_queue_entries(
                 ],
             )
             .map_err(display_error)?;
+        target.execute("INSERT OR IGNORE INTO queue_number_allocations(task_id,permanent_number,queue_date,daily_sequence,allocated_at,activated_at,voided_at,void_reason) SELECT id,permanent_number,?,?,?, ?,?,? FROM tasks WHERE id=?",params![entry.queue_date,sequence,entry.created_at,entry.enqueued_at,entry.closed_at,if entry.closed_at.is_some(){"导入历史队列"}else{""},target_task_id]).map_err(display_error)?;
+        target.execute("UPDATE queue_number_allocations SET activated_at=? WHERE task_id=? AND queue_date=? AND daily_sequence=?",params![entry.enqueued_at,target_task_id,entry.queue_date,sequence]).map_err(display_error)?;
         if inserted_task && entry.closed_at.is_none() {
             target
                 .execute(
@@ -4845,6 +4913,8 @@ mod tests {
             "completed-status",
             "processed-edit",
             "completed-edit",
+            "processing-status",
+            "processing-edit",
         ] {
             let mut input = sample(mode);
             input.planned_date = Some("2026-10-08".into());
@@ -4861,9 +4931,12 @@ mod tests {
                 "complete" => db.complete_round(original.id).unwrap(),
                 "processed-status" => db.set_status(original.id, "processed".into()).unwrap(),
                 "completed-status" => db.set_status(original.id, "completed".into()).unwrap(),
+                "processing-status" => db.set_status(original.id, "processing".into()).unwrap(),
                 _ => {
                     input.id = Some(original.id);
-                    input.status = if mode == "processed-edit" {
+                    input.status = if mode == "processing-edit" {
+                        "processing"
+                    } else if mode == "processed-edit" {
                         "processed"
                     } else {
                         "completed"
@@ -4880,7 +4953,12 @@ mod tests {
             let logs = db.get_logs(original.id).unwrap();
             assert!(logs.iter().any(|log| log.log_type == "queue_number_voided"));
             assert!(logs.iter().any(|log| log.log_type == "scheduled_early"));
-            if mode != "enqueue" {
+            if mode.starts_with("processing") {
+                assert_eq!(after.status, "processing");
+                assert!(after.has_active_queue);
+                assert!(after.started_at.is_some());
+                assert!(db.list_work_events(original.id).unwrap().is_empty());
+            } else if mode != "enqueue" {
                 assert_eq!(db.list_work_events(original.id).unwrap().len(), 1);
             }
         }
@@ -5043,6 +5121,7 @@ mod tests {
     fn subtask_sample(parent_task_id: i64, title: &str) -> CreateSubtaskInput {
         CreateSubtaskInput {
             parent_task_id,
+            planned_date: None,
             title: title.into(),
             details: "子任务测试".into(),
             task_type: None,
@@ -5058,6 +5137,294 @@ mod tests {
             internal_notes: String::new(),
             enqueue_today: true,
         }
+    }
+
+    #[test]
+    fn scheduled_subtasks_inherit_dates_and_remain_independent() {
+        let _clock = TestClock::at("2026-12-31T23:59:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-future-child-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let mut input = sample("未来父任务");
+        input.planned_date = Some("2027-01-01".into());
+        let parent = db.save_task(input.clone()).unwrap();
+        let child = db
+            .create_subtask(subtask_sample(parent.id, "继承日期子任务"))
+            .unwrap();
+        assert!(child.is_scheduled && !child.has_active_queue);
+        assert_eq!(child.planned_date, "2027-01-01");
+        assert_eq!(child.daily_sequence, parent.daily_sequence + 1);
+        let mut own = subtask_sample(parent.id, "独立日期子任务");
+        own.planned_date = Some("2027-01-02".into());
+        let own = db.create_subtask(own).unwrap();
+        assert_eq!(own.daily_sequence, 1);
+        input.id = Some(parent.id);
+        input.planned_date = Some("2027-01-03".into());
+        input.confirm_schedule_change = true;
+        db.save_task(input).unwrap();
+        assert_eq!(db.get_task(child.id).unwrap().planned_date, "2027-01-01");
+        assert_eq!(db.get_task(own.id).unwrap().planned_date, "2027-01-02");
+        let mut invalid = subtask_sample(parent.id, "截止时间非法");
+        invalid.requested_deadline = Some("2027-01-02T12:00:00+08:00".into());
+        assert!(db.create_subtask(invalid).is_err());
+        let _next = TestClock::at("2027-01-01T00:00:01+08:00");
+        assert_eq!(db.activate_due_scheduled().unwrap(), 1);
+        assert_eq!(
+            db.get_task(child.id).unwrap().daily_sequence,
+            child.daily_sequence
+        );
+        assert!(db.get_task(parent.id).unwrap().is_scheduled);
+        assert!(db.get_task(own.id).unwrap().is_scheduled);
+        let _later = TestClock::at("2027-01-05T10:00:00+08:00");
+        let clamped = db
+            .create_subtask(subtask_sample(parent.id, "继承过去日期夹到今天"))
+            .unwrap();
+        assert_eq!(clamped.planned_date, "2027-01-05");
+        assert!(clamped.has_active_queue);
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn production_upgrade_from_v8_preserves_data_and_creates_pre_migration_backup() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-production-upgrade-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let parent = db.save_task(sample("v8升级前父任务")).unwrap();
+        let child = db
+            .create_subtask(subtask_sample(parent.id, "v8子任务"))
+            .unwrap();
+        db.process_round(child.id).unwrap();
+        db.with_conn(|conn|conn.execute_batch("DROP INDEX idx_scheduled_due; DROP TABLE queue_number_allocations; ALTER TABLE tasks DROP COLUMN planned_date; ALTER TABLE tasks DROP COLUMN is_scheduled; ALTER TABLE tasks DROP COLUMN schedule_action; ALTER TABLE tasks DROP COLUMN schedule_action_at; UPDATE schema_meta SET version=8;").map_err(display_error)).unwrap();
+        drop(db);
+        let db = Database::open_root(root.clone()).unwrap();
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 9);
+        let after = db.get_task(child.id).unwrap();
+        assert_eq!(after.parent_task_id, Some(parent.id));
+        assert_eq!(after.permanent_number, child.permanent_number);
+        assert_eq!(after.status, "processed");
+        assert!(!after.is_scheduled);
+        assert_eq!(after.planned_date, child.ticket_date);
+        assert_eq!(db.list_work_events(child.id).unwrap().len(), 1);
+        let backups = db.list_backups().unwrap();
+        let migration = backups
+            .iter()
+            .find(|item| item.name.contains("before-migration"))
+            .unwrap();
+        let saved = Connection::open(&migration.path).unwrap();
+        assert_eq!(Database::schema_version(&saved).unwrap(), 8);
+        drop(saved);
+        let mut future = sample("升级后预约");
+        future.planned_date = Some("2026-10-05".into());
+        let future = db.save_task(future).unwrap();
+        drop(db);
+        let db = Database::open_root(root.clone()).unwrap();
+        assert!(db.get_task(future.id).unwrap().is_scheduled);
+        assert_eq!(db.list_work_events(child.id).unwrap().len(), 1);
+        assert_eq!(
+            db.list_backups()
+                .unwrap()
+                .iter()
+                .filter(|item| item.name.contains("before-migration"))
+                .count(),
+            1
+        );
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn future_backup_preserves_reservations_deleted_history_and_rolls_back_atomically() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-future-restore-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let source = Database::open_at(root.join("source.db")).unwrap();
+        let mut input = sample("备份未来父");
+        input.planned_date = Some("2026-10-05".into());
+        let parent = source.save_task(input.clone()).unwrap();
+        let _child = source
+            .create_subtask(subtask_sample(parent.id, "备份未来子"))
+            .unwrap();
+        input.title = "备份暂停".into();
+        let paused = source.save_task(input.clone()).unwrap();
+        source
+            .set_status(paused.id, "waiting_materials".into())
+            .unwrap();
+        input.title = "删除占号".into();
+        let deleted = source.save_task(input.clone()).unwrap();
+        source.soft_delete(deleted.id).unwrap();
+        source.permanently_delete_tasks(vec![deleted.id]).unwrap();
+        let backup = source.create_backup("manual").unwrap();
+        let target = Database::open_at(root.join("target.db")).unwrap();
+        input.title = "本地未来不可覆盖".into();
+        let local = target.save_task(input.clone()).unwrap();
+        let imported = target.import_backup(backup.path).unwrap();
+        target.with_conn(|tx|tx.execute_batch("CREATE TRIGGER reject_merge BEFORE INSERT ON queue_number_allocations WHEN NEW.permanent_number<>'' BEGIN SELECT RAISE(ABORT,'restore rollback probe'); END").map_err(display_error)).unwrap();
+        assert!(target.restore_backup(imported.path.clone()).is_err());
+        assert_eq!(target.list_tasks(TaskView::Queue).unwrap().len(), 1);
+        target
+            .with_conn(|tx| {
+                tx.execute_batch("DROP TRIGGER reject_merge")
+                    .map_err(display_error)
+            })
+            .unwrap();
+        let result = target.restore_backup(imported.path.clone()).unwrap();
+        assert_eq!(result.added_tasks, 3);
+        let items = target.list_tasks(TaskView::Queue).unwrap();
+        let restored_parent = items
+            .iter()
+            .find(|task| task.title == "备份未来父")
+            .unwrap();
+        let restored_child = items
+            .iter()
+            .find(|task| task.title == "备份未来子")
+            .unwrap();
+        assert_eq!(restored_child.parent_task_id, Some(restored_parent.id));
+        assert!(restored_parent.is_scheduled && !restored_parent.has_active_queue);
+        assert_eq!(restored_parent.planned_date, "2026-10-05");
+        assert_ne!(restored_parent.daily_sequence, local.daily_sequence);
+        assert!(
+            !items
+                .iter()
+                .find(|task| task.title == "备份暂停")
+                .unwrap()
+                .is_scheduled
+        );
+        assert_eq!(
+            target.get_task(local.id).unwrap().daily_sequence,
+            local.daily_sequence
+        );
+        let count = target
+            .with_conn(|tx| {
+                tx.query_row("SELECT count(*) FROM queue_number_allocations", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .map_err(display_error)
+            })
+            .unwrap();
+        let second = target.restore_backup(imported.path).unwrap();
+        assert_eq!(second.added_tasks, 0);
+        assert_eq!(
+            target
+                .with_conn(|tx| tx
+                    .query_row("SELECT count(*) FROM queue_number_allocations", [], |row| {
+                        row.get::<_, i64>(0)
+                    })
+                    .map_err(display_error))
+                .unwrap(),
+            count
+        );
+        target.with_conn(|tx|{
+            let orphan:i64=tx.query_row("SELECT count(*) FROM queue_number_allocations WHERE task_id IS NULL AND permanent_number=?",[deleted.permanent_number],|row|row.get(0)).map_err(display_error)?;assert!(orphan>0);
+            assert_eq!(tx.query_row("SELECT count(*) FROM task_queue_entries",[],|row|row.get::<_,i64>(0)).map_err(display_error)?,0);
+            assert_eq!(tx.query_row("SELECT count(*) FROM pragma_foreign_key_check",[],|row|row.get::<_,i64>(0)).map_err(display_error)?,0);
+            Ok(())
+        }).unwrap();
+        input.title = "导入后新预约".into();
+        let next = target.save_task(input).unwrap();
+        assert!(
+            next.daily_sequence > deleted.daily_sequence
+                && next.daily_sequence > restored_child.daily_sequence
+        );
+        drop(source);
+        drop(target);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn concurrent_midnight_checks_activate_exactly_once_and_manual_work_enters_first() {
+        let _clock = TestClock::at("2028-02-28T23:59:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-future-concurrent-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = std::sync::Arc::new(Database::open_at(root.join("inline.db")).unwrap());
+        let mut input = sample("闰日计划");
+        input.planned_date = Some("2028-02-29".into());
+        let task = db.save_task(input).unwrap();
+        let handles = (0..4)
+            .map(|_| {
+                let db = db.clone();
+                std::thread::spawn(move || {
+                    let _clock = TestClock::at("2028-02-29T00:00:01+08:00");
+                    db.activate_due_scheduled().unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .sum::<usize>(),
+            1
+        );
+        assert_eq!(
+            db.get_task(task.id).unwrap().daily_sequence,
+            task.daily_sequence
+        );
+        let mut input = sample("补录同步未来事项");
+        input.planned_date = Some("2028-03-01".into());
+        let task = db.save_task(input).unwrap();
+        db.record_work_event(WorkEventInput {
+            task_id: task.id,
+            result_status: "processed".into(),
+            handled_at: now(),
+            note: "同步状态".into(),
+            sync_status: true,
+        })
+        .unwrap();
+        let result = db.get_task(task.id).unwrap();
+        assert!(!result.is_scheduled);
+        assert_eq!(result.ticket_date, "2028-02-28");
+        assert_eq!(result.schedule_action, "early");
+        assert_eq!(db.list_work_events(task.id).unwrap().len(), 1);
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn backup_history_cannot_void_an_existing_local_current_number() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-backup-local-number-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(root.join("source")).unwrap();
+        let local = Database::open_at(root.join("inline.db")).unwrap();
+        let task = local.save_task(sample("本地队列号优先")).unwrap();
+        let snapshot = local.create_backup("manual").unwrap();
+        fs::copy(snapshot.path, root.join("source/inline.db")).unwrap();
+        let source = Database::open_at(root.join("source/inline.db")).unwrap();
+        source.process_round(task.id).unwrap();
+        source
+            .enqueue_task(QueueInput {
+                id: task.id,
+                inherit_deadline: false,
+                reason: "备份来源办理后重新入队".into(),
+            })
+            .unwrap();
+        let backup = source.create_backup("manual").unwrap();
+        let backup = local.import_backup(backup.path).unwrap();
+        assert_eq!(local.restore_backup(backup.path).unwrap().added_tasks, 0);
+        let current = local.get_task(task.id).unwrap();
+        assert!(current.has_active_queue);
+        assert_eq!(current.daily_sequence, task.daily_sequence);
+        local.with_conn(|conn|{let voided:Option<String>=conn.query_row("SELECT voided_at FROM queue_number_allocations WHERE task_id=? AND queue_date=? AND daily_sequence=?",params![task.id,task.ticket_date,task.daily_sequence],|row|row.get(0)).map_err(display_error)?;assert_eq!(voided,None);Ok(())}).unwrap();
+        assert_eq!(local.list_work_events(task.id).unwrap().len(), 1);
+        drop(local);
+        drop(source);
+        let _ = fs::remove_dir_all(root);
     }
 
     #[derive(Debug, PartialEq)]

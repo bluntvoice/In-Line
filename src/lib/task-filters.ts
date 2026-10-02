@@ -84,6 +84,6 @@ export function uniqueValues(values: string[]) {
 export function matchesTaskSearch(task: LegalTask, query: string, parentTitle?: string) {
   const key = query.trim().toLocaleLowerCase("zh-CN");
   if (!key) return true;
-  return [task.permanentNumber, task.department, task.contact, task.taskType, task.title, task.details, task.internalNotes, parentTitle ?? ""]
+  return [task.permanentNumber, task.department, task.contact, task.taskType, task.title, task.details, task.internalNotes, task.plannedDate??task.ticketDate,task.isScheduled?"未来事项":"", parentTitle ?? ""]
     .some(value => value.toLocaleLowerCase("zh-CN").includes(key));
 }

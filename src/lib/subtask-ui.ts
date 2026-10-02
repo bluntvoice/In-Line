@@ -1,10 +1,13 @@
 import type { CreateSubtaskInput, LegalTask } from "../types";
+import { dateOnly } from "./task-utils";
 
 const inheritedValues = (values: string[], fallback: string) => values?.length ? values : [fallback].filter(Boolean);
 
-export function createSubtaskDraft(parent: Pick<LegalTask,"id"|"taskType"|"departments"|"department"|"contacts"|"contact">): CreateSubtaskInput {
+export function createSubtaskDraft(parent: Pick<LegalTask,"id"|"taskType"|"departments"|"department"|"contacts"|"contact"> & Partial<Pick<LegalTask,"plannedDate"|"ticketDate">>,today=dateOnly()): CreateSubtaskInput {
+  const plannedDate=[parent.plannedDate||parent.ticketDate||today,today].sort().at(-1)!;
   return {
     parentTaskId: parent.id,
+    plannedDate,
     title: "",
     details: "",
     taskType: parent.taskType,
@@ -18,7 +21,7 @@ export function createSubtaskDraft(parent: Pick<LegalTask,"id"|"taskType"|"depar
     requestedDeadline: null,
     requestedDeadlineLabel: null,
     internalNotes: "",
-    enqueueToday: true
+    enqueueToday: plannedDate===today
   };
 }
 

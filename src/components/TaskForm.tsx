@@ -119,7 +119,7 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
     setSaving(true);
     setError("");
     try {
-      if (task && form.status === "completed" && task.status !== "completed" && onCompleteRequested) {
+      if (!confirmation && task && form.status === "completed" && task.status !== "completed" && onCompleteRequested) {
         const saved = await api.saveTask({ ...submitted, status: task.status });
         await onCompleteRequested(saved);
       } else {

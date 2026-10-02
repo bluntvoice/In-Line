@@ -14,7 +14,7 @@ export function scheduleLabel(task:LegalTask,today=dateOnly()){
   return "";
 }
 
-export function validatePlannedDate(input:TaskInput,original?:LegalTask|null,today=dateOnly()){
+export function validatePlannedDate(input:Pick<TaskInput,"plannedDate"|"requestedDeadline">,original?:LegalTask|null,today=dateOnly()){
   const date=input.plannedDate??today;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||(!original||date!==original.plannedDate)&&date<today)return "加入日期只能选择今天及未来日期";
   const reactivating=Boolean(original&&(original.archivedAt||["completed","archived"].includes(original.status))&&date!==original.plannedDate);

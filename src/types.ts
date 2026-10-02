@@ -25,7 +25,7 @@ export interface QueueInput{id:number;inheritDeadline:boolean;reason:string}
 export interface MergeTaskInput{targetTaskId:number;sourceTaskId:number;deduplicateRecords:boolean;trashSource:boolean}
 export interface ReorderSubtasksInput{parentTaskId:number;taskIds:number[]}
 export interface CreateSubtaskInput{
-  parentTaskId:number;title:string;details?:string;taskType?:string;departments?:string[];contacts?:string[];priority?:Priority;workload?:Workload;
+  parentTaskId:number;plannedDate?:string;title:string;details?:string;taskType?:string;departments?:string[];contacts?:string[];priority?:Priority;workload?:Workload;
   isUrgent?:boolean;urgentRequester?:string;urgentReason?:string;requestedDeadline?:string|null;requestedDeadlineLabel?:string|null;internalNotes?:string;enqueueToday?:boolean;
 }
 export interface SubtaskCompletionState{parentTaskId:number;totalSubtasks:number;completedSubtasks:number;eligibleSubtasks:number;completedEligibleSubtasks:number;allEligibleSubtasksCompleted:boolean;parentCanBeCompleted:boolean}

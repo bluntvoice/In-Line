@@ -75,6 +75,8 @@ fn default_true() -> bool {
 #[serde(rename_all = "camelCase")]
 pub struct CreateSubtaskInput {
     pub parent_task_id: i64,
+    #[serde(default)]
+    pub planned_date: Option<String>,
     pub title: String,
     #[serde(default)]
     pub details: String,

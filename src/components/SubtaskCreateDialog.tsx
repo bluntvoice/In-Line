@@ -3,6 +3,8 @@ import { AlertTriangle, Check, ChevronDown, ChevronUp, CornerDownRight, X } from
 import type { CreateSubtaskInput, LegalTask, MasterData, Priority, Workload } from "../types";
 import { api } from "../api";
 import { createSubtaskDraft } from "../lib/subtask-ui";
+import { dateOnly } from "../lib/task-utils";
+import { validatePlannedDate } from "../lib/scheduling";
 import ComboInput from "./ComboInput";
 import DeadlinePicker from "./DeadlinePicker";
 import MultiContactInput from "./MultiContactInput";
@@ -31,6 +33,8 @@ export default function SubtaskCreateDialog({ parent, masters, commonDepartments
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    const validation=validatePlannedDate({plannedDate:form.plannedDate,requestedDeadline:form.requestedDeadline??null});
+    if(validation){setError(validation);return;}
     setSaving(true);
     setError("");
     try {
@@ -60,9 +64,10 @@ export default function SubtaskCreateDialog({ parent, masters, commonDepartments
           <span>子任务名称 *</span>
           <input autoFocus required maxLength={100} value={form.title} onChange={event => update("title", event.target.value)} placeholder="一句话说明要处理的子任务" />
         </label>
+        <label className="subtask-title-field"><span>加入日期 *</span><input type="date" required min={dateOnly()} value={form.plannedDate} onChange={event=>setForm(current=>({...current,plannedDate:event.target.value,enqueueToday:event.target.value===dateOnly()}))}/><small>默认继承父任务日期，创建后独立调整</small></label>
         <label className="subtask-enqueue-switch">
-          <span><strong>立即加入今日队列</strong><small>开启后，子任务会独立取得今日编号</small></span>
-          <span className="switch"><input type="checkbox" checked={form.enqueueToday} onChange={event => update("enqueueToday", event.target.checked)} /><span /></span>
+          <span><strong>{form.plannedDate!>dateOnly()?"预占未来日期号码":"立即加入今日队列"}</strong><small>{form.plannedDate!>dateOnly()?"保存到未来事项，到期自动入队":"开启后，子任务会独立取得今日编号"}</small></span>
+          <span className="switch"><input type="checkbox" disabled={form.plannedDate!>dateOnly()} checked={form.enqueueToday} onChange={event => update("enqueueToday", event.target.checked)} /><span /></span>
         </label>
         <button type="button" className="subtask-more-toggle" aria-expanded={expanded} onClick={() => setExpanded(current => !current)}>
           {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}更多设置
@@ -82,7 +87,7 @@ export default function SubtaskCreateDialog({ parent, masters, commonDepartments
         </div>}
         <footer className="form-actions">
           <span className="keyboard-hint">部门、对接人和事项类型已从父任务复制，创建后可独立修改</span>
-          <div><button type="button" className="button secondary" onClick={onClose}>取消</button><button className="button primary" disabled={saving || !form.title.trim()}><Check size={16} />{saving ? "创建中" : form.enqueueToday ? "创建并取号" : "仅创建"}</button></div>
+          <div><button type="button" className="button secondary" onClick={onClose}>取消</button><button className="button primary" disabled={saving || !form.title.trim()}><Check size={16} />{saving ? "创建中" : form.plannedDate!>dateOnly()?"创建并提前取号":form.enqueueToday ? "创建并取号" : "仅创建"}</button></div>
         </footer>
       </form>
     </section>

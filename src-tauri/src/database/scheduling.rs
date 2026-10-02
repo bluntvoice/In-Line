@@ -336,6 +336,92 @@ pub(super) fn stop_scheduled_on(
     Ok(())
 }
 
+pub(super) fn merge_sequence_watermarks_on(
+    source: &Connection,
+    target: &Connection,
+) -> Result<(), String> {
+    let mut query = source
+        .prepare("SELECT ticket_date,last_sequence FROM daily_sequences")
+        .map_err(display_error)?;
+    for row in query
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+        })
+        .map_err(display_error)?
+    {
+        let (date, sequence) = row.map_err(display_error)?;
+        reserve_daily_sequence(target, &date, sequence)?;
+    }
+    Ok(())
+}
+
+/// Preserve source number evidence even when another local task owns the original pair.
+pub(super) fn merge_number_history_on(
+    source: &Connection,
+    target: &Connection,
+    ids: &HashMap<i64, i64>,
+    inserted: &HashSet<i64>,
+) -> Result<(), String> {
+    let mut query=source.prepare("SELECT task_id,permanent_number,queue_date,daily_sequence,allocated_at,activated_at,voided_at,void_reason FROM queue_number_allocations ORDER BY id").map_err(display_error)?;
+    let rows = query
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, Option<i64>>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, i64>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, Option<String>>(5)?,
+                row.get::<_, Option<String>>(6)?,
+                row.get::<_, String>(7)?,
+            ))
+        })
+        .map_err(display_error)?;
+    for row in rows {
+        let (source_id, permanent, date, sequence, allocated, activated, voided, reason) =
+            row.map_err(display_error)?;
+        let id = source_id.and_then(|value| ids.get(&value).copied());
+        if let (Some(source_task_id), Some(target_task_id)) = (source_id, id) {
+            if inserted.contains(&target_task_id) {
+                let original = get_task_on(source, source_task_id)?;
+                if original.ticket_date == date && original.daily_sequence == sequence {
+                    let current = get_task_on(target, target_task_id)?;
+                    target.execute("UPDATE queue_number_allocations SET activated_at=COALESCE(activated_at,?),voided_at=COALESCE(voided_at,?),void_reason=CASE WHEN void_reason='' THEN ? ELSE void_reason END WHERE task_id=? AND queue_date=? AND daily_sequence=?",params![activated,voided,reason,target_task_id,current.ticket_date,current.daily_sequence]).map_err(display_error)?;
+                }
+            }
+        }
+        let existing:Option<(Option<i64>,String,String)>=target.query_row("SELECT task_id,permanent_number,allocated_at FROM queue_number_allocations WHERE queue_date=? AND daily_sequence=?",params![date,sequence],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).optional().map_err(display_error)?;
+        if let Some((owner, number, stamp)) = &existing {
+            if owner == &id && number == &permanent && (id.is_some() || stamp == &allocated) {
+                // Preserve existing local dispositions. Source events were merged separately.
+                continue;
+            }
+        }
+        let (saved_sequence, saved_voided, saved_reason) = if existing.is_some() {
+            let marker = format!(
+                "备份原号 {}-{:02}；固定编号 {}；分配时间 {}；原激活 {:?}；原作废 {:?}；原原因 {}",
+                date, sequence, permanent, allocated, activated, voided, reason
+            );
+            let copied:bool=target.query_row("SELECT EXISTS(SELECT 1 FROM queue_number_allocations WHERE permanent_number=? AND allocated_at=? AND void_reason=?)",params![permanent,allocated,marker],|row|row.get(0)).map_err(display_error)?;
+            if copied {
+                continue;
+            }
+            (
+                next_import_sequence(target, &date)?,
+                Some(voided.clone().unwrap_or_else(now)),
+                marker,
+            )
+        } else {
+            (sequence, voided.clone(), reason.clone())
+        };
+        reserve_daily_sequence(target, &date, saved_sequence)?;
+        target.execute("INSERT INTO queue_number_allocations(task_id,permanent_number,queue_date,daily_sequence,allocated_at,activated_at,voided_at,void_reason) VALUES(?,?,?,?,?,?,?,?)",params![id,permanent,date,saved_sequence,allocated,activated,saved_voided,saved_reason]).map_err(display_error)?;
+    }
+    // Imported active history may have reallocated the current number after task creation.
+    target.execute("UPDATE queue_number_allocations SET voided_at=COALESCE(voided_at,?),void_reason=CASE WHEN void_reason='' THEN '导入时调整当前队列号码' ELSE void_reason END WHERE task_id IN (SELECT id FROM tasks) AND voided_at IS NULL AND NOT EXISTS(SELECT 1 FROM tasks t WHERE t.id=queue_number_allocations.task_id AND t.ticket_date=queue_number_allocations.queue_date AND t.daily_sequence=queue_number_allocations.daily_sequence)",[now()]).map_err(display_error)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

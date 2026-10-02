@@ -163,10 +163,11 @@ export default function App(){
 
   const source=useMemo(()=>{
     if(!data)return[];
+    if(query.trim()&&view!=="trash")return [...data.queue,...data.archive];
     if(view==="queue")return visibleQueueTasks(data.queue);
     if(view==="deferred")return filterDeferredTasks(sortDeferredQueue(data.queue.filter(task=>task.isScheduled||isDeferredStatus(task.status))),deferredFilter);
     return data[view];
-  },[data,view,deferredFilter]);
+  },[data,view,deferredFilter,query]);
   const structureTasks=useMemo(()=>data?[...data.queue,...data.archive,...data.trash]:[],[data]);
   const taskById=useMemo(()=>new Map(structureTasks.map(task=>[task.id,task])),[structureTasks]);
   const subtasksByParent=useMemo(()=>groupSubtasks(structureTasks),[structureTasks]);
@@ -255,7 +256,7 @@ export default function App(){
       <button className="new-ticket" onClick={()=>setEditing(null)}><Plus size={18}/>新增取号<kbd>{data.settings.global_shortcut??"Alt+I"}</kbd></button>
       <nav>
         <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="queue"?"active":""} onClick={()=>openView("queue")}><Inbox size={18}/><span>待办队列</span><b>{queueCount}</b></button>
-        <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="deferred"?"active":""} onClick={()=>openView("deferred")}><PauseCircle size={18}/><span>暂缓事项{scheduledCount>0&&<small>（未来 {scheduledCount}）</small>}</span><span className="nav-counts"><b>{deferred.length}</b>{deferredOverdue>0&&<em title={`${deferredOverdue} 项已逾期`}><ClockAlert size={12}/>{deferredOverdue}</em>}</span></button>
+        <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="deferred"?"active":""} onClick={()=>openView("deferred")}><PauseCircle size={18}/><span>暂缓事项</span><span className="nav-counts" title={`共 ${deferred.length} 项，其中未来事项 ${scheduledCount} 项`}><b>{deferred.length}</b>{deferredOverdue>0&&<em title={`${deferredOverdue} 项已逾期`}><ClockAlert size={12}/>{deferredOverdue}</em>}</span></button>
         <button className={!settings&&!about&&!statistics&&!workCalendar&&!help&&view==="archive"?"active":""} onClick={()=>openView("archive")}><Archive size={18}/><span>历史归档</span><b>{data.archive.length}</b></button>
         <button className={workCalendar?"active":""} onClick={()=>{setWorkCalendar(true);setStatistics(false);setHelp(false);setSettings(false);setAbout(false);setSelected(null);}}><CalendarDays size={18}/><span>工作日历</span></button>
         <button className={statistics?"active":""} onClick={()=>{setStatistics(true);setWorkCalendar(false);setHelp(false);setSettings(false);setAbout(false);setSelected(null);}}><BarChart3 size={18}/><span>统计中心</span></button>
@@ -286,7 +287,7 @@ export default function App(){
                 <td className={taskOverdue?"deadline overdue":"deadline"}>{view==="archive"?formatDateTime(historyTimestamp(task)):formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</td>
                 <td><div className="row-actions">{view==="trash"?<><button onClick={event=>{event.stopPropagation();void api.restoreTask(task.id).then(()=>toast("事项已恢复并加入今日队列")).catch(error=>toast(String(error)));}} title="恢复"><RotateCcw size={17}/></button><button className="danger" onClick={event=>{event.stopPropagation();void handleAction({type:"permanentDelete",task}).catch(error=>toast(String(error)));}} title="永久删除"><Trash2 size={17}/></button></>:<><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制取号图片"><Copy size={17}/></button><button disabled={!canMoveUp} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={17}/></button><button disabled={!canMoveDown} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={17}/></button></>}</div></td>
               </tr>})}</tbody></table>
-              {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query||activeFilterCount(filters)>0?"没有匹配事项":view==="deferred"?"目前没有暂缓事项":view==="trash"?"回收站为空":"目前没有排队事项"}</h2><p>{query||activeFilterCount(filters)>0?"请调整关键词或列筛选条件。":view==="deferred"?"待补充材料、待内部确认、待对方确认和已暂停事项会显示在这里。":view==="trash"?"移入回收站的事项会显示在这里，可恢复或永久删除。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
+              {!tasks.length&&<div className="empty-state"><img src="/inline-mark.svg"/><h2>{query||activeFilterCount(filters)>0?"没有匹配事项":view==="deferred"?"目前没有暂缓事项":view==="trash"?"回收站为空":"目前没有排队事项"}</h2><p>{query||activeFilterCount(filters)>0?"请调整关键词或列筛选条件。":view==="deferred"?"未来事项，以及待补充材料、待确认、已暂停和本轮已处理事项会显示在这里。":view==="trash"?"移入回收站的事项会显示在这里，可恢复或永久删除。":"新增事项后，系统会自动生成今日号码。"}</p></div>}
             </div>
           </section>
           {renderTaskDetail(actionView)}
