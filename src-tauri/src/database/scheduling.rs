@@ -181,6 +181,72 @@ pub(super) fn replan_on(
     Ok(())
 }
 
+pub(super) fn activate_reserved_on(connection: &Connection, id: i64) -> Result<(), String> {
+    let date = today();
+    let task = get_task_on(connection, id)?;
+    if task.has_active_queue {
+        return Err("未来事项存在重复的有效入队记录".into());
+    }
+    let late = task.planned_date < date;
+    let effective_at = if late {
+        use chrono::TimeZone;
+        let day = chrono::NaiveDate::parse_from_str(&task.planned_date, "%Y-%m-%d")
+            .map_err(display_error)?;
+        Local
+            .from_local_datetime(&day.and_hms_opt(0, 0, 0).ok_or("计划日期无效")?)
+            .earliest()
+            .ok_or("计划日期的本地时间无效")?
+            .to_rfc3339()
+    } else {
+        now()
+    };
+    activate_number_on(connection, id, &effective_at)?;
+    // Insert reserved slots before later numbers without urgent promotion.
+    let before:Option<i64>=connection.query_row("SELECT MIN(custom_sort_order) FROM tasks WHERE ticket_date=? AND daily_sequence>? AND EXISTS(SELECT 1 FROM task_queue_entries q WHERE q.task_id=tasks.id AND q.closed_at IS NULL)",params![task.ticket_date,task.daily_sequence],|row|row.get(0)).map_err(display_error)?;
+    let order = if let Some(value) = before {
+        connection
+            .execute(
+                "UPDATE tasks SET custom_sort_order=custom_sort_order+1 WHERE custom_sort_order>=?",
+                [value],
+            )
+            .map_err(display_error)?;
+        value
+    } else {
+        connection
+            .query_row(
+                "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map_err(display_error)?
+    };
+    connection.execute("UPDATE tasks SET is_scheduled=0,schedule_action=?,schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",params![if late{"late"}else{"planned"},now(),order,now(),id]).map_err(display_error)?;
+    add_log(
+        connection,
+        id,
+        if late {
+            "scheduled_late"
+        } else {
+            "scheduled_activated"
+        },
+        &format!(
+            "{}：原计划日期 {}；保留队列编号 {}-{:02}；入队统计归 {}；实际执行 {}",
+            if late {
+                "延迟自动入队"
+            } else {
+                "计划事项自动入队"
+            },
+            task.planned_date,
+            task.ticket_date,
+            task.daily_sequence,
+            task.planned_date,
+            now()
+        ),
+    )?;
+
+    Ok(())
+}
+
 impl Database {
     /// Idempotent lifecycle check. Reporting connections never call this write operation.
     pub fn activate_due_scheduled(&self) -> Result<usize, String> {
@@ -198,30 +264,73 @@ impl Database {
                 let ids=statement.query_map([&date],|row|row.get::<_,i64>(0)).map_err(display_error)?.collect::<Result<Vec<_>,_>>().map_err(display_error)?;
                 ids
             };
-            for id in &ids {
-                let task=get_task_on(tx,*id)?;
-                if task.has_active_queue { return Err("未来事项存在重复的有效入队记录".into()); }
-                let late=task.planned_date<date;
-                let effective_at=if late {
-                    use chrono::TimeZone;
-                    let day=chrono::NaiveDate::parse_from_str(&task.planned_date,"%Y-%m-%d").map_err(display_error)?;
-                    Local.from_local_datetime(&day.and_hms_opt(0,0,0).ok_or("计划日期无效")?).earliest().ok_or("计划日期的本地时间无效")?.to_rfc3339()
-                } else { now() };
-                activate_number_on(tx,*id,&effective_at)?;
-                // Insert reserved slots before later numbers without urgent promotion.
-                let before:Option<i64>=tx.query_row("SELECT MIN(custom_sort_order) FROM tasks WHERE ticket_date=? AND daily_sequence>? AND EXISTS(SELECT 1 FROM task_queue_entries q WHERE q.task_id=tasks.id AND q.closed_at IS NULL)",params![task.ticket_date,task.daily_sequence],|row|row.get(0)).map_err(display_error)?;
-                let order=if let Some(value)=before {
-                    tx.execute("UPDATE tasks SET custom_sort_order=custom_sort_order+1 WHERE custom_sort_order>=?",[value]).map_err(display_error)?;
-                    value
-                } else {
-                    tx.query_row("SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",[],|row|row.get::<_,i64>(0)).map_err(display_error)?
-                };
-                tx.execute("UPDATE tasks SET is_scheduled=0,schedule_action=?,schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",params![if late{"late"}else{"planned"},now(),order,now(),id]).map_err(display_error)?;
-                add_log(tx,*id,if late{"scheduled_late"}else{"scheduled_activated"},&format!("{}：原计划日期 {}；保留队列编号 {}-{:02}；入队统计归 {}；实际执行 {}",if late{"延迟自动入队"}else{"计划事项自动入队"},task.planned_date,task.ticket_date,task.daily_sequence,task.planned_date,now()))?;
-            }
+            for id in &ids { activate_reserved_on(tx,*id)?; }
             Ok(ids.len())
         })
     }
+}
+
+pub(super) fn enter_current_workflow_on(
+    connection: &Connection,
+    id: i64,
+) -> Result<LegalTask, String> {
+    let task = get_task_on(connection, id)?;
+    if !task.is_scheduled {
+        return Ok(task);
+    }
+    if task.deleted_at.is_some()
+        || task.archived_at.is_some()
+        || matches!(task.status.as_str(), "completed" | "archived" | "cancelled")
+    {
+        return Err("终态事项不能提前入队".into());
+    }
+    if task.planned_date > today() {
+        replan_on(
+            connection,
+            id,
+            &today(),
+            task.requested_deadline.as_deref(),
+            task.requested_deadline_label.as_deref(),
+        )?;
+        add_log(
+            connection,
+            id,
+            "scheduled_early",
+            &format!(
+                "提前进入当天工作流：原计划 {}，原队列 {}-{:02} 已作废；新今日编号 {}-{:02}",
+                task.planned_date,
+                task.ticket_date,
+                task.daily_sequence,
+                today(),
+                get_task_on(connection, id)?.daily_sequence
+            ),
+        )?;
+    } else {
+        activate_reserved_on(connection, id)?;
+    }
+    get_task_on(connection, id)
+}
+
+pub(super) fn stop_scheduled_on(
+    connection: &Connection,
+    id: i64,
+    reason: &str,
+    void: bool,
+) -> Result<(), String> {
+    let task = get_task_on(connection, id)?;
+    if task.is_scheduled {
+        if void {
+            void_number_on(connection, id, reason)?;
+        }
+        connection.execute("UPDATE tasks SET is_scheduled=0,schedule_action='',schedule_action_at=NULL WHERE id=?",[id]).map_err(display_error)?;
+        add_log(
+            connection,
+            id,
+            "scheduled_stopped",
+            &format!("停止计划自动入队：原计划 {}；{}", task.planned_date, reason),
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

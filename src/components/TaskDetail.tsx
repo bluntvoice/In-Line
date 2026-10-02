@@ -101,7 +101,7 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
         {terminal?<><button className="button primary" onClick={()=>setQueueDialog("reopen")}><RotateCcw size={16}/>重新开启并加入今日队列</button>{task.status==="completed"&&!task.archivedAt&&<button className="button secondary" onClick={async()=>{await api.archiveTask(task.id);onChanged();}}><Archive size={16}/>归档</button>}</>:<>
           {canWork&&<button className="button secondary" onClick={()=>void process()}><PlayCircle size={16}/>本轮已处理</button>}
           {canWork&&<button className="button primary" onClick={()=>void complete()}><CheckCircle2 size={16}/>本轮已完成</button>}
-          {!task.hasActiveQueue&&canWork&&<button className="button secondary" onClick={()=>setQueueDialog("enqueue")}><ListPlus size={16}/>加入今日队列</button>}
+          {!task.hasActiveQueue&&canWork&&<button className="button secondary" onClick={()=>setQueueDialog("enqueue")}><ListPlus size={16}/>{task.isScheduled?"提前入队":"加入今日队列"}</button>}
           {(task.status==="completed"||task.status==="cancelled")&&<button className="button secondary" onClick={async()=>{await api.archiveTask(task.id);onChanged();}}><Archive size={16}/>归档</button>}
         </>}
         <button className="icon-button danger" onClick={async()=>{await api.deleteTask(task.id);onChanged();}} aria-label="移入回收站"><Trash2 size={16}/></button>

@@ -18,7 +18,7 @@ export default function TaskContextMenu({task,view,x,y,onAction,onClose}:{task:L
         <span/>
         {canWork&&<button onClick={()=>fire("process")}><PlayCircle size={16}/>本轮已处理</button>}
         {canWork&&<button onClick={()=>fire("complete")}><CheckCircle2 size={16}/>本轮已完成</button>}
-        {!task.hasActiveQueue&&canWork&&<button onClick={()=>fire("enqueue")}><ListPlus size={16}/>加入今日队列</button>}
+        {!task.hasActiveQueue&&canWork&&<button onClick={()=>fire("enqueue")}><ListPlus size={16}/>{task.isScheduled?"提前入队":"加入今日队列"}</button>}
         {terminal&&<button onClick={()=>fire("reopen")}><RotateCcw size={16}/>重新开启并加入今日队列</button>}
         {(task.status==="completed"||task.status==="cancelled")&&<button onClick={()=>fire("archive")}><Archive size={16}/>归档</button>}
         <span/>

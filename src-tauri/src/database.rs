@@ -821,6 +821,10 @@ fn enqueue_on(
         return Err("加入队列后的状态必须为待处理或处理中".into());
     }
     let task = get_task_on(connection, task_id)?;
+    if task.is_scheduled {
+        let entered = enter_current_workflow_on(connection, task_id)?;
+        return Ok((entered.ticket_date, entered.daily_sequence));
+    }
     if task.has_active_queue {
         return Err("该事项已在有效队列中".into());
     }
@@ -832,6 +836,7 @@ fn enqueue_on(
         return Err("已完成或已归档事项请使用重新开启操作".into());
     }
     let date = today();
+    void_number_on(connection, task_id, "重新加入今日队列")?;
     let sequence = next_daily_sequence(connection, &date)?;
     let inherited: Option<(Option<String>, Option<String>)> = if inherit_deadline {
         connection
@@ -905,6 +910,9 @@ fn enqueue_on(
             reason,
         )?;
     }
+    connection.execute("UPDATE tasks SET planned_date=?,is_scheduled=0,schedule_action='',schedule_action_at=NULL WHERE id=?",params![date,task_id]).map_err(display_error)?;
+    allocate_number_on(connection, task_id, &date, sequence)?;
+    connection.execute("UPDATE queue_number_allocations SET activated_at=? WHERE task_id=? AND queue_date=? AND daily_sequence=?",params![stamp,task_id,date,sequence]).map_err(display_error)?;
     let reason_text = reason.trim();
     add_log(
         connection,
@@ -1075,7 +1083,7 @@ fn subtask_completion_state_on(
 }
 
 fn complete_task_on(connection: &Connection, id: i64, reason: &str) -> Result<(), String> {
-    let task = get_task_on(connection, id)?;
+    let task = enter_current_workflow_on(connection, id)?;
     if task.deleted_at.is_some()
         || task.archived_at.is_some()
         || matches!(task.status.as_str(), "completed" | "cancelled" | "archived")
@@ -1113,6 +1121,7 @@ fn archive_task_on(connection: &Connection, id: i64, reason: &str) -> Result<boo
         return Ok(false);
     }
     let stamp = now();
+    stop_scheduled_on(connection, id, "已归档", true)?;
     connection
         .execute(
             "UPDATE tasks SET status='archived',archived_at=?,updated_at=? WHERE id=?",
@@ -1131,6 +1140,7 @@ fn soft_delete_task_on(connection: &Connection, id: i64, reason: &str) -> Result
         return Ok(false);
     }
     let stamp = now();
+    stop_scheduled_on(connection, id, "移入回收站", true)?;
     connection
         .execute(
             "UPDATE tasks SET deleted_at=?,updated_at=? WHERE id=?",
@@ -1210,6 +1220,11 @@ impl Database {
         if scheduled_creation && input.status != "pending" {
             return Err("未来事项创建时请使用待处理状态".into());
         }
+        if previous_task.as_ref().is_some_and(|task| task.is_scheduled)
+            && matches!(input.status.as_str(), "processed" | "completed")
+        {
+            previous_task = Some(enter_current_workflow_on(&transaction, input.id.unwrap())?);
+        }
         let id = if let Some(previous) = previous_task.as_ref() {
             let id = previous.id;
             if (previous.archived_at.is_some() || previous.status == "archived")
@@ -1266,6 +1281,15 @@ impl Database {
                         "completed" | "cancelled" | "archived"
                     )
                 {
+                    stop_scheduled_on(
+                        &transaction,
+                        id,
+                        "用户主动修改工作流状态",
+                        matches!(
+                            input.status.as_str(),
+                            "completed" | "cancelled" | "archived"
+                        ),
+                    )?;
                     close_active_queue(&transaction, id, &format!("状态变更为 {}", input.status))?;
                 } else if matches!(input.status.as_str(), "pending" | "processing")
                     && !previous.has_active_queue
@@ -1419,9 +1443,11 @@ impl Database {
             {
                 close_active_queue(&transaction, id, &format!("初始状态为 {}", input.status))?;
             }
-            if effective_is_urgent && !scheduled_creation {
+            if effective_is_urgent {
                 record_urgent(&transaction, id, &input)?;
-                promote_one(&transaction, id)?;
+                if !scheduled_creation {
+                    promote_one(&transaction, id)?;
+                }
             }
             id
         };
@@ -1902,7 +1928,11 @@ impl Database {
             return Err("事项状态无效".into());
         }
         self.with_transaction(|transaction| {
-            let task = get_task_on(transaction, id)?;
+            let task = if matches!(status.as_str(), "processed" | "completed") {
+                enter_current_workflow_on(transaction, id)?
+            } else {
+                get_task_on(transaction, id)?
+            };
             if task.status == status {
                 if clears_urgent_status(&status) {
                     clear_urgent_on(transaction, id, "事项已完成或进入暂缓队列")?;
@@ -1960,6 +1990,12 @@ impl Database {
             if is_deferred_status(&status)
                 || matches!(status.as_str(), "completed" | "cancelled" | "archived")
             {
+                stop_scheduled_on(
+                    transaction,
+                    id,
+                    "用户主动修改状态",
+                    matches!(status.as_str(), "completed" | "cancelled" | "archived"),
+                )?;
                 close_active_queue(transaction, id, &format!("状态变更为 {status}"))?;
             }
             if clears_urgent_status(&status) {
@@ -2014,6 +2050,7 @@ impl Database {
     pub fn move_task(&self, id: i64, direction: MoveDirection) -> Result<(), String> {
         self.with_transaction(|transaction| {
             let task = get_task_on(transaction,id)?;
+            if task.is_scheduled {return Err("未来事项按加入日期及队列序号排序，不能人工调序".into());}
             let comparison = if matches!(direction,MoveDirection::Up){"<"}else{">"};
             let order = if matches!(direction,MoveDirection::Up){"DESC"}else{"ASC"};
             let sql = format!("SELECT id,custom_sort_order FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
@@ -2339,7 +2376,7 @@ impl Database {
 
     pub fn process_round(&self, id: i64) -> Result<(), String> {
         self.with_transaction(|tx| {
-            let task = get_task_on(tx, id)?;
+            let task = enter_current_workflow_on(tx, id)?;
             if task.deleted_at.is_some()
                 || task.archived_at.is_some()
                 || matches!(task.status.as_str(), "completed" | "cancelled" | "archived")
@@ -4785,6 +4822,86 @@ mod tests {
             .any(|log| log.log_type == "scheduled_late"
                 && log.content.contains("2026-10-05")
                 && log.content.contains("2026-10-07")));
+    }
+
+    #[test]
+    fn future_early_workflow_all_entry_points_and_defer_override() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-plan-early-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        for mode in [
+            "enqueue",
+            "process",
+            "complete",
+            "processed-status",
+            "completed-status",
+            "processed-edit",
+            "completed-edit",
+        ] {
+            let mut input = sample(mode);
+            input.planned_date = Some("2026-10-08".into());
+            let original = db.save_task(input.clone()).unwrap();
+            match mode {
+                "enqueue" => db
+                    .enqueue_task(QueueInput {
+                        id: original.id,
+                        inherit_deadline: false,
+                        reason: "提前处理".into(),
+                    })
+                    .unwrap(),
+                "process" => db.process_round(original.id).unwrap(),
+                "complete" => db.complete_round(original.id).unwrap(),
+                "processed-status" => db.set_status(original.id, "processed".into()).unwrap(),
+                "completed-status" => db.set_status(original.id, "completed".into()).unwrap(),
+                _ => {
+                    input.id = Some(original.id);
+                    input.status = if mode == "processed-edit" {
+                        "processed"
+                    } else {
+                        "completed"
+                    }
+                    .into();
+                    db.save_task(input).unwrap();
+                }
+            }
+            let after = db.get_task(original.id).unwrap();
+            assert!(!after.is_scheduled);
+            assert_eq!(after.ticket_date, "2026-10-02");
+            assert_eq!(after.schedule_action, "early");
+            assert_eq!(after.permanent_number, original.permanent_number);
+            let logs = db.get_logs(original.id).unwrap();
+            assert!(logs.iter().any(|log| log.log_type == "queue_number_voided"));
+            assert!(logs.iter().any(|log| log.log_type == "scheduled_early"));
+            if mode != "enqueue" {
+                assert_eq!(db.list_work_events(original.id).unwrap().len(), 1);
+            }
+        }
+        let mut input = sample("主动暂停");
+        input.planned_date = Some("2026-10-05".into());
+        let paused = db.save_task(input.clone()).unwrap();
+        db.set_status(paused.id, "paused".into()).unwrap();
+        assert!(!db.get_task(paused.id).unwrap().is_scheduled);
+        input.id = Some(paused.id);
+        input.planned_date = Some("2026-10-06".into());
+        input.confirm_schedule_change = true;
+        assert!(db.save_task(input).unwrap().is_scheduled);
+        TEST_TIME.with(|clock| {
+            *clock.borrow_mut() =
+                Some(chrono::DateTime::parse_from_rfc3339("2026-10-06T09:00:00+08:00").unwrap())
+        });
+        assert_eq!(db.activate_due_scheduled().unwrap(), 1);
+        let old_day = db
+            .statistics(
+                "2026-10-02T00:00:00+08:00".into(),
+                "2026-10-03T00:00:00+08:00".into(),
+                480,
+            )
+            .unwrap();
+        assert_eq!(old_day.summary.handled_tasks, 6);
     }
 
     #[test]
