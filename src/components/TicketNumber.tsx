@@ -9,7 +9,7 @@ export default function TicketNumber({ task }: { task: LegalTask }) {
   return (
     <span className="ticket-identity">
       <span
-        className={`ticket-number ${age > 0 ? "ticket-aged" : ""} ${alert ? "ticket-alert" : ""} ${task.isUrgent ? "ticket-urgent" : ""}`}
+        className={`ticket-number ${age > 0 ? "ticket-aged" : ""} ${alert ? "ticket-alert" : ""} ${task.isUrgent ? "ticket-urgent" : ""} ${task.isScheduled ? "ticket-scheduled" : ""}`}
         title={task.hasActiveQueue ? (age > 0 ? `该事项已在队列中等候 ${age} 天，请关注时效风险。` : "今日取号事项") : "最近一次排队序号"}
       >
         {alert && <span className="ticket-triangle" aria-label="时效警示">▲</span>}

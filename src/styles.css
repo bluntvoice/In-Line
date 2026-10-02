@@ -290,8 +290,10 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 .font-picker>footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;border-top:1px solid #dfe6ef;color:#607086;font-size:12px}
 .task-table{min-width:100%!important}.task-table th{width:auto!important}.column-resize-handle{position:absolute;z-index:4;top:0;right:-5px;width:10px;height:100%;cursor:col-resize;touch-action:none}.column-resize-handle:after{content:"";position:absolute;top:7px;bottom:7px;left:4px;width:2px;border-radius:2px;background:transparent}.column-resize-handle:hover:after,.column-resize-handle:focus-visible:after{background:#ffb000}.column-resize-handle:focus-visible{outline:0}.column-layout-menu{width:218px}
 
-.scheduled-row { background: #f1f6f8; }
+.ticket-number.ticket-scheduled { background: #536f7a; }
 .schedule-mark { display: inline-block; color: #4c6771; background: #e9f1f4; padding: 2px 6px; border-radius: 4px; font-size: 12px; line-height: 1.5; width: fit-content; }
+.task-title-structure > .schedule-mark { margin-top: 3px; }
+.detail-panel > .schedule-mark { display: block; margin-bottom: 12px; }
 .deferred-filter { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; }
 .deferred-filter select { padding: 4px 8px; }
 .deferred-filter small { color: #697882; }
