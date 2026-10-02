@@ -93,6 +93,94 @@ pub(super) fn void_number_on(connection: &Connection, id: i64, reason: &str) -> 
     Ok(())
 }
 
+pub(super) fn validate_plan(
+    date: &str,
+    deadline: Option<&str>,
+    changed: bool,
+) -> Result<(), String> {
+    let parsed = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        .map_err(|_| "加入日期格式无效".to_string())?;
+    if parsed.format("%Y-%m-%d").to_string() != date || (changed && date < today().as_str()) {
+        return Err("加入日期只能选择今天及未来日期".into());
+    }
+    if let Some(value) = deadline {
+        let value = chrono::DateTime::parse_from_rfc3339(value)
+            .map_err(|_| "截止时间格式无效".to_string())?;
+        if value.with_timezone(&Local).date_naive() < parsed {
+            return Err("截止时间不得早于加入日期，请修改或清空截止时间".into());
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn activate_number_on(
+    connection: &Connection,
+    id: i64,
+    effective_at: &str,
+) -> Result<(), String> {
+    let task = get_task_on(connection, id)?;
+    connection.execute("INSERT INTO task_queue_entries(task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,enqueued_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)",
+        params![id,task.ticket_date,task.daily_sequence,task.requested_deadline,task.requested_deadline_label,effective_at,now(),now()]).map_err(display_error)?;
+    connection.execute("UPDATE queue_number_allocations SET activated_at=? WHERE task_id=? AND queue_date=? AND daily_sequence=? AND voided_at IS NULL",params![now(),id,task.ticket_date,task.daily_sequence]).map_err(display_error)?;
+    Ok(())
+}
+
+pub(super) fn replan_on(
+    connection: &Connection,
+    id: i64,
+    date: &str,
+    deadline: Option<&str>,
+    deadline_label: Option<&str>,
+) -> Result<(), String> {
+    let old = get_task_on(connection, id)?;
+    close_active_queue(connection, id, "修改加入日期")?;
+    void_number_on(connection, id, "修改加入日期")?;
+    let sequence = next_daily_sequence(connection, date)?;
+    let scheduled = date > today().as_str();
+    let order: i64 = connection
+        .query_row(
+            "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    connection.execute("UPDATE tasks SET planned_date=?,ticket_date=?,daily_sequence=?,is_scheduled=?,status='pending',requested_deadline=?,requested_deadline_label=?,schedule_action=?,schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",
+        params![date,date,sequence,scheduled as i64,deadline,deadline_label,if old.is_scheduled&&!scheduled{"early"}else{""},if old.is_scheduled&&!scheduled{Some(now())}else{None},order,now(),id]).map_err(display_error)?;
+    allocate_number_on(connection, id, date, sequence)?;
+    add_log(
+        connection,
+        id,
+        "schedule_changed",
+        &format!(
+            "加入日期：{} → {}；原队列 {}-{:02} 作废，分配 {}-{:02}{}",
+            old.planned_date,
+            date,
+            old.ticket_date,
+            old.daily_sequence,
+            date,
+            sequence,
+            if scheduled {
+                "；移出当前待办，转为未来事项"
+            } else {
+                "；加入今日待办"
+            }
+        ),
+    )?;
+    if old.status != "pending" {
+        add_status(
+            connection,
+            id,
+            Some(&old.status),
+            "pending",
+            "重新制定加入计划",
+        )?;
+    }
+    if !scheduled {
+        activate_number_on(connection, id, &now())?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

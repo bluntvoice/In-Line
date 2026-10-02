@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from
 import { AlertTriangle, Check, X } from "lucide-react";
 import type { LegalTask, MasterData, Priority, TaskInput, TaskStatus, Workload } from "../types";
 import { api } from "../api";
-import { isDeferredStatus } from "../lib/task-utils";
+import { dateOnly, isDeferredStatus } from "../lib/task-utils";
+import { scheduleConfirmation,validatePlannedDate } from "../lib/scheduling";
 import ComboInput from "./ComboInput";
 import DeadlinePicker from "./DeadlinePicker";
 import MultiContactInput from "./MultiContactInput";
@@ -21,6 +22,7 @@ type MasterKind = "department" | "task_type" | "contact";
 const clearsUrgentStatus = (status: TaskStatus) => status === "completed" || isDeferredStatus(status);
 
 const emptyTask = (defaultTaskType: string): TaskInput => ({
+  plannedDate:dateOnly(),
   department: "",
   departments: [],
   contact: "",
@@ -43,6 +45,7 @@ function toInput(task: LegalTask | null, defaultTaskType: string): TaskInput {
   if (!task) return emptyTask(defaultTaskType);
   return {
     id: task.id,
+    plannedDate:task.plannedDate||task.ticketDate,
     department: task.department,
     departments: task.departments?.length ? task.departments : [task.department].filter(Boolean),
     contact: task.contact,
@@ -106,14 +109,19 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
 
   const submit = async (event?: FormEvent) => {
     event?.preventDefault();
+    const planError=validatePlannedDate(form,task);
+    if(planError){setError(planError);return;}
+    const confirmation=task?scheduleConfirmation(task,form):null;
+    if(confirmation&&!window.confirm(confirmation))return;
+    const submitted={...form,confirmScheduleChange:Boolean(confirmation)};
     setSaving(true);
     setError("");
     try {
       if (task && form.status === "completed" && task.status !== "completed" && onCompleteRequested) {
-        const saved = await api.saveTask({ ...form, status: task.status });
+        const saved = await api.saveTask({ ...submitted, status: task.status });
         await onCompleteRequested(saved);
       } else {
-        await api.saveTask(form);
+        await api.saveTask(submitted);
       }
       onSaved();
     } catch (reason) {
@@ -142,6 +150,7 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
         <form onSubmit={submit} onKeyDown={enterToSave}>
           {error && <div className="form-error"><AlertTriangle size={15} />{error}</div>}
           <div className="form-grid">
+            <label><span>加入日期 *</span><input type="date" required min={dateOnly()} value={form.plannedDate??dateOnly()} onChange={event=>update("plannedDate",event.target.value)}/></label>
             <label className="paired-control-field">
               <span>部门 / 团队 *</span>
               <MultiContactInput values={form.departments} options={localMasters.departments} commonOptions={quickDepartments} itemLabel="部门 / 团队" placeholder="输入或选择部门 / 团队"

@@ -1143,7 +1143,7 @@ fn soft_delete_task_on(connection: &Connection, id: i64, reason: &str) -> Result
 }
 
 impl Database {
-    pub fn save_task(&self, input: TaskInput) -> Result<LegalTask, String> {
+    pub fn save_task(&self, mut input: TaskInput) -> Result<LegalTask, String> {
         validate_task_input(&input)?;
         let contacts = normalized_contacts(&input);
         let departments = normalized_departments(&input);
@@ -1157,10 +1157,58 @@ impl Database {
         let transaction = connection.transaction().map_err(display_error)?;
         let stamp = now();
         let effective_is_urgent = input.is_urgent && !clears_urgent_status(&input.status);
-        let previous_task = input
+        let mut previous_task = input
             .id
             .map(|id| get_task_on(&transaction, id))
             .transpose()?;
+        let plan = input.planned_date.clone().unwrap_or_else(|| {
+            previous_task
+                .as_ref()
+                .map(|task| {
+                    if task.planned_date.is_empty() {
+                        task.ticket_date.clone()
+                    } else {
+                        task.planned_date.clone()
+                    }
+                })
+                .unwrap_or_else(today)
+        });
+        let plan_changed = input.planned_date.is_some()
+            && previous_task
+                .as_ref()
+                .is_some_and(|task| task.planned_date != plan);
+        validate_plan(
+            &plan,
+            input.requested_deadline.as_deref(),
+            previous_task.is_none() || plan_changed,
+        )?;
+        if plan_changed {
+            let previous = previous_task.as_ref().unwrap();
+            if previous.deleted_at.is_some() {
+                return Err("回收站事项请先恢复再制定计划".into());
+            }
+            if matches!(previous.status.as_str(), "completed" | "archived")
+                || previous.archived_at.is_some()
+            {
+                return Err("已完成或归档事项重新计划尚未开放".into());
+            }
+            if !input.confirm_schedule_change {
+                return Err("修改加入日期会作废原队列编号，请先确认".into());
+            }
+            replan_on(
+                &transaction,
+                previous.id,
+                &plan,
+                input.requested_deadline.as_deref(),
+                input.requested_deadline_label.as_deref(),
+            )?;
+            input.status = "pending".into();
+            previous_task = Some(get_task_on(&transaction, previous.id)?);
+        }
+        let scheduled_creation = previous_task.is_none() && plan > today();
+        if scheduled_creation && input.status != "pending" {
+            return Err("未来事项创建时请使用待处理状态".into());
+        }
         let id = if let Some(previous) = previous_task.as_ref() {
             let id = previous.id;
             if (previous.archived_at.is_some() || previous.status == "archived")
@@ -1270,9 +1318,19 @@ impl Database {
             add_log(&transaction, id, "updated", "更新事项信息")?;
             id
         } else {
-            let date = today();
-            let sequence = next_daily_sequence(&transaction, &date)?;
-            let permanent = format!("{}-{:02}", date.replace('-', ""), sequence);
+            let identity_date = today();
+            let identity_sequence = next_daily_sequence(&transaction, &identity_date)?;
+            let date = plan.clone();
+            let sequence = if scheduled_creation {
+                next_daily_sequence(&transaction, &date)?
+            } else {
+                identity_sequence
+            };
+            let permanent = format!(
+                "{}-{:02}",
+                identity_date.replace('-', ""),
+                identity_sequence
+            );
             let order: i64 = transaction
                 .query_row(
                     "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
@@ -1293,6 +1351,14 @@ impl Database {
             let id = transaction.last_insert_rowid();
             transaction
                 .execute(
+                    "UPDATE tasks SET planned_date=?,is_scheduled=? WHERE id=?",
+                    params![plan, scheduled_creation as i64, id],
+                )
+                .map_err(display_error)?;
+            allocate_number_on(&transaction, id, &date, sequence)?;
+            if !scheduled_creation {
+                transaction
+                .execute(
                     "INSERT INTO task_queue_entries(
                        task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,
                        enqueued_at,created_at,updated_at
@@ -1309,6 +1375,23 @@ impl Database {
                     ],
                 )
                 .map_err(display_error)?;
+                transaction
+                    .execute(
+                        "UPDATE queue_number_allocations SET activated_at=? WHERE task_id=?",
+                        params![stamp, id],
+                    )
+                    .map_err(display_error)?;
+            } else {
+                add_log(
+                    &transaction,
+                    id,
+                    "scheduled_created",
+                    &format!(
+                        "未来事项：计划加入日期 {}；预分配队列编号 {:02}（{}-{:02}）",
+                        date, sequence, date, sequence
+                    ),
+                )?;
+            }
             add_log(
                 &transaction,
                 id,
@@ -1335,7 +1418,7 @@ impl Database {
             {
                 close_active_queue(&transaction, id, &format!("初始状态为 {}", input.status))?;
             }
-            if effective_is_urgent {
+            if effective_is_urgent && !scheduled_creation {
                 record_urgent(&transaction, id, &input)?;
                 promote_one(&transaction, id)?;
             }
@@ -4512,6 +4595,66 @@ mod tests {
         input
     }
 
+    struct TestClock;
+    impl TestClock {
+        fn at(value: &str) -> Self {
+            TEST_TIME.with(|clock| {
+                *clock.borrow_mut() = Some(chrono::DateTime::parse_from_rfc3339(value).unwrap())
+            });
+            Self
+        }
+    }
+    impl Drop for TestClock {
+        fn drop(&mut self) {
+            TEST_TIME.with(|clock| *clock.borrow_mut() = None);
+        }
+    }
+
+    #[test]
+    fn planned_creation_edit_confirmation_deadline_and_number_reservation() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-plan-edit-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let mut input = sample("提前取号");
+        input.planned_date = Some("2026-10-05".into());
+        let first = db.save_task(input.clone()).unwrap();
+        let second = db.save_task(input.clone()).unwrap();
+        assert!(first.is_scheduled && !first.has_active_queue);
+        assert_eq!(first.ticket_date, "2026-10-05");
+        assert_eq!(first.daily_sequence, 1);
+        assert_eq!(second.daily_sequence, 2);
+        assert!(first.permanent_number.starts_with("20261002-"));
+        input.id = Some(first.id);
+        input.planned_date = Some("2026-10-08".into());
+        assert!(db.save_task(input.clone()).unwrap_err().contains("确认"));
+        input.confirm_schedule_change = true;
+        let changed = db.save_task(input.clone()).unwrap();
+        assert_eq!(changed.permanent_number, first.permanent_number);
+        assert_eq!(changed.ticket_date, "2026-10-08");
+        input.id = None;
+        input.planned_date = Some("2026-10-05".into());
+        assert_eq!(db.save_task(input.clone()).unwrap().daily_sequence, 3);
+        input.planned_date = Some("2026-10-01".into());
+        assert!(db.save_task(input.clone()).is_err());
+        input.planned_date = Some("2026-10-08".into());
+        input.requested_deadline = Some("2026-10-07T12:00:00+08:00".into());
+        assert!(db.save_task(input.clone()).is_err());
+        input.id = Some(first.id);
+        input.planned_date = Some("2026-10-02".into());
+        input.requested_deadline = None;
+        let early = db.save_task(input).unwrap();
+        assert!(early.has_active_queue && !early.is_scheduled);
+        assert_eq!(early.permanent_number, first.permanent_number);
+        db.with_conn(|connection| {
+            let count:i64=connection.query_row("SELECT count(*) FROM queue_number_allocations WHERE task_id=? AND voided_at IS NOT NULL",[first.id],|row|row.get(0)).map_err(display_error)?;
+            assert_eq!(count,2);Ok(())
+        }).unwrap();
+    }
+
     #[test]
     fn scheduling_v9_rollback_and_deleted_number_history() {
         let nonce = Utc::now().timestamp_nanos_opt().unwrap();
@@ -4538,7 +4681,6 @@ mod tests {
         let db = Database::open_at(root.join("history.db")).unwrap();
         let task = db.save_task(sample("永不回收")).unwrap();
         db.with_transaction(|tx| {
-            allocate_number_on(tx, task.id, &task.ticket_date, task.daily_sequence)?;
             void_number_on(tx, task.id, "测试作废")?;
             Ok(())
         })
@@ -5578,6 +5720,7 @@ mod tests {
 
     #[test]
     fn quick_status_and_urgent_actions_preserve_business_rules() {
+        let _clock = TestClock::at("2026-10-01T08:00:00+08:00");
         let root = std::env::temp_dir().join(format!(
             "inline-quick-actions-test-{}",
             Utc::now().timestamp_nanos_opt().unwrap()
@@ -6282,6 +6425,7 @@ mod tests {
 
     #[test]
     fn create_subtask_inherits_defaults_but_keeps_queue_deadline_and_urgency_independent() {
+        let _clock = TestClock::at("2026-10-01T08:00:00+08:00");
         let root = std::env::temp_dir().join(format!(
             "inline-create-subtask-test-{}",
             Utc::now().timestamp_nanos_opt().unwrap()

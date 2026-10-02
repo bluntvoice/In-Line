@@ -106,6 +106,7 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
       </>}
     </div>
     <dl className="detail-grid">
+      <div><dt>加入日期</dt><dd>{task.plannedDate||task.ticketDate}<button type="button" className="button secondary small" onClick={onEdit}>修改</button></dd></div>
       <div><dt>状态</dt><dd><StatusBadge status={task.status} overdue={isOverdue(task)}/></dd></div><div><dt>累计处理轮次</dt><dd>{task.processingRounds} 次</dd></div>
       <div><dt>优先级</dt><dd>{PRIORITY_LABELS[task.priority]}</dd></div><div><dt>预计工作量</dt><dd>{WORKLOAD_LABELS[task.workload]}</dd></div>
       <div><dt>部门 / 团队</dt><dd>{task.department}</dd></div><div><dt>对接人</dt><dd>{task.contact}</dd></div>

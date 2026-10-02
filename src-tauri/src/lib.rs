@@ -69,6 +69,7 @@ fn show_floating(app: &tauri::AppHandle) {
     }
 }
 fn show_quick_add(app: &tauri::AppHandle) {
+    let _ = app.emit_to("quick-add", "new-task", ());
     if let Some(window) = app.get_webview_window("quick-add") {
         let _ = window.show();
         let _ = window.unminimize();
