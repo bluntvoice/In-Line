@@ -4,6 +4,10 @@ import { filterDeferredTasks,scheduleLabel,scheduleConfirmation,validatePlannedD
 import { displayTicket,sortDeferredQueue,taskDetailView,visibleQueueTasks } from "./task-utils";
 const task={plannedDate:"2026-10-05",ticketDate:"2026-10-05",dailySequence:3,status:"pending",hasActiveQueue:false,isScheduled:true} as LegalTask;
 describe("加入日期校验与确认",()=>{
+  it("业务标识只在实际入队当天保留，跨日消失",()=>{
+    const activated={...task,isScheduled:false,scheduleAction:"planned",scheduleActionAt:"2026-10-05T08:00:00+08:00"};
+    expect(scheduleLabel(activated,"2026-10-05")).toBe("计划事项");expect(scheduleLabel(activated,"2026-10-06")).toBe("");
+  });
   it("未来事项优先按日期与正式序号排列，普通暂缓保持最近进入顺序",()=>{
     const values=[{...task,id:1,plannedDate:"2026-10-08"},{...task,id:2,dailySequence:4},{...task,id:3,dailySequence:2},{...task,id:4,isScheduled:false,status:"paused",updatedAt:"2026-10-02T08:00:00Z"},{...task,id:5,isScheduled:false,status:"paused",updatedAt:"2026-10-02T09:00:00Z"}] as LegalTask[];
     expect(sortDeferredQueue(values).map(task=>task.id)).toEqual([3,2,1,5,4]);

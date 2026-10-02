@@ -28,6 +28,7 @@ import { defaultTaskColumnLayouts,fitTaskColumnWidths,normalizeTaskColumnLayouts
 
 import ScheduleBadge from "./components/ScheduleBadge";
 import { filterDeferredTasks,type DeferredFilter } from "./lib/scheduling";
+import { dateOnly } from "./lib/task-utils";
 
 const emptyMasters:MasterData={departments:[],taskTypes:[],contacts:[]};
 type MenuState={task:LegalTask;view:TaskView;x:number;y:number}|null;
@@ -106,6 +107,15 @@ export default function App(){
       setStartupError(detail||"初始化失败，请重试");
     }
   };
+  useEffect(()=>{
+    let lastDate=dateOnly();
+    const checkDate=()=>{const current=dateOnly();if(current!==lastDate){lastDate=current;void refresh();}};
+    const timer=window.setInterval(checkDate,30_000);
+    const onFocus=()=>void refresh();
+    window.addEventListener("focus",onFocus);
+    document.addEventListener("visibilitychange",checkDate);
+    return()=>{window.clearInterval(timer);window.removeEventListener("focus",onFocus);document.removeEventListener("visibilitychange",checkDate);};
+  },[]);
   const performCompletion=async(task:LegalTask,includeSubtasks:boolean)=>{
     const result=await api.completeTask({taskId:task.id,includeEligibleSubtasks:includeSubtasks});
     const state=result.completionState;
@@ -234,7 +244,7 @@ export default function App(){
   const updateColumnWidth=(columnId:TaskColumnId,width:number)=>setColumnLayouts(current=>({...current,[view]:{...current[view],[columnId]:normalizeTaskColumnWidth(columnId,width)}}));
   const resizeHandle=(columnId:TaskColumnId)=>{const column=TASK_COLUMN_DEFINITIONS.find(item=>item.id===columnId)!;return <ColumnResizeHandle label={column.label} width={columnWidths[columnId]} minWidth={column.minWidth} maxWidth={column.maxWidth} onResize={width=>updateColumnWidth(columnId,width)}/>;};
   const resetColumnWidths=()=>{setColumnLayouts(current=>({...current,[view]:defaultTaskColumnLayouts()[view]}));setColumnMenu(null);toast("已恢复当前页面默认列宽");};
-  const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);setSelected(null);setColumnMenu(null);setView(next);};
+  const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);setSelected(null);setColumnMenu(null);setView(next);void refresh();};
   const renderTaskDetail=(detailView:TaskView)=>selected&&<TaskDetail key={selected.id} task={selected} view={detailView} mergeCandidates={[...data.queue,...data.archive]} relationRefreshKey={relationRefreshKey}
     onClose={()=>setSelected(null)} onEdit={()=>setEditing(selected)} onChanged={()=>{setSelected(null);void refresh();}} onRelationshipChanged={()=>void refresh()}
     onAddSubtask={setSubtaskParent} onOpenTask={showTaskDetails} onQuickAction={(task,mode)=>setQuickAction({task,mode})} onCompleteTask={requestCompletion} onOpenContext={context} notify={toast}/>;

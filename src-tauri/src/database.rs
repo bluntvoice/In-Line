@@ -572,6 +572,7 @@ impl Database {
     }
 
     pub fn list_tasks(&self, view: TaskView) -> Result<Vec<LegalTask>, String> {
+        self.activate_due_scheduled()?;
         self.with_conn(|connection| {
             let condition = match view {
                 TaskView::Queue => "deleted_at IS NULL AND archived_at IS NULL AND status NOT IN ('completed','cancelled','archived')",
@@ -3524,6 +3525,7 @@ impl Database {
         })
     }
     pub fn bootstrap(&self) -> Result<BootstrapData, String> {
+        self.activate_due_scheduled()?;
         Ok(BootstrapData {
             queue: self.list_tasks(TaskView::Queue)?,
             archive: self.list_tasks(TaskView::Archive)?,
@@ -4653,6 +4655,61 @@ mod tests {
             let count:i64=connection.query_row("SELECT count(*) FROM queue_number_allocations WHERE task_id=? AND voided_at IS NOT NULL",[first.id],|row|row.get(0)).map_err(display_error)?;
             assert_eq!(count,2);Ok(())
         }).unwrap();
+    }
+
+    #[test]
+    fn due_scheduled_is_idempotent_keeps_reserved_order_and_skips_non_pending() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-plan-due-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let mut input = sample("计划入队");
+        input.planned_date = Some("2026-10-05".into());
+        let first = db.save_task(input.clone()).unwrap();
+        input.is_urgent = true;
+        input.urgent_requester = "负责人".into();
+        input.urgent_reason = "加急计划".into();
+        let second = db.save_task(input.clone()).unwrap();
+        input.is_urgent = false;
+        let paused = db.save_task(input.clone()).unwrap();
+        let terminal = db.save_task(input).unwrap();
+        db.set_status(paused.id, "paused".into()).unwrap();
+        db.archive(terminal.id).unwrap();
+        TEST_TIME.with(|clock| {
+            *clock.borrow_mut() =
+                Some(chrono::DateTime::parse_from_rfc3339("2026-10-05T08:00:00+08:00").unwrap())
+        });
+        let normal = db.save_task(sample("当日新增")).unwrap();
+        assert_eq!(normal.daily_sequence, 5);
+        assert_eq!(db.activate_due_scheduled().unwrap(), 2);
+        assert_eq!(db.activate_due_scheduled().unwrap(), 0);
+        let active = db
+            .list_tasks(TaskView::Queue)
+            .unwrap()
+            .into_iter()
+            .filter(|task| task.has_active_queue)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            active.iter().map(|task| task.id).collect::<Vec<_>>(),
+            vec![first.id, second.id, normal.id]
+        );
+        let after = db.get_task(first.id).unwrap();
+        assert_eq!(after.daily_sequence, first.daily_sequence);
+        assert_eq!(after.ticket_date, first.ticket_date);
+        assert_eq!(after.schedule_action, "planned");
+        assert!(!db.get_task(paused.id).unwrap().has_active_queue);
+        assert!(!db.get_task(terminal.id).unwrap().has_active_queue);
+        assert_eq!(
+            db.get_logs(first.id)
+                .unwrap()
+                .iter()
+                .filter(|log| log.log_type == "scheduled_activated")
+                .count(),
+            1
+        );
     }
 
     #[test]

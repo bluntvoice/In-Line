@@ -181,6 +181,43 @@ pub(super) fn replan_on(
     Ok(())
 }
 
+impl Database {
+    /// Idempotent lifecycle check. Reporting connections never call this write operation.
+    pub fn activate_due_scheduled(&self) -> Result<usize, String> {
+        if self.with_conn(|connection| {
+            connection
+                .query_row("PRAGMA query_only", [], |row| row.get::<_, bool>(0))
+                .map_err(display_error)
+        })? {
+            return Ok(0);
+        }
+        self.with_transaction(|tx| {
+            let date=today();
+            let ids={
+                let mut statement=tx.prepare("SELECT id FROM tasks WHERE is_scheduled=1 AND planned_date=? AND status='pending' AND deleted_at IS NULL AND archived_at IS NULL ORDER BY planned_date,daily_sequence,id").map_err(display_error)?;
+                let ids=statement.query_map([&date],|row|row.get::<_,i64>(0)).map_err(display_error)?.collect::<Result<Vec<_>,_>>().map_err(display_error)?;
+                ids
+            };
+            for id in &ids {
+                let task=get_task_on(tx,*id)?;
+                if task.has_active_queue { return Err("未来事项存在重复的有效入队记录".into()); }
+                activate_number_on(tx,*id,&now())?;
+                // Insert reserved slots before later numbers without urgent promotion.
+                let before:Option<i64>=tx.query_row("SELECT MIN(custom_sort_order) FROM tasks WHERE ticket_date=? AND daily_sequence>? AND EXISTS(SELECT 1 FROM task_queue_entries q WHERE q.task_id=tasks.id AND q.closed_at IS NULL)",params![task.ticket_date,task.daily_sequence],|row|row.get(0)).map_err(display_error)?;
+                let order=if let Some(value)=before {
+                    tx.execute("UPDATE tasks SET custom_sort_order=custom_sort_order+1 WHERE custom_sort_order>=?",[value]).map_err(display_error)?;
+                    value
+                } else {
+                    tx.query_row("SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",[],|row|row.get::<_,i64>(0)).map_err(display_error)?
+                };
+                tx.execute("UPDATE tasks SET is_scheduled=0,schedule_action='planned',schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",params![now(),order,now(),id]).map_err(display_error)?;
+                add_log(tx,*id,"scheduled_activated",&format!("计划事项自动入队：计划日期 {}；保留队列编号 {}-{:02}；实际执行 {}",task.planned_date,task.ticket_date,task.daily_sequence,now()))?;
+            }
+            Ok(ids.len())
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
