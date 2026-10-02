@@ -27,8 +27,9 @@ export function historyTimestamp(task:HistoryTask){
   if(task.status==="cancelled"||task.status==="archived")return task.updatedAt??task.completedAt??null;
   return null;
 }
-type TicketDisplayTask=Pick<LegalTask,"ticketDate"|"dailySequence">&HistoryTask;
+type TicketDisplayTask=Pick<LegalTask,"ticketDate"|"dailySequence">&HistoryTask&Pick<Partial<LegalTask>,"isScheduled">;
 export function displayTicket(task:TicketDisplayTask,today?:string){
+  if(task.isScheduled)return String(task.dailySequence).padStart(2,"0");
   let referenceDate=today;
   const frozenAt=historyTimestamp(task)??(task.status&&isDeferredStatus(task.status)?task.deferredEnteredAt??task.updatedAt??null:null);
   if(frozenAt){
@@ -41,10 +42,10 @@ export function isOverdue(task:Pick<LegalTask,"requestedDeadline"|"status">,now=
   return Boolean(task.requestedDeadline&&!['processed','completed','cancelled','archived'].includes(task.status)&&new Date(task.requestedDeadline).getTime()<now.getTime());
 }
 export function isDeferredStatus(status:TaskStatus){return DEFERRED_STATUSES.includes(status);}
-export function taskDetailView(task:Pick<LegalTask,"archivedAt"|"deletedAt"|"status">):TaskView|"deferred"{
+export function taskDetailView(task:Pick<LegalTask,"archivedAt"|"deletedAt"|"status">&Pick<Partial<LegalTask>,"isScheduled">):TaskView|"deferred"{
   if(task.deletedAt)return"trash";
   if(task.archivedAt||["completed","cancelled","archived"].includes(task.status))return"archive";
-  if(isDeferredStatus(task.status))return"deferred";
+  if(task.isScheduled||isDeferredStatus(task.status))return"deferred";
   return"queue";
 }
 export function localizeStatusText(value:string){
@@ -55,7 +56,7 @@ export function sortQueue(tasks:LegalTask[],now=new Date()){
 }
 export function sortDeferredQueue(tasks:LegalTask[]){
   const enteredAt=(task:LegalTask)=>Date.parse(task.deferredEnteredAt??task.updatedAt)||0;
-  return [...tasks].sort((a,b)=>enteredAt(b)-enteredAt(a)||b.id-a.id);
+  return [...tasks].sort((a,b)=>Number(Boolean(b.isScheduled))-Number(Boolean(a.isScheduled))||(a.isScheduled&&b.isScheduled?(a.plannedDate??a.ticketDate).localeCompare(b.plannedDate??b.ticketDate)||a.dailySequence-b.dailySequence||a.id-b.id:enteredAt(b)-enteredAt(a)||b.id-a.id));
 }
 export function visibleQueueTasks(tasks:LegalTask[],now=new Date()){
   return sortQueue(tasks.filter(task=>task.hasActiveQueue&&(task.status==="pending"||task.status==="processing")),now);

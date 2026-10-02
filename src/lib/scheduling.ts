@@ -1,6 +1,19 @@
 import type { LegalTask, TaskInput } from "../types";
 import { dateOnly, displayTicket } from "./task-utils";
 
+export type DeferredFilter="all"|"deferred"|"scheduled";
+export function filterDeferredTasks(tasks:LegalTask[],filter:DeferredFilter){
+  return tasks.filter(task=>filter==="all"||(filter==="scheduled"?Boolean(task.isScheduled):!task.isScheduled));
+}
+export function scheduleLabel(task:LegalTask,today=dateOnly()){
+  if(task.isScheduled)return `未来事项 · ${task.plannedDate??task.ticketDate}`;
+  if(!task.scheduleActionAt||dateOnly(new Date(task.scheduleActionAt))!==today)return "";
+  if(task.scheduleAction==="planned")return "计划事项";
+  if(task.scheduleAction==="late")return `延迟入队 · 原计划${task.plannedDate??task.ticketDate}`;
+  if(task.scheduleAction==="early")return "提前入队";
+  return "";
+}
+
 export function validatePlannedDate(input:TaskInput,original?:LegalTask|null,today=dateOnly()){
   const date=input.plannedDate??today;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||(!original||date!==original.plannedDate)&&date<today)return "加入日期只能选择今天及未来日期";

@@ -10,6 +10,8 @@ import QueueDialog from "./QueueDialog";
 import MergeTaskDialog from "./MergeTaskDialog";
 import type { QuickActionMode } from "./TaskQuickActionDialog";
 
+import ScheduleBadge from "./ScheduleBadge";
+
 const historyWarning="这是该事项最早的有效办理记录，删除后可能改变历史周报、月报或季度统计。";
 const sourceLabel=(source:string)=>source==="manual"?"手动记录":source==="quick_action"?"快捷处理":"状态变化自动记录";
 
@@ -105,7 +107,7 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
         <button className="icon-button danger" onClick={async()=>{await api.deleteTask(task.id);onChanged();}} aria-label="移入回收站"><Trash2 size={16}/></button>
       </>}
     </div>
-    <dl className="detail-grid">
+    <ScheduleBadge task={task}/><dl className="detail-grid">
       <div><dt>加入日期</dt><dd>{task.plannedDate||task.ticketDate}<button type="button" className="button secondary small" onClick={onEdit}>修改</button></dd></div>
       <div><dt>状态</dt><dd><StatusBadge status={task.status} overdue={isOverdue(task)}/></dd></div><div><dt>累计处理轮次</dt><dd>{task.processingRounds} 次</dd></div>
       <div><dt>优先级</dt><dd>{PRIORITY_LABELS[task.priority]}</dd></div><div><dt>预计工作量</dt><dd>{WORKLOAD_LABELS[task.workload]}</dd></div>
