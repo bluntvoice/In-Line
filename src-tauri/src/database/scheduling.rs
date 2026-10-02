@@ -194,14 +194,20 @@ impl Database {
         self.with_transaction(|tx| {
             let date=today();
             let ids={
-                let mut statement=tx.prepare("SELECT id FROM tasks WHERE is_scheduled=1 AND planned_date=? AND status='pending' AND deleted_at IS NULL AND archived_at IS NULL ORDER BY planned_date,daily_sequence,id").map_err(display_error)?;
+                let mut statement=tx.prepare("SELECT id FROM tasks WHERE is_scheduled=1 AND planned_date<=? AND status='pending' AND deleted_at IS NULL AND archived_at IS NULL ORDER BY planned_date,daily_sequence,id").map_err(display_error)?;
                 let ids=statement.query_map([&date],|row|row.get::<_,i64>(0)).map_err(display_error)?.collect::<Result<Vec<_>,_>>().map_err(display_error)?;
                 ids
             };
             for id in &ids {
                 let task=get_task_on(tx,*id)?;
                 if task.has_active_queue { return Err("未来事项存在重复的有效入队记录".into()); }
-                activate_number_on(tx,*id,&now())?;
+                let late=task.planned_date<date;
+                let effective_at=if late {
+                    use chrono::TimeZone;
+                    let day=chrono::NaiveDate::parse_from_str(&task.planned_date,"%Y-%m-%d").map_err(display_error)?;
+                    Local.from_local_datetime(&day.and_hms_opt(0,0,0).ok_or("计划日期无效")?).earliest().ok_or("计划日期的本地时间无效")?.to_rfc3339()
+                } else { now() };
+                activate_number_on(tx,*id,&effective_at)?;
                 // Insert reserved slots before later numbers without urgent promotion.
                 let before:Option<i64>=tx.query_row("SELECT MIN(custom_sort_order) FROM tasks WHERE ticket_date=? AND daily_sequence>? AND EXISTS(SELECT 1 FROM task_queue_entries q WHERE q.task_id=tasks.id AND q.closed_at IS NULL)",params![task.ticket_date,task.daily_sequence],|row|row.get(0)).map_err(display_error)?;
                 let order=if let Some(value)=before {
@@ -210,8 +216,8 @@ impl Database {
                 } else {
                     tx.query_row("SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",[],|row|row.get::<_,i64>(0)).map_err(display_error)?
                 };
-                tx.execute("UPDATE tasks SET is_scheduled=0,schedule_action='planned',schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",params![now(),order,now(),id]).map_err(display_error)?;
-                add_log(tx,*id,"scheduled_activated",&format!("计划事项自动入队：计划日期 {}；保留队列编号 {}-{:02}；实际执行 {}",task.planned_date,task.ticket_date,task.daily_sequence,now()))?;
+                tx.execute("UPDATE tasks SET is_scheduled=0,schedule_action=?,schedule_action_at=?,custom_sort_order=?,updated_at=? WHERE id=?",params![if late{"late"}else{"planned"},now(),order,now(),id]).map_err(display_error)?;
+                add_log(tx,*id,if late{"scheduled_late"}else{"scheduled_activated"},&format!("{}：原计划日期 {}；保留队列编号 {}-{:02}；入队统计归 {}；实际执行 {}",if late{"延迟自动入队"}else{"计划事项自动入队"},task.planned_date,task.ticket_date,task.daily_sequence,task.planned_date,now()))?;
             }
             Ok(ids.len())
         })

@@ -4713,6 +4713,81 @@ mod tests {
     }
 
     #[test]
+    fn delayed_startup_keeps_original_date_and_attributes_real_work_to_operation_day() {
+        let _clock = TestClock::at("2026-10-02T10:00:00+08:00");
+        let root = std::env::temp_dir().join(format!(
+            "inline-plan-late-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("inline.db");
+        let db = Database::open_at(path.clone()).unwrap();
+        let mut input = sample("延迟入队");
+        input.planned_date = Some("2026-10-05".into());
+        let task = db.save_task(input).unwrap();
+        assert_eq!(
+            db.statistics(
+                "2026-10-02T00:00:00+08:00".into(),
+                "2026-10-03T00:00:00+08:00".into(),
+                480
+            )
+            .unwrap()
+            .summary
+            .rate_denominator,
+            0
+        );
+        drop(db);
+        TEST_TIME.with(|clock| {
+            *clock.borrow_mut() =
+                Some(chrono::DateTime::parse_from_rfc3339("2026-10-07T09:00:00+08:00").unwrap())
+        });
+        let db = Database::open_at(path.clone()).unwrap();
+        assert_eq!(db.activate_due_scheduled().unwrap(), 1);
+        assert_eq!(db.activate_due_scheduled().unwrap(), 0);
+        let after = db.get_task(task.id).unwrap();
+        assert_eq!(after.ticket_date, "2026-10-05");
+        assert_eq!(after.daily_sequence, task.daily_sequence);
+        assert_eq!(after.schedule_action, "late");
+        assert_eq!(
+            db.statistics(
+                "2026-10-05T00:00:00+08:00".into(),
+                "2026-10-06T00:00:00+08:00".into(),
+                480
+            )
+            .unwrap()
+            .summary
+            .rate_denominator,
+            1
+        );
+        db.process_round(task.id).unwrap();
+        let old = db
+            .statistics(
+                "2026-10-05T00:00:00+08:00".into(),
+                "2026-10-06T00:00:00+08:00".into(),
+                480,
+            )
+            .unwrap();
+        assert_eq!(old.summary.handled_tasks, 0);
+        let real = db
+            .statistics(
+                "2026-10-07T00:00:00+08:00".into(),
+                "2026-10-08T00:00:00+08:00".into(),
+                480,
+            )
+            .unwrap();
+        assert_eq!(real.summary.processed, 1);
+        let reader = Database::open_reporting_at(path).unwrap();
+        assert_eq!(reader.activate_due_scheduled().unwrap(), 0);
+        assert!(db
+            .get_logs(task.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.log_type == "scheduled_late"
+                && log.content.contains("2026-10-05")
+                && log.content.contains("2026-10-07")));
+    }
+
+    #[test]
     fn scheduling_v9_rollback_and_deleted_number_history() {
         let nonce = Utc::now().timestamp_nanos_opt().unwrap();
         let root = std::env::temp_dir().join(format!("inline-v9-{nonce}"));
