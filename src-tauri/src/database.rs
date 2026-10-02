@@ -1,8 +1,10 @@
 use crate::models::*;
+mod scheduling;
 use chrono::{Datelike, FixedOffset, Local, Utc};
 use rusqlite::{
     params, params_from_iter, types::Value, Connection, OpenFlags, OptionalExtension, Transaction,
 };
+use scheduling::*;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs, io,
@@ -17,7 +19,8 @@ const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ti
      WHERE history.task_id=tasks.id
        AND history.new_status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed')
        AND (history.old_status IS NULL OR history.old_status NOT IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed'))
-     ORDER BY history.id DESC LIMIT 1), is_import_conflict, parent_task_id, subtask_sort_order
+     ORDER BY history.id DESC LIMIT 1), is_import_conflict, parent_task_id, subtask_sort_order,
+     planned_date,is_scheduled,schedule_action,schedule_action_at
     FROM tasks";
 const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
@@ -38,7 +41,7 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 8 {
+        if existed && Self::schema_version(&connection)? < 9 {
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
         }
@@ -84,7 +87,7 @@ impl Database {
         connection
             .execute_batch("PRAGMA query_only=ON; PRAGMA busy_timeout=5000;")
             .map_err(display_error)?;
-        if Self::schema_version(&connection)? < 8 {
+        if Self::schema_version(&connection)? < 9 {
             return Err("数据库版本过旧，请先启动 In Line 完成升级".into());
         }
         let backup_dir = path.parent().ok_or("数据库路径无效")?.join("backups");
@@ -468,6 +471,7 @@ impl Database {
                 )
                 .map_err(display_error)?;
         }
+        migrate_scheduling(&transaction, version)?;
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -560,6 +564,10 @@ impl Database {
             is_import_conflict: row.get::<_, i64>(28)? != 0,
             parent_task_id: row.get(29)?,
             subtask_sort_order: row.get(30)?,
+            planned_date: row.get(31)?,
+            is_scheduled: row.get::<_, i64>(32)? != 0,
+            schedule_action: row.get(33)?,
+            schedule_action_at: row.get(34)?,
         })
     }
 
@@ -622,10 +630,22 @@ fn queue_ahead_on(connection: &Connection, id: i64) -> Result<i64, String> {
 }
 
 fn now() -> String {
+    #[cfg(test)]
+    if let Some(value) = TEST_TIME.with(|clock| clock.borrow().clone()) {
+        return value.to_rfc3339();
+    }
     Utc::now().to_rfc3339()
 }
 fn today() -> String {
+    #[cfg(test)]
+    if let Some(value) = TEST_TIME.with(|clock| clock.borrow().clone()) {
+        return value.format("%Y-%m-%d").to_string();
+    }
     Local::now().format("%Y-%m-%d").to_string()
+}
+#[cfg(test)]
+thread_local! {
+    static TEST_TIME: std::cell::RefCell<Option<chrono::DateTime<FixedOffset>>> = const { std::cell::RefCell::new(None) };
 }
 fn display_error(error: impl std::fmt::Display) -> String {
     error.to_string()
@@ -764,7 +784,12 @@ fn close_active_queue(
 fn next_daily_sequence(connection: &Connection, date: &str) -> Result<i64, String> {
     let sequence: i64 = connection
         .query_row(
-            "SELECT last_sequence FROM daily_sequences WHERE ticket_date=?",
+            "SELECT MAX(value) FROM (
+                SELECT COALESCE(MAX(last_sequence),0) value FROM daily_sequences WHERE ticket_date=?1
+                UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM queue_number_allocations WHERE queue_date=?1
+                UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM task_queue_entries WHERE queue_date=?1
+                UNION ALL SELECT COALESCE(MAX(daily_sequence),0) FROM tasks WHERE ticket_date=?1
+             )",
             [date],
             |row| row.get(0),
         )
@@ -1367,6 +1392,8 @@ impl Database {
                 .clone()
                 .unwrap_or_else(|| parent.contacts.clone());
             let task = TaskInput {
+                planned_date: None,
+                confirm_schedule_change: false,
                 id: None,
                 department: departments.first().cloned().unwrap_or_default(),
                 departments,
@@ -3560,7 +3587,7 @@ impl Database {
             }
         }
         let version = Self::schema_version(&connection)?;
-        if version > 8 {
+        if version > 9 {
             return Err("该备份来自更高版本的 In Line，请先升级软件".into());
         }
         Ok(())
@@ -4456,6 +4483,8 @@ mod tests {
 
     fn sample(title: &str) -> TaskInput {
         TaskInput {
+            planned_date: None,
+            confirm_schedule_change: false,
             id: None,
             department: "产品组".into(),
             departments: vec!["产品组".into()],
@@ -4481,6 +4510,59 @@ mod tests {
         input.urgent_requester = "测试人".into();
         input.urgent_reason = "需要优先处理".into();
         input
+    }
+
+    #[test]
+    fn scheduling_v9_rollback_and_deleted_number_history() {
+        let nonce = Utc::now().timestamp_nanos_opt().unwrap();
+        let root = std::env::temp_dir().join(format!("inline-v9-{nonce}"));
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("rollback.db");
+        create_v7_database(&path);
+        let connection = Connection::open(&path).unwrap();
+        connection.execute_batch("CREATE TRIGGER reject_v9 BEFORE INSERT ON schema_meta WHEN NEW.version=9 BEGIN SELECT RAISE(ABORT,'blocked v9'); END;").unwrap();
+        drop(connection);
+        assert!(Database::open_at(path.clone()).is_err());
+        let connection = Connection::open(path).unwrap();
+        assert_eq!(Database::schema_version(&connection).unwrap(), 7);
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('tasks') WHERE name='planned_date'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        let db = Database::open_at(root.join("history.db")).unwrap();
+        let task = db.save_task(sample("永不回收")).unwrap();
+        db.with_transaction(|tx| {
+            allocate_number_on(tx, task.id, &task.ticket_date, task.daily_sequence)?;
+            void_number_on(tx, task.id, "测试作废")?;
+            Ok(())
+        })
+        .unwrap();
+        db.soft_delete(task.id).unwrap();
+        db.permanently_delete_tasks(vec![task.id]).unwrap();
+        db.with_conn(|connection| {
+            let record: (Option<i64>, String, Option<String>) = connection
+                .query_row(
+                    "SELECT task_id,permanent_number,voided_at FROM queue_number_allocations",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .map_err(display_error)?;
+            assert_eq!(record.0, None);
+            assert_eq!(record.1, task.permanent_number);
+            assert!(record.2.is_some());
+            assert_eq!(
+                next_daily_sequence(connection, &task.ticket_date)?,
+                task.daily_sequence + 1
+            );
+            Ok(())
+        })
+        .unwrap();
     }
 
     fn subtask_sample(parent_task_id: i64, title: &str) -> CreateSubtaskInput {
@@ -4575,7 +4657,7 @@ mod tests {
         create_v7_database(&upgraded_path);
 
         let upgraded = Database::open_at(upgraded_path.clone()).unwrap();
-        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 8);
+        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 9);
         let task = upgraded.get_task(1).unwrap();
         assert_eq!(task.parent_task_id, None);
         assert_eq!(task.subtask_sort_order, 0);
@@ -5942,7 +6024,7 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 8);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 9);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);

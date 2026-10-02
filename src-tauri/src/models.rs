@@ -54,6 +54,10 @@ pub struct LegalTask {
     pub is_import_conflict: bool,
     pub parent_task_id: Option<i64>,
     pub subtask_sort_order: i64,
+    pub planned_date: String,
+    pub is_scheduled: bool,
+    pub schedule_action: String,
+    pub schedule_action_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -159,6 +163,10 @@ pub struct DeleteTaskResult {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskInput {
+    #[serde(default)]
+    pub planned_date: Option<String>,
+    #[serde(default)]
+    pub confirm_schedule_change: bool,
     pub id: Option<i64>,
     pub department: String,
     #[serde(default)]

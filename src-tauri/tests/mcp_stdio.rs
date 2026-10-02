@@ -21,6 +21,8 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
     let database = Database::open_at(path.clone()).map_err(std::io::Error::other)?;
     let task = database
         .save_task(TaskInput {
+            planned_date: None,
+            confirm_schedule_change: false,
             id: None,
             department: "产品组".into(),
             departments: vec!["产品组".into()],
