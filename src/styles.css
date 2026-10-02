@@ -7,6 +7,8 @@
 /* Fixed floating geometry and queue table filters */
 .paired-control-field{align-self:start;min-width:0}
 .paired-control-field>.combo-input,.paired-control-field>.deadline-picker,.paired-control-field>.multi-contact{width:100%}
+.form-grid .paired-control-field>input[type=date],.form-grid .paired-control-field>.combo-input input{height:38px}
+.form-grid .multi-contact,.form-grid .deadline-picker{gap:7px}
 .table-meta>span:first-child{display:flex;align-items:center;gap:5px}
 .table-meta b{color:#0b3a82;font-weight:650}
 .table-meta button{padding:2px 6px;border:0;background:transparent;color:#0b3a82;font-size:12px}

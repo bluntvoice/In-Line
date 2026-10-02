@@ -152,7 +152,6 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
         <form onSubmit={submit} onKeyDown={enterToSave}>
           {error && <div className="form-error"><AlertTriangle size={15} />{error}</div>}
           <div className="form-grid">
-            <label><span>加入日期 *</span><input type="date" required min={task&&form.plannedDate===(task.plannedDate||task.ticketDate)&&form.plannedDate<dateOnly()?form.plannedDate:dateOnly()} value={form.plannedDate??dateOnly()} onChange={event=>update("plannedDate",event.target.value)}/>{task&&(task.archivedAt||["completed","archived"].includes(task.status))&&<button type="button" className="button secondary small" onClick={()=>void submit(undefined,true)}>重新激活并应用加入日期</button>}</label>
             <label className="paired-control-field">
               <span>部门 / 团队 *</span>
               <MultiContactInput values={form.departments} options={localMasters.departments} commonOptions={quickDepartments} itemLabel="部门 / 团队" placeholder="输入或选择部门 / 团队"
@@ -170,6 +169,17 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
               <ComboInput value={form.taskType} options={localMasters.taskTypes} onChange={(value) => update("taskType", value)} onDelete={(value) => removeMaster("task_type", value)} onMove={(value, direction) => moveMaster("task_type", value, direction)} placeholder="输入或选择事项类型" />
             </label>
             <label className="paired-control-field">
+              <span>优先级</span>
+              <select value={form.priority} onChange={(event) => update("priority", event.target.value as Priority)}>
+                <option value="normal">普通</option><option value="elevated">较急</option><option value="urgent">紧急</option><option value="critical">重大紧急</option>
+              </select>
+            </label>
+            <label className="paired-control-field">
+              <span>加入日期 *</span>
+              <input type="date" required min={task&&form.plannedDate===(task.plannedDate||task.ticketDate)&&form.plannedDate<dateOnly()?form.plannedDate:dateOnly()} value={form.plannedDate??dateOnly()} onChange={event=>update("plannedDate",event.target.value)}/>
+              {task&&(task.archivedAt||["completed","archived"].includes(task.status))&&<button type="button" className="button secondary small" onClick={()=>void submit(undefined,true)}>重新激活并应用加入日期</button>}
+            </label>
+            <label className="paired-control-field">
               <span>要求完成时间</span>
               <DeadlinePicker value={form.requestedDeadline} label={form.requestedDeadlineLabel} onChange={(value, label) => setForm((current) => ({ ...current, requestedDeadline: value, requestedDeadlineLabel: label }))} />
             </label>
@@ -185,12 +195,6 @@ export default function TaskForm({ task, masters, commonDepartments, commonConta
               <span>当前状态</span>
               <select value={form.status} onChange={(event) => updateStatus(event.target.value as TaskStatus)}>
                 <option value="pending">待处理</option><option value="processing">处理中</option><option value="waiting_materials">待补充材料</option><option value="waiting_confirmation">待内部确认</option><option value="waiting_counterparty_confirmation">待对方确认</option><option value="paused">已暂停</option><option value="processed">已处理</option><option value="completed">已完成</option><option value="cancelled">已取消</option>{task?.status==="archived"&&<option value="archived">已归档</option>}
-              </select>
-            </label>
-            <label>
-              <span>优先级</span>
-              <select value={form.priority} onChange={(event) => update("priority", event.target.value as Priority)}>
-                <option value="normal">普通</option><option value="elevated">较急</option><option value="urgent">紧急</option><option value="critical">重大紧急</option>
               </select>
             </label>
             <label>
