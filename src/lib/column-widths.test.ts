@@ -62,4 +62,23 @@ describe("task table column widths",()=>{
     expect(TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+fitted[column.id],0)).toBe(924);
     expect(TASK_COLUMN_DEFINITIONS.every(column=>fitted[column.id]>=column.minWidth)).toBe(true);
   });
+
+  it("reserves badge and cell padding at the horizontal scrolling boundary",()=>{
+    const saved=defaultTaskColumnLayouts().queue;
+    const fitted=fitTaskColumnWidths(saved,700,98);
+    expect(fitted.number).toBe(98);
+    expect(saved.number).toBe(82);
+    expect(TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+fitted[column.id],0)).toBeGreaterThan(700);
+    expect(TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+fitTaskColumnWidths(saved,920,98)[column.id],0)).toBe(920);
+  });
+
+  it("protects wider number content without rewriting saved custom columns",()=>{
+    const saved=defaultTaskColumnLayouts().queue;
+    saved.number=70;saved.title=420;
+    const rendered=fitTaskColumnWidths(saved,700,124.4);
+    expect(rendered.number).toBe(125);
+    expect(rendered.title).toBe(420);
+    expect(saved.number).toBe(70);
+    expect(saved.title).toBe(420);
+  });
 });

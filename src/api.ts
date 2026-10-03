@@ -86,6 +86,13 @@ export const api={
   cleanupBackups:()=>invoke<import("./types").BackupCleanupResult>("cleanup_backups"),
   setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode"|"launch_at_login"|"ui_font_family"|"ui_scale"|"ticket_colors",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
+  getFloatingVisible:()=>invoke<boolean>("get_floating_visible"),
+  setFloatingVisible:(visible:boolean)=>invoke<boolean>("set_floating_visible",{visible}),
+  onFloatingVisibilityChanged:(callback:(visible:boolean)=>void)=>{
+    let dispose:(()=>void)|undefined,disposed=false;
+    void listen<boolean>("floating-visibility-changed",event=>callback(event.payload)).then(value=>{if(disposed)value();else dispose=value;}).catch(()=>undefined);
+    return()=>{disposed=true;dispose?.();};
+  },
   resizeFloating:(mini:boolean)=>invoke<void>("resize_floating",{mini}),
   showMain:()=>invoke<void>("show_main_window"),
   requestNewTask:()=>invoke<void>("request_new_task"),

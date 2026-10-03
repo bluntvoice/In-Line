@@ -52,12 +52,20 @@ fn emit_change(app: &tauri::AppHandle) -> Result<(), String> {
     app.emit("data-changed", ())
         .map_err(|error| error.to_string())
 }
+fn emit_floating_visibility(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("floating") {
+        if let Ok(visible) = window.is_visible() {
+            let _ = app.emit("floating-visibility-changed", visible);
+        }
+    }
+}
 fn show_main(app: &tauri::AppHandle) {
     for label in ["floating", "quick-add"] {
         if let Some(window) = app.get_webview_window(label) {
             let _ = window.hide();
         }
     }
+    emit_floating_visibility(app);
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
@@ -69,6 +77,7 @@ fn show_floating(app: &tauri::AppHandle) {
         let _ = window.show();
         let _ = window.set_focus();
     }
+    emit_floating_visibility(app);
 }
 fn show_quick_add(app: &tauri::AppHandle) {
     let _ = app.emit_to("quick-add", "new-task", ());
@@ -727,15 +736,26 @@ fn open_task_action(
 }
 #[tauri::command]
 fn toggle_floating(app: tauri::AppHandle) -> Result<bool, String> {
+    let visible = get_floating_visible(app.clone())?;
+    set_floating_visible(app, !visible)
+}
+#[tauri::command]
+fn get_floating_visible(app: tauri::AppHandle) -> Result<bool, String> {
     let window = app.get_webview_window("floating").ok_or("悬浮窗尚未创建")?;
-    let visible = window.is_visible().map_err(|error| error.to_string())?;
+    window.is_visible().map_err(|error| error.to_string())
+}
+#[tauri::command]
+fn set_floating_visible(app: tauri::AppHandle, visible: bool) -> Result<bool, String> {
+    let window = app.get_webview_window("floating").ok_or("悬浮窗尚未创建")?;
     if visible {
-        window.hide()
-    } else {
         window.show()
+    } else {
+        window.hide()
     }
     .map_err(|error| error.to_string())?;
-    Ok(!visible)
+    let actual = window.is_visible().map_err(|error| error.to_string())?;
+    let _ = app.emit("floating-visibility-changed", actual);
+    Ok(actual)
 }
 #[tauri::command]
 fn show_main_window(app: tauri::AppHandle) {
@@ -998,6 +1018,8 @@ pub fn run() {
             copy_ticket_card,
             open_task_action,
             toggle_floating,
+            get_floating_visible,
+            set_floating_visible,
             resize_floating,
             show_main_window,
             request_new_task,

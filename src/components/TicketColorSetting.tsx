@@ -59,7 +59,7 @@ export default function TicketColorSetting({ notify }: { notify: (text: string) 
   };
   return <>
     <section className="ticket-color-setting" aria-labelledby="ticket-color-setting-title">
-      <header><div><h2 id="ticket-color-setting-title">编号配色</h2><p>选择候选色或输入 HEX 编码；应用后所有窗口同步，编号字色自动适配。</p></div><button type="button" className="button secondary small" disabled={busy} onClick={() => void reset()}><RotateCcw size={15} />恢复默认配色</button></header>
+      <header><div><h2 id="ticket-color-setting-title">编号配色</h2><p>选择候选色或输入 HEX 编码；应用后所有窗口同步，编号字色自动适配。</p></div><button type="button" className="button secondary small" disabled={busy} onClick={() => void reset()}><RotateCcw size={15} />恢复默认</button></header>
       {unavailable && <p className="font-fallback-note">暂时无法读取配色设置，当前使用默认色。</p>}
       {error && !open && <p className="ticket-color-error" role="alert">{error}</p>}
       <div className="ticket-color-editors">{(Object.keys(DEFAULT_TICKET_COLORS) as TicketColorKind[]).map(kind => <ColorEditor key={kind} kind={kind} value={colors[kind]} busy={busy} resetKey={resetKey} onSave={persist} onChoose={value => { trigger.current = document.activeElement as HTMLElement; setError(""); setOpen(value); }} />)}</div>

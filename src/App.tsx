@@ -24,7 +24,7 @@ import { DeadlineFilterHeader,StructureFilterHeader,ValueFilterHeader } from "./
 import { activeFilterCount,applyTaskFilters,EMPTY_TASK_FILTERS,matchesTaskSearch,uniqueValues,type TaskFilters } from "./lib/task-filters";
 import { STATUS_LABELS } from "./lib/task-utils";
 import { groupSubtasks,needsParentCompletionChoice,shouldOfferParentCompletion } from "./lib/subtask-progress";
-import { defaultTaskColumnLayouts,fitTaskColumnWidths,normalizeTaskColumnLayouts,normalizeTaskColumnWidth,serializeTaskColumnLayouts,TASK_COLUMN_DEFINITIONS,type TaskColumnId,type TaskTablePage } from "./lib/column-widths";
+import { defaultTaskColumnLayouts,fitTaskColumnWidths,MIN_TASK_NUMBER_COLUMN_WIDTH,normalizeTaskColumnLayouts,normalizeTaskColumnWidth,serializeTaskColumnLayouts,TASK_COLUMN_DEFINITIONS,type TaskColumnId,type TaskTablePage } from "./lib/column-widths";
 
 import ScheduleBadge from "./components/ScheduleBadge";
 import { filterDeferredTasks,type DeferredFilter } from "./lib/scheduling";
@@ -65,20 +65,9 @@ export default function App(){
   const [columnLayouts,setColumnLayouts]=useState(()=>{try{return normalizeTaskColumnLayouts(window.localStorage.getItem(COLUMN_LAYOUT_KEY)??"");}catch{return defaultTaskColumnLayouts();}});
   const [tableScrollElement,setTableScrollElement]=useState<HTMLDivElement|null>(null);
   const [tableViewportWidth,setTableViewportWidth]=useState(0);
+  const [numberColumnMinimum,setNumberColumnMinimum]=useState(MIN_TASK_NUMBER_COLUMN_WIDTH);
 
   useEffect(()=>{try{window.localStorage.setItem(COLUMN_LAYOUT_KEY,serializeTaskColumnLayouts(columnLayouts));}catch{/* 界面配置写入失败不应阻断队列 */}},[columnLayouts]);
-  useLayoutEffect(()=>{
-    if(!tableScrollElement)return;
-    const measure=()=>setTableViewportWidth(tableScrollElement.clientWidth);
-    measure();
-    if(typeof ResizeObserver==="undefined"){
-      window.addEventListener("resize",measure);
-      return()=>window.removeEventListener("resize",measure);
-    }
-    const observer=new ResizeObserver(measure);
-    observer.observe(tableScrollElement);
-    return()=>observer.disconnect();
-  },[tableScrollElement]);
 
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),2300);};
   const showTaskDetails=(task:LegalTask)=>{
@@ -184,6 +173,32 @@ export default function App(){
     return filtered.filter(task=>matchesTaskSearch(task,query,task.parentTaskId===null?undefined:taskById.get(task.parentTaskId)?.title));
   },[source,query,filters,taskById]);
 
+  useLayoutEffect(()=>{
+    if(!tableScrollElement)return;
+    let active=true;
+    const badges=Array.from(tableScrollElement.querySelectorAll<HTMLElement>("tbody td:first-child .ticket-number"));
+    const measure=()=>{
+      if(!active)return;
+      setTableViewportWidth(tableScrollElement.clientWidth);
+      const minimum=badges.reduce((current,badge)=>{
+        const cell=badge.closest("td");
+        if(!cell)return current;
+        const style=getComputedStyle(cell);
+        const bounds=badge.getBoundingClientRect(),cellBounds=cell.getBoundingClientRect();
+        // 回收站号码前还有复选框，实际左偏移也必须保留。
+        return Math.max(current,Math.ceil(bounds.right-cellBounds.left+parseFloat(style.paddingRight)));
+      },MIN_TASK_NUMBER_COLUMN_WIDTH);
+      setNumberColumnMinimum(minimum);
+    };
+    measure();
+    void document.fonts.ready.then(measure);
+    const observer=typeof ResizeObserver!=="undefined"?new ResizeObserver(measure):null;
+    observer?.observe(tableScrollElement);
+    badges.forEach(badge=>observer?.observe(badge));
+    window.addEventListener("resize",measure);
+    return()=>{active=false;observer?.disconnect();window.removeEventListener("resize",measure);};
+  },[tableScrollElement,tasks]);
+
   const copy=async(task:LegalTask)=>{try{await api.copyTicketImage(task);toast("已复制："+displayTicket(task));}catch(error){toast("复制失败："+String(error));}};
   const move=async(event:React.MouseEvent,task:LegalTask,direction:"up"|"down")=>{event.stopPropagation();try{await api.moveTask(task.id,direction);}catch(error){toast("调整失败："+String(error));}};
   const handleAction=async(action:ContextAction)=>{
@@ -240,10 +255,10 @@ export default function App(){
   const frequentContacts=commonContacts(taskHistory);
   const actionView:TaskView=view==="deferred"?"queue":view;
   const columnWidths=columnLayouts[view];
-  const visibleColumnWidths=fitTaskColumnWidths(columnWidths,tableViewportWidth-1);
+  const visibleColumnWidths=fitTaskColumnWidths(columnWidths,tableViewportWidth-1,numberColumnMinimum);
   const totalColumnWidth=TASK_COLUMN_DEFINITIONS.reduce((sum,column)=>sum+visibleColumnWidths[column.id],0);
   const updateColumnWidth=(columnId:TaskColumnId,width:number)=>setColumnLayouts(current=>({...current,[view]:{...current[view],[columnId]:normalizeTaskColumnWidth(columnId,width)}}));
-  const resizeHandle=(columnId:TaskColumnId)=>{const column=TASK_COLUMN_DEFINITIONS.find(item=>item.id===columnId)!;return <ColumnResizeHandle label={column.label} width={columnWidths[columnId]} minWidth={column.minWidth} maxWidth={column.maxWidth} onResize={width=>updateColumnWidth(columnId,width)}/>;};
+  const resizeHandle=(columnId:TaskColumnId)=>{const column=TASK_COLUMN_DEFINITIONS.find(item=>item.id===columnId)!;const number=columnId==="number";return <ColumnResizeHandle label={column.label} width={number?visibleColumnWidths.number:columnWidths[columnId]} minWidth={number?Math.min(column.maxWidth,numberColumnMinimum):column.minWidth} maxWidth={column.maxWidth} onResize={width=>updateColumnWidth(columnId,width)}/>;};
   const resetColumnWidths=()=>{setColumnLayouts(current=>({...current,[view]:defaultTaskColumnLayouts()[view]}));setColumnMenu(null);toast("已恢复当前页面默认列宽");};
   const openView=(next:PageView)=>{setSettings(false);setAbout(false);setStatistics(false);setWorkCalendar(false);setHelp(false);setSelected(null);setColumnMenu(null);setView(next);void refresh();};
   const renderTaskDetail=(detailView:TaskView)=>selected&&<TaskDetail key={selected.id} task={selected} view={detailView} mergeCandidates={[...data.queue,...data.archive]} relationRefreshKey={relationRefreshKey}

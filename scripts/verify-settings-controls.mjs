@@ -1,0 +1,62 @@
+// Isolated settings integration; never reads native windows or user databases.
+import assert from "node:assert/strict";
+import {pathToFileURL} from "node:url";
+import {mkdir,writeFile} from "node:fs/promises";
+import {createServer} from "vite";
+const {chromium}=await import(process.env.INLINE_PLAYWRIGHT_MODULE?pathToFileURL(process.env.INLINE_PLAYWRIGHT_MODULE).href:"playwright");
+const mock=`
+const callbacks=new Set(),visibilityCallbacks=new Set();let visible=false;
+const settings={ui_scale:"100"},progress={phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null};
+window.__floatingWrites=[];
+window.__floatingEvent=value=>{visible=value;visibilityCallbacks.forEach(callback=>callback(value));};
+window.__floatingListeners=()=>visibilityCallbacks.size;
+const api={bootstrap:async()=>({queue:[],archive:[],trash:[],masters:{departments:[],contacts:[],taskTypes:[]},settings,backups:[]}),getVersion:async()=>"0.5.0",globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,listBackups:async()=>[],getTicketColors:async()=>null,getUIFontSelection:async()=>({requested:"",effective:"",missing:false}),getUIScale:async()=>"100",getRecommendedFontStatus:async()=>progress,onRecommendedFontProgress:()=>()=>{},onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},setSetting:async(key,value)=>{settings[key]=value;callbacks.forEach(callback=>callback());},getFloatingVisible:()=>{if(window.__readFail)return Promise.reject(new Error("读取失败"));const snapshot=visible;return window.__holdRead?new Promise(resolve=>window.__releaseRead=()=>resolve(snapshot)):Promise.resolve(snapshot);},setFloatingVisible:value=>{window.__floatingWrites.push(value);if(window.__writeFail)return Promise.reject(new Error("隔离切换失败"));return window.__holdWrite?new Promise(resolve=>window.__releaseWrite=()=>{window.__floatingEvent(value);resolve(value);}):Promise.resolve().then(()=>{window.__floatingEvent(value);return value;});},onFloatingVisibilityChanged:cb=>{visibilityCallbacks.add(cb);return()=>visibilityCallbacks.delete(cb);}};
+export {api};`;
+const server=await createServer({server:{port:0},plugins:[{name:"isolated-settings-controls",enforce:"pre",load(id){if(id.replaceAll("\\","/").endsWith("/src/api.ts"))return mock;}}]});
+await server.listen();
+const browser=await chromium.launch({headless:true,executablePath:process.env.INLINE_BROWSER_PATH});
+const errors=[];
+try{
+  const page=await browser.newPage({viewport:{width:1280,height:900}});
+  page.on("pageerror",error=>errors.push(error.message));
+  await page.addInitScript(()=>window.__holdRead=true);
+  await page.goto(server.resolvedUrls.local[0]);
+  await page.getByRole("button",{name:"软件设置",exact:true}).click();
+  const toggle=page.getByRole("switch",{name:"显示桌面悬浮窗"}),row=page.locator(".floating-window-setting");
+  assert.equal(await toggle.isDisabled(),true);
+  await page.evaluate(()=>window.__floatingEvent(true));
+  await page.getByText("已显示",{exact:true}).waitFor();
+  await page.evaluate(()=>{window.__releaseRead();window.__holdRead=false;});
+  await page.waitForTimeout(60);assert.equal(await toggle.isChecked(),true,"stale initial read must not overwrite visibility event");
+  await page.evaluate(()=>window.__holdWrite=true);
+  await toggle.click();await page.getByText("切换中…",{exact:true}).waitFor();assert.equal(await toggle.isDisabled(),true);
+  assert.deepEqual(await page.evaluate(()=>window.__floatingWrites),[false]);
+  await page.evaluate(()=>{window.__releaseWrite();window.__holdWrite=false;});
+  await page.getByText("已隐藏",{exact:true}).waitFor();assert.equal(await toggle.isChecked(),false);
+  await toggle.focus();await page.keyboard.press("Space");await page.getByText("已显示",{exact:true}).waitFor();
+  await page.evaluate(()=>window.__writeFail=true);await toggle.click();
+  await page.locator(".toast").filter({hasText:"隔离切换失败"}).waitFor();assert.equal(await toggle.isChecked(),true);
+  await page.evaluate(()=>{window.__writeFail=false;window.__floatingEvent(false);});await page.getByText("已隐藏",{exact:true}).waitFor();
+  await page.getByRole("button",{name:"待办队列",exact:false}).first().click();
+  assert.equal(await page.evaluate(()=>window.__floatingListeners()),0);
+  await page.evaluate(()=>{window.__floatingEvent(true);window.__readFail=true;});
+  await page.getByRole("button",{name:"软件设置",exact:true}).click();await page.getByText("状态不可用",{exact:true}).waitFor();assert.equal(await toggle.isDisabled(),true);
+  await page.evaluate(()=>{window.__readFail=false;window.dispatchEvent(new Event("focus"));});await page.getByText("已显示",{exact:true}).waitFor();assert.equal(await toggle.isChecked(),true);
+  assert.equal(await page.getByRole("button",{name:"恢复默认配色",exact:true}).count(),0);
+  await page.locator(".ticket-color-setting").getByRole("button",{name:"恢复默认",exact:true}).click();
+  await page.locator(".toast").filter({hasText:"已恢复默认编号配色"}).waitFor();
+  const buttons=page.locator('.settings-page .button,.settings-page .week-start-options button');
+  const dimensions=await buttons.evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return{text:node.textContent.trim(),height:node.getBoundingClientRect().height,size:style.fontSize,weight:style.fontWeight};}));
+  for(const value of dimensions){assert.equal(value.height,36,JSON.stringify(value));assert.equal(value.size,"14px",JSON.stringify(value));assert.equal(value.weight,"600",JSON.stringify(value));}
+  await writeFile("release/settings-button-audit-after.json",JSON.stringify(dimensions,null,2)+"\n");
+  await mkdir("release/ui",{recursive:true});await row.scrollIntoViewIfNeeded();await page.screenshot({path:"release/ui/settings-floating-switch.png"});
+  const cdp=await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setDeviceMetricsOverride",{width:653,height:600,deviceScaleFactor:1.5,mobile:false});
+  await row.scrollIntoViewIfNeeded();
+  assert.ok(await page.locator(".settings-page").evaluate(node=>node.scrollWidth<=node.clientWidth+1),"settings overflow at 150% / 980px");
+  const layout=await row.evaluate(node=>{const outer=node.getBoundingClientRect(),control=node.querySelector('.floating-switch-control').getBoundingClientRect();return{outer:outer.right,control:control.right};});assert.ok(layout.control<=layout.outer,"floating switch overflow");
+  assert.ok(await page.locator('.week-start-options button').evaluateAll(nodes=>nodes.every(node=>node.scrollHeight<=node.clientHeight+1&&node.scrollWidth<=node.clientWidth+1)),"segmented text clipped at 150%");
+  const screenshot=await cdp.send("Page.captureScreenshot",{format:"png"});await writeFile("release/ui/settings-floating-switch-150.png",Buffer.from(screenshot.data,"base64"));
+  assert.deepEqual(errors,[]);
+  console.log("PASS settings controls: 36px / 14px / 600 action and segmented buttons; reset copy; visibility synchronization; stale-read protection; loading/busy/failed operations; keyboard switch; unsubscription/reopen; read retry; 150% layout without clipped segmented labels. Native window API is simulated.");
+}finally{await browser.close();await server.close();}

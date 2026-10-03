@@ -1,6 +1,6 @@
 import { useEffect,useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { AlertTriangle,CheckCircle2,ChevronRight,Copy,DatabaseBackup,FileInput,FolderOpen,Keyboard,MonitorUp,Plug,RefreshCw,RotateCcw,Trash2,X } from "lucide-react";
+import { AlertTriangle,CheckCircle2,ChevronRight,Copy,DatabaseBackup,FileInput,FolderOpen,Keyboard,Plug,RefreshCw,RotateCcw,Trash2,X } from "lucide-react";
 import { api } from "../api";
 import type { BackupConflictItem,BackupInfo,BackupMergeResult } from "../types";
 import { backupFailureGuidance,prioritizeBackups } from "../lib/backup-ux";
@@ -8,6 +8,7 @@ import { shortcutFromKeyboardEvent,shortcutUsageHint } from "../lib/global-short
 import FontSetting from "./FontSetting";
 import UIScaleSetting from "./UIScaleSetting";
 import TicketColorSetting from "./TicketColorSetting";
+import FloatingWindowSetting from "./FloatingWindowSetting";
 
 type McpDialog={title:string;summary:string;scenario:string;usage:string;content:string}|null;
 type BackupDestination="queue"|"deferred"|"archive";
@@ -171,7 +172,7 @@ export default function SettingsPanel({backups,settings,isDatabaseEmpty,onChange
     <FontSetting notify={notify}/>
     <UIScaleSetting notify={notify}/>
     <TicketColorSetting notify={notify}/>
-    <div className="setting-row"><div><strong>桌面悬浮窗</strong><span>关闭主界面后默认显示，也可在此手动显示或隐藏</span></div><button className="button secondary" onClick={()=>void api.toggleFloating()}><MonitorUp size={16}/>显示 / 隐藏</button></div>
+    <FloatingWindowSetting notify={notify}/>
     <div className="setting-row"><div><strong>每周起始日</strong><span>用于统计中心“本周”和“上一周”的日期范围</span></div><div className="week-start-options" role="group" aria-label="每周起始日"><button type="button" className={weekStart==="monday"?"active":""} onClick={()=>void saveWeekStart("monday")}>周一</button><button type="button" className={weekStart==="sunday"?"active":""} onClick={()=>void saveWeekStart("sunday")}>周日</button></div></div>
     <div className="setting-row"><div><strong>统计比例口径</strong><span>{rateMode==="processing"?"有效处理率：有效办理事项 ÷ 周期内应处理事项":"事项办结率：已完成事项 ÷ 周期内实际处理事项"}</span></div><div className="week-start-options rate-mode-options" role="group" aria-label="统计比例口径"><button type="button" className={rateMode==="processing"?"active":""} onClick={()=>void saveRateMode("processing")}>有效处理率</button><button type="button" className={rateMode==="closure"?"active":""} onClick={()=>void saveRateMode("closure")}>事项办结率</button></div></div>
     <div className="setting-row shortcut-setting-row"><div><strong>全局快捷新增</strong><span>直接录入自定义组合；注册成功才会保存，发生系统占用时继续使用原快捷键</span></div><div className="shortcut-editor"><label className={`shortcut-recorder ${shortcutRecording?"recording":""}`}><Keyboard size={16}/><input readOnly value={busy==="shortcut"?"正在检查…":shortcut} disabled={busy==="shortcut"} onFocus={()=>{setShortcutRecording(true);setShortcutFeedback({tone:"idle",message:"请按住 Ctrl 或 Alt，再按一个字母、数字或功能键；Esc 取消"});}} onBlur={()=>setShortcutRecording(false)} onKeyDown={captureShortcut} aria-label="录入全局快捷新增组合"/></label><button type="button" className="button secondary small" disabled={busy==="shortcut"||shortcut==="Alt+I"} onClick={()=>void saveShortcut("Alt+I")}>恢复默认</button><p className={`shortcut-feedback ${shortcutFeedback.tone}`}>{shortcutFeedback.tone==="success"?<CheckCircle2 size={14}/>:shortcutFeedback.tone==="error"?<AlertTriangle size={14}/>:<Keyboard size={14}/>}<span>{shortcutFeedback.message}</span></p></div></div>

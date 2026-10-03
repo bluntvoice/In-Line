@@ -13,7 +13,7 @@ const read=()=>JSON.parse(localStorage.getItem("inline-ticket-colors-test")||'{"
 const emit=()=>callbacks.forEach(cb=>cb());channel.onmessage=emit;
 window.__colorCalls=[];window.__pendingColors=[];window.__emitColors=emit;
 window.__releaseColors=()=>{window.__holdColors=false;window.__pendingColors.splice(0).forEach(release=>release())};
-const specific={bootstrap:async()=>({queue,archive:[],trash:[],masters:{departments:["测试部门"],contacts:["测试人员"],taskTypes:["合同审查"]},settings:read(),backups:[]}),getVersion:async()=>"0.5.0",getTicketColors:()=>{const value=read().ticket_colors??null;return window.__holdColors?new Promise(resolve=>window.__pendingColors.push(()=>resolve(value))):Promise.resolve(value)},setSetting:async(key,value)=>{window.__colorCalls.push({key,value});if(window.__failColorSave)throw new Error("隔离测试保存失败");localStorage.setItem("inline-ticket-colors-test",JSON.stringify({...read(),[key]:value}));emit();channel.postMessage("changed")},onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},getUIFontSelection:async()=>({requested:"",effective:"",missing:false}),globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},onUpdateProgress:()=>()=>{},getTask:async id=>queue.find(t=>t.id===id),getUpdateProgress:async()=>({phase:"idle",version:null,downloadedBytes:0,totalBytes:null,percent:null,message:null})};
+const specific={bootstrap:async()=>({queue,archive:[],trash:[],masters:{departments:["测试部门"],contacts:["测试人员"],taskTypes:["合同审查"]},settings:read(),backups:[]}),getVersion:async()=>"0.5.0",getTicketColors:()=>{const value=read().ticket_colors??null;return window.__holdColors?new Promise(resolve=>window.__pendingColors.push(()=>resolve(value))):Promise.resolve(value)},setSetting:async(key,value)=>{window.__colorCalls.push({key,value});if(window.__failColorSave)throw new Error("隔离测试保存失败");localStorage.setItem("inline-ticket-colors-test",JSON.stringify({...read(),[key]:value}));emit();channel.postMessage("changed")},onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},getUIFontSelection:async()=>({requested:"",effective:"",missing:false}),globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,getFloatingVisible:async()=>false,getUIScale:async()=>"100",getRecommendedFontStatus:async()=>({phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null}),onRecommendedFontProgress:()=>()=>{},onFloatingVisibilityChanged:()=>()=>{},onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},onUpdateProgress:()=>()=>{},getTask:async id=>queue.find(t=>t.id===id),getUpdateProgress:async()=>({phase:"idle",version:null,downloadedBytes:0,totalBytes:null,percent:null,message:null})};
 export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async()=>[])});`;
 const server = await createServer({ server: { host: "127.0.0.1", port: 0 }, plugins: [{ name: "isolated-ticket-colors", enforce: "pre", load(id) { if (id.replaceAll("\\", "/").endsWith("/src/api.ts")) return mock; } }] });
 await server.listen();
@@ -21,7 +21,7 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const errors = [];
 try {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "Asia/Shanghai" });
-  const page = await context.newPage(); page.setDefaultTimeout(15000); page.on("pageerror", e => errors.push(e.message));
+  const page = await context.newPage(); page.setDefaultTimeout(15000); page.on("pageerror", e => {errors.push(e.message);console.error(e.message);});
   await page.goto(server.resolvedUrls.local[0]); await page.locator(".task-table tbody tr").first().waitFor();
   const floating = await context.newPage(); floating.on("pageerror", e => errors.push(e.message));
   await floating.setViewportSize({ width: 444, height: 564 }); await floating.goto(server.resolvedUrls.local[0] + "#/floating"); await floating.locator(".floating-card").first().waitFor();
@@ -55,10 +55,10 @@ try {
   await page.getByRole("alert").filter({ hasText: "保存失败" }).waitFor(); assert.equal(await page.evaluate(() => JSON.parse(JSON.parse(localStorage.getItem("inline-ticket-colors-test")).ticket_colors).future), "#F3D98B");
   await page.evaluate(() => { window.__failColorSave = false; }); await editor(1).getByRole("button", { name: "应用", exact: true }).click();
   await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--ticket-future-background") === "#123456");
-  await input(0).fill("unsaved"); await page.getByRole("button", { name: "恢复默认配色", exact: true }).click();
+  await input(0).fill("unsaved"); await page.locator(".ticket-color-setting").getByRole("button", { name: "恢复默认", exact: true }).click();
   await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--ticket-future-background") === "#3F766E");
   assert.equal(await input(0).inputValue(), "#0B3A82"); assert.equal(await input(1).inputValue(), "#3F766E"); assert.equal(await input(2).inputValue(), "#C43D4B");
-  await input(0).fill("bad-draft"); await page.getByRole("button", { name: "恢复默认配色", exact: true }).click(); await page.waitForFunction(() => document.querySelector('.ticket-color-editor input').value === '#0B3A82');
+  await input(0).fill("bad-draft"); await page.locator(".ticket-color-setting").getByRole("button", { name: "恢复默认", exact: true }).click(); await page.waitForFunction(() => document.querySelector('.ticket-color-editor input').value === '#0B3A82');
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("inline-ticket-colors-test")).week_start_day), "sunday");
   // A previously initiated settings read must not overwrite a successful newer save.
   await page.evaluate(() => { window.__holdColors = true; window.__emitColors(); }); await page.waitForFunction(() => window.__pendingColors.length > 0);
@@ -68,7 +68,7 @@ try {
   await editor(2).getByRole("button", { name: "选择候选色" }).click(); await page.getByRole("button", { name: "奶油黄 #F3D98B", exact: true }).click();
   await waitColor(floating, ".ticket-urgent", "rgb(243, 217, 139)", "rgb(0, 0, 0)");
   assert.equal(await floating.locator(".ticket-urgent .ticket-triangle").evaluate(node => getComputedStyle(node).color), "rgb(0, 0, 0)");
-  await page.getByRole("button", { name: "恢复默认配色", exact: true }).click(); await waitColor(floating, ".ticket-urgent", "rgb(196, 61, 75)", "rgb(255, 255, 255)");
+  await page.locator(".ticket-color-setting").getByRole("button", { name: "恢复默认", exact: true }).click(); await waitColor(floating, ".ticket-urgent", "rgb(196, 61, 75)", "rgb(255, 255, 255)");
   await mkdir("release/ui", { recursive: true }); await page.mouse.move(10, 10); await page.screenshot({ path: "release/ui/ticket-colors-settings.png", fullPage: true });
   await editor(1).getByRole("button", { name: "选择候选色" }).click(); await page.mouse.move(10, 10); await page.screenshot({ path: "release/ui/ticket-color-picker.png", fullPage: true });
   await page.getByRole("button", { name: "关闭配色选择", exact: true }).click(); await page.setViewportSize({ width: 1140, height: 820 });

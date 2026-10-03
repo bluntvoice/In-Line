@@ -16,33 +16,42 @@ export type TaskColumnId = typeof TASK_COLUMN_DEFINITIONS[number]["id"];
 export type TaskColumnWidths = Record<TaskColumnId, number>;
 export type TaskColumnLayouts = Record<TaskTablePage, TaskColumnWidths>;
 
+// 78px 编号底色，加上单元格左右各 10px 留白。
+export const MIN_TASK_NUMBER_COLUMN_WIDTH = 98;
+
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 export function defaultTaskColumnWidths(): TaskColumnWidths {
   return Object.fromEntries(TASK_COLUMN_DEFINITIONS.map(column => [column.id, column.defaultWidth])) as TaskColumnWidths;
 }
 
-export function fitTaskColumnWidths(widths: TaskColumnWidths, availableWidth: number): TaskColumnWidths {
+export function fitTaskColumnWidths(widths: TaskColumnWidths, availableWidth: number, numberMinimum = 0): TaskColumnWidths {
+  const minimumFor = (column: typeof TASK_COLUMN_DEFINITIONS[number]) => column.id === "number" && Number.isFinite(numberMinimum)
+    ? Math.max(column.minWidth, Math.ceil(numberMinimum)) : column.minWidth;
+  // 仅对显示宽度作内容保护，不能回写或压缩用户保存的其他列宽。
+  const rendered = widths.number < minimumFor(TASK_COLUMN_DEFINITIONS[0])
+    ? { ...widths, number: minimumFor(TASK_COLUMN_DEFINITIONS[0]) } : widths;
   const available = Math.floor(availableWidth);
-  const total = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + widths[column.id], 0);
-  if (!Number.isFinite(available) || available <= 0 || total <= available) return widths;
+  const total = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + rendered[column.id], 0);
+  if (!Number.isFinite(available) || available <= 0 || total <= available) return rendered;
   // 仅默认布局自适应；即使手动保存的布局只超出几像素，也不能偷偷缩窄。
-  if (TASK_COLUMN_DEFINITIONS.some(column => widths[column.id] !== column.defaultWidth)) return widths;
+  if (TASK_COLUMN_DEFINITIONS.some(column => widths[column.id] !== column.defaultWidth)) return rendered;
 
-  const minimum = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + column.minWidth, 0);
+  const minimum = TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + minimumFor(column), 0);
   if (available <= minimum) {
-    return Object.fromEntries(TASK_COLUMN_DEFINITIONS.map(column => [column.id, column.minWidth])) as TaskColumnWidths;
+    return Object.fromEntries(TASK_COLUMN_DEFINITIONS.map(column => [column.id, minimumFor(column)])) as TaskColumnWidths;
   }
 
   const ratio = (available - minimum) / (total - minimum);
   const fitted = Object.fromEntries(TASK_COLUMN_DEFINITIONS.map(column => {
-    const width = column.minWidth + Math.floor((widths[column.id] - column.minWidth) * ratio);
+    const min = minimumFor(column);
+    const width = min + Math.floor((rendered[column.id] - min) * ratio);
     return [column.id, width];
   })) as TaskColumnWidths;
   let remainder = available - TASK_COLUMN_DEFINITIONS.reduce((sum, column) => sum + fitted[column.id], 0);
   for (const column of TASK_COLUMN_DEFINITIONS) {
     if (remainder === 0) break;
-    if (fitted[column.id] < widths[column.id]) {
+    if (fitted[column.id] < rendered[column.id]) {
       fitted[column.id] += 1;
       remainder -= 1;
     }

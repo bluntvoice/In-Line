@@ -277,6 +277,12 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 .font-setting-trigger svg{flex:0 0 auto}
 .font-setting-row .font-setting-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;min-width:0}
 .font-setting-actions .button.small{flex:0 0 auto;white-space:nowrap}
+.settings-page{--settings-control-height:36px;--settings-control-font-size:14px;--settings-control-font-weight:600}
+.settings-page .button,.settings-page .button.small,.settings-page .week-start-options button,.settings-page .week-start-options button.active{height:var(--settings-control-height);min-height:var(--settings-control-height);padding:0 12px;font-size:var(--settings-control-font-size);font-weight:var(--settings-control-font-weight);line-height:1.5;white-space:nowrap}
+.settings-page .shortcut-recorder,.settings-page .ticket-color-code input{height:var(--settings-control-height);min-height:var(--settings-control-height)}
+.settings-page .setting-row>div:first-child{min-width:0}.settings-page .week-start-options{flex:0 0 auto;max-width:100%;flex-wrap:wrap;gap:3px}
+@media(max-width:760px){.settings-page .setting-row:has(>.week-start-options){align-items:stretch;flex-direction:column}.settings-page .week-start-options{align-self:flex-start}}
+.floating-switch-control{display:flex!important;align-items:center;gap:10px;flex:0 0 auto}.floating-switch-control>span{white-space:nowrap}.settings-page .switch{position:relative;display:inline-flex;flex:0 0 auto;cursor:pointer}.settings-page .switch input{z-index:1;inset:0;width:100%;height:100%;margin:0;cursor:pointer}.settings-page .switch input:focus-visible+span{outline:2px solid #ffb000;outline-offset:3px}.settings-page .switch input:disabled+span{opacity:.35}.settings-page .switch:has(input:disabled),.settings-page .switch input:disabled{cursor:not-allowed}
 .font-fallback-note{margin-top:4px;color:#986700;font-size:12px}
 .font-picker{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;width:min(560px,calc(100vw - 48px));height:min(650px,calc(100vh - 48px));border-radius:14px;background:#fff;box-shadow:0 22px 70px #102a5640;overflow:hidden}
 .font-picker>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 20px;border-bottom:1px solid #dfe6ef}
@@ -296,6 +302,7 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 .ticket-number.ticket-urgent { background: var(--ticket-urgent-background, #c43d4b); color: var(--ticket-urgent-text, #fff); }
 .ticket-number.ticket-scheduled { background: var(--ticket-future-background, #3f766e); color: var(--ticket-future-text, #fff); }
 .ticket-number .ticket-triangle { color: inherit; }
+.task-table .ticket-identity>.ticket-number{width:max-content;flex-shrink:0}
 .schedule-mark { display: inline-block; color: #4c6771; background: #e9f1f4; padding: 2px 6px; border-radius: 4px; font-size: 12px; line-height: 1.5; width: fit-content; }
 .task-title-structure > .schedule-mark { margin-top: 3px; }
 .detail-panel > .schedule-mark { display: block; margin-bottom: 12px; }
