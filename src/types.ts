@@ -38,6 +38,7 @@ export interface DeleteTaskResult{trashedTaskIds:number[];detachedSubtaskIds:num
 export interface TicketSnapshot{task:LegalTask;queueAhead:number}
 export interface MasterData{departments:string[];taskTypes:string[];contacts:string[]}
 export interface BackupInfo{name:string;path:string;size:number;modifiedAt:string}
+export interface BackupCleanupResult{deletedCount:number;failures:{name:string;reason:string}[];backups:BackupInfo[]}
 export interface BackupConflictItem{taskId:number;permanentNumber:string;sourceTitle:string;importedTitle:string}
 export interface BackupMergeResult{addedTasks:number;mergedTasks:number;conflictTasks:number;appliedSettings:number;conflicts:BackupConflictItem[]}
 export interface TaskUiAction{id:number;action:"view"|"edit"|"status"|"urgent"|"complete"|"addSubtask"}

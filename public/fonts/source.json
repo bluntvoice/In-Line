@@ -1,0 +1,30 @@
+{
+  "project": "https://github.com/be5invis/Sarasa-Gothic",
+  "version": "1.0.42",
+  "archive": "https://github.com/be5invis/Sarasa-Gothic/releases/download/v1.0.42/SarasaUiSC-TTF-1.0.42.7z",
+  "archiveSha256": "daba2085409fb8a23dfc22f36e02e8b901a08510a3ac95ce3b0fb7161e6925bd",
+  "conversion": "fontTools lossless WOFF2 compression; full glyph set and hinting retained",
+  "files": [
+    {
+      "file": "SarasaUiSC-Regular.woff2",
+      "weight": 400,
+      "glyphs": 46272,
+      "bytes": 8343180,
+      "sha256": "d1af2cf8d2ae42657d5f199707bddb4ea08db6c05d24373c6acd542295148e0a"
+    },
+    {
+      "file": "SarasaUiSC-SemiBold.woff2",
+      "weight": 600,
+      "glyphs": 46272,
+      "bytes": 8479044,
+      "sha256": "2735b9303427f98608119c84a363097a47cbb71d3f3adecf90f5a96edb3accb7"
+    },
+    {
+      "file": "SarasaUiSC-Bold.woff2",
+      "weight": 700,
+      "glyphs": 46272,
+      "bytes": 8621424,
+      "sha256": "e1c39dd332beae687d06809e2816b1189f919f6eb6274baa7dccf3e39f959f58"
+    }
+  ]
+}

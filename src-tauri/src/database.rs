@@ -3790,24 +3790,60 @@ impl Database {
         self.backup_dir.clone()
     }
     pub fn list_backups(&self) -> Result<Vec<BackupInfo>, String> {
-        let mut values = fs::read_dir(&self.backup_dir)
-            .map_err(display_error)?
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| {
-                path.extension()
-                    .is_some_and(|value| value.eq_ignore_ascii_case("db"))
+        let mut values = Vec::new();
+        for entry in fs::read_dir(&self.backup_dir).map_err(display_error)? {
+            let path = entry.map_err(display_error)?.path();
+            if path
+                .extension()
+                .is_none_or(|value| !value.eq_ignore_ascii_case("db"))
+            {
+                continue;
+            }
+            let metadata = fs::symlink_metadata(&path).map_err(display_error)?;
+            if !regular_backup_file(&metadata) {
+                continue;
+            }
+            values.push((
+                metadata.modified().map_err(display_error)?,
+                backup_info(&path)?,
+            ));
+        }
+        values.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.name.cmp(&a.1.name)));
+        Ok(values.into_iter().map(|(_, backup)| backup).collect())
+    }
+    // Serialize with backup creation and database writes; this operation never changes SQLite.
+    pub fn cleanup_backups(&self) -> Result<BackupCleanupResult, String> {
+        self.with_conn(|_| {
+            let candidates = self.list_backups()?;
+            let mut deleted_count = 0;
+            let mut failures = Vec::new();
+            for backup in candidates.into_iter().skip(5) {
+                match self.delete_backup(backup.path) {
+                    Ok(()) => deleted_count += 1,
+                    Err(reason) => failures.push(BackupCleanupFailure {
+                        name: backup.name,
+                        reason,
+                    }),
+                }
+            }
+            Ok(BackupCleanupResult {
+                deleted_count,
+                failures,
+                backups: self.list_backups()?,
             })
-            .filter_map(|path| backup_info(&path).ok())
-            .collect::<Vec<_>>();
-        values.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
-        Ok(values)
+        })
     }
     pub fn delete_backup(&self, raw_path: String) -> Result<(), String> {
+        let metadata = fs::symlink_metadata(&raw_path).map_err(|_| "找不到所选备份".to_string())?;
+        if !regular_backup_file(&metadata) {
+            return Err("只能删除备份目录中的普通数据库文件".into());
+        }
         let selected = fs::canonicalize(&raw_path).map_err(|_| "找不到所选备份".to_string())?;
         let backup_root = fs::canonicalize(&self.backup_dir).map_err(display_error)?;
-        if !selected.starts_with(&backup_root)
-            || selected.extension().is_none_or(|value| value != "db")
+        if selected.parent() != Some(backup_root.as_path())
+            || selected
+                .extension()
+                .is_none_or(|value| !value.eq_ignore_ascii_case("db"))
         {
             return Err("只能删除 In Line 备份目录中的数据库文件".into());
         }
@@ -4635,9 +4671,178 @@ fn backup_info(path: &Path) -> Result<BackupInfo, String> {
     })
 }
 
+fn regular_backup_file(metadata: &fs::Metadata) -> bool {
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return false;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        // FILE_ATTRIBUTE_REPARSE_POINT also excludes junctions and other redirected files.
+        if metadata.file_attributes() & 0x400 != 0 {
+            return false;
+        }
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn cleanup_fixture(count: usize) -> (PathBuf, Database) {
+        let root = std::env::temp_dir().join(format!(
+            "inline-cleanup-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        db.save_task(sample("清理后仍保留的事项")).unwrap();
+        db.set_setting("week_start_day".into(), "sunday".into())
+            .unwrap();
+        for index in 0..count {
+            let kind = ["manual", "auto", "import", "before-restore"][index % 4];
+            let path = db
+                .backup_dir
+                .join(format!("InLine-backup-{index:02}-{kind}.db"));
+            db.with_conn(|connection| Database::backup_connection(connection, &path))
+                .unwrap();
+            fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(
+                    std::time::UNIX_EPOCH
+                        + std::time::Duration::from_secs(1_700_000_000 + index as u64),
+                )
+                .unwrap();
+        }
+        (root, db)
+    }
+
+    #[test]
+    fn cleanup_keeps_zero_to_five_backups_without_changes() {
+        for count in 0..=5 {
+            let (root, db) = cleanup_fixture(count);
+            let before = db.list_backups().unwrap();
+            let result = db.cleanup_backups().unwrap();
+            assert_eq!(result.deleted_count, 0);
+            assert!(result.failures.is_empty());
+            assert_eq!(
+                result.backups.iter().map(|b| &b.path).collect::<Vec<_>>(),
+                before.iter().map(|b| &b.path).collect::<Vec<_>>()
+            );
+            assert_eq!(
+                db.list_tasks(TaskView::Queue).unwrap()[0].title,
+                "清理后仍保留的事项"
+            );
+            assert_eq!(db.settings().unwrap()["week_start_day"], "sunday");
+            drop(db);
+            fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn cleanup_keeps_actual_latest_five_and_stays_inside_backup_root() {
+        let (root, db) = cleanup_fixture(10);
+        let original_order = db.list_backups().unwrap();
+        let kept = original_order
+            .iter()
+            .take(5)
+            .map(|b| b.name.clone())
+            .collect::<Vec<_>>();
+        let outside = root.join("external.db");
+        fs::copy(&original_order[0].path, &outside).unwrap();
+        fs::write(db.backup_dir.join("notes.txt"), "保留").unwrap();
+        fs::write(db.backup_dir.join("source.db-wal"), "保留").unwrap();
+        let nested = db.backup_dir.join("nested.db");
+        fs::create_dir(&nested).unwrap();
+        let nested_backup = nested.join("untouched.db");
+        fs::copy(&outside, &nested_backup).unwrap();
+        assert!(db
+            .delete_backup(nested_backup.to_string_lossy().into())
+            .is_err());
+        assert!(db.delete_backup(outside.to_string_lossy().into()).is_err());
+        #[cfg(windows)]
+        let linked =
+            std::os::windows::fs::symlink_file(&outside, db.backup_dir.join("linked.db")).is_ok();
+        #[cfg(unix)]
+        let linked = std::os::unix::fs::symlink(&outside, db.backup_dir.join("linked.db")).is_ok();
+        if linked {
+            assert!(db
+                .delete_backup(db.backup_dir.join("linked.db").to_string_lossy().into())
+                .is_err());
+        }
+        assert_eq!(db.list_backups().unwrap().len(), 10);
+        let result = db.cleanup_backups().unwrap();
+        assert_eq!(result.deleted_count, 5);
+        assert!(result.failures.is_empty());
+        assert_eq!(
+            result
+                .backups
+                .iter()
+                .map(|b| b.name.clone())
+                .collect::<Vec<_>>(),
+            kept
+        );
+        for backup in &result.backups {
+            Database::validate_backup_file(Path::new(&backup.path)).unwrap();
+        }
+        assert!(outside.exists() && nested_backup.exists());
+        assert_eq!(
+            fs::read_to_string(db.backup_dir.join("notes.txt")).unwrap(),
+            "保留"
+        );
+        assert!(db.backup_dir.join("source.db-wal").exists());
+        assert_eq!(
+            db.list_tasks(TaskView::Queue).unwrap()[0].title,
+            "清理后仍保留的事项"
+        );
+        assert_eq!(db.settings().unwrap()["week_start_day"], "sunday");
+        assert_eq!(db.cleanup_backups().unwrap().deleted_count, 0);
+        // Timestamp ties are deterministic; frontend pinning cannot alter this order.
+        for backup in &result.backups {
+            fs::File::options()
+                .write(true)
+                .open(&backup.path)
+                .unwrap()
+                .set_modified(std::time::UNIX_EPOCH)
+                .unwrap();
+        }
+        let tied = db.list_backups().unwrap();
+        assert!(tied.windows(2).all(|pair| pair[0].name > pair[1].name));
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cleanup_reports_locked_file_and_retries_without_deleting_retained_backups() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let (root, db) = cleanup_fixture(8);
+        let before = db.list_backups().unwrap();
+        let locked = fs::File::options()
+            .read(true)
+            .share_mode(3)
+            .open(&before[7].path)
+            .unwrap();
+        let result = db.cleanup_backups().unwrap();
+        assert_eq!(result.deleted_count, 2);
+        assert_eq!(result.failures.len(), 1);
+        assert_eq!(result.failures[0].name, before[7].name);
+        assert_eq!(result.backups.len(), 6);
+        assert!(Path::new(&before[7].path).exists());
+        drop(locked);
+        let retry = db.cleanup_backups().unwrap();
+        assert_eq!(retry.deleted_count, 1);
+        assert!(retry.failures.is_empty());
+        assert_eq!(
+            retry.backups.iter().map(|b| &b.path).collect::<Vec<_>>(),
+            before.iter().take(5).map(|b| &b.path).collect::<Vec<_>>()
+        );
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn ticket_colors_persist_across_reopen_and_invalid_saves_preserve_all_roles() {

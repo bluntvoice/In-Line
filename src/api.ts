@@ -75,6 +75,7 @@ export const api={
   mcpConnectionGuide:()=>invoke<string>("mcp_connection_guide"),
   restoreBackup:(path:string)=>invoke<BackupMergeResult>("restore_backup",{path}),
   deleteBackup:(path:string)=>invoke<void>("delete_backup",{path}),
+  cleanupBackups:()=>invoke<import("./types").BackupCleanupResult>("cleanup_backups"),
   setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode"|"launch_at_login"|"ui_font_family"|"ticket_colors",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
   showMain:()=>invoke<void>("show_main_window"),

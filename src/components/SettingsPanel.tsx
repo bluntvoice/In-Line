@@ -26,6 +26,7 @@ export default function SettingsPanel({backups,settings,isDatabaseEmpty,onChange
   const [highlightedBackup,setHighlightedBackup]=useState<string|null>(null);
   const [backupNotice,setBackupNotice]=useState<BackupNotice>(null);
   const [retryBackup,setRetryBackup]=useState<BackupInfo|null>(null);
+  const [cleanupFeedback,setCleanupFeedback]=useState<{error:boolean;text:string}|null>(null);
 
   useEffect(()=>{void api.launchAtLogin().then(setLaunch);},[]);
   useEffect(()=>setWeekStart(settings.week_start_day==="sunday"?"sunday":"monday"),[settings]);
@@ -125,6 +126,23 @@ export default function SettingsPanel({backups,settings,isDatabaseEmpty,onChange
     catch(error){notify("删除失败："+String(error));}
     finally{setBusy("");}
   };
+  const cleanup=async()=>{
+    setBusy("cleanup");setCleanupFeedback(null);
+    try{
+      const values=await api.listBackups();
+      setVisibleBackups(prioritizeBackups(values,highlightedBackup));
+      if(values.length<=5){notify("备份不超过 5 个，无需清理");return;}
+      if(!window.confirm(`当前有 ${values.length} 个备份，将按备份时间仅保留最近 5 个，预计删除 ${values.length-5} 个较旧备份（含手动、自动、导入及恢复前备份）。删除后无法恢复；当前事项数据和外部备份原文件不受影响。是否继续？`))return;
+      const result=await api.cleanupBackups();
+      const pinned=result.backups.some(value=>value.path===highlightedBackup)?highlightedBackup:null;
+      setHighlightedBackup(pinned);
+      setVisibleBackups(prioritizeBackups(result.backups,pinned));
+      if(retryBackup&&!result.backups.some(value=>value.path===retryBackup.path)){setRetryBackup(null);setBackupNotice(null);}
+      const text=`已清理 ${result.deletedCount} 个备份，保留 ${result.backups.length} 个。`+(result.failures.length?` ${result.failures.length} 个删除失败：`+result.failures.map(value=>`${value.name}（${value.reason}）`).join("；"):"");
+      setCleanupFeedback({error:result.failures.length>0,text});notify(text);onChanged();
+    }catch(error){setCleanupFeedback({error:true,text:"清理失败："+String(error)});await refreshBackups().catch(()=>undefined);}
+    finally{setBusy("");}
+  };
   const saveWeekStart=async(value:"monday"|"sunday")=>{try{await api.setSetting("week_start_day",value);setWeekStart(value);}catch(error){notify("设置保存失败："+String(error));}};
   const saveRateMode=async(value:"closure"|"processing")=>{try{await api.setSetting("statistics_rate_mode",value);setRateMode(value);}catch(error){notify("设置保存失败："+String(error));}};
   const saveShortcut=async(value:string)=>{setBusy("shortcut");setShortcutFeedback({tone:"checking",message:`正在检查 ${value} 是否可用…`});try{await api.setGlobalShortcut(value);setShortcut(value);setShortcutFeedback({tone:"success",message:shortcutUsageHint(value)});notify(`全局快捷键已更新为 ${value}`);onChanged();}catch(error){const message=String(error);setShortcutFeedback({tone:"error",message:`存在冲突：${message}`});notify("快捷键设置失败："+message);}finally{setBusy("");setShortcutRecording(false);}};
@@ -159,7 +177,8 @@ export default function SettingsPanel({backups,settings,isDatabaseEmpty,onChange
     <div className="setting-row"><div><strong>AI MCP 接入</strong><span>复制通用接入信息，可直接交给 Codex 等 AI 客户端完成配置</span></div><div className="mcp-actions"><button className="button secondary" disabled={busy==="mcp"} onClick={()=>void showMcpContent({title:"通用 MCP 接入",summary:"一份适用于 stdio MCP 客户端的接入指令，包含本机程序路径、工具清单和只读权限范围。",scenario:"首次在 Codex 等 AI 客户端接入 In Line，安装路径改变后重新配置，或排查 MCP 启动问题时使用。",usage:"复制后交给目标客户端，按其中的启动命令完成接入。"},api.mcpConnectionGuide)}><Plug size={16}/>通用接入</button></div></div>
     <div className="setting-row"><div><strong>数据备份</strong><span>事项、办理记录和软件设置会统一写入本地数据库备份</span></div><button className="button secondary" disabled={busy!==""} onClick={()=>void backup()}><DatabaseBackup size={16}/>{busy==="backup"?"备份中…":"立即备份"}</button></div>
     <div className="backup-list">
-      <div className="backup-list-header"><div><h2>可恢复备份 <span>{visibleBackups.length}</span></h2><small>列表显示全部备份；新导入文件会置顶并高亮。</small></div><div className="backup-toolbar"><button className="button primary" disabled={busy!==""} onClick={()=>void importAndRestore()}><FileInput size={16}/>{busy==="import"?"正在校验…":"导入并恢复"}</button><button className="button secondary" disabled={busy!==""} onClick={()=>void manualRefresh()}><RefreshCw className={busy==="refresh"?"spin":""} size={16}/>{busy==="refresh"?"刷新中…":"刷新列表"}</button><button className="button secondary" onClick={()=>void api.openBackupDirectory().catch(error=>notify("打开备份目录失败："+String(error)))}><FolderOpen size={16}/>备份目录</button></div></div>
+      <div className="backup-list-header"><div><h2>可恢复备份 <span>{visibleBackups.length}</span></h2><small>显示全部备份；可手动清理，仅保留最近 5 个。</small></div><div className="backup-toolbar"><button className="button primary" disabled={busy!==""} onClick={()=>void importAndRestore()}><FileInput size={16}/>{busy==="import"?"正在校验…":"导入并恢复"}</button><button className="button secondary" disabled={busy!==""||visibleBackups.length<=5} onClick={()=>void cleanup()}><Trash2 size={16}/>{busy==="cleanup"?"清理中…":"仅保留最近 5 个"}</button><button className="button secondary" disabled={busy!==""} onClick={()=>void manualRefresh()}><RefreshCw className={busy==="refresh"?"spin":""} size={16}/>{busy==="refresh"?"刷新中…":"刷新列表"}</button><button className="button secondary" onClick={()=>void api.openBackupDirectory().catch(error=>notify("打开备份目录失败："+String(error)))}><FolderOpen size={16}/>备份目录</button></div></div>
+      {cleanupFeedback&&<p className={`backup-cleanup-feedback ${cleanupFeedback.error?"error":""}`} role={cleanupFeedback.error?"alert":"status"}>{cleanupFeedback.text}</p>}
       {isDatabaseEmpty&&<div className="backup-empty-guide"><DatabaseBackup size={18}/><div><strong>当前数据库为空</strong><span>选择备份后将自动校验并恢复，恢复前仍会创建安全备份。</span></div></div>}
       {visibleBackups.map(value=><article key={value.path} className={highlightedBackup===value.path?"latest-import":""}><div><strong>{value.name}{highlightedBackup===value.path&&<em>刚刚导入</em>}</strong><span>{new Date(value.modifiedAt).toLocaleString("zh-CN")} · {(value.size/1024).toFixed(0)} KB</span></div><div className="backup-actions"><button className="button secondary small restore-backup-button" disabled={busy!==""} aria-busy={busy===value.path} onClick={()=>void restore(value)}><RotateCcw className={busy===value.path?"spin":""} size={15}/>{busy===value.path?"恢复中…":"恢复数据"}</button><button className="icon-button danger" disabled={busy!==""} onClick={()=>void remove(value)} title="删除此备份" aria-label={`删除备份 ${value.name}`}><Trash2 size={16}/></button></div></article>)}{!visibleBackups.length&&<p className="muted">暂无备份，可立即备份或使用“导入并恢复”。</p>}
     </div>

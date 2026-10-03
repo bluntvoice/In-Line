@@ -6,6 +6,7 @@ import QuickAddWindow from "./QuickAddWindow";
 import UpdateProgressWindow from "./UpdateProgressWindow";
 import UIFontProvider from "./components/UIFontProvider";
 import TicketColorProvider from "./components/TicketColorProvider";
+import "./fonts.css";
 import "./styles.css";
 import "./recovery.css";
 

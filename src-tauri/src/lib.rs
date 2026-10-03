@@ -455,6 +455,15 @@ fn delete_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Re
     emit_change(&app)
 }
 #[tauri::command]
+fn cleanup_backups(
+    app: tauri::AppHandle,
+    db: State<Database>,
+) -> Result<BackupCleanupResult, String> {
+    let result = db.cleanup_backups()?;
+    emit_change(&app)?;
+    Ok(result)
+}
+#[tauri::command]
 async fn set_setting(
     app: tauri::AppHandle,
     db: State<'_, Database>,
@@ -826,6 +835,7 @@ pub fn run() {
             open_backup_directory,
             mcp_connection_guide,
             delete_backup,
+            cleanup_backups,
             set_setting,
             get_ticket_colors,
             list_system_fonts,

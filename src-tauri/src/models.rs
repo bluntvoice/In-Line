@@ -449,6 +449,21 @@ pub struct BackupInfo {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BackupCleanupFailure {
+    pub name: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupCleanupResult {
+    pub deleted_count: usize,
+    pub failures: Vec<BackupCleanupFailure>,
+    pub backups: Vec<BackupInfo>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BackupMergeResult {
     pub added_tasks: usize,
     pub merged_tasks: usize,
