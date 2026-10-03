@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {applyUIFont,BUNDLED_UI_FONT_CSS_FAMILY,BUNDLED_UI_FONT_FAMILY,DEFAULT_UI_FONT_SELECTION,DEFAULT_UI_FONT_STACK,filterSystemFonts} from "./ui-font";
+import {applyUIFont,RECOMMENDED_UI_FONT_CSS_FAMILY,RECOMMENDED_UI_FONT_FAMILY,DEFAULT_UI_FONT_SELECTION,DEFAULT_UI_FONT_STACK,filterSystemFonts} from "./ui-font";
 import type {SystemFont} from "../types";
 
 const fonts:SystemFont[]=[{family:"Microsoft YaHei",displayName:"微软雅黑",aliases:["Microsoft YaHei","微软雅黑"],cjk:true},{family:"Arial",displayName:"Arial",aliases:["Arial"],cjk:false}];
@@ -10,7 +10,7 @@ describe("UI font selection",()=>{
     expect(filterSystemFonts(fonts,"")).toBe(fonts);
     expect(filterSystemFonts(fonts,"missing")).toEqual([]);
   });
-  it("keeps custom fonts quoted and restores the bundled font for default, missing or Sarasa selections",()=>{
+  it("uses the system default for empty or missing selections and a private family for downloaded fonts",()=>{
     const properties=new Map<string,string>(),attributes=new Map<string,string>();
     const root={style:{setProperty:(key:string,value:string)=>properties.set(key,value),removeProperty:(key:string)=>properties.delete(key)},setAttribute:(key:string,value:string)=>attributes.set(key,value),removeAttribute:(key:string)=>attributes.delete(key)} as unknown as HTMLElement;
     applyUIFont({requested:"Arial",effective:"Arial",missing:false},root);
@@ -18,11 +18,13 @@ describe("UI font selection",()=>{
     expect(attributes.get("data-ui-font")).toBe("Arial");
     applyUIFont(DEFAULT_UI_FONT_SELECTION,root);
     expect(properties.get("--ui-font-family")).toBe(DEFAULT_UI_FONT_STACK);
-    expect(attributes.get("data-ui-font")).toBe(BUNDLED_UI_FONT_CSS_FAMILY);
+    expect(attributes.get("data-ui-font")).toBe("default");
     applyUIFont({requested:"Missing",effective:"",missing:true},root);
-    expect(attributes.get("data-ui-font")).toBe(BUNDLED_UI_FONT_CSS_FAMILY);
-    applyUIFont({requested:BUNDLED_UI_FONT_FAMILY,effective:BUNDLED_UI_FONT_FAMILY,missing:false},root);
-    expect(properties.get("--ui-font-family")).toBe(DEFAULT_UI_FONT_STACK);
-    expect(attributes.get("data-ui-font")).toBe(BUNDLED_UI_FONT_CSS_FAMILY);
+    expect(attributes.get("data-ui-font")).toBe("default");
+    applyUIFont({requested:RECOMMENDED_UI_FONT_FAMILY,effective:RECOMMENDED_UI_FONT_FAMILY,missing:false},root);
+    expect(properties.get("--ui-font-family")).toBe(`"${RECOMMENDED_UI_FONT_CSS_FAMILY}",${DEFAULT_UI_FONT_STACK}`);
+    expect(attributes.get("data-ui-font")).toBe(RECOMMENDED_UI_FONT_CSS_FAMILY);
+    applyUIFont({requested:"Sarasa UI SC",effective:"Sarasa UI SC",missing:false},root);
+    expect(attributes.get("data-ui-font")).toBe("Sarasa UI SC");
   });
 });

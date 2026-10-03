@@ -13,6 +13,7 @@ const seed=count=>window.__backups=Array.from({length:count},(_,i)=>({name:"InLi
 const fonts=[{family:"Arial",displayName:"Arial",aliases:["Arial"],cjk:false},{family:"Sarasa UI SC",displayName:"更纱黑体 UI SC",aliases:["Sarasa UI SC","更纱黑体 UI SC"],cjk:true}];
 const specific={bootstrap:async()=>({queue:[task],archive:[],trash:[],masters:{departments:["测试"],contacts:["测试"],taskTypes:["合同审查"]},settings,backups:window.__backups}),getVersion:async()=>"0.5.0",globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,listBackups:async()=>window.__backups,onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},getTask:async()=>task,listSubtasks:async()=>[],listParentTaskCandidates:async()=>[],getLogs:async()=>[],getWorkEvents:async()=>[],getTicketColors:async()=>null,listSystemFonts:async()=>fonts,getUIFontSelection:async()=>{if(window.__fontReadFail)throw new Error("读取失败");const requested=settings.ui_font_family,effective=fonts.some(f=>f.family===requested)?requested:"";return{requested,effective,missing:Boolean(requested&&!effective)}},setSetting:async(key,value)=>{settings[key]=value;if(key==="ui_font_family"){localStorage.setItem("backup-font-selection",value);channel.postMessage(value)}callbacks.forEach(cb=>cb())},getUpdateProgress:async()=>({phase:"idle",version:null,downloadedBytes:0,totalBytes:null,percent:null,message:null}),onUpdateProgress:()=>()=>{},cleanupBackups:async()=>{window.__cleanupCalls++;if(window.__cleanupError)throw new Error("隔离清理失败");if(window.__pauseCleanup)await new Promise(resolve=>window.__releaseCleanup=resolve);const old=window.__backups.slice(5),failed=window.__cleanupFail?old.slice(-1):[];window.__backups=[...window.__backups.slice(0,5),...failed];return{deletedCount:old.length-failed.length,failures:failed.map(b=>({name:b.name,reason:"文件被占用"})),backups:window.__backups}}};
 window.__restoreFont=value=>{settings.ui_font_family=value;localStorage.setItem("backup-font-selection",value);callbacks.forEach(cb=>cb())};
+specific.getRecommendedFontStatus=async()=>({phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null});specific.onRecommendedFontProgress=()=>()=>{};specific.getUIScale=async()=>"100";
 export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async()=>[])});
 `;
 const server=await createServer({server:{port:0,strictPort:false},plugins:[{name:"isolated-backup-font",enforce:"pre",load(id){if(id.replaceAll("\\","/").endsWith("/src/api.ts"))return mock;}}]});
@@ -24,16 +25,9 @@ try{
   const page=await context.newPage();page.on("pageerror",error=>errors.push(error.message));page.on("response",response=>{if(response.url().endsWith(".woff2")&&response.status()>=400)fontErrors.push(response.status())});
   await page.goto(server.resolvedUrls.local[0],{waitUntil:"domcontentloaded"});
   await page.locator(".task-table tbody tr").first().waitFor();
-  await page.evaluate(async()=>{for(const weight of [400,600,700])await document.fonts.load(weight+' 16px "In Line Sarasa UI SC"',"事项 Agjy");await document.fonts.ready});
-  // CDP distinguishes the downloaded custom font from any system-installed Sarasa.
-  const cdp=await context.newCDPSession(page);await cdp.send("DOM.enable");await cdp.send("CSS.enable");
-  const document=await cdp.send("DOM.getDocument");
-  const node=await cdp.send("DOM.querySelector",{nodeId:document.root.nodeId,selector:".task-title-line strong"});
-  const actual=await cdp.send("CSS.getPlatformFontsForNode",{nodeId:node.nodeId});
-  assert.ok(actual.fonts.some(font=>font.isCustomFont&&font.familyName==="Sarasa UI SC"&&font.glyphCount>0),JSON.stringify(actual));
   await page.locator(".settings-button").filter({hasText:"软件设置"}).click();
   const cleanup=page.getByRole("button",{name:"仅保留最近 5 个",exact:true});
-  assert.match(await page.locator(".font-setting-trigger").innerText(),/更纱黑体 UI SC · 内置默认/);
+  assert.match(await page.locator(".font-setting-trigger").innerText(),/系统默认字体/);
   page.once("dialog",dialog=>dialog.dismiss());await cleanup.click();assert.equal(await page.evaluate(()=>window.__cleanupCalls),0);
   await page.evaluate(()=>{window.__cleanupFail=true;window.__pauseCleanup=true});
   page.once("dialog",dialog=>{assert.match(dialog.message(),/删除 4 个/);return dialog.accept()});await cleanup.click();
@@ -51,20 +45,20 @@ try{
   for(const count of [0,1,5]){await page.evaluate(count=>window.__seedBackups(count),count);await page.getByRole("button",{name:"刷新列表",exact:true}).click();assert.equal(await cleanup.isDisabled(),true);}
   await page.evaluate(()=>{window.__seedBackups(9);window.__cleanupError=false});await page.getByRole("button",{name:"刷新列表",exact:true}).click();
   await page.locator(".font-setting-trigger").click();await page.getByRole("option").filter({has:page.getByText("Arial",{exact:true})}).waitFor();
-  assert.equal(await page.getByRole("option").count(),2); // The installed and bundled Sarasa entry is not duplicated.
-  await mkdir("release/ui",{recursive:true});await page.screenshot({path:"release/ui/bundled-font-picker.png"});
+  assert.equal(await page.locator(".font-picker-list [role=option]").count(),3); // Default plus the two real system families.
+  await mkdir("release/ui",{recursive:true});await page.screenshot({path:"release/ui/system-font-picker.png"});
   await page.getByRole("option").filter({has:page.getByText("Arial",{exact:true})}).click();await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="Arial");
   const secondary=await context.newPage();await secondary.goto(server.resolvedUrls.local[0]+"#floating");await secondary.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="Arial");
   await page.reload();await page.locator(".task-table tbody tr").first().waitFor();await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="Arial");
   await page.locator(".settings-button").filter({hasText:"软件设置"}).click();await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).click();
-  await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="In Line Sarasa UI SC");await secondary.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="In Line Sarasa UI SC");
+  await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="default");await secondary.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="default");
   await page.evaluate(()=>window.__restoreFont("Missing test font"));await page.locator(".font-fallback-note").filter({hasText:"不可用"}).waitFor();
-  assert.match(await page.locator(".font-setting-trigger").innerText(),/内置默认/);assert.equal(await page.evaluate(()=>localStorage.getItem("backup-font-selection")),"Missing test font");
-  await page.evaluate(()=>window.__restoreFont("Sarasa UI SC"));await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="In Line Sarasa UI SC");
+  assert.match(await page.locator(".font-setting-trigger").innerText(),/系统默认字体/);assert.equal(await page.evaluate(()=>localStorage.getItem("backup-font-selection")),"Missing test font");
+  await page.evaluate(()=>window.__restoreFont("Sarasa UI SC"));await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="Sarasa UI SC");
   await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).click();
-  for(const hash of ["floating","quick-add","update-progress"]){await secondary.goto(server.resolvedUrls.local[0]+"#"+hash);await secondary.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="In Line Sarasa UI SC");await secondary.evaluate(()=>document.fonts.ready);}
+  for(const hash of ["floating","quick-add","update-progress"]){await secondary.goto(server.resolvedUrls.local[0]+"#"+hash);await secondary.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="default");await secondary.evaluate(()=>document.fonts.ready);}
   await page.locator(".backup-list").scrollIntoViewIfNeeded();await page.screenshot({path:"release/ui/backup-cleanup.png"});
   for(const width of [1280,980]){await page.setViewportSize({width,height:900});assert.ok(await page.locator(".settings-page").evaluate(e=>e.scrollWidth<=e.clientWidth+1));}
   assert.deepEqual(errors,[]);assert.deepEqual(fontErrors,[]);
-  console.log("PASS: actual bundled Sarasa custom font; 3 weights; default/custom/reload/missing/auxiliary windows; cleanup cancel/count/disable/partial failure/retry/errors; settings layout");
+  console.log("PASS: system font default; default/custom/reload/missing/auxiliary windows; cleanup cancel/count/disable/partial failure/retry/errors; settings layout");
 }finally{await browser.close();await server.close();}

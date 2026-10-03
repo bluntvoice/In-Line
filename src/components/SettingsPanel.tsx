@@ -6,6 +6,7 @@ import type { BackupConflictItem,BackupInfo,BackupMergeResult } from "../types";
 import { backupFailureGuidance,prioritizeBackups } from "../lib/backup-ux";
 import { shortcutFromKeyboardEvent,shortcutUsageHint } from "../lib/global-shortcut";
 import FontSetting from "./FontSetting";
+import UIScaleSetting from "./UIScaleSetting";
 import TicketColorSetting from "./TicketColorSetting";
 
 type McpDialog={title:string;summary:string;scenario:string;usage:string;content:string}|null;
@@ -168,6 +169,7 @@ export default function SettingsPanel({backups,settings,isDatabaseEmpty,onChange
 
   return <section className="settings-page"><h1>软件设置</h1><p>所有事项与备份均保存在本机，不上传数据。</p>
     <FontSetting notify={notify}/>
+    <UIScaleSetting notify={notify}/>
     <TicketColorSetting notify={notify}/>
     <div className="setting-row"><div><strong>桌面悬浮窗</strong><span>关闭主界面后默认显示，也可在此手动显示或隐藏</span></div><button className="button secondary" onClick={()=>void api.toggleFloating()}><MonitorUp size={16}/>显示 / 隐藏</button></div>
     <div className="setting-row"><div><strong>每周起始日</strong><span>用于统计中心“本周”和“上一周”的日期范围</span></div><div className="week-start-options" role="group" aria-label="每周起始日"><button type="button" className={weekStart==="monday"?"active":""} onClick={()=>void saveWeekStart("monday")}>周一</button><button type="button" className={weekStart==="sunday"?"active":""} onClick={()=>void saveWeekStart("sunday")}>周日</button></div></div>

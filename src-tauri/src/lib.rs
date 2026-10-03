@@ -1,6 +1,7 @@
 pub mod database;
 pub mod fonts;
 pub mod models;
+pub mod recommended_font;
 pub mod updater;
 
 use database::Database;
@@ -14,6 +15,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use tauri_plugin_window_state::StateFlags;
 
 struct GlobalShortcutStatus(Mutex<GlobalShortcutConfig>);
+struct UiScaleState(Mutex<f64>);
 struct GlobalShortcutConfig {
     shortcut: String,
     available: bool,
@@ -471,18 +473,140 @@ async fn set_setting(
     value: String,
 ) -> Result<(), String> {
     let value = if key == "ui_font_family" {
-        tauri::async_runtime::spawn_blocking(move || fonts::validate_selection(&value))
-            .await
-            .map_err(|error| error.to_string())??
+        let root = recommended_font::root(&app)?;
+        tauri::async_runtime::spawn_blocking(move || {
+            if value == recommended_font::FAMILY {
+                if recommended_font::is_ready(&root) {
+                    Ok(value)
+                } else {
+                    Err("请先下载推荐字体".into())
+                }
+            } else {
+                fonts::validate_selection(&value)
+            }
+        })
+        .await
+        .map_err(|error| error.to_string())??
     } else {
         value
     };
-    db.set_setting(key, value)?;
+    if key == "ui_scale" {
+        if !matches!(
+            value.as_str(),
+            "100" | "110" | "120" | "130" | "140" | "150"
+        ) {
+            return Err("界面大小仅支持 100% 至 150% 的六档设置".into());
+        }
+        let previous = db
+            .settings()?
+            .remove("ui_scale")
+            .unwrap_or_else(|| "100".into());
+        db.set_setting(key, value.clone())?;
+        if let Err(error) = apply_ui_scale(&app, &value) {
+            let _ = db.set_setting("ui_scale".into(), previous.clone());
+            let _ = apply_ui_scale(&app, &previous);
+            return Err(error);
+        }
+        return emit_change(&app);
+    }
+    if key == "ui_font_family" {
+        recommended_font::save_selection(&app, &db, value)?;
+    } else {
+        db.set_setting(key, value)?;
+    }
     emit_change(&app)
 }
 #[tauri::command]
 fn get_ticket_colors(db: State<Database>) -> Result<Option<String>, String> {
     Ok(db.settings()?.remove("ticket_colors"))
+}
+fn resize_auxiliary_window(
+    window: &tauri::WebviewWindow,
+    mut width: f64,
+    mut height: f64,
+) -> Result<(), String> {
+    let monitor = window
+        .current_monitor()
+        .map_err(|_| "无法读取窗口所在显示器")?;
+    let dpi = window.scale_factor().map_err(|_| "无法读取窗口缩放")?;
+    if let Some(monitor) = &monitor {
+        width = width.min(monitor.work_area().size.width as f64 / dpi);
+        height = height.min(monitor.work_area().size.height as f64 / dpi);
+    }
+    window
+        .set_size(tauri::LogicalSize::new(width, height))
+        .map_err(|_| "无法调整辅助窗口大小")?;
+    if let Some(monitor) = monitor {
+        let area = monitor.work_area();
+        let position = window.outer_position().map_err(|_| "无法读取窗口位置")?;
+        let max_x = (area.position.x + area.size.width as i32 - (width * dpi).ceil() as i32)
+            .max(area.position.x);
+        let max_y = (area.position.y + area.size.height as i32 - (height * dpi).ceil() as i32)
+            .max(area.position.y);
+        window
+            .set_position(tauri::PhysicalPosition::new(
+                position.x.clamp(area.position.x, max_x),
+                position.y.clamp(area.position.y, max_y),
+            ))
+            .map_err(|_| "无法调整窗口位置")?;
+    }
+    Ok(())
+}
+#[tauri::command]
+fn resize_floating(app: tauri::AppHandle, mini: bool) -> Result<(), String> {
+    let state = app.state::<UiScaleState>();
+    let factor = *state.0.lock().map_err(|_| "界面大小设置不可用")?;
+    let window = app.get_webview_window("floating").ok_or("悬浮窗尚未创建")?;
+    resize_auxiliary_window(
+        &window,
+        444. * factor,
+        (if mini { 72. } else { 564. }) * factor,
+    )
+}
+fn apply_ui_scale(app: &tauri::AppHandle, value: &str) -> Result<(), String> {
+    let factor = value
+        .parse::<f64>()
+        .ok()
+        .filter(|value| [100., 110., 120., 130., 140., 150.].contains(value))
+        .unwrap_or(100.)
+        / 100.;
+    let state = app.state::<UiScaleState>();
+    let mut previous = state.0.lock().map_err(|_| "界面大小设置不可用")?;
+    if (*previous - factor).abs() < f64::EPSILON {
+        return Ok(());
+    }
+    let old_factor = *previous;
+    *previous = factor;
+    // Small fixed-size windows need enough space for their scaled controls.
+    if let Some(window) = app.get_webview_window("floating") {
+        let height = window
+            .inner_size()
+            .map_err(|_| "无法读取悬浮窗大小")?
+            .height as f64
+            / window.scale_factor().map_err(|_| "无法读取悬浮窗缩放")?
+            / old_factor;
+        let base_height = if height <= 120. { 72. } else { 564. };
+        resize_auxiliary_window(&window, 444. * factor, base_height * factor)?;
+    }
+    if let Some(window) = app.get_webview_window("update-progress") {
+        resize_auxiliary_window(&window, 360. * factor, 188. * factor)?;
+    }
+    for window in app.webview_windows().values() {
+        window
+            .set_zoom(factor)
+            .map_err(|_| "无法调整界面大小，请重试")?;
+    }
+    *previous = factor;
+    Ok(())
+}
+#[tauri::command]
+fn get_ui_scale(app: tauri::AppHandle, db: State<Database>) -> Result<String, String> {
+    let value = db
+        .settings()?
+        .remove("ui_scale")
+        .unwrap_or_else(|| "100".into());
+    apply_ui_scale(&app, &value)?;
+    Ok(value)
 }
 #[tauri::command]
 async fn list_system_fonts() -> Result<Vec<fonts::SystemFont>, String> {
@@ -491,11 +615,30 @@ async fn list_system_fonts() -> Result<Vec<fonts::SystemFont>, String> {
         .map_err(|error| error.to_string())?
 }
 #[tauri::command]
-async fn get_ui_font_selection(db: State<'_, Database>) -> Result<fonts::UiFontSelection, String> {
+async fn get_ui_font_selection(
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+) -> Result<fonts::UiFontSelection, String> {
     let requested = db.settings()?.remove("ui_font_family").unwrap_or_default();
-    tauri::async_runtime::spawn_blocking(move || fonts::resolve_selection(requested))
-        .await
-        .map_err(|error| error.to_string())?
+    let root = recommended_font::root(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        if requested == recommended_font::FAMILY {
+            let ready = recommended_font::is_ready(&root);
+            Ok(fonts::UiFontSelection {
+                requested,
+                effective: if ready {
+                    recommended_font::FAMILY.into()
+                } else {
+                    String::new()
+                },
+                missing: !ready,
+            })
+        } else {
+            fonts::resolve_selection(requested)
+        }
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 #[tauri::command]
 fn get_launch_at_login(app: tauri::AppHandle, db: State<Database>) -> Result<bool, String> {
@@ -675,6 +818,12 @@ pub fn run() {
         .unwrap_or_else(|| DEFAULT_GLOBAL_SHORTCUT.into());
     tauri::Builder::default()
         .manage(database)
+        .manage(UiScaleState(Mutex::new(1.)))
+        .manage(recommended_font::FontManager::default())
+        .register_uri_scheme_protocol("recommended-font", |context, request| {
+            let root = recommended_font::root(context.app_handle()).unwrap_or_default();
+            recommended_font::serve(&root, request.uri().path())
+        })
         .manage(updater::UpdateManager::default())
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             show_main(app)
@@ -840,12 +989,16 @@ pub fn run() {
             get_ticket_colors,
             list_system_fonts,
             get_ui_font_selection,
+            get_ui_scale,
+            recommended_font::get_recommended_font_status,
+            recommended_font::download_recommended_font,
             get_launch_at_login,
             set_launch_at_login,
             restore_backup,
             copy_ticket_card,
             open_task_action,
             toggle_floating,
+            resize_floating,
             show_main_window,
             request_new_task,
             global_shortcut_available,

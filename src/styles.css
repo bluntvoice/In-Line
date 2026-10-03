@@ -271,6 +271,8 @@ small{font-size:12px}
 /* Explicit numeric/monospace UI text also follows an active user choice.
    No override when default is selected; SVG and dedicated symbols are untouched. */
 html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-symbol-font]):not([data-symbol-font] *){font-family:var(--ui-font-family)!important}
+.sidebar{min-height:0;overflow-y:auto;scrollbar-width:thin}.sidebar>.brand,.sidebar>.new-ticket,.sidebar>nav,.sidebar>.sidebar-summary,.sidebar>.settings-button,.sidebar>.about-button{flex-shrink:0}
+.recommended-font-row{align-items:flex-start}.recommended-font-row>div{min-width:0}.recommended-font-row>.button{flex:0 0 auto;white-space:nowrap}.recommended-font-progress{display:grid;gap:4px;margin-top:8px}.recommended-font-progress progress{width:100%;max-width:360px;accent-color:#0b3a82}.recommended-font-note{margin-top:4px;color:#207347;font-size:12px}.ui-scale-actions{display:flex!important;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}.ui-scale-actions select{min-height:36px;border:1px solid #c9d8e7;border-radius:7px;background:#fff;padding:5px 8px}.ui-scale-actions .button{white-space:nowrap}@media(max-width:760px){.font-setting-row,.recommended-font-row,.ui-scale-setting{align-items:stretch;flex-direction:column}.font-setting-row .font-setting-actions,.ui-scale-actions{justify-content:flex-start}}
 .font-setting-trigger{flex:0 1 auto;min-width:140px;max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .font-setting-trigger svg{flex:0 0 auto}
 .font-setting-row .font-setting-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;min-width:0}

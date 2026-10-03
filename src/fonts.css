@@ -1,5 +1,2 @@
-/* Full Sarasa UI SC fonts, bundled under SIL OFL 1.1. See public/fonts/source.json. */
-@font-face{font-family:"In Line Sarasa UI SC";src:url("/fonts/SarasaUiSC-Regular.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap}
-@font-face{font-family:"In Line Sarasa UI SC";src:url("/fonts/SarasaUiSC-SemiBold.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap}
-@font-face{font-family:"In Line Sarasa UI SC";src:url("/fonts/SarasaUiSC-Bold.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap}
-:root{--ui-font-family:"In Line Sarasa UI SC","Microsoft YaHei UI","Microsoft YaHei","Segoe UI",sans-serif}
+/* Recommended fonts load only from the verified, optional app-local cache. */
+:root{--ui-font-family:"Microsoft YaHei UI","Microsoft YaHei","Segoe UI",sans-serif}

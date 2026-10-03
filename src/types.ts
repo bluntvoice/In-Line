@@ -44,6 +44,7 @@ export interface BackupMergeResult{addedTasks:number;mergedTasks:number;conflict
 export interface TaskUiAction{id:number;action:"view"|"edit"|"status"|"urgent"|"complete"|"addSubtask"}
 export interface SystemFont{family:string;displayName:string;aliases:string[];cjk:boolean}
 export interface UiFontSelection{requested:string;effective:string;missing:boolean}
+export interface RecommendedFontProgress{phase:"idle"|"downloading"|"verifying"|"ready"|"error";downloadedBytes:number;totalBytes:number;percent:number;message:string|null}
 export interface BootstrapData{
   queue:LegalTask[];archive:LegalTask[];trash:LegalTask[];masters:MasterData;settings:Record<string,string>;backups:BackupInfo[];
 }

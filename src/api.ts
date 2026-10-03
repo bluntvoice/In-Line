@@ -29,6 +29,14 @@ export const api={
   bootstrap:()=>withTimeout(invoke<BootstrapData>("bootstrap"),"队列初始化"),
   listSystemFonts:()=>invoke<import("./types").SystemFont[]>("list_system_fonts"),
   getUIFontSelection:()=>invoke<import("./types").UiFontSelection>("get_ui_font_selection"),
+  getUIScale:()=>invoke<string>("get_ui_scale"),
+  getRecommendedFontStatus:()=>invoke<import("./types").RecommendedFontProgress>("get_recommended_font_status"),
+  downloadRecommendedFont:()=>invoke<void>("download_recommended_font"),
+  onRecommendedFontProgress:(callback:(progress:import("./types").RecommendedFontProgress)=>void)=>{
+    let dispose:(()=>void)|undefined,disposed=false;
+    void listen<import("./types").RecommendedFontProgress>("recommended-font-progress",event=>callback(event.payload)).then(value=>{if(disposed)value();else dispose=value;});
+    return()=>{disposed=true;dispose?.();};
+  },
   getTicketColors:()=>invoke<string|null>("get_ticket_colors"),
   listTasks:(view:TaskView)=>withTimeout(invoke<LegalTask[]>("list_tasks",{view}),"队列载入"),
   saveTask:(task:TaskInput)=>invoke<LegalTask>("save_task",{task}),
@@ -76,8 +84,9 @@ export const api={
   restoreBackup:(path:string)=>invoke<BackupMergeResult>("restore_backup",{path}),
   deleteBackup:(path:string)=>invoke<void>("delete_backup",{path}),
   cleanupBackups:()=>invoke<import("./types").BackupCleanupResult>("cleanup_backups"),
-  setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode"|"launch_at_login"|"ui_font_family"|"ticket_colors",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
+  setSetting:(key:"show_deferred_in_queue"|"week_start_day"|"statistics_rate_mode"|"launch_at_login"|"ui_font_family"|"ui_scale"|"ticket_colors",value:boolean|string)=>invoke<void>("set_setting",{key,value:typeof value==="boolean"?(value?"true":"false"):value}),
   toggleFloating:()=>invoke<boolean>("toggle_floating"),
+  resizeFloating:(mini:boolean)=>invoke<void>("resize_floating",{mini}),
   showMain:()=>invoke<void>("show_main_window"),
   requestNewTask:()=>invoke<void>("request_new_task"),
   globalShortcutAvailable:()=>invoke<boolean>("global_shortcut_available"),

@@ -1,5 +1,7 @@
 # 应用内检查更新 PRD
 
+> v0.5.0 补充：推荐字体下载是另一个由用户主动触发的 GitHub 请求，详细规则见 [推荐字体 PRD](backup-cleanup-and-bundled-font.md)。软件更新的正式 Release 通道、校验与安装方式保持本 PRD 规则。
+
 > **状态：已实现 · 待测试验收**
 >
 > **适用项目：In Line｜排着呢**

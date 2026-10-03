@@ -662,6 +662,7 @@ fn valid_setting(key: &str, value: &str) -> bool {
         "statistics_rate_mode" => matches!(value, "closure" | "processing"),
         "global_shortcut" => value.is_ascii() && value.len() <= 64 && value.contains('+'),
         "ui_font_family" => value.len() <= 256 && !value.chars().any(char::is_control),
+        "ui_scale" => matches!(value, "100" | "110" | "120" | "130" | "140" | "150"),
         "ticket_colors" => {
             value.len() <= 256
                 && serde_json::from_str::<HashMap<String, String>>(value).is_ok_and(|colors| {
@@ -6099,6 +6100,13 @@ mod tests {
             .is_err());
         db.set_setting("ui_font_family".into(), String::new())
             .unwrap();
+        for scale in ["100", "110", "120", "130", "140", "150"] {
+            db.set_setting("ui_scale".into(), scale.into()).unwrap();
+            assert_eq!(db.settings().unwrap().get("ui_scale").unwrap(), scale);
+        }
+        for scale in ["90", "160", "125", "1.5", "", "NaN"] {
+            assert!(db.set_setting("ui_scale".into(), scale.into()).is_err());
+        }
         db.move_task(second.id, MoveDirection::Up).unwrap();
         assert_eq!(db.list_tasks(TaskView::Queue).unwrap()[0].id, second.id);
         let third = db.save_task(sample("第三项")).unwrap();
@@ -7297,6 +7305,7 @@ mod tests {
         source
             .set_setting("ui_font_family".into(), "Cross-device Missing Font".into())
             .unwrap();
+        source.set_setting("ui_scale".into(), "150".into()).unwrap();
         source.save_task(sample("完全一致事项")).unwrap();
         source
             .with_conn(|connection| {
@@ -7337,7 +7346,7 @@ mod tests {
         assert_eq!(result.added_tasks, 2);
         assert_eq!(result.merged_tasks, 1);
         assert_eq!(result.conflict_tasks, 1);
-        assert_eq!(result.applied_settings, 3);
+        assert_eq!(result.applied_settings, 4);
         assert_eq!(result.conflicts.len(), 1);
 
         let all = [
@@ -7408,6 +7417,14 @@ mod tests {
                 .get("ui_font_family")
                 .map(String::as_str),
             Some("Cross-device Missing Font")
+        );
+        assert_eq!(
+            target
+                .settings()
+                .unwrap()
+                .get("ui_scale")
+                .map(String::as_str),
+            Some("150")
         );
         drop(target);
         let target = Database::open_at(target_root.join("inline.db")).unwrap();

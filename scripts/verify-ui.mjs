@@ -38,6 +38,7 @@ const localDay=value=>{const d=new Date(value);return d.getFullYear()+"-"+String
 specific.getStatistics=async(...args)=>{const day=localDay(args[0]);statisticsDays.add(day);const data=await originalStatistics(...args);data.trend[0].periodStart=day;if(new Date(args[1])-new Date(args[0])>62*86400000){const monday=new Date(args[0]);monday.setDate(monday.getDate()-(monday.getDay()+6)%7);data.trendGranularity="week";data.trend[0].periodStart=localDay(monday);}return data};
 specific.getStatisticsTrendDetails=async(...args)=>{window.__inlineCalls.push(["trend",...args]);if(!statisticsDays.has(localDay(args[0])))return [];return args[2]?details.filter(t=>t.resultStatus===args[2]):details};
 specific.copyText=async text=>{if(window.__inlineCopyFail)throw new Error("隔离剪贴板失败");window.__inlineCalls.push(["copyText",text]);window.__inlineClipboard=text};
+specific.getRecommendedFontStatus=async()=>({phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null});specific.onRecommendedFontProgress=()=>()=>{};specific.getUIScale=async()=>"100";
 export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async(...args)=>{window.__inlineCalls.push([key,...args]);return []})});
 `;
 const server = await createServer({ server: { port: 0, strictPort: false }, plugins: [{
@@ -122,7 +123,7 @@ try {
     assert.ok(nativeFonts.length>20);assert.ok(nativeFonts[0].cjk);
     const openPicker=async()=>{await page.locator(".settings-button").filter({hasText:"软件设置"}).click();await page.locator(".font-setting-trigger").click();await page.locator(".font-picker-list [role=option]").nth(1).waitFor();};
     await openPicker();
-    assert.equal(await page.locator(".font-picker-list [role=option]").count(),nativeFonts.filter(font=>font.family!=="Sarasa UI SC").length+1);
+    assert.equal(await page.locator(".font-picker-list [role=option]").count(),nativeFonts.length+1);
     if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT});
     const chinese=nativeFonts.find(f=>f.cjk&&f.aliases.some(a=>/[\u4e00-\u9fff]/.test(a)))??nativeFonts.find(f=>f.cjk);
     const english=nativeFonts.find(f=>f.family==="Arial")??nativeFonts.find(f=>!f.cjk);
@@ -133,7 +134,7 @@ try {
       await search.fill(query);assert.ok(await page.locator(".font-picker-list [role=option]").count()>=2);
     }
     await search.fill("In-Line nonexistent 8933");await page.getByText("没有匹配的字体，请尝试其他名称。").waitFor();
-    await search.fill("");assert.equal(await page.locator(".font-picker-list [role=option]").count(),nativeFonts.filter(font=>font.family!=="Sarasa UI SC").length+1);
+    await search.fill("");assert.equal(await page.locator(".font-picker-list [role=option]").count(),nativeFonts.length+1);
     await page.getByRole("button",{name:"关闭字体选择"}).click();
     for(const font of [chinese,english,wider,tall]){
       await openPicker();await search.fill(font.family);
@@ -169,19 +170,19 @@ try {
     await openPicker();assert.equal(await page.getByRole("option").filter({has:page.getByText(tall.displayName,{exact:true})}).getAttribute("aria-selected"),"true");
     await page.getByRole("button",{name:"关闭字体选择"}).click();
     await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).click();
-    await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="In Line Sarasa UI SC");
-    await secondary.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="In Line Sarasa UI SC");
+    await page.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="default");
+    await secondary.waitForFunction(()=>document.documentElement.getAttribute("data-ui-font")==="default");
     await secondary.close();
     await page.evaluate(()=>window.__inlineRestoreFont("In-Line nonexistent font 8933"));
     await page.locator(".font-fallback-note").filter({hasText:"不可用"}).waitFor();
-    assert.equal(await page.locator(".font-setting-trigger").innerText(),"更纱黑体 UI SC · 内置默认");
-    assert.equal(await page.evaluate(()=>document.documentElement.getAttribute("data-ui-font")),"In Line Sarasa UI SC");
+    assert.equal(await page.locator(".font-setting-trigger").innerText(),"系统默认字体");
+    assert.equal(await page.evaluate(()=>document.documentElement.getAttribute("data-ui-font")),"default");
     await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).click();
     await page.waitForFunction(()=>localStorage.getItem("isolated-ui-font")==="");
     assert.equal((await page.evaluate(()=>window.__inlineCalls)).filter(c=>c[0]==="fonts").length,1);
     await page.reload();await page.locator(".task-table tbody tr").first().waitFor();
     await page.locator(".settings-button").filter({hasText:"软件设置"}).click();
-    assert.equal(await page.locator(".font-setting-trigger").innerText(),"更纱黑体 UI SC · 内置默认");
+    assert.equal(await page.locator(".font-setting-trigger").innerText(),"系统默认字体");
     assert.equal(await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).isDisabled(),true);
     console.log("PASS fonts:",nativeFonts.length,"native families; aliases/search/local cache/live global/default/missing/restart/auxiliary routes; 4 font row and overflow regression");
   }

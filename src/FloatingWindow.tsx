@@ -1,7 +1,6 @@
 import { useEffect,useMemo,useState } from "react";
 import { ArrowDown,ArrowUp,ClockAlert,Copy,ExternalLink,Grip,Maximize2,Minimize2,Plus,X } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { LogicalSize } from "@tauri-apps/api/dpi";
 import { api } from "./api";
 import type { LegalTask } from "./types";
 import { displayTicket,isOverdue,visibleQueueTasks } from "./lib/task-utils";
@@ -53,10 +52,9 @@ export default function FloatingWindow(){
     toast("操作已完成");
   };
   const resize=async(value:boolean)=>{
-    const currentWindow=getCurrentWindow();
     // Reserve 12 px on every side for the CSS shadow while keeping the
     // visible floating content at 420 × 540 (or 420 × 48 in mini mode).
-    await currentWindow.setSize(new LogicalSize(444,value?72:564));
+    await api.resizeFloating(value);
     setMini(value);
   };
   const startDrag=(event:React.MouseEvent<HTMLElement>)=>{

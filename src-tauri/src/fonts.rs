@@ -19,11 +19,6 @@ pub struct UiFontSelection {
 }
 
 static FONT_CACHE: Mutex<Option<Vec<SystemFont>>> = Mutex::new(None);
-const BUNDLED_FONT_FAMILY: &str = "Sarasa UI SC";
-
-fn is_bundled_font(value: &str) -> bool {
-    value.eq_ignore_ascii_case(BUNDLED_FONT_FAMILY) || value == "更纱黑体 UI SC"
-}
 
 pub fn system_fonts() -> Result<Vec<SystemFont>, String> {
     let mut cache = FONT_CACHE.lock().map_err(|_| "字体缓存不可用")?;
@@ -54,13 +49,6 @@ pub fn resolve_selection(requested: String) -> Result<UiFontSelection, String> {
             missing: false,
         });
     }
-    if is_bundled_font(&requested) {
-        return Ok(UiFontSelection {
-            requested,
-            effective: BUNDLED_FONT_FAMILY.into(),
-            missing: false,
-        });
-    }
     let effective = find_font(&system_fonts()?, &requested)
         .map(|font| font.family.clone())
         .unwrap_or_default();
@@ -75,9 +63,6 @@ pub fn resolve_selection(requested: String) -> Result<UiFontSelection, String> {
 pub fn validate_selection(value: &str) -> Result<String, String> {
     if value.is_empty() {
         return Ok(String::new());
-    }
-    if is_bundled_font(value) {
-        return Ok(BUNDLED_FONT_FAMILY.into());
     }
     find_font(&system_fonts()?, value)
         .map(|font| font.family.clone())
@@ -195,16 +180,6 @@ fn enumerate_fonts() -> Result<Vec<SystemFont>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn bundled_font_is_available_without_system_enumeration() {
-        for alias in ["Sarasa UI SC", "sarasa ui sc", "更纱黑体 UI SC"] {
-            assert_eq!(validate_selection(alias).unwrap(), BUNDLED_FONT_FAMILY);
-            let selected = resolve_selection(alias.into()).unwrap();
-            assert_eq!(selected.effective, BUNDLED_FONT_FAMILY);
-            assert!(!selected.missing);
-            assert_eq!(selected.requested, alias);
-        }
-    }
     #[test]
     fn aliases_and_missing_selection_are_safe() {
         let fonts = vec![SystemFont {
