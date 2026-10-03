@@ -472,6 +472,10 @@ async fn set_setting(
     emit_change(&app)
 }
 #[tauri::command]
+fn get_ticket_colors(db: State<Database>) -> Result<Option<String>, String> {
+    Ok(db.settings()?.remove("ticket_colors"))
+}
+#[tauri::command]
 async fn list_system_fonts() -> Result<Vec<fonts::SystemFont>, String> {
     tauri::async_runtime::spawn_blocking(fonts::system_fonts)
         .await
@@ -823,6 +827,7 @@ pub fn run() {
             mcp_connection_guide,
             delete_backup,
             set_setting,
+            get_ticket_colors,
             list_system_fonts,
             get_ui_font_selection,
             get_launch_at_login,

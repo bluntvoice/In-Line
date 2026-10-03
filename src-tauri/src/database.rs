@@ -662,6 +662,19 @@ fn valid_setting(key: &str, value: &str) -> bool {
         "statistics_rate_mode" => matches!(value, "closure" | "processing"),
         "global_shortcut" => value.is_ascii() && value.len() <= 64 && value.contains('+'),
         "ui_font_family" => value.len() <= 256 && !value.chars().any(char::is_control),
+        "ticket_colors" => {
+            value.len() <= 256
+                && serde_json::from_str::<HashMap<String, String>>(value).is_ok_and(|colors| {
+                    colors.len() == 3
+                        && ["normal", "future", "urgent"].iter().all(|key| {
+                            colors.get(*key).is_some_and(|color| {
+                                color.len() == 7
+                                    && color.starts_with('#')
+                                    && color[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
+                            })
+                        })
+                })
+        }
         _ => false,
     }
 }
@@ -4625,6 +4638,95 @@ fn backup_info(path: &Path) -> Result<BackupInfo, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ticket_colors_persist_across_reopen_and_invalid_saves_preserve_all_roles() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-colors-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let db = Database::open_root(root.clone()).unwrap();
+        assert!(!db.settings().unwrap().contains_key("ticket_colors"));
+        let colors = serde_json::json!({"normal":"#0B3A82","future":"#F3D98B","urgent":"#A7446A"})
+            .to_string();
+        db.set_setting("ticket_colors".into(), colors.clone())
+            .unwrap();
+        db.set_setting("week_start_day".into(), "sunday".into())
+            .unwrap();
+        for invalid in [
+            "null".into(), "{}".into(), "not-json".into(),
+            serde_json::json!({"normal":"#fff","future":"#F3D98B","urgent":"#A7446A"}).to_string(),
+            serde_json::json!({"normal":"#0B3A82","future":"url(x)","urgent":"#A7446A"}).to_string(),
+            serde_json::json!({"normal":"#0B3A82","future":123,"urgent":"#A7446A"}).to_string(),
+            serde_json::json!({"normal":"#0B3A82","future":"#F3D98B","urgent":"#A7446A","extra":"#FFFFFF"}).to_string(),
+            format!("{colors}{}", " ".repeat(256)),
+        ] {
+            assert!(db.set_setting("ticket_colors".into(), invalid).is_err());
+            assert_eq!(db.settings().unwrap().get("ticket_colors"), Some(&colors));
+        }
+        drop(db);
+        let db = Database::open_root(root.clone()).unwrap();
+        assert_eq!(db.settings().unwrap().get("ticket_colors"), Some(&colors));
+        let defaults =
+            serde_json::json!({"normal":"#0B3A82","future":"#3F766E","urgent":"#C43D4B"})
+                .to_string();
+        db.set_setting("ticket_colors".into(), defaults.clone())
+            .unwrap();
+        assert_eq!(db.settings().unwrap().get("ticket_colors"), Some(&defaults));
+        assert_eq!(
+            db.settings()
+                .unwrap()
+                .get("week_start_day")
+                .map(String::as_str),
+            Some("sunday")
+        );
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn backup_restores_valid_ticket_colors_and_skips_corrupt_color_settings() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-color-backup-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let source = Database::open_root(root.join("source")).unwrap();
+        source.save_task(sample("配色备份")).unwrap();
+        let colors = serde_json::json!({"normal":"#68717D","future":"#F3D98B","urgent":"#9B4055"})
+            .to_string();
+        source
+            .set_setting("ticket_colors".into(), colors.clone())
+            .unwrap();
+        let backup = source.create_backup("manual").unwrap();
+        let target = Database::open_root(root.join("target")).unwrap();
+        let imported = target.import_backup(backup.path).unwrap();
+        target.restore_backup(imported.path.clone()).unwrap();
+        assert_eq!(
+            target.settings().unwrap().get("ticket_colors"),
+            Some(&colors)
+        );
+        let local = serde_json::json!({"normal":"#536C8F","future":"#3F766E","urgent":"#C43D4B"})
+            .to_string();
+        target
+            .set_setting("ticket_colors".into(), local.clone())
+            .unwrap();
+        let corrupt_backup = Connection::open(&imported.path).unwrap();
+        corrupt_backup
+            .execute(
+                "UPDATE settings SET value='invalid' WHERE key='ticket_colors'",
+                [],
+            )
+            .unwrap();
+        drop(corrupt_backup);
+        target.restore_backup(imported.path).unwrap();
+        assert_eq!(
+            target.settings().unwrap().get("ticket_colors"),
+            Some(&local)
+        );
+        drop(source);
+        drop(target);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     fn create_v7_database(path: &Path) {
         let connection = Connection::open(path).unwrap();

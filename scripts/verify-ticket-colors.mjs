@@ -1,0 +1,78 @@
+// Isolated settings/renderer integration. Never invokes the native user database.
+import assert from "node:assert/strict";
+import { pathToFileURL } from "node:url";
+import { mkdir } from "node:fs/promises";
+import { createServer } from "vite";
+const { chromium } = await import(process.env.INLINE_PLAYWRIGHT_MODULE ? pathToFileURL(process.env.INLINE_PLAYWRIGHT_MODULE).href : "playwright");
+const mock = `
+const day=(d=new Date())=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+const later=new Date();later.setDate(later.getDate()+3);
+const task=(id,scheduled=false,urgent=false)=>({id,title:"配色事项"+id,status:"pending",plannedDate:scheduled?day(later):day(),isScheduled:scheduled,scheduleAction:"",scheduleActionAt:null,permanentNumber:"FIXED-"+id,dailySequence:id,ticketDate:scheduled?day(later):day(),department:"测试部门",departments:["测试部门"],contact:"测试人员",contacts:["测试人员"],taskType:"合同审查",details:"隔离数据",priority:urgent?"critical":"normal",workload:"standard",isUrgent:urgent,urgentRequester:urgent?"测试":"",urgentReason:urgent?"测试":"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),startedAt:null,completedAt:null,archivedAt:null,deletedAt:null,customSortOrder:id,processingRounds:0,hasActiveQueue:!scheduled,deferredEnteredAt:null,isImportConflict:false,parentTaskId:null,subtaskSortOrder:0});
+const queue=[task(1),task(2,false,true),task(3,true)],callbacks=new Set(),channel=new BroadcastChannel("inline-ticket-colors-test");
+const read=()=>JSON.parse(localStorage.getItem("inline-ticket-colors-test")||'{"week_start_day":"sunday"}');
+const emit=()=>callbacks.forEach(cb=>cb());channel.onmessage=emit;
+window.__colorCalls=[];window.__pendingColors=[];window.__emitColors=emit;
+window.__releaseColors=()=>{window.__holdColors=false;window.__pendingColors.splice(0).forEach(release=>release())};
+const specific={bootstrap:async()=>({queue,archive:[],trash:[],masters:{departments:["测试部门"],contacts:["测试人员"],taskTypes:["合同审查"]},settings:read(),backups:[]}),getVersion:async()=>"0.5.0",getTicketColors:()=>{const value=read().ticket_colors??null;return window.__holdColors?new Promise(resolve=>window.__pendingColors.push(()=>resolve(value))):Promise.resolve(value)},setSetting:async(key,value)=>{window.__colorCalls.push({key,value});if(window.__failColorSave)throw new Error("隔离测试保存失败");localStorage.setItem("inline-ticket-colors-test",JSON.stringify({...read(),[key]:value}));emit();channel.postMessage("changed")},onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},getUIFontSelection:async()=>({requested:"",effective:"",missing:false}),globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},onUpdateProgress:()=>()=>{},getTask:async id=>queue.find(t=>t.id===id),getUpdateProgress:async()=>({phase:"idle",version:null,downloadedBytes:0,totalBytes:null,percent:null,message:null})};
+export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async()=>[])});`;
+const server = await createServer({ server: { host: "127.0.0.1", port: 0 }, plugins: [{ name: "isolated-ticket-colors", enforce: "pre", load(id) { if (id.replaceAll("\\", "/").endsWith("/src/api.ts")) return mock; } }] });
+await server.listen();
+const browser = await chromium.launch({ headless: true, executablePath: process.env.INLINE_BROWSER_PATH });
+const errors = [];
+try {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, timezoneId: "Asia/Shanghai" });
+  const page = await context.newPage(); page.setDefaultTimeout(15000); page.on("pageerror", e => errors.push(e.message));
+  await page.goto(server.resolvedUrls.local[0]); await page.locator(".task-table tbody tr").first().waitFor();
+  const floating = await context.newPage(); floating.on("pageerror", e => errors.push(e.message));
+  await floating.setViewportSize({ width: 444, height: 564 }); await floating.goto(server.resolvedUrls.local[0] + "#/floating"); await floating.locator(".floating-card").first().waitFor();
+  const waitColor = (target, selector, background, foreground) => target.waitForFunction(({ selector, background, foreground }) => {
+    const element = document.querySelector(selector); if (!element) return false;
+    const style = getComputedStyle(element); return style.backgroundColor === background && (!foreground || style.color === foreground);
+  }, { selector, background, foreground });
+  await waitColor(floating, ".ticket-number:not(.ticket-urgent)", "rgb(11, 58, 130)", "rgb(255, 255, 255)");
+  const settings = () => page.getByRole("button", { name: "软件设置", exact: true }).click();
+  const editor = index => page.locator(".ticket-color-editor").nth(index);
+  const input = index => editor(index).locator("input");
+  await settings(); await page.getByRole("heading", { name: "编号配色", exact: true }).waitFor();
+  assert.equal(await input(0).inputValue(), "#0B3A82"); assert.equal(await input(1).inputValue(), "#3F766E"); assert.equal(await input(2).inputValue(), "#C43D4B");
+  await editor(1).getByRole("button", { name: "选择候选色" }).click();
+  assert.equal(await page.locator(".ticket-color-options>button").count(), 16);
+  await page.getByRole("button", { name: "奶油黄 #F3D98B", exact: true }).click(); await page.locator(".ticket-color-picker").waitFor({ state: "hidden" });
+  await page.locator(".sidebar nav button").filter({ hasText: "暂缓事项" }).click();
+  await waitColor(page, ".ticket-scheduled", "rgb(243, 217, 139)", "rgb(0, 0, 0)");
+  await page.locator(".scheduled-row").click(); await waitColor(page, ".detail-panel .ticket-scheduled", "rgb(243, 217, 139)", "rgb(0, 0, 0)");
+  await settings(); await input(0).fill("abc"); await input(0).press("Enter");
+  await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--ticket-normal-background") === "#AABBCC");
+  assert.equal(await input(0).inputValue(), "#AABBCC");
+  await input(2).fill("A7446a"); await editor(2).getByRole("button", { name: "应用", exact: true }).click();
+  await waitColor(floating, ".ticket-number:not(.ticket-urgent)", "rgb(170, 187, 204)", "rgb(0, 0, 0)");
+  await waitColor(floating, ".ticket-urgent", "rgb(167, 68, 106)", "rgb(255, 255, 255)");
+  await page.reload(); await settings(); assert.equal(await input(0).inputValue(), "#AABBCC"); assert.equal(await input(1).inputValue(), "#F3D98B"); assert.equal(await input(2).inputValue(), "#A7446A");
+  const calls = await page.evaluate(() => window.__colorCalls.length);
+  await input(1).fill("#zzzzzz"); await editor(1).getByRole("button", { name: "应用", exact: true }).click();
+  await page.getByRole("alert").filter({ hasText: "请输入 3 或 6 位" }).waitFor(); assert.equal(await page.evaluate(() => window.__colorCalls.length), calls);
+  await input(1).fill("#123456"); await page.evaluate(() => { window.__failColorSave = true; }); await editor(1).getByRole("button", { name: "应用", exact: true }).click();
+  await page.getByRole("alert").filter({ hasText: "保存失败" }).waitFor(); assert.equal(await page.evaluate(() => JSON.parse(JSON.parse(localStorage.getItem("inline-ticket-colors-test")).ticket_colors).future), "#F3D98B");
+  await page.evaluate(() => { window.__failColorSave = false; }); await editor(1).getByRole("button", { name: "应用", exact: true }).click();
+  await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--ticket-future-background") === "#123456");
+  await input(0).fill("unsaved"); await page.getByRole("button", { name: "恢复默认配色", exact: true }).click();
+  await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--ticket-future-background") === "#3F766E");
+  assert.equal(await input(0).inputValue(), "#0B3A82"); assert.equal(await input(1).inputValue(), "#3F766E"); assert.equal(await input(2).inputValue(), "#C43D4B");
+  await input(0).fill("bad-draft"); await page.getByRole("button", { name: "恢复默认配色", exact: true }).click(); await page.waitForFunction(() => document.querySelector('.ticket-color-editor input').value === '#0B3A82');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("inline-ticket-colors-test")).week_start_day), "sunday");
+  // A previously initiated settings read must not overwrite a successful newer save.
+  await page.evaluate(() => { window.__holdColors = true; window.__emitColors(); }); await page.waitForFunction(() => window.__pendingColors.length > 0);
+  await input(0).fill("536c8f"); await editor(0).getByRole("button", { name: "应用", exact: true }).click(); await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--ticket-normal-background") === "#536C8F");
+  await page.evaluate(() => window.__releaseColors()); await page.waitForTimeout(80); assert.equal(await input(0).inputValue(), "#536C8F");
+  await waitColor(floating, ".ticket-number:not(.ticket-urgent)", "rgb(83, 108, 143)", "rgb(255, 255, 255)");
+  await editor(2).getByRole("button", { name: "选择候选色" }).click(); await page.getByRole("button", { name: "奶油黄 #F3D98B", exact: true }).click();
+  await waitColor(floating, ".ticket-urgent", "rgb(243, 217, 139)", "rgb(0, 0, 0)");
+  assert.equal(await floating.locator(".ticket-urgent .ticket-triangle").evaluate(node => getComputedStyle(node).color), "rgb(0, 0, 0)");
+  await page.getByRole("button", { name: "恢复默认配色", exact: true }).click(); await waitColor(floating, ".ticket-urgent", "rgb(196, 61, 75)", "rgb(255, 255, 255)");
+  await mkdir("release/ui", { recursive: true }); await page.mouse.move(10, 10); await page.screenshot({ path: "release/ui/ticket-colors-settings.png", fullPage: true });
+  await editor(1).getByRole("button", { name: "选择候选色" }).click(); await page.mouse.move(10, 10); await page.screenshot({ path: "release/ui/ticket-color-picker.png", fullPage: true });
+  await page.getByRole("button", { name: "关闭配色选择", exact: true }).click(); await page.setViewportSize({ width: 1140, height: 820 });
+  assert.equal(await page.locator(".ticket-color-setting").evaluate(node => node.scrollWidth <= node.clientWidth), true);
+  assert.deepEqual(errors, []);
+  console.log("PASS ticket colors: 16 presets, independent roles, HEX normalization, invalid input, light text contrast, save failure/retry, reload persistence, floating synchronization, atomic reset, draft clearing and stale-read race");
+} finally { await browser.close(); await server.close(); }
