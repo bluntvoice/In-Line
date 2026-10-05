@@ -46,7 +46,6 @@ export default function FloatingWindow(){
     if(value.type==="enqueue"||value.type==="reopen"){
       await api.openTaskAction(value.task.id,"view");toast("请在事项详情中确认是否继承截止时间");return;
     }
-    if(value.type==="archive")await api.archiveTask(value.task.id);
     if(value.type==="delete")await api.deleteTask(value.task.id);
     if(value.type==="restore")await api.restoreTask(value.task.id);
     toast("操作已完成");

@@ -1,5 +1,5 @@
 import { useEffect,useState } from "react";
-import { AlertTriangle,Archive,ArrowDown,ArrowUp,Check,CheckCircle2,Edit3,GitMerge,GripVertical,ListPlus,MoreHorizontal,Pencil,PlayCircle,Plus,RotateCcw,ShieldCheck,Trash2,X } from "lucide-react";
+import { AlertTriangle,ArrowDown,ArrowUp,Check,CheckCircle2,Edit3,GitMerge,GripVertical,ListPlus,MoreHorizontal,Pencil,PlayCircle,Plus,RotateCcw,ShieldCheck,Trash2,X } from "lucide-react";
 import type { LegalTask,TaskLog,TaskView,TaskWorkEvent } from "../types";
 import { api } from "../api";
 import { displayTicket,formatDateTime,formatDeadline,isOverdue,localizeStatusText,PRIORITY_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
@@ -98,11 +98,10 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
     <div className="detail-actions">
       {view==="trash"?<><button className="button primary" onClick={async()=>{await api.restoreTask(task.id);notify("事项已恢复并加入今日队列");onChanged();}}><RotateCcw size={16}/>恢复</button><button className="button secondary danger" onClick={async()=>{if(!window.confirm(`永久删除“${task.title}”？事项及其全部办理记录将不可恢复。`))return;await api.permanentlyDeleteTasks([task.id]);notify("事项已永久删除");onChanged();}}><Trash2 size={16}/>永久删除</button></>:<>
         <button className="button secondary" onClick={onEdit}><Edit3 size={16}/>编辑</button><button className="button secondary" onClick={()=>setMergeDialog(true)}><GitMerge size={16}/>合并</button>
-        {terminal?<><button className="button primary" onClick={()=>setQueueDialog("reopen")}><RotateCcw size={16}/>重新开启并加入今日队列</button>{task.status==="completed"&&!task.archivedAt&&<button className="button secondary" onClick={async()=>{await api.archiveTask(task.id);onChanged();}}><Archive size={16}/>归档</button>}</>:<>
+        {terminal?<button className="button primary" onClick={()=>setQueueDialog("reopen")}><RotateCcw size={16}/>重新开启并加入今日队列</button>:<>
           {canWork&&<button className="button secondary" onClick={()=>void process()}><PlayCircle size={16}/>本轮已处理</button>}
           {canWork&&<button className="button primary" onClick={()=>void complete()}><CheckCircle2 size={16}/>本轮已完成</button>}
           {!task.hasActiveQueue&&canWork&&<button className="button secondary" onClick={()=>setQueueDialog("enqueue")}><ListPlus size={16}/>{task.isScheduled?"提前入队":"加入今日队列"}</button>}
-          {(task.status==="completed"||task.status==="cancelled")&&<button className="button secondary" onClick={async()=>{await api.archiveTask(task.id);onChanged();}}><Archive size={16}/>归档</button>}
         </>}
         <button className="icon-button danger" onClick={async()=>{await api.deleteTask(task.id);onChanged();}} aria-label="移入回收站"><Trash2 size={16}/></button>
       </>}

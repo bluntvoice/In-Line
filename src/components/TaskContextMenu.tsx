@@ -1,8 +1,8 @@
-import { Archive,CheckCircle2,Edit3,Eye,Flame,ListPlus,PlayCircle,Plus,RotateCcw,Trash2 } from "lucide-react";
+import { CheckCircle2,Edit3,Eye,Flame,ListPlus,PlayCircle,Plus,RotateCcw,Trash2 } from "lucide-react";
 import type { LegalTask,TaskView } from "../types";
 import { isDeferredStatus } from "../lib/task-utils";
 
-export interface ContextAction{type:"view"|"edit"|"addSubtask"|"status"|"urgent"|"process"|"complete"|"enqueue"|"reopen"|"archive"|"delete"|"restore"|"permanentDelete";task:LegalTask}
+export interface ContextAction{type:"view"|"edit"|"addSubtask"|"status"|"urgent"|"process"|"complete"|"enqueue"|"reopen"|"delete"|"restore"|"permanentDelete";task:LegalTask}
 export default function TaskContextMenu({task,view,x,y,onAction,onClose}:{task:LegalTask;view:TaskView;x:number;y:number;onAction:(action:ContextAction)=>void;onClose:()=>void}){
   const fire=(type:ContextAction["type"])=>{onAction({type,task});onClose();};
   const terminal=task.status==="completed"||task.status==="archived"||Boolean(task.archivedAt);
@@ -20,7 +20,6 @@ export default function TaskContextMenu({task,view,x,y,onAction,onClose}:{task:L
         {canWork&&<button onClick={()=>fire("complete")}><CheckCircle2 size={16}/>本轮已完成</button>}
         {!task.hasActiveQueue&&canWork&&<button onClick={()=>fire("enqueue")}><ListPlus size={16}/>{task.isScheduled?"提前入队":"加入今日队列"}</button>}
         {terminal&&<button onClick={()=>fire("reopen")}><RotateCcw size={16}/>重新开启并加入今日队列</button>}
-        {(task.status==="completed"||task.status==="cancelled")&&<button onClick={()=>fire("archive")}><Archive size={16}/>归档</button>}
         <span/>
         <button className="danger" onClick={()=>fire("delete")}><Trash2 size={16}/>移入回收站</button>
       </>}

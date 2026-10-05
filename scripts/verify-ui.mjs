@@ -15,6 +15,11 @@ const task=(id,status="pending",parentTaskId=null)=>({id,permanentNumber:"IL-"+i
 const queue=Array.from({length:30},(_,i)=>task(i+1,i%3===2?"processed":"pending",i===1?1:null));
 const archive=Array.from({length:10},(_,i)=>task(i+31,"completed",i===1?31:null));
 const all=[...queue,...archive];
+if (${JSON.stringify(mode)} === "history") {
+  Object.assign(archive[0], {status:"completed",archivedAt:null,completedAt:"2026-09-30T08:00:00+08:00"});
+  Object.assign(archive[1], {status:"cancelled",archivedAt:null});
+  Object.assign(archive[2], {status:"archived",archivedAt:"2026-09-30T08:00:00+08:00"});
+}
 queue.find(t=>t.id===9).parentTaskId=3;
 const settings={week_start_day:"monday",statistics_rate_mode:"processing"};
 settings.ui_font_family=localStorage.getItem("isolated-ui-font")??"";
@@ -39,6 +44,16 @@ specific.getStatistics=async(...args)=>{const day=localDay(args[0]);statisticsDa
 specific.getStatisticsTrendDetails=async(...args)=>{window.__inlineCalls.push(["trend",...args]);if(!statisticsDays.has(localDay(args[0])))return [];return args[2]?details.filter(t=>t.resultStatus===args[2]):details};
 specific.copyText=async text=>{if(window.__inlineCopyFail)throw new Error("隔离剪贴板失败");window.__inlineCalls.push(["copyText",text]);window.__inlineClipboard=text};
 specific.getRecommendedFontStatus=async()=>({phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null});specific.onRecommendedFontProgress=()=>()=>{};specific.getUIScale=async()=>"100";
+if (${JSON.stringify(mode)} === "history") {
+  specific.getLogs=async id=>[{id:100+id,taskId:id,logType:"status",content:"保留的历史记录",createdAt:"2026-09-30T08:00:00+08:00"}];
+  specific.reopenTask=async input=>{
+    window.__inlineCalls.push(["reopenTask",input]);
+    const reopened=all.find(t=>t.id===input.id);
+    archive.splice(archive.indexOf(reopened),1);
+    Object.assign(reopened,{status:"pending",archivedAt:null,completedAt:null,hasActiveQueue:true});
+    queue.push(reopened);
+  };
+}
 export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async(...args)=>{window.__inlineCalls.push([key,...args]);return []})});
 `;
 const server = await createServer({ server: { port: 0, strictPort: false }, plugins: [{
@@ -55,6 +70,40 @@ try {
   page.on("pageerror", error => errors.push(error.message));
   await page.goto(server.resolvedUrls.local[0],{waitUntil:"domcontentloaded",timeout:45000});
   await page.locator(".task-table tbody tr").first().waitFor();
+  if (mode === "history") {
+    await page.locator(".sidebar nav button").filter({hasText:"历史归档"}).click();
+    const rows=page.locator(".task-table tbody tr");
+    assert.equal(await rows.count(),10);
+    for (const [id,status] of [[31,"已完成"],[32,"已取消"],[33,"已归档"]]) {
+      const row=rows.filter({has:page.locator(".task-title-line>strong").filter({hasText:`隔离测试事项 ${id} —`})});
+      assert.equal(await row.locator(".status-badge").innerText(),status);
+      await row.click({button:"right"});
+      const menu=page.getByRole("menu");
+      assert.equal(await menu.getByRole("button",{name:"归档",exact:true}).count(),0);
+      assert.equal(await menu.getByRole("button",{name:"重新开启并加入今日队列",exact:true}).count(),id===32?0:1);
+      await menu.getByRole("button",{name:"查看详情",exact:true}).click();
+      const detail=page.locator(".detail-panel");
+      await detail.getByText("保留的历史记录",{exact:true}).waitFor();
+      assert.equal(await detail.getByRole("button",{name:"归档",exact:true}).count(),0);
+      assert.equal(await detail.getByRole("button",{name:"重新开启并加入今日队列",exact:true}).count(),id===32?0:1);
+      if(id===33) {
+        await detail.getByRole("button",{name:"重新开启并加入今日队列",exact:true}).click();
+        const dialog=page.getByRole("dialog");
+        await dialog.getByPlaceholder("选填，将记录到事项时间线").fill("旧归档事项继续办理");
+        assert.equal(await dialog.getByRole("checkbox").isChecked(),false);
+        await dialog.getByRole("button",{name:"确认加入",exact:true}).click();
+        await page.waitForFunction(()=>window.__inlineCalls.some(c=>c[0]==="reopenTask"));
+        await page.waitForFunction(()=>document.querySelectorAll(".task-table tbody tr").length===9);
+        await page.locator(".sidebar nav button").filter({hasText:"待办队列"}).click();
+        await page.locator(".task-table tbody tr").filter({hasText:"隔离测试事项 33 —"}).click();
+        await page.locator(".detail-panel").getByText("保留的历史记录",{exact:true}).waitFor();
+        assert.deepEqual((await page.evaluate(()=>window.__inlineCalls)).find(c=>c[0]==="reopenTask"),["reopenTask",{id:33,inheritDeadline:false,reason:"旧归档事项继续办理"}]);
+      }
+      await detail.locator("header").first().getByRole("button",{name:"关闭",exact:true}).click();
+    }
+    assert.equal((await page.evaluate(()=>window.__inlineCalls)).filter(c=>/archiveTask/.test(c[0])).length,0);
+    console.log("PASS history: completed/cancelled/legacy archived navigation, preserved logs, legacy reopen with default deadline and return to queue");
+  }
   if (mode === "measure") {
     for (const width of [1440, 1280, 1200, 1920]) {
       await page.setViewportSize({width, height:900});

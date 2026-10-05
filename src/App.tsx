@@ -211,7 +211,6 @@ export default function App(){
     if(type==="complete"){await requestCompletion(task);return;}
     if(type==="enqueue"){setQueueAction({task,reopen:false});return;}
     if(type==="reopen"){setQueueAction({task,reopen:true});return;}
-    if(type==="archive")await api.archiveTask(task.id);
     if(type==="delete")await api.deleteTask(task.id);
     if(type==="restore")await api.restoreTask(task.id);
     if(type==="permanentDelete"){
