@@ -103,11 +103,11 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
           {canWork&&<button className="button primary" onClick={()=>void complete()}><CheckCircle2 size={16}/>本轮已完成</button>}
           {!task.hasActiveQueue&&canWork&&<button className="button secondary" onClick={()=>setQueueDialog("enqueue")}><ListPlus size={16}/>{task.isScheduled?"提前入队":"加入今日队列"}</button>}
         </>}
-        <button className="icon-button danger" onClick={async()=>{await api.deleteTask(task.id);onChanged();}} aria-label="移入回收站"><Trash2 size={16}/></button>
+        <button className="button secondary danger" onClick={async()=>{await api.deleteTask(task.id);onChanged();}} aria-label="移入回收站"><Trash2 size={16}/>删除</button>
       </>}
     </div>
     <ScheduleBadge task={task}/><dl className="detail-grid">
-      <div><dt>加入日期</dt><dd>{task.plannedDate||task.ticketDate}<button type="button" className="button secondary small" onClick={onEdit}>修改</button></dd></div>
+      <div><dt>加入日期</dt><dd>{task.plannedDate||task.ticketDate}</dd></div>
       <div><dt>状态</dt><dd><StatusBadge status={task.status} overdue={isOverdue(task)}/></dd></div><div><dt>累计处理轮次</dt><dd>{task.processingRounds} 次</dd></div>
       <div><dt>优先级</dt><dd>{PRIORITY_LABELS[task.priority]}</dd></div><div><dt>预计工作量</dt><dd>{WORKLOAD_LABELS[task.workload]}</dd></div>
       <div><dt>部门 / 团队</dt><dd>{task.department}</dd></div><div><dt>对接人</dt><dd>{task.contact}</dd></div>
