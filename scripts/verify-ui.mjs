@@ -40,7 +40,7 @@ specific.getUpdateProgress=async()=>({phase:"idle",version:null,downloadedBytes:
 specific.onUpdateProgress=()=>()=>{};
 const statisticsDays=new Set();
 const localDay=value=>{const d=new Date(value);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-specific.getStatistics=async(...args)=>{const day=localDay(args[0]);statisticsDays.add(day);const data=await originalStatistics(...args);data.trend[0].periodStart=day;if(new Date(args[1])-new Date(args[0])>62*86400000){const monday=new Date(args[0]);monday.setDate(monday.getDate()-(monday.getDay()+6)%7);data.trendGranularity="week";data.trend[0].periodStart=localDay(monday);}return data};
+specific.getStatistics=async(...args)=>{window.__inlineCalls.push(["statistics",...args]);const day=localDay(args[0]);statisticsDays.add(day);const data=await originalStatistics(...args);data.trend[0].periodStart=day;if(new Date(args[1])-new Date(args[0])>62*86400000){const monday=new Date(args[0]);monday.setDate(monday.getDate()-(monday.getDay()+6)%7);data.trendGranularity="week";data.trend[0].periodStart=localDay(monday);}return data};
 specific.getStatisticsTrendDetails=async(...args)=>{window.__inlineCalls.push(["trend",...args]);if(!statisticsDays.has(localDay(args[0])))return [];return args[2]?details.filter(t=>t.resultStatus===args[2]):details};
 specific.copyText=async text=>{if(window.__inlineCopyFail)throw new Error("隔离剪贴板失败");window.__inlineCalls.push(["copyText",text]);window.__inlineClipboard=text};
 specific.getRecommendedFontStatus=async()=>({phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null});specific.onRecommendedFontProgress=()=>()=>{};specific.getUIScale=async()=>"100";
@@ -56,7 +56,7 @@ if (${JSON.stringify(mode)} === "history") {
 }
 export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async(...args)=>{window.__inlineCalls.push([key,...args]);return []})});
 `;
-const server = await createServer({ server: { port: 0, strictPort: false }, plugins: [{
+const server = await createServer({ server: { port: 0, strictPort: false, watch: { ignored: ["**/src-tauri/target/**"] } }, plugins: [{
   name: "isolated-ui-api", enforce: "pre",
   load(id) { if (id.replaceAll("\\", "/").endsWith("/src/api.ts")) return mock; }
 }] });
@@ -234,6 +234,56 @@ try {
     assert.equal(await page.locator(".font-setting-trigger").innerText(),"系统默认字体");
     assert.equal(await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).isDisabled(),true);
     console.log("PASS fonts:",nativeFonts.length,"native families; aliases/search/local cache/live global/default/missing/restart/auxiliary routes; 4 font row and overflow regression");
+  }
+  if (mode === "statistics-range") {
+    const openStatistics=()=>page.locator(".sidebar nav button").filter({hasText:"统计中心"}).click();
+    const tabs=page.locator(".preset-tabs");
+    const periodText=()=>page.locator(".period-footer>small").innerText();
+    const queries=()=>page.evaluate(()=>window.__inlineCalls.filter(call=>call[0]==="statistics").slice(-2));
+    const openDetails=async(source,row)=>{
+      await page.locator(source).first().click();
+      await page.locator(".details-card tbody tr").last().waitFor();
+      await page.locator(".details-card tbody tr").nth(row).click();
+      await page.locator(".detail-panel").waitFor();
+      assert.equal(await page.locator(".statistics-panel").count(),0);
+      await page.locator(".detail-panel>header").getByRole("button",{name:"关闭",exact:true}).click();
+    };
+    await openStatistics();
+    assert.equal(await tabs.locator(".active").innerText(),"本周");
+    for(const [index,label] of ["上一周","上一个月","上一季度"].entries()) {
+      await tabs.getByRole("button",{name:label,exact:true}).click();
+      await page.locator(".type-stats button, .task-type-pie-legend button").first().waitFor();
+      const expectedText=await periodText(),expectedQueries=await queries();
+      await openDetails(".type-stats button, .task-type-pie-legend button",index);
+      await openStatistics();
+      await page.locator(".type-stats button, .task-type-pie-legend button").first().waitFor();
+      assert.equal(await tabs.locator(".active").innerText(),label);
+      assert.equal(await periodText(),expectedText);
+      assert.deepEqual(await queries(),expectedQueries);
+    }
+    await tabs.getByRole("button",{name:"自定义",exact:true}).click();
+    const dates=page.locator(".custom-range input");
+    await dates.nth(0).fill("2026-08-01");
+    await dates.nth(1).fill("2026-08-31");
+    await page.locator(".trend-column .trend-total").first().waitFor();
+    const expectedQueries=await queries();
+    await openDetails(".trend-column .trend-total",0);
+    await openStatistics();
+    await page.locator(".trend-column .trend-total").first().waitFor();
+    assert.equal(await tabs.locator(".active").innerText(),"自定义");
+    assert.equal(await dates.nth(0).inputValue(),"2026-08-01");
+    assert.equal(await dates.nth(1).inputValue(),"2026-08-31");
+    assert.equal(await periodText(),"2026-08-01 至 2026-08-31");
+    assert.deepEqual(await queries(),expectedQueries);
+    await tabs.getByRole("button",{name:"上一周",exact:true}).click();
+    await tabs.getByRole("button",{name:"自定义",exact:true}).click();
+    assert.equal(await dates.nth(0).inputValue(),"2026-08-01");
+    assert.equal(await dates.nth(1).inputValue(),"2026-08-31");
+    await page.locator(".sidebar nav button").filter({hasText:"待办队列"}).click();
+    await openStatistics();
+    assert.equal(await tabs.locator(".active").innerText(),"自定义");
+    assert.equal(await periodText(),"2026-08-01 至 2026-08-31");
+    console.log("PASS statistics-range: presets/custom dates and query bounds survive task details and page navigation");
   }
   if (mode === "trend") {
     await page.locator(".sidebar nav button").filter({ hasText: "统计中心" }).click();

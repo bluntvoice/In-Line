@@ -1,5 +1,6 @@
 export type WeekStart = "monday" | "sunday";
 export type StatisticsPreset = "currentWeek" | "previousWeek" | "month" | "quarter" | "custom";
+export interface StatisticsPeriodSelection { preset: StatisticsPreset; customStart: string; customEnd: string }
 export type StatisticsTrendPoint = { periodStart: string; handledTasks: number; processed?: number; completed?: number };
 
 export function statisticsTrendRange(periodStart:string,granularity:"day"|"week",range:{start:string;end:string}){

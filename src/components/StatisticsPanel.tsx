@@ -4,7 +4,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import type { StatisticsDetail,StatisticsResult } from "../types";
 import { formatDateTime,STATUS_LABELS } from "../lib/task-utils";
-import { statisticsComparisonRange,statisticsDisplayTrend,statisticsPresetRange,statisticsTrendRange,statisticsWeekdayLabel,type StatisticsPreset,type WeekStart } from "../lib/statistics-range";
+import { statisticsComparisonRange,statisticsDisplayTrend,statisticsPresetRange,statisticsTrendRange,statisticsWeekdayLabel,type StatisticsPeriodSelection,type StatisticsPreset,type WeekStart } from "../lib/statistics-range";
 import { buildReportPrompt,customReportTemplateIsValid,DEFAULT_CUSTOM_REPORT_TEMPLATE,REPORT_TEMPLATE_OPTIONS,type ReportTemplateMode } from "../lib/report-prompts";
 import { DEFAULT_STATISTICS_CHART_ORDER,moveStatisticsChart,normalizeHiddenStatisticsCharts,normalizeStatisticsChartOrder,normalizeTaskTypeChartMode,STATISTICS_CHARTS,type StatisticsChartId,type TaskTypeChartMode } from "../lib/statistics-charts";
 import { buildNativeReport,nativeReportTitle } from "../lib/native-report";
@@ -25,9 +25,12 @@ const comparisonName=(preset:StatisticsPreset)=>preset==="currentWeek"?"上周�
 const deltaText=(current:number,previous:number)=>previous===0?(current===0?"持平":"新增"): `${current>=previous?"+":""}${Math.round((current-previous)/previous*100)}%`;
 const changeTone=(current:number,previous:number)=>current>previous?"increase":current<previous?"decrease":"unchanged";
 
-export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStartsOn,currentOverdueCount,currentOverdueByTaskType}:{onOpenTask:(id:number)=>void;notify:(text:string)=>void;refreshKey?:string|number;weekStartsOn:WeekStart;currentOverdueCount:number;currentOverdueByTaskType:Record<string,number>}){
-  const [preset,setPreset]=useState<StatisticsPreset>("currentWeek");const initial=statisticsPresetRange("currentWeek",weekStartsOn);
-  const [customStart,setCustomStart]=useState(initial.start);const [customEnd,setCustomEnd]=useState(initial.end);
+export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStartsOn,currentOverdueCount,currentOverdueByTaskType,period,onPeriodChange}:{onOpenTask:(id:number)=>void;notify:(text:string)=>void;refreshKey?:string|number;weekStartsOn:WeekStart;currentOverdueCount:number;currentOverdueByTaskType:Record<string,number>;period:StatisticsPeriodSelection|null;onPeriodChange:(period:StatisticsPeriodSelection)=>void}){
+  const initial=statisticsPresetRange("currentWeek",weekStartsOn);
+  const {preset,customStart,customEnd}=period??{preset:"currentWeek",customStart:initial.start,customEnd:initial.end};
+  const setPreset=(preset:StatisticsPreset)=>onPeriodChange({preset,customStart,customEnd});
+  const setCustomStart=(customStart:string)=>onPeriodChange({preset,customStart,customEnd});
+  const setCustomEnd=(customEnd:string)=>onPeriodChange({preset,customStart,customEnd});
   const [data,setData]=useState<StatisticsResult|null>(null);const [comparisonData,setComparisonData]=useState<StatisticsResult|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
   const [selectedType,setSelectedType]=useState("");const [details,setDetails]=useState<StatisticsDetail[]>([]);const detailsRequestRef=useRef(0);
   const [selectedTrend,setSelectedTrend]=useState<{key:string;title:string}|null>(null);const [detailsBusy,setDetailsBusy]=useState(false);
