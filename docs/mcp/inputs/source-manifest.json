@@ -1,0 +1,29 @@
+[
+  {
+    "name": "01-In-Line-MCP-PRD-144项完整需求.md",
+    "originalPath": "D:\\Downloads\\01-In-Line-MCP-PRD-144项完整需求.md",
+    "repositoryPath": "docs/mcp/inputs/01-In-Line-MCP-PRD-144项完整需求.md",
+    "bytes": 36155,
+    "sha256": "454F780D5E77E4FBD1481B36FE3C288246470A262329FB7292FB87C0EFBB0845",
+    "checkedOn": "2026-10-09",
+    "identical": true
+  },
+  {
+    "name": "02-In-Line-MCP-分阶段开发与验收方案.md",
+    "originalPath": "D:\\Downloads\\02-In-Line-MCP-分阶段开发与验收方案.md",
+    "repositoryPath": "docs/mcp/inputs/02-In-Line-MCP-分阶段开发与验收方案.md",
+    "bytes": 10300,
+    "sha256": "F1FEAE474B5A87D387193B728E420CCB6C9B6F456B8EA41B991B24981E3642E5",
+    "checkedOn": "2026-10-09",
+    "identical": true
+  },
+  {
+    "name": "03-In-Line-MCP-Codex-总执行提示词.md",
+    "originalPath": "D:\\Downloads\\03-In-Line-MCP-Codex-总执行提示词.md",
+    "repositoryPath": "docs/mcp/inputs/03-In-Line-MCP-Codex-总执行提示词.md",
+    "bytes": 8425,
+    "sha256": "2C747C69C77F11F3629DD8DFF3E8D5F1ECEDC94E83D98B22A02FE14C3A528D0A",
+    "checkedOn": "2026-10-09",
+    "identical": true
+  }
+]

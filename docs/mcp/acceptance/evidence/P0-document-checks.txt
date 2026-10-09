@@ -1,0 +1,6 @@
+PASS: all three source copies byte-identical to D:/Downloads originals; SHA256/length manifest saved (source provenance, not a fault export hash list).
+PASS: MCP-001..144 unique; original names/phases/acceptance conditions preserved; all 13 fields filled; no new feature marked passed or accepted.
+PASS: 33 local Markdown links resolve.
+PASS: HEAD unchanged; no tracked changes; untracked files only docs/mcp; five version sources unchanged at 0.5.0; no Commit/Push/Tag/Release performed by this task.
+BASELINE: B1 frontend 105 passed; B2 library59+MCP2+stdio1=62 passed; B3 build exit0; B4 fmt exit0. These are existing tests, not new MCP requirements.
+NOT RUN: new auth/IPC/scope/write/batch/jobs/changes/cache/diagnostics/export tests; NSIS/GUI/install/upgrade/multi-account/second-device; remote Actions/CI.

@@ -1,0 +1,7 @@
+2026-10-09 Phase 0 document validation, second run: exit 1.
+Command: pwsh -NoProfile -File docs/mcp/verify-phase0-documents.ps1
+Error: Out-of-scope file: "docs/mcp/inputs/01-In-Line-MCP-PRD-144\351\241\271\345\256\214\346\225\264\351\234\200\346\261\202.md"
+Cause: git ls-files default core.quotePath output quoted and escaped a Unicode filename; the docs/mcp prefix check received the surrounding quote.
+Fix: per-command git -c core.quotePath=false for path inventories; no persistent Git setting changed, and scope checks remain strict.
+This is a document-tool path decoding failure, not a product/security/transaction/data test failure.
+Rerun result is recorded in P0-document-checks.txt.

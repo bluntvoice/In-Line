@@ -1,0 +1,6 @@
+2026-10-09 Phase 0 document validation, third run: exit 1.
+Command: pwsh -NoProfile -File docs/mcp/verify-phase0-documents.ps1
+Error: ConvertFrom-Json rejected the empty property name in package-lock.json packages[""].
+Fix: parse the package lock with ConvertFrom-Json -AsHashtable; no lockfile changed.
+This is a document-tool JSON-reader error, not a product/security/transaction/data test failure. Version consistency remains mandatory.
+Rerun result is recorded in P0-document-checks.txt.

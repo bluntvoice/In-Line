@@ -1,0 +1,7 @@
+2026-10-09 Phase 0 document validation, first run: exit 1.
+Command: pwsh -NoProfile -File docs/mcp/verify-phase0-documents.ps1
+Error: Broken local link docs/mcp/acceptance/PHASE-00.md: evidence/P0-document-checks.txt
+Cause: validator checked the report's link to its own output before creating that output.
+Fix: write completed preliminary check records to the evidence file before validating local links; all remaining checks still execute, and final records are written after success.
+This is a document-tool initialization failure. It is not a failed product/security/transaction/data test, and no assertions were weakened.
+Rerun result is recorded in P0-document-checks.txt.
