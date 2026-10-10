@@ -1,0 +1,829 @@
+11:28:45 [vite] (client) Re-optimizing dependencies because vite config has changed
+(!) Failed to run dependency scan. Skipping dependency pre-bundling. Error:   Failed to scan for dependencies from entries:
+  C:/Users/KB/Documents/inline/In-Line/index.html
+C:/Users/KB/Documents/inline/In-Line/src-tauri/target/release/build/in-line-69661939eeb58847/out/tauri-codegen-assets/5a4b53ec0535fcb1cb913499034e7fd4bad50f9ce3cc9a12aee6f4a27aa1676c.html
+C:/Users/KB/Documents/inline/In-Line/src-tauri/target/release/build/in-line-69661939eeb58847/out/tauri-codegen-assets/9a3324fa986e637c4f582d36ee64314b87913375bb80c37059fd7adbcc71a653.html
+
+  X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:20:32:
+      20 │ import SubtaskCreateDialog from "./components/SubtaskCreateDialog";
+         ╵                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31710:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31707:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/api.ts:5:37:
+      5 │ ...writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
+        ╵                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/components/TaskForm.tsx:6:57:
+      6 │ ...cheduleConfirmation,validatePlannedDate } from "../lib/scheduling";
+        ╵                                                   ~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/api.ts:7:68:
+      7 │ ...ng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
+        ╵                                                  ~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:22:33:
+      22 │ import TaskCompletionDialog from "./components/TaskCompletionDialog";
+         ╵                                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/components/TaskForm.tsx:7:23:
+      7 │ import ComboInput from "./ComboInput";
+        ╵                        ~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/components/SubtaskProgressControl.tsx:6:32:
+      6 │ import { subtaskProgress } from "../lib/subtask-progress";
+        ╵                                 ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:23:36:
+      23 │ ...btaskCompletionNotice from "./components/SubtaskCompletionNotice";
+         ╵                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/components/TaskForm.tsx:8:27:
+      8 │ import DeadlinePicker from "./DeadlinePicker";
+        ╵                            ~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/components/SubtaskProgressControl.tsx:7:24:
+      7 │ import StatusBadge from "./StatusBadge";
+        ╵                         ~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/components/TaskForm.tsx:9:30:
+      9 │ import MultiContactInput from "./MultiContactInput";
+        ╵                               ~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:24:31:
+      24 │ import ColumnResizeHandle from "./components/ColumnResizeHandle";
+         ╵                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/components/SubtaskProgressControl.tsx:8:25:
+      8 │ import TicketNumber from "./TicketNumber";
+        ╵                          ~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:25:77:
+      25 │ ...terHeader,ValueFilterHeader } from "./components/TaskTableFilter";
+         ╵                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:26:118:
+      26 │ ...kSearch,uniqueValues,type TaskFilters } from "./lib/task-filters";
+         ╵                                                 ~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:29:230:
+      29 │ ...type TaskColumnId,type TaskTablePage } from "./lib/column-widths";
+         ╵                                                ~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:31:26:
+      31 │ import ScheduleBadge from "./components/ScheduleBadge";
+         ╵                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+X [ERROR] The server is being restarted or closed. Request is outdated [plugin vite:dep-scan]
+
+    node_modules/esbuild/lib/main.js:1498:27:
+      1498 │         let result = await callback({
+           ╵                            ^
+
+    at throwClosedServerError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28639:32)
+    at EnvironmentPluginContainer.resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:28771:65)
+    at resolveId (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31580:38)
+    at resolve$4 (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31585:22)
+    at file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31738:28
+    at requestCallbacks.on-resolve (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1498:28)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+
+  This error came from the "onResolve" callback registered here:
+
+    node_modules/esbuild/lib/main.js:1422:20:
+      1422 │       let promise = setup({
+           ╵                     ^
+
+    at setup (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31737:12)
+    at handlePlugins (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1422:21)
+    at buildOrContextImpl (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1135:5)
+    at Object.buildOrContext (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:961:5)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:68
+    at new Promise (<anonymous>)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2325:27)
+    at Object.context (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:2167:58)
+    at prepareEsbuildScanner (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:31534:23)
+
+  The plugin "vite:dep-scan" was triggered by this import
+
+    src/App.tsx:32:56:
+      32 │ ...filterDeferredTasks,type DeferredFilter } from "./lib/scheduling";
+         ╵                                                   ~~~~~~~~~~~~~~~~~~
+
+
+    at failureErrorWithLog (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1748:15)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1207:25
+    at runOnEndCallbacks (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1588:45)
+    at buildResponseToResult (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1205:7)
+    at C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1217:9
+    at new Promise (<anonymous>)
+    at requestCallbacks.on-end (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:1216:54)
+    at handleRequest (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:909:17)
+    at handleIncomingPacket (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:934:7)
+    at Socket.readFromStdout (C:\Users\KB\Documents\inline\In-Line\node_modules\esbuild\lib\main.js:862:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "http://127.0.0.1:5173/", waiting until "load"
+
+    at C:\Users\KB\Documents\inline\In-Line\scripts\verify-task-ticket-colors.mjs:23:14 {
+  log: [
+    '  - navigating to "http://127.0.0.1:5173/", waiting until "load"'
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v24.19.0

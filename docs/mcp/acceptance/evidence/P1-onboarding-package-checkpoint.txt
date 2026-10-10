@@ -1,0 +1,5 @@
+{
+  "InstalledProgramModified": false,
+  "PreviousInstallerHash": "F87530CD5B5FE09379DB19C31B31EE9E482A8E84334B654E67D48ECA4326B963",
+  "Checkpoint": "C:\\Users\\KB\\AppData\\Local\\In-Line-P1-TestWindows\\onboarding-build-20261010-d6f064aa5ff943058955ab5f32d9e8d5"
+}

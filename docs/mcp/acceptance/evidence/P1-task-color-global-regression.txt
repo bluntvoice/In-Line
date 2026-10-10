@@ -1,0 +1,18 @@
+11:43:43 [vite] (client) Re-optimizing dependencies because vite config has changed
+Cannot read properties of undefined (reading 'find')
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.waitFor: Timeout 15000ms exceeded.
+Call log:
+  - waiting for getByRole('heading', { name: '编号配色', exact: true }) to be visible
+
+    at C:\Users\KB\Documents\inline\In-Line\scripts\verify-ticket-colors.mjs:36:84 {
+  log: [
+    "  - waiting for getByRole('heading', { name: '编号配色', exact: true }) to be visible"
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v24.19.0

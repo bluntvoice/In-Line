@@ -8,6 +8,7 @@ import TicketNumber from "./components/TicketNumber";
 import TaskForm from "./components/TaskForm";
 import TaskDetail from "./components/TaskDetail";
 import TaskContextMenu,{type ContextAction} from "./components/TaskContextMenu";
+import TaskTicketColorDialog from "./components/TaskTicketColorDialog";
 import SettingsPanel from "./components/SettingsPanel";
 import AboutPanel from "./components/AboutPanel";
 import StatisticsPanel from "./components/StatisticsPanel";
@@ -45,6 +46,7 @@ export default function App(){
   const [deferredFilter,setDeferredFilter]=useState<DeferredFilter>("all");
   const [selected,setSelected]=useState<LegalTask|null>(null);
   const [editing,setEditing]=useState<LegalTask|null|undefined>(undefined);
+  const [ticketColorTask,setTicketColorTask]=useState<LegalTask|null>(null);
   const [settings,setSettings]=useState(false);
   const [about,setAbout]=useState(false);
   const [statistics,setStatistics]=useState(false);
@@ -207,6 +209,7 @@ export default function App(){
     const {task,type}=action;
     if(type==="view"){showTaskDetails(task);return;}
     if(type==="edit"){setEditing(task);return;}
+    if(type==="ticketColor"){setTicketColorTask(task);return;}
     if(type==="addSubtask"){setSubtaskParent(task);return;}
     if(type==="status"||type==="urgent"){setQuickAction({task,mode:type});return;}
     if(type==="process"){await api.processRound(task.id);toast("已记录本轮处理，事项已进入暂缓队列");return;}
@@ -316,6 +319,7 @@ export default function App(){
     {completionPrompt&&<TaskCompletionDialog task={completionPrompt.task} state={completionPrompt.state} onClose={()=>setCompletionPrompt(null)} onComplete={async includeSubtasks=>{await performCompletion(completionPrompt.task,includeSubtasks);setCompletionPrompt(null);}}/>}
     {columnMenu&&<div className="context-backdrop" onPointerDown={()=>setColumnMenu(null)} onContextMenu={event=>{event.preventDefault();setColumnMenu(null);}}><div className="context-menu column-layout-menu" style={{left:Math.max(8,Math.min(columnMenu.x,window.innerWidth-226)),top:Math.max(8,Math.min(columnMenu.y,window.innerHeight-54))}} onPointerDown={event=>event.stopPropagation()} role="menu"><button type="button" role="menuitem" onClick={resetColumnWidths}><RotateCcw size={16}/>恢复本页默认列宽</button></div></div>}
     {menu&&<TaskContextMenu {...menu} onAction={action=>void handleAction(action).catch(error=>toast(String(error)))} onClose={()=>setMenu(null)}/>}
+    {ticketColorTask&&<TaskTicketColorDialog task={ticketColorTask} onClose={()=>setTicketColorTask(null)} onSaved={()=>toast("已保存事项编号配色")}/>}
     {queueAction&&<QueueDialog task={queueAction.task} reopen={queueAction.reopen} onClose={()=>setQueueAction(null)} onSaved={()=>{toast(queueAction.reopen?"事项已重新开启并加入今日队列":"事项已加入今日队列");setQueueAction(null);void refresh();}}/>}
     {completionNotice&&<SubtaskCompletionNotice parent={completionNotice} onClose={()=>setCompletionNotice(null)} onCompleteParent={async()=>{try{await performCompletion(completionNotice,false);setCompletionNotice(null);}catch(error){toast("完成父任务失败："+String(error));}}}/>}
     {message&&<div className="toast">{message}</div>}

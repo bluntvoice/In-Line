@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "codex/**"
+      - "feat/scheduled-items"
   pull_request:
 
 permissions:

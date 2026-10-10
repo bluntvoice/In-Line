@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-10",
+  "desktopVersion": "26.1002.7124.0",
+  "cliVersion": "0.162.0-alpha.2",
+  "scope": "current loaded desktop conversation; no fresh app server counts as success",
+  "selectedPolicy": "strict automatic import and reload, no manual reconnect",
+  "configProbeWrite": "passed parse/equivalence and actual-byte validation; only in_line command/args changed",
+  "transparentProxySelftest": "passed actual installed sidecar protocol and anonymous gate; separate nonce/log",
+  "currentSessionCalls": [
+    {
+      "requestId": "df8a2d37bc4cf3f16b8c301248ee54bde28d97a26418a6cb3eafd6a1d34367c3",
+      "result": "unauthenticated"
+    },
+    {
+      "requestId": "197cb8f361266cf903068efb87af8947030e69da4dec292c757d546a1ba46971",
+      "result": "unauthenticated"
+    }
+  ],
+  "desktopProxyStarted": false,
+  "desktopProxyObservedCurrentCalls": false,
+  "controlSocketProbe": "public codex app-server daemon version failed to connect to app-server-control.sock, OS10050; no daemon started/restarted",
+  "exposedReloadTool": false,
+  "originalConfigurationRestoredByteIdentical": true,
+  "credentialsCreatedOrRead": false,
+  "businessDataReadOrModified": false,
+  "strictOnboardingAcceptance": "NOT PASSED",
+  "supportList": [],
+  "limitations": "Only this installed desktop version/current session/file-update path tested. Public reload API exists, but current process callable access not established. Does not prove all Codex versions impossible or a supported future integration cannot work."
+}

@@ -1,0 +1,2 @@
+PASS: installed binary hashes unchanged; release importer remains closed.
+{"apiVersion":1,"requestId":"a825be7a7311c71b2f5ea340bc45392be94fb6fddd722088e51a46bf265f92f3","status":"error","data":null,"error":{"code":"onboarding_unavailable","message":"当前客户端自动接入仍在验证，入口暂未开放","retryAfterSeconds":null,"retryable":false}}

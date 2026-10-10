@@ -20,7 +20,7 @@ const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ti
        AND history.new_status IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed')
        AND (history.old_status IS NULL OR history.old_status NOT IN ('waiting_materials','waiting_confirmation','waiting_counterparty_confirmation','paused','processed'))
      ORDER BY history.id DESC LIMIT 1), is_import_conflict, parent_task_id, subtask_sort_order,
-     planned_date,is_scheduled,schedule_action,schedule_action_at
+     planned_date,is_scheduled,schedule_action,schedule_action_at,ticket_color
     FROM tasks";
 const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
@@ -31,6 +31,10 @@ pub struct Database {
 
 impl Database {
     pub fn open() -> Result<Self, String> {
+        #[cfg(debug_assertions)]
+        if let Some(root) = std::env::var_os("IN_LINE_MCP_TEST_DATA_ROOT") {
+            return Self::open_root(root.into());
+        }
         let root = dirs::config_dir()
             .ok_or("无法定位应用数据目录")?
             .join("in-line");
@@ -45,9 +49,23 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? < 9 {
+        if existed && Self::schema_version(&connection)? > 10 {
+            return Err("数据库版本高于本程序，请升级软件；未执行迁移".into());
+        }
+        if existed && Self::schema_version(&connection)? < 10 {
+            Self::check_integrity(&connection)?;
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
+            #[cfg(windows)]
+            {
+                crate::mcp::platform::check_path(&backup).map_err(|e| e.message)?;
+                crate::mcp::platform::Descriptor::new(false)
+                    .and_then(|sd| sd.apply(&backup))
+                    .map_err(|e| e.message)?;
+            }
+            let protected = Connection::open_with_flags(&backup, OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .map_err(display_error)?;
+            Self::check_integrity(&protected)?;
         }
         Self::migrate(&mut connection)?;
         let date_marker = Local::now().format("%Y%m%d").to_string();
@@ -91,7 +109,7 @@ impl Database {
         connection
             .execute_batch("PRAGMA query_only=ON; PRAGMA busy_timeout=5000;")
             .map_err(display_error)?;
-        if Self::schema_version(&connection)? < 9 {
+        if Self::schema_version(&connection)? < 10 {
             return Err("数据库版本过旧，请先启动 In Line 完成升级".into());
         }
         let backup_dir = path.parent().ok_or("数据库路径无效")?.join("backups");
@@ -476,6 +494,25 @@ impl Database {
                 .map_err(display_error)?;
         }
         migrate_scheduling(&transaction, version)?;
+        if version < 10 {
+            let has_color: i64 = transaction
+                .query_row(
+                    "SELECT count(*) FROM pragma_table_info('tasks') WHERE name='ticket_color'",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if has_color == 0 {
+                transaction
+                    .execute_batch("ALTER TABLE tasks ADD COLUMN ticket_color TEXT;")
+                    .map_err(display_error)?;
+            }
+            transaction
+                .execute_batch(
+                    "DELETE FROM schema_meta; INSERT INTO schema_meta(version) VALUES(10);",
+                )
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -515,7 +552,25 @@ impl Database {
                 ensure_master(&transaction, "contact", &contact)?;
             }
         }
+        if version < 10 {
+            Self::check_integrity(&transaction)?;
+        }
         transaction.commit().map_err(display_error)
+    }
+
+    fn check_integrity(connection: &Connection) -> Result<(), String> {
+        let integrity: String = connection
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .map_err(display_error)?;
+        let foreign_keys: i64 = connection
+            .query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
+                row.get(0)
+            })
+            .map_err(display_error)?;
+        if integrity != "ok" || foreign_keys != 0 {
+            return Err("数据库完整性校验失败，升级已停止；请保留原库和升级前备份".into());
+        }
+        Ok(())
     }
 
     fn with_conn<T>(
@@ -572,6 +627,25 @@ impl Database {
             is_scheduled: row.get::<_, i64>(32)? != 0,
             schedule_action: row.get(33)?,
             schedule_action_at: row.get(34)?,
+            ticket_color: row.get(35)?,
+        })
+    }
+
+    pub fn set_task_ticket_color(&self, id: i64, color: Option<String>) -> Result<(), String> {
+        let color = color
+            .map(|value| normalize_ticket_color(&value))
+            .transpose()?;
+        self.with_conn(|connection| {
+            let changed = connection
+                .execute(
+                    "UPDATE tasks SET ticket_color=? WHERE id=?",
+                    params![color, id],
+                )
+                .map_err(display_error)?;
+            if changed != 1 {
+                return Err("找不到该事项".into());
+            }
+            Ok(())
         })
     }
 
@@ -678,6 +752,18 @@ fn valid_setting(key: &str, value: &str) -> bool {
         }
         _ => false,
     }
+}
+fn normalize_ticket_color(value: &str) -> Result<String, String> {
+    let value = value.trim().strip_prefix('#').unwrap_or(value.trim());
+    if !matches!(value.len(), 3 | 6) || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("请输入3位或6位十六进制颜色，例如 #0B3A82".into());
+    }
+    let value = if value.len() == 3 {
+        value.chars().flat_map(|c| [c, c]).collect::<String>()
+    } else {
+        value.to_string()
+    };
+    Ok(format!("#{}", value.to_ascii_uppercase()))
 }
 fn parse_contacts(stored: &str) -> Vec<String> {
     let parsed =
@@ -2853,6 +2939,20 @@ impl Database {
         end: String,
         timezone_offset_minutes: i32,
     ) -> Result<StatisticsResult, String> {
+        self.statistics_scoped(
+            start,
+            end,
+            timezone_offset_minutes,
+            crate::mcp::scope::Scope::default(),
+        )
+    }
+    pub fn statistics_scoped(
+        &self,
+        start: String,
+        end: String,
+        timezone_offset_minutes: i32,
+        scope: crate::mcp::scope::Scope,
+    ) -> Result<StatisticsResult, String> {
         let start_time = chrono::DateTime::parse_from_rfc3339(&start)
             .map_err(|_| "统计开始时间无效".to_string())?;
         let end_time = chrono::DateTime::parse_from_rfc3339(&end)
@@ -2864,13 +2964,14 @@ impl Database {
         let offset_seconds = timezone_offset_minutes.clamp(-14 * 60, 14 * 60) * 60;
         let offset = FixedOffset::east_opt(offset_seconds).ok_or("本地时区无效")?;
         self.with_conn(|connection| {
+            scope.register(connection)?;
             let cte = "WITH ranged AS (
                 SELECT event.id,event.task_id,event.result_status,event.handled_at,
                        tasks.task_type AS current_task_type,tasks.department AS current_department,
                        tasks.parent_task_id AS current_parent_task_id
                 FROM task_work_events event
                 JOIN tasks ON tasks.id=event.task_id
-                WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
                   AND strftime('%s',event.handled_at)>=strftime('%s',?1)
                   AND strftime('%s',event.handled_at)<strftime('%s',?2)
               ), ranked AS (
@@ -2922,7 +3023,7 @@ impl Database {
                            SELECT entry.task_id
                            FROM task_queue_entries entry
                            JOIN tasks ON tasks.id=entry.task_id
-                           WHERE tasks.deleted_at IS NULL
+                           WHERE tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
                              AND strftime('%s',entry.enqueued_at)<strftime('%s',?2)
                              AND (entry.closed_at IS NULL OR strftime('%s',entry.closed_at)>strftime('%s',?1))
                              AND (tasks.requested_deadline IS NULL OR (
@@ -2933,7 +3034,7 @@ impl Database {
                            SELECT event.task_id
                            FROM task_work_events event
                            JOIN tasks ON tasks.id=event.task_id
-                           WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                           WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
                              AND strftime('%s',event.handled_at)>=strftime('%s',?1)
                              AND strftime('%s',event.handled_at)<strftime('%s',?2)
                          ) SELECT count(*) FROM eligible",
@@ -3042,7 +3143,7 @@ impl Database {
                     "SELECT event.task_id,event.handled_at,event.result_status
                      FROM task_work_events event
                      JOIN tasks ON tasks.id=event.task_id
-                     WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                     WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
                        AND strftime('%s',event.handled_at)>=strftime('%s',?)
                        AND strftime('%s',event.handled_at)<strftime('%s',?)
                      ORDER BY strftime('%s',event.handled_at),event.id",
@@ -3193,6 +3294,22 @@ impl Database {
         limit: i64,
         offset: i64,
     ) -> Result<ReportItemsPage, String> {
+        self.report_items_scoped(
+            start,
+            end,
+            limit,
+            offset,
+            crate::mcp::scope::Scope::default(),
+        )
+    }
+    pub fn report_items_scoped(
+        &self,
+        start: String,
+        end: String,
+        limit: i64,
+        offset: i64,
+        scope: crate::mcp::scope::Scope,
+    ) -> Result<ReportItemsPage, String> {
         let start_time = chrono::DateTime::parse_from_rfc3339(&start)
             .map_err(|_| "报告开始时间无效".to_string())?;
         let end_time = chrono::DateTime::parse_from_rfc3339(&end)
@@ -3203,12 +3320,13 @@ impl Database {
         let limit = limit.clamp(1, 500);
         let offset = offset.max(0);
         self.with_conn(|connection| {
+            scope.register(connection)?;
             let total = connection
                 .query_row(
                     "SELECT count(DISTINCT event.task_id)
                      FROM task_work_events event
                      JOIN tasks ON tasks.id=event.task_id
-                     WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                     WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
                        AND strftime('%s',event.handled_at)>=strftime('%s',?1)
                        AND strftime('%s',event.handled_at)<strftime('%s',?2)",
                     params![&start, &end],
@@ -3221,7 +3339,7 @@ impl Database {
                        SELECT event.task_id,max(strftime('%s',event.handled_at)) AS last_handled
                        FROM task_work_events event
                        JOIN tasks ON tasks.id=event.task_id
-                       WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL
+                       WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
                          AND strftime('%s',event.handled_at)>=strftime('%s',?1)
                          AND strftime('%s',event.handled_at)<strftime('%s',?2)
                        GROUP BY event.task_id
@@ -3761,7 +3879,7 @@ impl Database {
             }
         }
         let version = Self::schema_version(&connection)?;
-        if version > 9 {
+        if version > 10 {
             return Err("该备份来自更高版本的 In Line，请先升级软件".into());
         }
         Ok(())
@@ -4269,7 +4387,11 @@ fn insert_imported_task(
         )
         .map_err(display_error)?;
     let id = connection.last_insert_rowid();
-    connection.execute("UPDATE tasks SET planned_date=?,is_scheduled=?,schedule_action=?,schedule_action_at=? WHERE id=?",params![task.planned_date,task.is_scheduled as i64,task.schedule_action,task.schedule_action_at,id]).map_err(display_error)?;
+    let color = task
+        .ticket_color
+        .as_deref()
+        .and_then(|value| normalize_ticket_color(value).ok());
+    connection.execute("UPDATE tasks SET planned_date=?,is_scheduled=?,schedule_action=?,schedule_action_at=?,ticket_color=? WHERE id=?",params![task.planned_date,task.is_scheduled as i64,task.schedule_action,task.schedule_action_at,color,id]).map_err(display_error)?;
     allocate_number_on(connection, id, &ticket_date, daily_sequence)?;
     if daily_sequence != task.daily_sequence {
         add_log(
@@ -4886,6 +5008,97 @@ mod tests {
                 .map(String::as_str),
             Some("sunday")
         );
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn task_ticket_color_is_independent_persistent_and_preserved_by_edits_and_backup() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-task-color-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let db = Database::open_root(root.join("source")).unwrap();
+        let task = db.save_task(sample("自选编号事项")).unwrap();
+        let other = db.save_task(sample("其他事项")).unwrap();
+        db.set_task_ticket_color(task.id, Some(" abc ".into()))
+            .unwrap();
+        for invalid in ["", "#12", "#GGGGGG", "url(x)", "#FFFFFF00"] {
+            assert!(db
+                .set_task_ticket_color(task.id, Some(invalid.into()))
+                .is_err());
+        }
+        assert!(db.set_task_ticket_color(-1, Some("#fff".into())).is_err());
+        let mut edited = sample("自选编号事项");
+        edited.id = Some(task.id);
+        edited.details = "重新编辑".into();
+        let task = db.save_task(edited).unwrap();
+        assert_eq!(task.ticket_color.as_deref(), Some("#AABBCC"));
+        assert_eq!(
+            db.list_tasks(TaskView::Queue)
+                .unwrap()
+                .iter()
+                .find(|t| t.id == other.id)
+                .unwrap()
+                .ticket_color,
+            None
+        );
+        let backup = db.create_backup("manual").unwrap();
+        drop(db);
+        let db = Database::open_root(root.join("source")).unwrap();
+        assert_eq!(
+            db.get_task(task.id).unwrap().ticket_color.as_deref(),
+            Some("#AABBCC")
+        );
+        let target = Database::open_root(root.join("target")).unwrap();
+        target.save_task(sample("目标旧事项")).unwrap();
+        let imported = target.import_backup(backup.path).unwrap();
+        target.restore_backup(imported.path).unwrap();
+        let restored = target
+            .list_tasks(TaskView::Queue)
+            .unwrap()
+            .into_iter()
+            .find(|t| t.title == task.title)
+            .unwrap();
+        assert_eq!(restored.ticket_color.as_deref(), Some("#AABBCC"));
+        db.set_task_ticket_color(task.id, None).unwrap();
+        assert_eq!(db.get_task(task.id).unwrap().ticket_color, None);
+        drop(db);
+        drop(target);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn schema9_upgrade_adds_color_without_changing_tasks_and_backs_up_before_migration() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-color-migration-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let db = Database::open_root(root.clone()).unwrap();
+        let original = db.save_task(sample("升级前事项")).unwrap();
+        db.with_conn(|c| {
+            c.execute_batch(
+                "ALTER TABLE tasks DROP COLUMN ticket_color; UPDATE schema_meta SET version=9;",
+            )
+            .map_err(display_error)
+        })
+        .unwrap();
+        drop(db);
+        let db = Database::open_root(root.clone()).unwrap();
+        let current = db.get_task(original.id).unwrap();
+        assert_eq!(current.permanent_number, original.permanent_number);
+        assert_eq!(current.updated_at, original.updated_at);
+        assert_eq!(current.ticket_color, None);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 10);
+        let backups = db.list_backups().unwrap();
+        let before = backups
+            .iter()
+            .find(|b| b.name.ends_with("before-migration.db"))
+            .unwrap();
+        let saved =
+            Connection::open_with_flags(&before.path, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        assert_eq!(Database::schema_version(&saved).unwrap(), 9);
+        drop(saved);
         drop(db);
         fs::remove_dir_all(root).unwrap();
     }
@@ -5513,7 +5726,7 @@ mod tests {
         db.with_conn(|conn|conn.execute_batch("DROP INDEX idx_scheduled_due; DROP TABLE queue_number_allocations; ALTER TABLE tasks DROP COLUMN planned_date; ALTER TABLE tasks DROP COLUMN is_scheduled; ALTER TABLE tasks DROP COLUMN schedule_action; ALTER TABLE tasks DROP COLUMN schedule_action_at; UPDATE schema_meta SET version=8;").map_err(display_error)).unwrap();
         drop(db);
         let db = Database::open_root(root.clone()).unwrap();
-        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 9);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 10);
         let after = db.get_task(child.id).unwrap();
         assert_eq!(after.parent_task_id, Some(parent.id));
         assert_eq!(after.permanent_number, child.permanent_number);
@@ -5527,6 +5740,11 @@ mod tests {
             .find(|item| item.name.contains("before-migration"))
             .unwrap();
         let saved = Connection::open(&migration.path).unwrap();
+        #[cfg(windows)]
+        crate::mcp::platform::Descriptor::new(false)
+            .unwrap()
+            .verify(Path::new(&migration.path))
+            .unwrap();
         assert_eq!(Database::schema_version(&saved).unwrap(), 8);
         drop(saved);
         let mut future = sample("升级后预约");
@@ -5807,7 +6025,7 @@ mod tests {
         create_v7_database(&upgraded_path);
 
         let upgraded = Database::open_at(upgraded_path.clone()).unwrap();
-        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 9);
+        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 10);
         let task = upgraded.get_task(1).unwrap();
         assert_eq!(task.parent_task_id, None);
         assert_eq!(task.subtask_sort_order, 0);
@@ -7182,7 +7400,7 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 9);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 10);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);

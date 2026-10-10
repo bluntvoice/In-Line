@@ -1,0 +1,39 @@
+fixture diagnostics {
+  callbacks: [
+    '() => void refresh()',
+    '() => void refresh()',
+    '() => void refresh()',
+    '() => void refresh()'
+  ],
+  events: 1,
+  colors: [
+    { id: 1, color: '#AABBCC', priority: 'normal' },
+    { id: 2, color: '#F3D98B', priority: 'normal' },
+    { id: 3, color: null, priority: 'normal' }
+  ],
+  bootstrap: [
+    { id: 1, color: '#AABBCC', priority: 'normal' },
+    { id: 2, color: null, priority: 'normal' },
+    { id: 3, color: null, priority: 'normal' }
+  ],
+  html: [
+    '<span class="ticket-number    " title="今日取号事项" style="background-color: rgb(170, 187, 204); color: rgb(0, 0, 0);"><span class="ticket-prefix"></span><strong>01</strong></span>',
+    '<span class="ticket-number   ticket-urgent " title="今日取号事项"><span class="ticket-prefix"></span><strong>02</strong></span>'
+  ]
+}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: color mismatch {"actual":{"background":"rgb(196, 61, 75)","text":"rgb(255, 255, 255)"},"color":"rgb(243, 217, 139)"}
+    at rgb (file:///C:/Users/KB/Documents/inline/In-Line/scripts/verify-task-ticket-colors.mjs:37:12)
+    at async file:///C:/Users/KB/Documents/inline/In-Line/scripts/verify-task-ticket-colors.mjs:51:110 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: undefined,
+  operator: 'fail',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

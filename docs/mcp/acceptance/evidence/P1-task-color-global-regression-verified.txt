@@ -1,0 +1,1 @@
+PASS ticket colors: 16 presets, independent roles, HEX normalization, invalid input, light text contrast, save failure/retry, reload persistence, floating synchronization, atomic reset, draft clearing and stale-read race

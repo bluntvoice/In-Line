@@ -302,6 +302,14 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 .ticket-number.ticket-urgent { background: var(--ticket-urgent-background, #c43d4b); color: var(--ticket-urgent-text, #fff); }
 .ticket-number.ticket-scheduled { background: var(--ticket-future-background, #3f766e); color: var(--ticket-future-text, #fff); }
 .ticket-number .ticket-triangle { color: inherit; }
+.task-ticket-color-note{margin:0;padding:10px 16px;color:#607086;font-size:12px}
+.subtask-reservation-status{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;padding:4px 8px;border:1px solid #bad3cc;border-radius:6px;background:#edf5f2;color:#3f766e;font-size:12px;font-weight:600}
+.task-ticket-color-code{display:flex;align-items:end;gap:10px;padding:0 16px 12px}
+.task-ticket-color-code label{display:grid;flex:1;min-width:0;gap:4px;font-size:12px}
+.task-ticket-color-code input{width:100%;height:32px;padding:0 8px;border:1px solid #cfd8e5;border-radius:6px}
+.task-ticket-color-picker{max-height:calc(100vh - 24px);overflow:auto}
+.task-ticket-color-picker header p{max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:480px){.task-ticket-color-picker .ticket-color-options{grid-template-columns:repeat(2,minmax(0,1fr))}.task-ticket-color-code{flex-wrap:wrap}.task-ticket-color-picker header p{max-width:230px}}
 .task-table .ticket-identity>.ticket-number{width:max-content;flex-shrink:0}
 .schedule-mark { display: inline-block; color: #4c6771; background: #e9f1f4; padding: 2px 6px; border-radius: 4px; font-size: 12px; line-height: 1.5; width: fit-content; }
 .task-title-structure > .schedule-mark { margin-top: 3px; }
@@ -339,3 +347,17 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 
 .backup-cleanup-feedback{margin:0 12px 12px;padding:10px 12px;border:1px solid #b8d7c5;border-radius:8px;background:#fbfffc;color:#173f2b;font-size:12px;line-height:1.6;overflow-wrap:anywhere}
 .backup-cleanup-feedback.error{border-color:#edbec6;background:#fffafb;color:#762131}
+.mcp-security-setting{margin:8px 12px 14px;font-size:12px;line-height:1.6}
+.mcp-security-setting summary{cursor:pointer;color:#0b3a82;font-weight:600}
+.mcp-security-setting p{margin:8px 0;color:#607086}
+.mcp-security-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0}
+.mcp-security-controls label{display:flex;align-items:center;gap:5px}
+.mcp-client-list{list-style:none;padding:0;margin:8px 0}
+.mcp-client-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e4eaf2}
+.mcp-client-list small{display:block;font-size:12px;color:#607086;overflow-wrap:anywhere}
+.mcp-client-list li>div:last-child{display:flex;gap:6px}
+.mcp-grant-form{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:8px 0}
+.mcp-grant-form label{display:grid;gap:4px;flex:1 1 180px}
+.mcp-grant-form input,.mcp-grant-form select{width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px;border:1px solid #ccd7e8;border-radius:6px}
+.mcp-issued textarea{width:100%;box-sizing:border-box;min-height:180px;font:12px Consolas,monospace}
+.mcp-security-setting .mcp-security-error{color:#b42318}

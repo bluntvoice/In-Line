@@ -1,17 +1,18 @@
-import { CheckCircle2,Edit3,Eye,Flame,ListPlus,PlayCircle,Plus,RotateCcw,Trash2 } from "lucide-react";
+import { CheckCircle2,Edit3,Eye,Flame,ListPlus,Palette,PlayCircle,Plus,RotateCcw,Trash2 } from "lucide-react";
 import type { LegalTask,TaskView } from "../types";
 import { isDeferredStatus } from "../lib/task-utils";
 
-export interface ContextAction{type:"view"|"edit"|"addSubtask"|"status"|"urgent"|"process"|"complete"|"enqueue"|"reopen"|"delete"|"restore"|"permanentDelete";task:LegalTask}
+export interface ContextAction{type:"view"|"edit"|"ticketColor"|"addSubtask"|"status"|"urgent"|"process"|"complete"|"enqueue"|"reopen"|"delete"|"restore"|"permanentDelete";task:LegalTask}
 export default function TaskContextMenu({task,view,x,y,onAction,onClose}:{task:LegalTask;view:TaskView;x:number;y:number;onAction:(action:ContextAction)=>void;onClose:()=>void}){
   const fire=(type:ContextAction["type"])=>{onAction({type,task});onClose();};
   const terminal=task.status==="completed"||task.status==="archived"||Boolean(task.archivedAt);
   const canWork=!terminal&&task.status!=="cancelled";
   return <div className="context-backdrop" onPointerDown={onClose} onContextMenu={event=>{event.preventDefault();onClose();}}>
     <div className="context-menu" style={{left:Math.max(8,Math.min(x,window.innerWidth-226)),top:Math.max(8,Math.min(y,window.innerHeight-510)),maxHeight:"calc(100vh - 16px)",overflowY:"auto"}} onPointerDown={event=>event.stopPropagation()} role="menu">
-      {view==="trash"?<><button onClick={()=>fire("restore")}><RotateCcw size={16}/>恢复并加入今日队列</button><span/><button className="danger" onClick={()=>fire("permanentDelete")}><Trash2 size={16}/>永久删除</button></>:<>
+      {view==="trash"?<><button onClick={()=>fire("restore")}><RotateCcw size={16}/>恢复并加入今日队列</button><button onClick={()=>fire("ticketColor")}><Palette size={16}/>编号配色</button><span/><button className="danger" onClick={()=>fire("permanentDelete")}><Trash2 size={16}/>永久删除</button></>:<>
         <button onClick={()=>fire("view")}><Eye size={16}/>查看详情</button>
         <button onClick={()=>fire("edit")}><Edit3 size={16}/>编辑事项</button>
+        <button onClick={()=>fire("ticketColor")}><Palette size={16}/>编号配色</button>
         {task.parentTaskId===null&&<button onClick={()=>fire("addSubtask")}><Plus size={16}/>添加子任务</button>}
         {!terminal&&<button onClick={()=>fire("status")}><CheckCircle2 size={16}/>修改状态</button>}
         {!terminal&&(!isDeferredStatus(task.status)||task.isUrgent)&&<button onClick={()=>fire("urgent")}><Flame size={16}/>{task.isUrgent?"取消加急":"设置加急"}</button>}

@@ -1,0 +1,28 @@
+P1 document verification failures, 2026-10-09.
+Transcribed from the command-tool responses in this session; these are not successful stdout logs. PowerShell terminating errors stopped the pipeline before Tee-Object created the intended first/second/third evidence files.
+
+First invocation: ./docs/mcp/verify-phase1-documents.ps1
+Exception: verify-phase1-documents.ps1:17
+Expected 13 traceability fields
+Cause: PSObject.Properties.Count does not give the required collection count here.
+Fix: @($row.PSObject.Properties).Count; all 13 fields remain required.
+
+Second invocation: ./docs/mcp/verify-phase1-documents.ps1
+ConvertFrom-Json: verify-phase1-documents.ps1:24
+The provided JSON includes a property whose name is an empty string, this is only supported using the -AsHashTable switch.
+Cause: package-lock.json contains packages[""].
+Fix: ConvertFrom-Json -AsHashtable for package-lock.json; version gate retained.
+
+Third invocation: ./docs/mcp/verify-phase1-documents.ps1
+Exception: verify-phase1-documents.ps1:39
+Broken link: PHASE-01.md -> evidence/P1-format-final.txt
+Cause: successful cargo fmt emitted no output, so Tee-Object did not create a file.
+Fix: record the actual successful format command's exit status explicitly; link gate retained.
+
+Fourth invocation during the remaining build:
+Exception: verify-phase1-documents.ps1:39
+Broken link: PHASE-01.md -> evidence/P1-nsis-final.txt
+Cause: report already named the next frozen-source build, which had not started yet.
+Fix: complete the named build and reverify all links; no link check was disabled.
+
+Final successful command outputs: P1-document-checks.txt.

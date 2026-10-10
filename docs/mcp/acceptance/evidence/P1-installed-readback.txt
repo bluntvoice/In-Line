@@ -1,0 +1,19 @@
+{
+  "testedAt": "2026-10-09T23:30:56.9569922+08:00",
+  "installerExitCode": 0,
+  "mainVersion": "0.5.0",
+  "mainBytes": 7485440,
+  "mainSHA256": "4D15983FF06F96E9978A5AA9E78BA98B394C5BB16688F54C14015F55A11FF4C2",
+  "sidecarVersion": "0.5.0",
+  "sidecarBytes": 1171456,
+  "sidecarSHA256": "7A0E582F4279C94EBF8A5147DA9916AC2E9877DF1E5B0AFFDE90A5BBA3AB7373",
+  "selectedSidecarInput": "target/release/in-line-mcp.exe (second NSIS input)",
+  "databaseIntegrity": "ok",
+  "databaseForeignKeys": "ok",
+  "schema": 9,
+  "tasks": 268,
+  "all11TableLogicalDigestsPreserved": true,
+  "anonymousStdio": "3 tools unauthenticated; sixth call rate_limited; isError=true; data=null; stdout JSON only",
+  "authUpgrade": "not tested: no prior independent authorization store",
+  "gui": "not executed by automation: computer-use kernel assets initialization failed twice"
+}

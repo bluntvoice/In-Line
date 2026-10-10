@@ -1,0 +1,9 @@
+warning: in the working copy of 'src-tauri/Cargo.lock', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src-tauri/Cargo.toml', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src-tauri/src/bin/in-line-mcp.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src-tauri/src/database.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src-tauri/src/lib.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src-tauri/tests/mcp_stdio.rs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/SettingsPanel.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/styles.css', LF will be replaced by CRLF the next time Git touches it
+PASS: git diff --check

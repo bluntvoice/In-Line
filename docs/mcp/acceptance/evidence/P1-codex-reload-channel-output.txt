@@ -1,0 +1,5 @@
+{"proxyExitCode": 1, "timeout": false, "protocolResponseReceived": false, "stderr": "Error: failed to connect to socket at C:\\Users\\KB\\.codex\\app-server-control\\app-server-control.sock\n\nCaused by:\n    \u5957\u63a5\u5b57\u64cd\u4f5c\u9047\u5230\u4e86\u4e00\u4e2a\u5df2\u6b7b\u7684\u7f51\u7edc\u3002 (os error 10050)", "configUnchanged": true}
+{"check": "app_server.status", "status": "ok", "summary": "background server is not running", "details": {"status": "not running", "mode": "ephemeral", "control socket": "C:\\Users\\KB\\.codex\\app-server-control\\app-server-control.sock", "dedicated pid file": "C:\\Users\\KB\\.codex\\app-server-daemon\\daemon.pid (missing)"}}
+{"check": "config.load", "status": "ok", "summary": "config loaded", "details": {"config.toml parse": "ok", "active thread overrides": "not inspected"}}
+{"check": "desktop.app.version", "status": "ok", "summary": "the desktop application is installed", "details": {"running": "true", "version": "26.1002.7124.0"}}
+{"doctorExitCode": 1, "doctorOverallStatus": "fail", "scope": "only selected checks apply to reload-channel investigation"}

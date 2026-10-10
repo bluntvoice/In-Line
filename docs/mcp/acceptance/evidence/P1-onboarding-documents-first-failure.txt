@@ -1,0 +1,2 @@
+First document verification failed: Original decision altered: MCP-044
+The latest user authorization had been written into the frozen original-decision field. Restored the original field verbatim and kept the new explicit authorization in implementation/confirmation fields and the appended PRD section. Original inputs and their copies were never edited. Verifier assertions were not changed.

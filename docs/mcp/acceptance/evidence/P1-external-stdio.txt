@@ -1,0 +1,1 @@
+PASS: release sidecar initialize/tools/list/3 anonymous tools + 3 repeat calls (6th rate_limited); stdout JSON only; structured errors with isError=true and no business data.

@@ -1,0 +1,11 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error[E0432]: unresolved import `windows_sys::Win32::Security::SE_GROUP_LOGON_ID`
+  --> src\mcp\platform.rs:41:13
+   |
+41 |             SE_GROUP_LOGON_ID, TOKEN_GROUPS, TOKEN_QUERY, TOKEN_USER,
+   |             ^^^^^^^^^^^^^^^^^ no `SE_GROUP_LOGON_ID` in `Win32::Security`
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `in-line` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `in-line` (lib test) due to 1 previous error

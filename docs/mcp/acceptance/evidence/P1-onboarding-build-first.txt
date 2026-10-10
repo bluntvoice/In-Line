@@ -1,0 +1,5 @@
+
+> in-line@0.5.0 build
+> tsc -p tsconfig.renderer.json --noEmit && vite build
+
+src/api.ts(89,66): error TS2694: Namespace '"C:/Users/KB/Documents/inline/In-Line/src/components/McpSecuritySetting"' has no exported member 'McpPermissions'.

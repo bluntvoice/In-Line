@@ -19,8 +19,10 @@ chrono = { version = "0.4", features = ["clock", "serde"] }
 dirs = "6"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["gzip", "json", "rustls-tls", "stream"] }
-rmcp = { version = "3.1.2", features = ["transport-io"] }
-rusqlite = { version = "0.37", features = ["bundled"] }
+rmcp = { version = "3.1.2", features = ["transport-io", "client", "transport-child-process"] }
+rusqlite = { version = "0.37", features = ["bundled", "functions"] }
+getrandom = "0.3"
+hmac = "0.12"
 schemars = "1"
 semver = "1"
 serde = { version = "1", features = ["derive"] }
@@ -35,11 +37,13 @@ tauri-plugin-notification = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 thiserror = "2"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+toml_edit = "=0.25.13"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "io-util", "time", "sync"] }
 
 [target.'cfg(windows)'.dependencies]
 # Native Windows API bindings already present transitively; no font database dependency.
 windows = { version = "0.61", features = ["Win32_Graphics_DirectWrite"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Security_Cryptography", "Win32_System_Threading", "Win32_System_Registry", "Win32_System_SystemServices", "Win32_System_Diagnostics_ToolHelp", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_UI_WindowsAndMessaging"] }
 
 [profile.release]
 codegen-units = 1

@@ -58,6 +58,7 @@ pub struct LegalTask {
     pub is_scheduled: bool,
     pub schedule_action: String,
     pub schedule_action_at: Option<String>,
+    pub ticket_color: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

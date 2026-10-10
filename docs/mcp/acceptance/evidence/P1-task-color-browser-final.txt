@@ -1,0 +1,12 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.evaluate: Error: color mismatch rgb(196, 61, 75) rgb(255, 255, 255)
+    at check (eval at evaluate (:311:30), <anonymous>:2:184)
+    at rgb (C:\Users\KB\Documents\inline\In-Line\scripts\verify-task-ticket-colors.mjs:29:55)
+    at C:\Users\KB\Documents\inline\In-Line\scripts\verify-task-ticket-colors.mjs:44:90 {
+  log: []
+}
+
+Node.js v24.19.0

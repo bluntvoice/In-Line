@@ -2,9 +2,10 @@ import { useEffect,useRef,useState } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle,CheckCircle2,ExternalLink,Plus,RotateCcw,X } from "lucide-react";
 import type { LegalTask } from "../types";
-import { displayTicket,formatDeadline,isOverdue } from "../lib/task-utils";
+import { formatDeadline,isOverdue } from "../lib/task-utils";
 import { subtaskProgress } from "../lib/subtask-progress";
 import StatusBadge from "./StatusBadge";
+import TicketNumber from "./TicketNumber";
 
 interface Props {
   parent:LegalTask;
@@ -58,7 +59,7 @@ export default function SubtaskProgressControl({parent,subtasks,onOpenTask,onAdd
         {error&&<div className="relation-error"><AlertTriangle size={14}/>{error}</div>}
         <div className="subtask-popover-list">
           {subtasks.map(task=>{const completed=task.status==="completed";const disabled=Boolean(task.deletedAt)||task.status==="cancelled"||task.status==="archived"||Boolean(task.archivedAt);return <article key={task.id}>
-            <button type="button" className="popover-subtask-main" onClick={()=>{setPosition(null);onOpenTask(task);}} title={task.title}><strong>{task.title}</strong><span><b>{displayTicket(task)}</b><StatusBadge status={task.status} overdue={isOverdue(task)}/>{task.isUrgent&&<em>加急</em>}</span></button>
+            <button type="button" className="popover-subtask-main" onClick={()=>{setPosition(null);onOpenTask(task);}} title={task.title}><strong>{task.title}</strong><span><TicketNumber task={task}/><StatusBadge status={task.status} overdue={isOverdue(task)}/>{task.isUrgent&&<em>加急</em>}</span></button>
             <div className="popover-subtask-meta"><span>{formatDeadline(task.requestedDeadline,task.requestedDeadlineLabel)}</span><span>{task.hasActiveQueue?"今日队列中":"未加入队列"}</span></div>
             <div className="popover-subtask-actions"><button type="button" disabled={disabled||busyId===task.id} title={completed?"取消完成并恢复为待处理":"快速完成"} onClick={()=>void toggle(task)}>{completed?<RotateCcw size={14}/>:<CheckCircle2 size={14}/>}<span>{completed?"取消完成":"完成"}</span></button><button type="button" title="进入详情" onClick={()=>{setPosition(null);onOpenTask(task);}}><ExternalLink size={14}/></button></div>
           </article>})}

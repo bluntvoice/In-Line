@@ -1,0 +1,8 @@
+src-tauri\target\release\in-line-mcp.exe | exit=1 | {"apiVersion":1,"requestId":"77b8ae0d0cc688c8fc0c941359eb9721671f0019a7e606749e8eabf77791840e","status":"error","data":null,"error":{"code":"onboarding_unavailable","message":"当前客户端自动接入仍在验证，入口暂未开放","retryAfterSeconds":null,"retryable":false}}
+
+src-tauri\binaries\in-line-mcp-x86_64-pc-windows-msvc.exe | exit=1 | {"apiVersion":1,"requestId":"4d927ba70b564686d38f7f54dd5efb1029c0a984c7ef5dd580445e52bf2f2eae","status":"error","data":null,"error":{"code":"onboarding_unavailable","message":"当前客户端自动接入仍在验证，入口暂未开放","retryAfterSeconds":null,"retryable":false}}
+
+PASS: both release inputs reject import before file access; Codex config hash unchanged.
+Installed unchanged | D:\Application\In Line\in-line-mcp.exe | SHA256=7A0E582F4279C94EBF8A5147DA9916AC2E9877DF1E5B0AFFDE90A5BBA3AB7373
+Installed unchanged | D:\Application\In Line\in-line.exe | SHA256=4D15983FF06F96E9978A5AA9E78BA98B394C5BB16688F54C14015F55A11FF4C2
+branch=feat/scheduled-items | HEAD=f2a97b34410f850f3da8c19d4ec6e21c7d63048f

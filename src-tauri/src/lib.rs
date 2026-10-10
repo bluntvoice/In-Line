@@ -1,5 +1,6 @@
 pub mod database;
 pub mod fonts;
+pub mod mcp;
 pub mod models;
 pub mod recommended_font;
 pub mod updater;
@@ -115,6 +116,16 @@ fn create_subtask(
     let task = db.create_subtask(input)?;
     emit_change(&app)?;
     Ok(task)
+}
+#[tauri::command]
+fn set_task_ticket_color(
+    app: tauri::AppHandle,
+    db: State<Database>,
+    id: i64,
+    color: Option<String>,
+) -> Result<(), String> {
+    db.set_task_ticket_color(id, color)?;
+    emit_change(&app)
 }
 #[tauri::command]
 fn set_task_status(
@@ -456,9 +467,106 @@ fn mcp_executable() -> Result<std::path::PathBuf, String> {
 fn mcp_connection_guide() -> Result<String, String> {
     let executable = mcp_executable()?;
     Ok(format!(
-        "请为当前 AI 工具接入以下 In Line MCP 服务。\n\n服务器名称：in_line\n传输方式：stdio\n启动命令：{}\n启动参数：无\n\n可用工具：\n- get_report_summary：读取指定日期范围的统计汇总\n- list_report_items：分页读取指定日期范围的办理事项明细\n\n权限范围：仅只读；不返回联系人、事项详情、内部备注、普通操作日志或回收站事项。\n\n请完成配置、检查格式和程序路径，并告诉我是否需要重启当前 AI 工具。",
+        "In Line MCP（本机stdio）\n服务程序：{}\n\n新接入流程：选择AI客户端与权限，授权并复制提示词，发送给所选AI。长期凭证只由本机程序处理，不在提示词中显示。Codex当前会话自动接入仍在实机验证，入口暂未开放；既有授权仍可管理或撤销。\n\n工具：get_capabilities、get_report_summary、list_report_items。每页最多100；统一返回status/data/error。常规读取不返回办理自由文本；完整读取需全局及客户端双方启用。当前开发阶段尚无写入工具。\n\n配置与授权验证、当前AI会话连接验证分别记录；禁止用另起实例冒充当前会话自动重载成功。",
         executable.display()
     ))
+}
+
+type McpSecurity = std::sync::Arc<mcp::security::Security>;
+fn mcp_local(window: &tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "main" {
+        return Err("请在主界面软件设置管理MCP授权".into());
+    }
+    Ok(())
+}
+fn mcp_error(error: mcp::contract::McpError) -> String {
+    format!("{}：{}", error.code, error.message)
+}
+#[tauri::command]
+fn mcp_security_state(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    let mut view = serde_json::to_value(security.view().map_err(mcp_error)?)
+        .map_err(|_| "无法读取授权状态".to_string())?;
+    view["onboardingClients"] = serde_json::to_value(mcp::onboarding::presets())
+        .map_err(|_| "无法读取客户端状态".to_string())?;
+    Ok(view)
+}
+#[tauri::command]
+fn mcp_prepare_onboarding(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    args: mcp::onboarding::PrepareArgs,
+) -> Result<mcp::onboarding::Receipt, String> {
+    mcp_local(&window)?;
+    mcp::onboarding::require_available(&args.client).map_err(mcp_error)?;
+    mcp::onboarding::prepare_at(
+        &security,
+        &mcp::platform::root().map_err(mcp_error)?,
+        &mcp_executable()?,
+        args,
+        chrono::Utc::now().timestamp(),
+    )
+    .map_err(mcp_error)
+}
+#[tauri::command]
+fn mcp_rotate_onboarding(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    id: String,
+) -> Result<mcp::onboarding::Receipt, String> {
+    mcp_local(&window)?;
+    mcp::onboarding::require_available("codex").map_err(mcp_error)?;
+    mcp::onboarding::rotate_at(
+        &security,
+        &mcp::platform::root().map_err(mcp_error)?,
+        &mcp_executable()?,
+        &id,
+        chrono::Utc::now().timestamp(),
+    )
+    .map_err(mcp_error)
+}
+#[tauri::command]
+fn mcp_revoke_client(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    id: String,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security.revoke(&id).map_err(mcp_error)
+}
+#[tauri::command]
+fn mcp_update_client(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    id: String,
+    permissions: mcp::security::Permissions,
+    scope: mcp::scope::Scope,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security
+        .update_client(&id, permissions, scope)
+        .map_err(mcp_error)
+}
+#[tauri::command]
+fn mcp_set_groups(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    groups: mcp::security::Permissions,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security.set_groups(groups).map_err(mcp_error)
+}
+#[tauri::command]
+fn mcp_set_paused(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    paused: bool,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security.pause(paused).map_err(mcp_error)
 }
 #[tauri::command]
 fn delete_backup(app: tauri::AppHandle, db: State<Database>, path: String) -> Result<(), String> {
@@ -829,15 +937,37 @@ fn save_chart_export(path: String, bytes: Vec<u8>) -> Result<(), String> {
 }
 
 pub fn run() {
-    let database = Database::open().expect("In Line 数据库初始化失败");
-    let initial_shortcut = database
-        .settings()
-        .ok()
-        .and_then(|values| values.get("global_shortcut").cloned())
-        .filter(|value| valid_global_shortcut(value))
-        .unwrap_or_else(|| DEFAULT_GLOBAL_SHORTCUT.into());
+    let background = std::env::args().any(|arg| arg == "--mcp-background");
+    let context = tauri::generate_context!();
+    #[cfg(debug_assertions)]
+    let context = {
+        let mut context = context;
+        if let Some(root) = std::env::var_os("IN_LINE_MCP_TEST_DATA_ROOT") {
+            use sha2::{Digest, Sha256};
+            let suffix = Sha256::digest(root.to_string_lossy().as_bytes())
+                .iter()
+                .map(|x| format!("{x:02x}"))
+                .collect::<String>();
+            context.config_mut().identifier =
+                format!("io.github.bluntvoice.inline.test.{}", &suffix[..16]);
+            for window in &mut context.config_mut().app.windows {
+                window.data_directory = Some(
+                    std::path::PathBuf::from(&root)
+                        .join("webviews")
+                        .join(&window.label),
+                );
+            }
+        }
+        context
+    };
+    #[cfg(windows)]
+    let host_gate = std::sync::Arc::new(
+        mcp::platform::HostGate::enter(&context.config().identifier)
+            .expect("主程序单实例协调失败，未打开业务库"),
+    );
+    #[cfg(windows)]
+    let setup_gate = host_gate.clone();
     tauri::Builder::default()
-        .manage(database)
         .manage(UiScaleState(Mutex::new(1.)))
         .manage(recommended_font::FontManager::default())
         .register_uri_scheme_protocol("recommended-font", |context, request| {
@@ -845,8 +975,10 @@ pub fn run() {
             recommended_font::serve(&root, request.uri().path())
         })
         .manage(updater::UpdateManager::default())
-        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            show_main(app)
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if !args.iter().any(|arg| arg == "--mcp-background") {
+                show_main(app);
+            }
         }))
         .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -867,6 +999,49 @@ pub fn run() {
                 .build(),
         )
         .setup(move |app| {
+            // Single-instance plugin has already resolved secondary launches before opening DB.
+            #[cfg(windows)]
+            if !setup_gate.owns_database() {
+                return Err(
+                    std::io::Error::other("已有主程序占有业务库，第二实例未打开数据库").into(),
+                );
+            }
+            let database = Database::open().map_err(std::io::Error::other)?;
+            let initial_shortcut = database
+                .settings()
+                .ok()
+                .and_then(|values| values.get("global_shortcut").cloned())
+                .filter(|value| valid_global_shortcut(value))
+                .unwrap_or_else(|| DEFAULT_GLOBAL_SHORTCUT.into());
+            app.manage(database);
+            #[cfg(windows)]
+            {
+                // Corrupt authorization fails closed for MCP while keeping the local UI available.
+                if let Ok(security) = mcp::security::Security::open() {
+                    let security = std::sync::Arc::new(security);
+                    let handle = app.handle().clone();
+                    let service_security = security.clone();
+                    if mcp::ipc::start(
+                        security.clone(),
+                        std::sync::Arc::new(move |credentials, tool, args| {
+                            mcp::service::execute(
+                                &service_security,
+                                &handle.state::<Database>(),
+                                credentials,
+                                tool,
+                                args,
+                            )
+                        }),
+                    )
+                    .is_err()
+                    {
+                        eprintln!("MCP本机协调服务不可用，已拒绝客户端访问");
+                    }
+                    app.manage(security);
+                } else {
+                    eprintln!("MCP安全存储不可用，已拒绝客户端访问；请在软件内检查");
+                }
+            }
             let shortcut_available = match app.global_shortcut().register(initial_shortcut.as_str())
             {
                 Ok(()) => true,
@@ -932,7 +1107,13 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
-            show_main(app.handle());
+            #[cfg(windows)]
+            setup_gate
+                .mark_ready()
+                .map_err(|e| std::io::Error::other(e.message))?;
+            if !background {
+                show_main(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -960,6 +1141,7 @@ pub fn run() {
             bootstrap,
             list_tasks,
             save_task,
+            set_task_ticket_color,
             create_subtask,
             set_task_status,
             set_task_urgent,
@@ -1003,6 +1185,13 @@ pub fn run() {
             import_backup,
             open_backup_directory,
             mcp_connection_guide,
+            mcp_security_state,
+            mcp_prepare_onboarding,
+            mcp_rotate_onboarding,
+            mcp_revoke_client,
+            mcp_update_client,
+            mcp_set_groups,
+            mcp_set_paused,
             delete_backup,
             cleanup_backups,
             set_setting,
@@ -1031,7 +1220,7 @@ pub fn run() {
             updater::show_update_progress,
             updater::hide_update_progress
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("In Line 启动失败");
 }
 

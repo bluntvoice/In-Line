@@ -1,0 +1,23 @@
+node:internal/fs/watchers:323
+    const error = new UVException({
+                  ^
+
+Error: EBUSY: resource busy or locked, watch 'C:\Users\KB\Documents\inline\In-Line\src-tauri\target\debug\deps\in_line_mcp.exe'
+    at FSWatcher.<computed> (node:internal/fs/watchers:323:19)
+    at Object.watch (node:fs:2609:36)
+    at createFsWatchInstance (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:12958:16)
+    at setFsWatchListener (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:13000:14)
+    at NodeFsHandler$1._watchWithNodeFs (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:13114:20)
+    at NodeFsHandler$1._handleFile (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:13158:24)
+    at NodeFsHandler$1._addToNodeFs (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:13332:26)
+Emitted 'error' event on FSWatcher instance at:
+    at FSWatcher._handleError (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:14133:148)
+    at NodeFsHandler$1._addToNodeFs (file:///C:/Users/KB/Documents/inline/In-Line/node_modules/vite/dist/node/chunks/config.js:13337:18) {
+  errno: -4082,
+  syscall: 'watch',
+  code: 'EBUSY',
+  path: 'C:\\Users\\KB\\Documents\\inline\\In-Line\\src-tauri\\target\\debug\\deps\\in_line_mcp.exe',
+  filename: 'C:\\Users\\KB\\Documents\\inline\\In-Line\\src-tauri\\target\\debug\\deps\\in_line_mcp.exe'
+}
+
+Node.js v24.19.0

@@ -1,28 +1,17 @@
-# In-Line MCP 扩展：Phase 0 审查包
+# In-Line MCP 阶段开发
 
-日期：2026-10-09。状态：**P0已获用户验收，C1–C4均选A；提交、推送、固定阶段Tag后进入P1**。
+2026-10-09：P0已验收，C1–C4均选A；已推送提交`f2a97b34410f850f3da8c19d4ec6e21c7d63048f`及固定Tag`mcp-phase-00-accepted`。P1本地实现已加入，等待实机/用户验收，未提交或发布。
 
 ## 阅读顺序
 
-1. [三份权威输入](inputs/03-In-Line-MCP-Codex-总执行提示词.md)及其配套 PRD、阶段方案。
-2. [本轮现状、冲突和验收报告](acceptance/PHASE-00.md)。
-3. [架构草案](architecture.md)与 [API 草案](api-draft.md)。
-4. [144 项追踪矩阵](requirements-traceability.md)，另有 [CSV](requirements-traceability.csv)。
-5. [P0–P9 阶段计划](phase-plan.md)与 [隔离测试设计](test-plan.md)。
-6. [执行检查点与压缩恢复规则](CURRENT_TASK.md)。
+1. [三份权威输入](inputs/03-In-Line-MCP-Codex-总执行提示词.md)、[144项PRD](inputs/01-In-Line-MCP-PRD-144项完整需求.md)、[阶段方案](inputs/02-In-Line-MCP-分阶段开发与验收方案.md)。
+2. [P1验收报告](acceptance/PHASE-01.md)、[接入与迁移指南](connection-guide.md)、[执行检查点](CURRENT_TASK.md)。
+3. [144项矩阵](requirements-traceability.md)及[完整CSV](requirements-traceability.csv)。
+4. [架构](architecture.md)、[API](api-draft.md)、[阶段计划](phase-plan.md)、[测试设计](test-plan.md)。
+5. [P0历史验收](acceptance/PHASE-00.md)、[权威输入校验](inputs/source-manifest.json)。
 
-所有新增 API、表、模块和测试用例均为**拟建**，不能理解为已经存在。现有测试通过不能替代新增需求验收。本轮只新增文档、输入副本及现有基线测试证据，不改产品功能、版本、数据库或发布流程；未 Commit / Push / Tag / Release。
+输入副本逐字保留，当前实现进度不改写源需求。压缩后先回读D:/Downloads三原件，再回读本目录当前检查点；副本只在原件不可用时使用。
 
-## 权威输入
+## 阶段门禁
 
-输入副本逐字保留原文件，索引及验收口径不自行修改：
-
-- [01：144 项完整需求](inputs/01-In-Line-MCP-PRD-144项完整需求.md)
-- [02：分阶段开发与验收](inputs/02-In-Line-MCP-分阶段开发与验收方案.md)
-- [03：总执行提示词](inputs/03-In-Line-MCP-Codex-总执行提示词.md)
-
-来源为 `D:/Downloads/` 同名文件；副本校验见 [输入清单](inputs/source-manifest.json)。这些是用户本次明确授权执行的任务输入；历史 PRD 中留存的旧开发提示词仅用于理解现有规则，不授权执行旧任务。
-
-## 冻结门禁
-
-只有用户明确宣布“当前阶段验收通过，可以提交并推送，进入下一阶段”后，才能 Commit → Push → 固定阶段 Tag → 下一阶段。设计冻结或意见讨论本身不授权提交。正式发布另行确认；本轮停止在 P0。
+P1未用户验收，不得提交、推送、建立P1 Tag或进入P2。每阶段明确验收后Commit → Push → 固定阶段Tag → 下一阶段；正式Release需独立授权。本地NSIS验证不代表发布或完成实际安装验收。

@@ -1,0 +1,4 @@
+error: failed to download `toml_edit v0.25.13+spec-1.1.0`
+
+Caused by:
+  attempting to make an HTTP request, but --offline was specified

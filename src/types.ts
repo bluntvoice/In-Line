@@ -11,7 +11,7 @@ export interface LegalTask{
   updatedAt:string;startedAt:string|null;completedAt:string|null;archivedAt:string|null;deletedAt:string|null;customSortOrder:number;
   processingRounds:number;hasActiveQueue:boolean;deferredEnteredAt:string|null;isImportConflict:boolean;
   parentTaskId:number|null;subtaskSortOrder:number;
-  plannedDate?:string;isScheduled?:boolean;scheduleAction?:string;scheduleActionAt?:string|null;
+  plannedDate?:string;isScheduled?:boolean;scheduleAction?:string;scheduleActionAt?:string|null;ticketColor?:string|null;
 }
 export interface TaskInput{
   plannedDate?:string;confirmScheduleChange?:boolean;

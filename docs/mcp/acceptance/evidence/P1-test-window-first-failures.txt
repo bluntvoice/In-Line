@@ -1,0 +1,3 @@
+2026-10-09 local test-window first failures (transcribed from tool results):
+1. computer-use @oai/sky import initialization, attempted twice: failed to write kernel assets: 系统找不到指定的路径。 (os error 3). No GUI input executed; manual acceptance remains pending.
+2. icacls private checkpoint ACL first preparation lacked star prefix for numeric SID: No mapping between account names and security IDs was done. Occurred before process interruption or data copy. Corrected with *SID notation; exit0. Only after successful private ACL preparation were approved In-Line processes stopped and backups copied.

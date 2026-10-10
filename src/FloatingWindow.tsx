@@ -7,6 +7,7 @@ import { displayTicket,isOverdue,visibleQueueTasks } from "./lib/task-utils";
 import { isMiniFloatingHeight } from "./lib/floating-window";
 import StatusBadge from "./components/StatusBadge";
 import TaskContextMenu,{type ContextAction} from "./components/TaskContextMenu";
+import TaskTicketColorDialog from "./components/TaskTicketColorDialog";
 import TicketNumber from "./components/TicketNumber";
 import SubtaskProgressControl from "./components/SubtaskProgressControl";
 import { groupSubtasks } from "./lib/subtask-progress";
@@ -14,6 +15,7 @@ import { groupSubtasks } from "./lib/subtask-progress";
 export default function FloatingWindow(){
   const [tasks,setTasks]=useState<LegalTask[]>([]);const [structureTasks,setStructureTasks]=useState<LegalTask[]>([]);const [mini,setMini]=useState(()=>isMiniFloatingHeight(window.innerHeight));const [message,setMessage]=useState("");const [menu,setMenu]=useState<{task:LegalTask;x:number;y:number}|null>(null);
   const [loading,setLoading]=useState(true);const [loadError,setLoadError]=useState("");
+  const [ticketColorTask,setTicketColorTask]=useState<LegalTask|null>(null);
   const refresh=async()=>{
     setLoading(true);setLoadError("");
     try{const data=await api.bootstrap();setTasks(visibleQueueTasks(data.queue));setStructureTasks([...data.queue,...data.archive,...data.trash]);}
@@ -36,6 +38,7 @@ export default function FloatingWindow(){
     catch(error){toast("调整失败："+String(error));}
   };
   const action=async(value:ContextAction)=>{
+    if(value.type==="ticketColor"){setTicketColorTask(value.task);return;}
     if(["view","edit","status","urgent"].includes(value.type)){
       await api.openTaskAction(value.task.id,value.type as "view"|"edit"|"status"|"urgent");
       return;
@@ -88,6 +91,7 @@ export default function FloatingWindow(){
   }
   return <div className="floating-expanded">
     {toolbar}
+    {ticketColorTask&&<TaskTicketColorDialog task={ticketColorTask} onClose={()=>setTicketColorTask(null)} onSaved={()=>toast("已保存事项编号配色")}/>}
     <div className="floating-list" onMouseDown={startBlankDrag}>{loadError?<div className="floating-error" role="alert"><strong>队列载入失败</strong><p>{loadError}</p><button onClick={()=>void refresh()}>重新载入</button></div>:tasks.slice(0,12).map((task,index)=>{const taskOverdue=isOverdue(task);const parent=task.parentTaskId===null?null:taskById.get(task.parentTaskId)??null;const subtasks=subtasksByParent.get(task.id)??[];const canMoveUp=index>0&&isOverdue(tasks[index-1])===taskOverdue;const canMoveDown=index<tasks.length-1&&isOverdue(tasks[index+1])===taskOverdue;return <article key={task.id} className={`floating-card${task.isUrgent?" urgent":""}${taskOverdue?" overdue":""}`} onClick={()=>void openDetails(task)} onContextMenu={event=>{event.preventDefault();setMenu({task,x:event.clientX,y:event.clientY});}}>
       <TicketNumber task={task}/><div className="floating-copy"><div className="floating-title-line"><strong title={task.title}>{task.title}</strong>{subtasks.length>0&&<SubtaskProgressControl parent={task} subtasks={subtasks} onOpenTask={child=>void openDetails(child)} onAddSubtask={value=>void api.openTaskAction(value.id,"addSubtask").catch(error=>toast(String(error)))} onToggleCompletion={toggleSubtaskCompletion}/>}</div><span className={parent?"floating-parent-line":undefined}>{parent?<><button type="button" title={parent.title} onClick={event=>{event.stopPropagation();void openDetails(parent);}}>所属：{parent.title}</button>{(parent.archivedAt||parent.status==="archived")&&<em>已归档</em>}</>:<>{task.department} · {task.contact}</>}{isOverdue(task)&&<i className="floating-overdue"><ClockAlert size={11}/>已逾期</i>}{task.isImportConflict&&<i className="floating-conflict">导入冲突</i>}</span></div>
       <div className="float-row-actions"><button onClick={event=>{event.stopPropagation();void copy(task);}} title="复制"><Copy size={15}/></button><button disabled={!canMoveUp} onClick={event=>void move(event,task,"up")} title="上移"><ArrowUp size={15}/></button><button disabled={!canMoveDown} onClick={event=>void move(event,task,"down")} title="下移"><ArrowDown size={15}/></button></div>

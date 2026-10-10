@@ -1,0 +1,7 @@
+P1 independent document verification, 2026-10-09
+PASS: 3 original inputs and copies unchanged; 144 unique original decisions, 13 nonempty fields, 21 P1 mappings, no P1 user acceptance claim; 5 versions 0.5.0; P0 HEAD/tag exact; local documentation links valid.
+PASS: 3 original inputs and copies unchanged; 144 unique original decisions, 13 nonempty fields, 21 P1 mappings, no P1 user acceptance claim; 5 versions 0.5.0; P0 HEAD/tag exact; local documentation links valid.
+PASS: 3 original inputs and copies unchanged; 144 unique original decisions, 13 nonempty fields, 21 P1 mappings, no P1 user acceptance claim; 5 versions 0.5.0; P0 HEAD/tag exact; local documentation links valid.
+PASS: 3 original inputs and copies unchanged; 144 unique original decisions, 13 nonempty fields, 21 P1 mappings, no P1 user acceptance claim; 5 versions 0.5.0; P0 HEAD/tag exact; local documentation links valid.
+PASS: 3 original inputs and copies unchanged; 144 unique original decisions, 13 nonempty fields, 21 P1 mappings, no P1 user acceptance claim; 5 versions 0.5.0; P0 HEAD/tag exact; local documentation links valid.
+PASS: 3 original inputs and copies unchanged; 144 unique original decisions, 13 nonempty fields, 21 P1 mappings, no P1 user acceptance claim; 5 versions 0.5.0; P0 HEAD/tag exact; local documentation links valid.

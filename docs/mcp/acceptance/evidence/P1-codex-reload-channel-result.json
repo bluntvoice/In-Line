@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-10",
+  "desktopVersion": "26.1002.7124.0",
+  "cliVersion": "0.162.0-alpha.2",
+  "target": {
+    "appServerPid": 7884,
+    "parentDesktopPid": 29660,
+    "hasAppServerArgument": true,
+    "explicitListenerArgument": false,
+    "tcpListenEndpoints": [],
+    "defaultControlSocketExists": false
+  },
+  "channelChecks": [
+    {
+      "channel": "codex app-server proxy",
+      "kind": "actual current-environment connection attempt",
+      "result": "FAILED",
+      "exitCode": 1,
+      "timedOut": false,
+      "protocolResponseReceived": false,
+      "errorCode": 10050,
+      "configUnchanged": true
+    },
+    {
+      "channel": "codex doctor --json / app_server.status",
+      "result": "background managed server not running",
+      "status": "not running",
+      "mode": "ephemeral",
+      "dedicatedPidFile": "missing"
+    },
+    {
+      "channel": "codex mcp --help",
+      "result": "list/get/add/remove/login/logout only; no reload command"
+    },
+    {
+      "channel": "codex debug app-server send-message-v2 --help",
+      "result": "no socket/host/attach target option exposed; no debug turn started"
+    },
+    {
+      "channel": "available Codex app tools",
+      "result": "no current-instance MCP configuration reload tool"
+    },
+    {
+      "channel": "documented desktop deep links",
+      "result": "settings/plugin install flows; no documented noninteractive MCP reload action"
+    }
+  ],
+  "officialSources": [
+    "https://learn.chatgpt.com/docs/app-server",
+    "https://learn.chatgpt.com/docs/developer-commands",
+    "https://learn.chatgpt.com/docs/extend/mcp?surface=app",
+    "https://learn.chatgpt.com/docs/reference/commands"
+  ],
+  "reasoning": "The protocol method exists, but a supported external transport to the current desktop-owned app server has not been established. Absence of the managed control socket and daemon is independently confirmed; OS10050 alone is not diagnosed as a network fault.",
+  "previousProbe": "P1-codex-reload-result.json",
+  "strictReloadGate": "NOT PASSED",
+  "supportedClients": [],
+  "automaticImporterImplemented": false,
+  "mutations": {
+    "liveConfig": false,
+    "desktopRestart": false,
+    "daemonStart": false,
+    "credentialAccess": false,
+    "businessDataAccess": false,
+    "productCode": false
+  },
+  "limitations": "Current installed version and current instance only. Does not establish that all future versions or other clients are incapable. Doctor overall exit 1 is not treated as an app-server connectivity result; only selected checks were used. No authenticated import/verification performed."
+}

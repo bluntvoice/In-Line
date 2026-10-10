@@ -1,0 +1,110 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 17s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-b16bf7ddbaab8610.exe)
+
+running 66 tests
+test database::scheduling::tests::migration_preserves_identity_and_allocations_never_recycle ... ok
+test database::tests::counterparty_confirmation_is_a_valid_status ... ok
+test database::tests::concurrent_midnight_checks_activate_exactly_once_and_manual_work_enters_first ... ok
+test database::tests::contacts_and_master_sorting_are_persistent ... ok
+test database::tests::create_subtask_inherits_defaults_but_keeps_queue_deadline_and_urgency_independent ... ok
+test database::tests::deferred_entry_time_only_changes_after_leaving_and_reentering ... ok
+test database::tests::completion_requires_an_explicit_parent_choice_and_reports_aggregate_state ... ok
+test database::tests::archive_delete_restore_and_permanent_cleanup_apply_only_the_selected_scope ... ok
+test database::tests::delayed_startup_keeps_original_date_and_attributes_real_work_to_operation_day ... ok
+test database::tests::backup_history_cannot_void_an_existing_local_current_number ... ok
+test database::tests::due_scheduled_is_idempotent_keeps_reserved_order_and_skips_non_pending ... ok
+test database::tests::cleanup_reports_locked_file_and_retries_without_deleting_retained_backups ... ok
+test database::tests::backup_restore_maps_parent_ids_in_two_passes_without_overwriting_current_relation ... ok
+test database::tests::backup_restore_merges_tasks_preserves_conflicts_and_applies_settings ... ok
+test database::tests::handled_deferred_and_deleted_tasks_cancel_urgent_state ... ok
+test database::tests::merge_tasks_preserves_history_and_deduplicates_events ... ok
+test database::tests::merging_a_parent_appends_its_children_and_rejects_a_child_target ... ok
+test database::tests::backup_restores_valid_ticket_colors_and_skips_corrupt_color_settings ... ok
+test database::tests::future_early_workflow_all_entry_points_and_defer_override ... ok
+test database::tests::overdue_tasks_are_prioritized_consistently ... ok
+test database::tests::cleanup_keeps_actual_latest_five_and_stays_inside_backup_root ... ok
+test database::tests::migration_to_v8_backfills_queue_events_and_clears_handled_urgency ... ok
+test database::tests::permanent_delete_is_limited_to_trash_and_empty_trash_is_scoped ... ok
+test database::tests::imported_backup_uses_import_time_and_is_listed_first ... ok
+test database::tests::planned_creation_edit_confirmation_deadline_and_number_reservation ... ok
+test database::tests::processed_tasks_can_requeue_without_losing_identity_or_rounds ... ok
+test database::tests::parent_relationships_enforce_two_levels_preserve_queue_and_support_ordering ... ok
+test database::tests::quick_status_and_urgent_actions_preserve_business_rules ... ok
+test database::tests::reporting_reader_is_read_only_and_excludes_private_fields ... ok
+test database::tests::reactivation_retains_historical_statistics_clears_deadline_and_starts_new_cycle ... ok
+test database::tests::scheduled_subtasks_inherit_dates_and_remain_independent ... ok
+test database::tests::statistics_distinguish_top_level_tasks_and_subtasks ... ok
+test fonts::tests::aliases_and_missing_selection_are_safe ... ok
+test database::tests::sequence_and_manual_order_are_persistent ... ok
+test mcp::ipc::tests::framing_rejects_oversized_request_before_allocation ... ok
+test mcp::ipc::tests::proofs_bind_direction_and_nonce ... ok
+test database::tests::future_backup_preserves_reservations_deleted_history_and_rolls_back_atomically ... ok
+test database::tests::migration_v8_adds_self_reference_and_rolls_back_atomically ... ok
+test mcp::security::tests::invalid_id_spoofing_cannot_throttle_real_client_and_limits_expire ... ok
+test database::tests::ticket_colors_persist_across_reopen_and_invalid_saves_preserve_all_roles ... ok
+test database::tests::statistics_use_latest_event_and_guard_historical_attribution ... ok
+test database::tests::production_upgrade_from_v8_preserves_data_and_creates_pre_migration_backup ... ok
+test recommended_font::tests::corrupt_partial_is_rejected_and_valid_file_is_committed_without_touching_others ... ok
+test recommended_font::tests::pinned_assets_are_below_ten_mb_and_only_expected_paths_are_exposed ... ok
+test database::tests::trend_copy_eligibility_uses_any_valid_result_within_the_selected_range ... ok
+test database::tests::scheduling_v9_rollback_and_deleted_number_history ... ok
+test tests::global_shortcut_validation_accepts_custom_combinations_and_rejects_reserved_ones ... ok
+test tests::window_visibility_is_not_restored_on_startup ... ok
+test tests::chart_export_only_writes_png_data_to_png_paths ... ok
+test updater::tests::compares_semver_numerically_and_strips_v_prefix ... ok
+test updater::tests::handles_unknown_content_length_without_fake_percentage ... ok
+test mcp::security::tests::defaults_and_persistent_long_authorization ... ok
+test updater::tests::rejects_draft_and_prerelease_releases ... ok
+test updater::tests::rejects_untrusted_release_and_asset_urls ... ok
+test updater::tests::requires_one_valid_sha256_digest ... ok
+test updater::tests::selects_only_the_matching_x64_nsis_asset ... ok
+test database::tests::work_calendar_uses_real_queue_rounds_and_effective_events ... ok
+test mcp::security::tests::corrupt_and_copied_machine_store_never_reset_or_restore_credentials ... ok
+test updater::tests::verifies_file_digest_and_detects_changes ... ok
+test database::tests::trend_details_match_bucket_counts_and_historical_results ... ok
+test mcp::security::tests::persistence_failure_does_not_claim_revocation_or_change_memory ... ok
+test updater::tests::replaces_owned_partial_files_and_rejects_unwritable_roots ... ok
+test recommended_font::tests::interrupted_download_keeps_verified_weights_and_retry_uses_them ... ok
+test mcp::security::tests::rotate_revoke_pause_and_group_intersection ... ok
+test database::tests::cleanup_keeps_zero_to_five_backups_without_changes ... ok
+test fonts::tests::installed_fonts_are_real_cached_and_cjk_first ... ok
+
+test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.08s
+
+     Running unittests src\main.rs (src-tauri\target\debug\deps\in_line-7efea1a8f64c0ee0.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\in-line-mcp.rs (src-tauri\target\debug\deps\in_line_mcp-ced1730c29a6d7e0.exe)
+
+running 2 tests
+test tests::rejects_invalid_ranges ... ok
+test tests::report_range_includes_end ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\mcp_host.rs (src-tauri\target\debug\deps\mcp_host-48e6d2c3d9deaf15.exe)
+
+running 1 test
+test real_host_background_single_instance_and_protocol ... FAILED
+
+failures:
+
+---- real_host_background_single_instance_and_protocol stdout ----
+
+thread 'real_host_background_single_instance_and_protocol' (29656) panicked at tests\mcp_host.rs:82:5:
+assertion `left == right` failed: CallToolResult { result_type: None, content: [Text(TextContent { text: "{\"apiVersion\":1,\"data\":null,\"error\":{\"code\":\"host_unavailable\",\"message\":\"主程序协调服务不可用，请启动或升级In Line后检查连接\",\"retryAfterSeconds\":null,\"retryable\":false},\"requestId\":\"560fa9b4d8f5b84232801ed93674d6707d1208194af81e90a9e166632a47901a\",\"status\":\"error\"}", meta: None, annotations: None })], structured_content: Some(Object {"apiVersion": Number(1), "data": Null, "error": Object {"code": String("host_unavailable"), "message": String("主程序协调服务不可用，请启动或升级In Line后检查连接"), "retryAfterSeconds": Null, "retryable": Bool(false)}, "requestId": String("560fa9b4d8f5b84232801ed93674d6707d1208194af81e90a9e166632a47901a"), "status": String("error")}), is_error: Some(false), meta: None }
+  left: String("error")
+ right: "ok"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    real_host_background_single_instance_and_protocol
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.21s
+
+error: test failed, to rerun pass `--test mcp_host`

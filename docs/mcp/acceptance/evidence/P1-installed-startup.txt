@@ -1,0 +1,12 @@
+{
+  "startedAt": "2026-10-09T23:31:44.3664759+08:00",
+  "processId": 37160,
+  "applicationPath": "D:\\Application\\In Line\\in-line.exe",
+  "databaseIntegrity": "ok",
+  "schema": 9,
+  "tasks": 268,
+  "changedTables": [],
+  "newAuthorizationStoreExists": true,
+  "guiVisibleAndClicks": "awaiting human acceptance; native window automation unavailable",
+  "businessDataCopiedIntoRepository": false
+}

@@ -1,0 +1,25 @@
+fixture diagnostics {
+  callbacks: 4,
+  events: 1,
+  colors: [
+    { id: 1, color: '#AABBCC' },
+    { id: 2, color: '#F3D98B' },
+    { id: 3, color: null }
+  ]
+}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: color mismatch {"actual":{"background":"rgb(196, 61, 75)","text":"rgb(255, 255, 255)"},"color":"rgb(243, 217, 139)"}
+    at rgb (file:///C:/Users/KB/Documents/inline/In-Line/scripts/verify-task-ticket-colors.mjs:37:12)
+    at async file:///C:/Users/KB/Documents/inline/In-Line/scripts/verify-task-ticket-colors.mjs:51:110 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: undefined,
+  operator: 'fail',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

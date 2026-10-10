@@ -1,6 +1,9 @@
-# MCP API 草案（P0，未实现）
+# MCP API：P1实际契约与后续草案
 
-基线：0.5.0 / `41383aa`。工具名、结构与枚举是冻结前草案；不代表程序已经提供。既有两只读工具的业务含义保留，新认证/限域/100条上限需要迁移说明。
+> 当前进度：P0已验收并推送固定Tag，C1–C4均A；P1实际实现及未执行项以[PHASE-01](acceptance/PHASE-01.md)和[接入指南](connection-guide.md)为准。下文的P0现状表和未来草案是历史设计，不能视为当前工具清单或已实现能力。P1尚未用户验收。
+
+
+基线：0.5.0 / `41383aa`。P0设计已冻结，后续工具草案不代表程序已经提供；P1真实接口以本文末节及接入指南为准。既有两只读工具的业务含义保留，新认证/限域/100条上限需要迁移说明。
 
 ## 1. 连接与发现
 
@@ -10,7 +13,7 @@
   "args": [],
   "env": {
     "IN_LINE_MCP_CLIENT_ID": "<软件内创建的独立客户端ID>",
-    "IN_LINE_MCP_CLIENT_TOKEN": "<仅创建或轮换时显示的独立凭证>"
+    "IN_LINE_MCP_TOKEN": "<仅创建或轮换时显示的独立凭证>"
   }
 }
 ```
@@ -23,7 +26,7 @@
 
 | 工具草案 | 主要参数/动作 | 权限与返回 | 阶段 |
 | --- | --- | --- | --- |
-| `get_mcp_capabilities` | 无业务参数 | 已认证；自身有效能力/权限，不暴露其他客户端 | P1 |
+| `get_capabilities` | 无业务参数 | 已认证；自身有效能力/权限，不暴露其他客户端 | P1 |
 | `query_tasks` | filters、projection、limit、cursor、includeTrash显式条件 | 常规/完整读投影；事项列表或稳定ID明细，组合条件白名单，无SQL | P2 |
 | `query_task_history` | taskId、kinds、limit、cursor、includeVoided | 授权时间线/队列/办理/审计；自由文本和作废详细内容需完整读；检查现状限域 | P2 |
 | `get_report_summary` | 保留startDate/endDate，新增可选filters/snapshot | 授权结构化统计、范围/口径/完整性元数据；旧业务含义 | P1–P2/P6 |
@@ -101,7 +104,7 @@ JSON-RPC协议格式/参数解析错误遵循MCP；业务错误返回结构化co
 - 请求字段及派生结果均按权限过滤。仅有写权限却无完整读权限时，不能通过Dry Run/audit/beforeValue回显已有正文或联系人；客户端可写其明确提供的字段，但只返回允许读的投影和变化字段名称。
 - 状态切换按现有规则真实产生办理/队列事件；纯备注不生成办理量；新增工作活动需用户明确真实发生时间/结果，不能由AI虚构工作。
 - 事件纠错不覆盖原事件：作废原事件＋新更正事件＋correctionOf/解释/审计，遵守首次有效事件统计保护；精确事件ID，不允许静默改历史。已有void_work_event确认逻辑保留。
-- 归档、回收站、改期、批量目标及子任务范围须有明确意图；批次任何歧义、超范围、字段冲突全批不提交。改期是否允许批量及二次确认渠道待C2，不在P0决定。
+- 归档、回收站、改期、批量目标及子任务范围须有明确意图；批次任何歧义、超范围、字段冲突全批不提交。改期是否允许批量及二次确认渠道已按C2=A冻结：整批由应用内确认。
 - 批量新建子任务可使用批内localRef，但先解析所有关系并校验两级，计入实际受影响数量；提交前全批重新校验版本/授权/预演基准。
 - backup只创建本地完整受保护业务备份，不读取/恢复/覆盖/删除；备份不是事项批次中的一个可原子混合操作，单独执行并提供幂等receipt，不声称文件和SQLite事务自动原子。
 - 永久删除、清空回收站、恢复/覆盖库、自动授权/升级/下载附件、任意文件读写没有工具或动作，枚举和分发双重拒绝。
@@ -121,3 +124,9 @@ JSON-RPC协议格式/参数解析错误遵循MCP；业务错误返回结构化co
 | BUSY / TEMPORARY_IO / STORAGE_FULL / SECURITY_STORE_UNAVAILABLE | 有界低风险恢复；安全存储不可用fail closed，不碰业务修复 |
 
 上述枚举在P1规范化并逐阶段补全。绝不把错误建议当作AI可以执行危险恢复的授权。
+
+## P1实际接口（覆盖上文同名草案）
+
+仅有`get_capabilities`、`get_report_summary`、`list_report_items`，每次认证。参数仅现有startDate/endDate/offset/limit，不接收filters/snapshot/cursor。返回`{apiVersion:1,requestId,status,data,error}`；没有executionId/meta/快照完整性声明。API v1错误用小写code及message/retryable/retryAfterSeconds；JSON-RPC/schema错误由rmcp处理。业务错误同时设置工具isError=true，成功isError=false；structuredContent和文本均含同一结果壳。P2前维持371天范围和非稳定offset分页。
+
+能力结果含softwareVersion、mcpVersion、schemaVersion、commit（没有可信构建SHA时null）、transport、自身permissions/scope/authorizationRevision、实际tools/writeTools、unsupported、breakingChanges、pageLimit、reportMaxDays。不会暴露他人客户端列表。所有新工具草案仍未实现；完整执行/快照/诊断元数据逐所属阶段补齐。
