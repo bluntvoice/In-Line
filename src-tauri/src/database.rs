@@ -1,4 +1,5 @@
 use crate::models::*;
+mod mcp_read;
 mod scheduling;
 use chrono::{Datelike, FixedOffset, Local, Utc};
 use rusqlite::{
@@ -49,10 +50,10 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? > 10 {
+        if existed && Self::schema_version(&connection)? > 11 {
             return Err("数据库版本高于本程序，请升级软件；未执行迁移".into());
         }
-        if existed && Self::schema_version(&connection)? < 10 {
+        if existed && Self::schema_version(&connection)? < 11 {
             Self::check_integrity(&connection)?;
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
@@ -109,7 +110,7 @@ impl Database {
         connection
             .execute_batch("PRAGMA query_only=ON; PRAGMA busy_timeout=5000;")
             .map_err(display_error)?;
-        if Self::schema_version(&connection)? < 10 {
+        if Self::schema_version(&connection)? < 11 {
             return Err("数据库版本过旧，请先启动 In Line 完成升级".into());
         }
         let backup_dir = path.parent().ok_or("数据库路径无效")?.join("backups");
@@ -513,6 +514,7 @@ impl Database {
                 )
                 .map_err(display_error)?;
         }
+        mcp_read::migrate_basis(&transaction, version)?;
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -552,7 +554,7 @@ impl Database {
                 ensure_master(&transaction, "contact", &contact)?;
             }
         }
-        if version < 10 {
+        if version < 11 {
             Self::check_integrity(&transaction)?;
         }
         transaction.commit().map_err(display_error)
@@ -2704,6 +2706,21 @@ impl Database {
 
 impl Database {
     pub fn work_calendar(&self, start: String, end: String) -> Result<WorkCalendarResult, String> {
+        self.work_calendar_impl(start, end, 370)
+    }
+    pub(crate) fn mcp_work_calendar(
+        &self,
+        start: String,
+        end: String,
+    ) -> Result<WorkCalendarResult, String> {
+        self.work_calendar_impl(start, end, 36_501)
+    }
+    fn work_calendar_impl(
+        &self,
+        start: String,
+        end: String,
+        max_days: i64,
+    ) -> Result<WorkCalendarResult, String> {
         let start_time = chrono::DateTime::parse_from_rfc3339(&start)
             .map_err(|_| "日历开始时间格式无效".to_string())?;
         let end_time = chrono::DateTime::parse_from_rfc3339(&end)
@@ -2711,7 +2728,7 @@ impl Database {
         if end_time <= start_time {
             return Err("日历结束时间必须晚于开始时间".into());
         }
-        if (end_time - start_time).num_days() > 370 {
+        if (end_time - start_time).num_days() > max_days {
             return Err("单次日历查询范围不能超过 370 天".into());
         }
         let start_millis = start_time.timestamp_millis();
@@ -3879,7 +3896,7 @@ impl Database {
             }
         }
         let version = Self::schema_version(&connection)?;
-        if version > 10 {
+        if version > 11 {
             return Err("该备份来自更高版本的 In Line，请先升级软件".into());
         }
         Ok(())
@@ -5089,7 +5106,7 @@ mod tests {
         assert_eq!(current.permanent_number, original.permanent_number);
         assert_eq!(current.updated_at, original.updated_at);
         assert_eq!(current.ticket_color, None);
-        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 10);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 11);
         let backups = db.list_backups().unwrap();
         let before = backups
             .iter()
@@ -5726,7 +5743,7 @@ mod tests {
         db.with_conn(|conn|conn.execute_batch("DROP INDEX idx_scheduled_due; DROP TABLE queue_number_allocations; ALTER TABLE tasks DROP COLUMN planned_date; ALTER TABLE tasks DROP COLUMN is_scheduled; ALTER TABLE tasks DROP COLUMN schedule_action; ALTER TABLE tasks DROP COLUMN schedule_action_at; UPDATE schema_meta SET version=8;").map_err(display_error)).unwrap();
         drop(db);
         let db = Database::open_root(root.clone()).unwrap();
-        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 10);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 11);
         let after = db.get_task(child.id).unwrap();
         assert_eq!(after.parent_task_id, Some(parent.id));
         assert_eq!(after.permanent_number, child.permanent_number);
@@ -6025,7 +6042,7 @@ mod tests {
         create_v7_database(&upgraded_path);
 
         let upgraded = Database::open_at(upgraded_path.clone()).unwrap();
-        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 10);
+        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 11);
         let task = upgraded.get_task(1).unwrap();
         assert_eq!(task.parent_task_id, None);
         assert_eq!(task.subtask_sort_order, 0);
@@ -7400,7 +7417,7 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 10);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 11);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);

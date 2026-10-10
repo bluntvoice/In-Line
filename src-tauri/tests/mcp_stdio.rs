@@ -95,15 +95,23 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
     )?;
     let client = ().serve(transport).await?;
     let tools = client.list_all_tools().await?;
-    assert_eq!(tools.len(), 3);
+    assert_eq!(tools.len(), 7);
     assert!(tools.iter().any(|tool| tool.name == "get_capabilities"));
     assert!(tools.iter().any(|tool| tool.name == "get_report_summary"));
     assert!(tools.iter().any(|tool| tool.name == "list_report_items"));
+    for name in [
+        "query_tasks",
+        "query_task_history",
+        "query_work_calendar",
+        "manage_saved_query",
+    ] {
+        assert!(tools.iter().any(|tool| tool.name == name));
+    }
     assert!(tools.iter().all(|tool| {
         tool.annotations
             .as_ref()
             .and_then(|annotations| annotations.read_only_hint)
-            == Some(true)
+            == Some(tool.name != "manage_saved_query")
     }));
 
     let arguments = serde_json::from_value(json!({

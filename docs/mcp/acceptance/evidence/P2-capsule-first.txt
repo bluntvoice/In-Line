@@ -1,0 +1,23 @@
+14:11:32 [vite] (client) Re-optimizing dependencies because vite config has changed
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'flex'
+- 'inline-flex'
+
+    at file:///C:/Users/KB/Documents/inline/In-Line/scripts/verify-capsule-alignment.mjs:33:30
+    at Array.forEach (<anonymous>)
+    at file:///C:/Users/KB/Documents/inline/In-Line/scripts/verify-capsule-alignment.mjs:33:11 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'flex',
+  expected: 'inline-flex',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

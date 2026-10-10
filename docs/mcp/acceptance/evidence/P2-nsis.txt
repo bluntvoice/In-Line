@@ -1,0 +1,119 @@
+
+> in-line@0.5.0 dist
+> tauri build --bundles nsis
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm.cmd run build:bundle`
+
+> in-line@0.5.0 build:bundle
+> npm.cmd run build && node scripts/prepare-mcp-sidecar.mjs
+
+
+> in-line@0.5.0 build
+> tsc -p tsconfig.renderer.json --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1651 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.56 kB │ gzip:   0.37 kB
+dist/assets/index-CkoqT4sD.css  110.13 kB │ gzip:  19.45 kB
+dist/assets/index-CM2K96v2.js   449.17 kB │ gzip: 137.65 kB
+✓ built in 4.13s
+   Compiling vswhom-sys v0.1.3
+   Compiling vswhom v0.1.0
+   Compiling embed-resource v3.0.11
+   Compiling tauri-winres v0.3.6
+   Compiling tauri-build v2.6.3
+   Compiling tauri v2.11.5
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.43
+   Compiling tauri-plugin-fs v2.5.1
+   Compiling rustls-webpki v0.103.15
+   Compiling tauri-plugin-notification v2.3.3
+   Compiling tauri-plugin-dialog v2.7.1
+   Compiling tauri-plugin-global-shortcut v2.3.0
+   Compiling tauri-plugin-autostart v2.5.1
+   Compiling tauri-plugin-clipboard-manager v2.3.2
+   Compiling tauri-plugin-window-state v2.4.1
+   Compiling tokio-rustls v0.26.4
+   Compiling libsqlite3-sys v0.35.0
+   Compiling hyper-rustls v0.27.9
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+   Compiling rusqlite v0.37.0
+   Compiling reqwest v0.12.28
+   Compiling tauri-plugin-single-instance v2.4.3
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src\mcp\query.rs:470:22
+    |
+470 |         return Ok(db.mcp_history(t.id, false, false)?.iter().any(|e| {
+    |                      ^^^^^^^^^^^-------------------- argument #4 of type `bool` is missing
+    |
+note: method defined here
+   --> src\database\mcp_read.rs:232:19
+    |
+232 |     pub(crate) fn mcp_history(
+    |                   ^^^^^^^^^^^
+...
+237 |         redact_cross_task: bool,
+    |         -----------------------
+help: provide the argument
+    |
+470 |         return Ok(db.mcp_history(t.id, false, false, /* bool */)?.iter().any(|e| {
+    |                                                    ++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src\mcp\query.rs:602:18
+    |
+602 |               s.db.mcp_history(
+    |  __________________^^^^^^^^^^^-
+603 | |                 args.task_id,
+604 | |                 auth.permissions.full_read,
+605 | |                 args.include_voided,
+606 | |             )?
+    | |_____________- argument #4 of type `bool` is missing
+    |
+note: method defined here
+   --> src\database\mcp_read.rs:232:19
+    |
+232 |     pub(crate) fn mcp_history(
+    |                   ^^^^^^^^^^^
+...
+237 |         redact_cross_task: bool,
+    |         -----------------------
+help: provide the argument
+    |
+602 |             s.db.mcp_history(
+...
+605 |                 args.include_voided,
+606 ~                 /* bool */,
+607 ~             )?
+    |
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `in-line` (lib) due to 2 previous errors
+node:internal/errors:985
+  const err = new Error(message);
+              ^
+
+Error: Command failed: cargo build --locked --manifest-path C:\Users\KB\Documents\inline\In-Line\src-tauri\Cargo.toml --release --bin in-line-mcp
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at checkExecSyncError (node:child_process:942:11)
+    at execFileSync (node:child_process:978:15)
+    at file:///C:/Users/KB/Documents/inline/In-Line/scripts/prepare-mcp-sidecar.mjs:10:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  status: 101,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 35168,
+  stdout: null,
+  stderr: null
+}
+
+Node.js v24.19.0
+beforeBuildCommand `npm.cmd run build:bundle` failed with exit code 1
+       Error beforeBuildCommand `npm.cmd run build:bundle` failed with exit code 1

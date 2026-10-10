@@ -3,10 +3,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const API_VERSION: u32 = 1;
-pub const TOOLS: [&str; 3] = [
+pub const TOOLS: [&str; 7] = [
     "get_capabilities",
     "get_report_summary",
     "list_report_items",
+    "query_tasks",
+    "query_task_history",
+    "query_work_calendar",
+    "manage_saved_query",
 ];
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -42,7 +46,7 @@ impl McpError {
             "authorization_changed" => "读取期间授权发生变化，结果未释放；请按当前权限重新查询",
             "incompatible" => "接口或授权存储版本不兼容，请升级并重新检查连接",
             "rate_limited" => "调用过于频繁，请等待冷却后重试",
-            "invalid_arguments" => "参数无效：日期须为YYYY-MM-DD，结束日期不早于开始；报告最多371天，分页1至100且offset非负",
+            "invalid_arguments" => "参数无效：只接受白名单字段；日期须为YYYY-MM-DD，时间范围为RFC3339；分页1至100，后续offset必须绑定快照且不能与cursor混用",
             "unsupported" => "当前阶段不提供此操作",
             "host_unavailable" => "主程序协调服务不可用，请启动或升级In Line后检查连接",
             "security_unavailable" => "安全存储不可用；请在软件内检查授权，禁止自动恢复旧凭证",
@@ -53,6 +57,12 @@ impl McpError {
             "import_conflict" => "客户端配置冲突或发生变化，未覆盖其他配置",
             "import_invalid" => "接入包或客户端配置无效，未读取业务数据",
             "import_failed" => "接入验证失败，请在软件内检查；未回显凭证",
+            "snapshot_expired" => "查询快照已过期或服务已重启，请重新开始查询",
+            "cursor_invalid" => "分页参数、客户端或查询条件与快照不一致，请重新查询",
+            "snapshot_invalid" => "数据代际或事项授权范围变化，旧快照结果未释放",
+            "resource_limit" => "查询资源超过本机安全上限，请缩小范围或结束旧查询",
+            "not_found" => "未找到当前授权范围内的事项或查询",
+            "explicit_intent_required" => "保存或删除命名查询须有用户明确要求及写入授权",
             _ => "操作失败，请在本机检查软件状态；未自动修改业务数据",
         };
         Self {
@@ -113,6 +123,9 @@ pub struct CapabilityArgs {}
 pub struct DateRangeArgs {
     pub start_date: String,
     pub end_date: String,
+    pub filters: Option<super::query_types::QueryFilters>,
+    pub snapshot: Option<String>,
+    pub timezone_offset_minutes: Option<i32>,
 }
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -122,6 +135,10 @@ pub struct ReportItemsArgs {
     /// 每页1至100条，默认100；超过上限明确拒绝。
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub filters: Option<super::query_types::QueryFilters>,
+    pub snapshot: Option<String>,
+    pub cursor: Option<String>,
+    pub timezone_offset_minutes: Option<i32>,
 }
 pub fn report_range(start: &str, end: &str) -> Result<(String, String, i32), McpError> {
     let invalid = || McpError::new("invalid_arguments");

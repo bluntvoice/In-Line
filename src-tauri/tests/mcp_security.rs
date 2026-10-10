@@ -68,7 +68,10 @@ fn scope_filters_summary_denominator_trend_details_and_cross_client_calls() {
         let page = service::execute(&security, &db, &creds, "list_report_items", args()).unwrap();
         assert_eq!(page["page"]["total"], 1);
         assert_eq!(page["page"]["items"][0]["title"], title);
-        assert_eq!(page["page"]["items"][0]["workEvents"][0]["note"], "");
+        // P2 omits unauthorized text, instead of representing it as an empty value.
+        assert!(page["page"]["items"][0]["workEvents"][0]
+            .get("note")
+            .is_none());
         assert!(!page.to_string().contains("敏感办理说明"));
         assert!(!page.to_string().contains("跨部门"));
         assert!(!page.to_string().contains("内部隐私"));

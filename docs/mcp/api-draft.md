@@ -1,5 +1,7 @@
 # MCP API：P1实际契约与后续草案
 
+> 2026-10-10最新：用户指示进入P2，七工具本地实现及快照/offset迁移规则以[query-guide](query-guide.md)和[PHASE-02](acceptance/PHASE-02.md)为准。P1自动接入/当前会话重载仍待验证，不标P1通过。下文P1契约和P0草案保留作历史来源，不能当作最新工具清单。
+
 > 当前进度：P0已验收并推送固定Tag，C1–C4均A；P1实际实现及未执行项以[PHASE-01](acceptance/PHASE-01.md)和[接入指南](connection-guide.md)为准。下文的P0现状表和未来草案是历史设计，不能视为当前工具清单或已实现能力。P1尚未用户验收。
 
 

@@ -2,6 +2,7 @@ use super::{
     contract::*,
     security::{Limiter, Security},
 };
+use super::{query, query_types::*};
 use crate::database::Database;
 use serde_json::{json, Value};
 use std::time::Instant;
@@ -51,7 +52,7 @@ pub fn execute(
         let _: CapabilityArgs =
             serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
         return Ok(
-            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":10,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":[],"unsupported":["business_write","permanent_delete","restore_database","attachments","remote_transport","stable_snapshot_pagination","full_history"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read"],"pageLimit":100,"reportMaxDays":371,"connectionVerified":true}),
+            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":11,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":[],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["business_write","permanent_delete","restore_database","attachments","remote_transport","business_audit_not_yet_recorded"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"connectionVerified":true}),
         );
     }
     if !TOOLS.contains(&tool) {
@@ -60,37 +61,68 @@ pub fn execute(
     if !auth.permissions.regular_read {
         return Err(McpError::new("forbidden"));
     }
+    let mut queries = security
+        .queries
+        .lock()
+        .map_err(|_| McpError::new("security_unavailable"))?;
     match tool {
         "get_report_summary" => {
             let args: DateRangeArgs =
                 serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
-            let (start, end, offset) = report_range(&args.start_date, &args.end_date)?;
-            let statistics = db.statistics_scoped(start, end, offset, auth.scope)?;
-            Ok(
-                json!({"startDate":args.start_date,"endDate":args.end_date,"timezoneOffsetMinutes":offset,"statistics":statistics}),
+            query::report(
+                &mut queries,
+                db,
+                &credentials.client_id,
+                &auth,
+                ReportItemsArgs {
+                    start_date: args.start_date,
+                    end_date: args.end_date,
+                    filters: args.filters,
+                    snapshot: args.snapshot,
+                    timezone_offset_minutes: args.timezone_offset_minutes,
+                    limit: None,
+                    offset: None,
+                    cursor: None,
+                },
+                true,
             )
         }
         "list_report_items" => {
             let args: ReportItemsArgs =
                 serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
-            let limit = args.limit.unwrap_or(100);
-            let offset = args.offset.unwrap_or(0);
-            if !(1..=100).contains(&limit) || offset < 0 {
-                return Err(McpError::new("invalid_arguments"));
-            }
-            let (start, end, tz) = report_range(&args.start_date, &args.end_date)?;
-            let mut page = db.report_items_scoped(start, end, limit, offset, auth.scope)?;
-            if !auth.permissions.full_read {
-                for item in &mut page.items {
-                    for event in &mut item.work_events {
-                        event.note.clear();
-                    }
-                }
-            }
-            Ok(
-                json!({"startDate":args.start_date,"endDate":args.end_date,"timezoneOffsetMinutes":tz,"page":page,"redactedFields":if auth.permissions.full_read{vec![]}else{vec!["workEvents.note"]}}),
-            )
+            query::report(&mut queries, db, &credentials.client_id, &auth, args, false)
         }
+        "query_tasks" => query::tasks(
+            &mut queries,
+            db,
+            &credentials.client_id,
+            &auth,
+            serde_json::from_value::<QueryArgs>(args)
+                .map_err(|_| McpError::new("invalid_arguments"))?,
+        ),
+        "query_task_history" => query::history(
+            &mut queries,
+            db,
+            &credentials.client_id,
+            &auth,
+            serde_json::from_value::<HistoryArgs>(args)
+                .map_err(|_| McpError::new("invalid_arguments"))?,
+        ),
+        "query_work_calendar" => query::calendar(
+            &mut queries,
+            db,
+            &credentials.client_id,
+            &auth,
+            serde_json::from_value::<CalendarArgs>(args)
+                .map_err(|_| McpError::new("invalid_arguments"))?,
+        ),
+        "manage_saved_query" => query::saved(
+            &mut queries,
+            &auth,
+            &credentials.client_id,
+            serde_json::from_value::<SavedQueryArgs>(args)
+                .map_err(|_| McpError::new("invalid_arguments"))?,
+        ),
         _ => Err(McpError::new("unsupported")),
     }
 }

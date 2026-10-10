@@ -1,0 +1,3 @@
+    Checking rusqlite v0.37.0
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.25s

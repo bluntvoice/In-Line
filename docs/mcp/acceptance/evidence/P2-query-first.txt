@@ -1,0 +1,14 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 32.21s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 6 tests
+test mcp::query::tests::query_filters_are_bound_and_injection_has_no_sql_access ... ok
+test mcp::query::tests::history_projection_voided_and_trash_require_full_read ... ok
+test mcp::query::tests::report_and_calendar_share_ui_calculations_and_snapshot_with_long_history ... ok
+test mcp::query::tests::live_scope_change_expiry_revocation_and_generation_invalidate_results ... ok
+test mcp::query::tests::saved_queries_are_client_isolated_persistent_and_reauthorized ... ok
+test mcp::query::tests::pages_freeze_content_and_order_over_100_items_and_concurrent_writes ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 84 filtered out; finished in 0.77s
+

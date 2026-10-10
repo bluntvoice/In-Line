@@ -1,4 +1,5 @@
 use in_line_lib::mcp::contract::*;
+use in_line_lib::mcp::query_types::*;
 use rmcp::{
     handler::server::wrapper::Parameters, model::CallToolResult, tool, tool_router,
     transport::stdio, ServiceExt,
@@ -27,6 +28,68 @@ impl InLineMcp {
 }
 #[tool_router]
 impl InLineMcp {
+    #[tool(
+        description = "认证后按白名单组合条件检索事项，常规/完整投影及限域强制执行；每页最多100，后续使用原条件和不透明cursor或snapshot。不得将关联推断保存为事实。",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn query_tasks(&self, Parameters(args): Parameters<QueryArgs>) -> CallToolResult {
+        self.call("query_tasks", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
+        description = "认证后读取单事项完整可用时间线，包括状态、队列、办理、加急和原日志；敏感自由文本、日志、作废和回收站详细读取需要完整权限；稳定分页最多100。",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn query_task_history(
+        &self,
+        Parameters(args): Parameters<HistoryArgs>,
+    ) -> CallToolResult {
+        self.call("query_task_history", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
+        description = "认证后读取真实工作日历办理事件及队列区间，含授权范围内结构化汇总；日期结束含当天，每页100，固定快照分页，不创建未来日历事件。",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn query_work_calendar(
+        &self,
+        Parameters(args): Parameters<CalendarArgs>,
+    ) -> CallToolResult {
+        self.call("query_work_calendar", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
+        description = "当前客户端命名查询条件的list/get/save/delete；save/delete须用户明确要求且有日常写入权限，只保存查询定义。执行查询时再次鉴权，模板不能扩大权限。",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn manage_saved_query(
+        &self,
+        Parameters(args): Parameters<SavedQueryArgs>,
+    ) -> CallToolResult {
+        self.call("manage_saved_query", serde_json::to_value(args).unwrap())
+            .await
+    }
+
     #[tool(
         output_schema = rmcp::handler::server::common::schema_for_type::<Envelope>(),
         description = "查询当前客户端的认证状态、有效权限、实际工具与不支持能力；也需要认证。",

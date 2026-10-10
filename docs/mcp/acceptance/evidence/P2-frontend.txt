@@ -1,0 +1,32 @@
+
+> in-line@0.5.0 test
+> vitest run --maxWorkers=1 --no-file-parallelism
+
+
+ RUN  v3.2.7 C:/Users/KB/Documents/inline/In-Line
+
+ ✓ src/lib/scheduling.test.ts (4 tests) 30ms
+ ✓ src/components/TaskContextMenu.test.tsx (2 tests) 21ms
+ ✓ tests/task-utils.test.ts (46 tests) 14ms
+ ✓ tests/native-report.test.ts (2 tests) 13ms
+ ✓ src/lib/mcp-config.test.ts (4 tests) 20ms
+ ✓ src/lib/task-ticket-color.test.ts (3 tests) 14ms
+ ✓ src/lib/ticket-colors.test.ts (5 tests) 10ms
+ ✓ src/lib/work-calendar.test.ts (6 tests) 8ms
+ ✓ src/lib/subtask-ui.test.ts (5 tests) 7ms
+ ✓ src/lib/column-widths.test.ts (10 tests) 6ms
+ ✓ src/lib/statistics-trend.test.ts (2 tests) 6ms
+ ✓ src/lib/statistics-copy.test.ts (4 tests) 5ms
+ ✓ src/lib/backup-ux.test.ts (4 tests) 5ms
+ ✓ tests/update-ui.test.ts (3 tests) 5ms
+ ✓ tests/global-shortcut.test.ts (3 tests) 7ms
+ ✓ src/lib/ui-font.test.ts (2 tests) 5ms
+ ✓ tests/statistics-export.test.ts (3 tests) 6ms
+ ✓ src/lib/subtask-progress.test.ts (3 tests) 4ms
+ ✓ src/lib/ui-scale.test.ts (1 test) 3ms
+
+ Test Files  19 passed (19)
+      Tests  112 passed (112)
+   Start at  14:20:07
+   Duration  9.14s (transform 429ms, setup 0ms, collect 1.13s, tests 190ms, environment 4ms, prepare 2.08s)
+

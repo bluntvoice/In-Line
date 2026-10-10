@@ -7,6 +7,9 @@ pub mod ipc;
 #[cfg(windows)]
 pub mod onboarding;
 pub mod platform;
+#[cfg(windows)]
+pub mod query;
+pub mod query_types;
 pub mod scope;
 #[cfg(windows)]
 pub mod security;

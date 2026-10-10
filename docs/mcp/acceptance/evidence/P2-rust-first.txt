@@ -1,0 +1,21 @@
+   Compiling rusqlite v0.37.0
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error: unexpected closing delimiter: `}`
+    --> src\database.rs:5775:5
+     |
+5080 |     fn schema9_upgrade_adds_color_without_changing_tasks_and_backs_up_before_migration() {
+     |                                                                                          - the nearest open delimiter
+...
+5100 |         $111);
+     |             - missing open `(` for this delimiter
+...
+5721 |     fn production_upgrade_from_v8_preserves_data_and_creates_pre_migration_backup() {
+     |                                                                                     - the nearest open delimiter
+...
+5737 |         $111);
+     |             - missing open `(` for this delimiter
+...
+5775 |     }
+     |     ^ unexpected closing delimiter
+
+error: could not compile `in-line` (lib) due to 1 previous error

@@ -1,0 +1,1 @@
+PASS: installed main and sidecar hashes remain identical to current-turn initial readback; production program not replaced.

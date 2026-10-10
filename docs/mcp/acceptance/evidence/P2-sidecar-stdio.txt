@@ -1,0 +1,1 @@
+PASS: P2 sidecar initialize/tools/list/7 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.

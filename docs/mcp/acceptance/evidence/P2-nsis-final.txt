@@ -1,0 +1,44 @@
+
+> in-line@0.5.0 dist
+> tauri build --bundles nsis
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm.cmd run build:bundle`
+
+> in-line@0.5.0 build:bundle
+> npm.cmd run build && node scripts/prepare-mcp-sidecar.mjs
+
+
+> in-line@0.5.0 build
+> tsc -p tsconfig.renderer.json --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1651 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.56 kB │ gzip:   0.37 kB
+dist/assets/index-CkoqT4sD.css  110.13 kB │ gzip:  19.45 kB
+dist/assets/index-CM2K96v2.js   449.17 kB │ gzip: 137.65 kB
+✓ built in 6.87s
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `release` profile [optimized] target(s) in 3m 14s
+MCP sidecar ready: C:\Users\KB\Documents\inline\In-Line\src-tauri\binaries\in-line-mcp-x86_64-pc-windows-msvc.exe
+   Compiling tauri v2.11.5
+   Compiling tauri-plugin-fs v2.5.1
+   Compiling tauri-plugin-dialog v2.7.1
+   Compiling tauri-plugin-notification v2.3.3
+   Compiling tauri-plugin-window-state v2.4.1
+   Compiling tauri-plugin-global-shortcut v2.3.0
+   Compiling tauri-plugin-autostart v2.5.1
+   Compiling tauri-plugin-clipboard-manager v2.3.2
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+   Compiling tauri-plugin-single-instance v2.4.3
+    Finished `release` profile [optimized] target(s) in 4m 53s
+       Built application at: C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\in-line.exe
+        Info Patching C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\in-line.exe with bundle type information: nsis
+        Info Target: x64
+     Running makensis to produce C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\bundle\nsis\In Line_0.5.0_x64-setup.exe
+    Finished 1 bundle at:
+        C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\bundle\nsis\In Line_0.5.0_x64-setup.exe
+

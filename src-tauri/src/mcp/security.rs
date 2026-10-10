@@ -157,6 +157,7 @@ pub struct Security {
     pub(crate) store: Mutex<Store>,
     path: PathBuf,
     pub(crate) limits: Mutex<Limiter>,
+    pub(crate) queries: Mutex<super::query::QueryState>,
 }
 impl Security {
     pub fn open() -> Result<Self, McpError> {
@@ -185,6 +186,7 @@ impl Security {
             store: Mutex::new(store),
             path,
             limits: Mutex::new(Limiter::default()),
+            queries: Mutex::new(super::query::QueryState::new(root.clone())),
         };
         if !security.path.exists() {
             let guard = security

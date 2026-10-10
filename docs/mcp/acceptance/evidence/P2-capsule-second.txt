@@ -1,0 +1,406 @@
+{
+  "passed": true,
+  "actualSarasaFontVerified": true,
+  "measurements": [
+    {
+      "font": "Capsule Sarasa",
+      "scale": 1,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 177,
+          "center": 177.5,
+          "textCenter": 177,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 131.71875,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 166.234375,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 163.734375,
+          "center": 273.5,
+          "textCenter": 273,
+          "svgCenter": null
+        }
+      ]
+    },
+    {
+      "font": "Capsule Sarasa",
+      "scale": 1.5,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 152,
+          "center": 177.5,
+          "textCenter": 177,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 106.71875,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 141.234375,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Capsule Sarasa\", sans-serif",
+          "left": 138.734375,
+          "center": 273.5,
+          "textCenter": 273,
+          "svgCenter": null
+        }
+      ]
+    },
+    {
+      "font": "Microsoft YaHei UI",
+      "scale": 1,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 177,
+          "center": 177.5,
+          "textCenter": 177,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 132.78125,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 166.59375,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 164.796875,
+          "center": 273.5,
+          "textCenter": 273,
+          "svgCenter": null
+        }
+      ]
+    },
+    {
+      "font": "Microsoft YaHei UI",
+      "scale": 1.5,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 152,
+          "center": 177.5,
+          "textCenter": 177,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 107.78125,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 141.59375,
+          "center": 225.5,
+          "textCenter": 225,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Microsoft YaHei UI\", sans-serif",
+          "left": 139.796875,
+          "center": 273.5,
+          "textCenter": 273,
+          "svgCenter": null
+        }
+      ]
+    },
+    {
+      "font": "Segoe UI",
+      "scale": 1,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 177,
+          "center": 177.5,
+          "textCenter": 177.5,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 134.28125,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 167.09375,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 166.28125,
+          "center": 273.5,
+          "textCenter": 273.5,
+          "svgCenter": null
+        }
+      ]
+    },
+    {
+      "font": "Segoe UI",
+      "scale": 1.5,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 152,
+          "center": 177.5,
+          "textCenter": 177.5,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 109.28125,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 142.09375,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "\"Segoe UI\", sans-serif",
+          "left": 141.28125,
+          "center": 273.5,
+          "textCenter": 273.5,
+          "svgCenter": null
+        }
+      ]
+    },
+    {
+      "font": "Arial",
+      "scale": 1,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 177,
+          "center": 177.5,
+          "textCenter": 177.5,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 134.953125,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 167.3125,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 166.96875,
+          "center": 273.5,
+          "textCenter": 273.5,
+          "svgCenter": null
+        }
+      ]
+    },
+    {
+      "font": "Arial",
+      "scale": 1.5,
+      "values": [
+        {
+          "text": "6",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 152,
+          "center": 177.5,
+          "textCenter": 177.5,
+          "svgCenter": null
+        },
+        {
+          "text": "79",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 109.953125,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": null
+        },
+        {
+          "text": "1",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 142.3125,
+          "center": 225.5,
+          "textCenter": 225.5,
+          "svgCenter": 225.5
+        },
+        {
+          "text": "182",
+          "display": "flex",
+          "height": 22,
+          "lineHeight": "12px",
+          "font": "Arial, sans-serif",
+          "left": 141.96875,
+          "center": 273.5,
+          "textCenter": 273.5,
+          "svgCenter": null
+        }
+      ]
+    }
+  ]
+}
