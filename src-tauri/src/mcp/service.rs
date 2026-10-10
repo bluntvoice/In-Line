@@ -1,3 +1,4 @@
+use super::write_types::*;
 use super::{
     contract::*,
     security::{Limiter, Security},
@@ -52,7 +53,7 @@ pub fn execute(
         let _: CapabilityArgs =
             serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
         return Ok(
-            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":11,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":[],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["business_write","permanent_delete","restore_database","attachments","remote_transport","business_audit_not_yet_recorded"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"connectionVerified":true}),
+            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":12,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":["mutate_task","manage_preferences","request_undo"],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["batch_write","queue_write","subtask_write","permanent_delete","restore_database","attachments","remote_transport"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"connectionVerified":true}),
         );
     }
     if !TOOLS.contains(&tool) {
@@ -60,6 +61,36 @@ pub fn execute(
     }
     if !auth.permissions.regular_read {
         return Err(McpError::new("forbidden"));
+    }
+    if matches!(tool, "mutate_task" | "request_undo") && !auth.permissions.write {
+        return Err(McpError::new("forbidden"));
+    }
+    match tool {
+        "mutate_task" => {
+            return db.mcp_mutate(
+                &credentials.client_id,
+                &auth,
+                serde_json::from_value::<MutateArgs>(args)
+                    .map_err(|_| McpError::new("invalid_arguments"))?,
+            )
+        }
+        "request_undo" => {
+            return db.mcp_request_undo(
+                &credentials.client_id,
+                &auth,
+                serde_json::from_value::<UndoArgs>(args)
+                    .map_err(|_| McpError::new("invalid_arguments"))?,
+            )
+        }
+        "manage_preferences" => {
+            return db.mcp_preferences(
+                &credentials.client_id,
+                &auth,
+                serde_json::from_value::<PreferenceArgs>(args)
+                    .map_err(|_| McpError::new("invalid_arguments"))?,
+            )
+        }
+        _ => {}
     }
     let mut queries = security
         .queries

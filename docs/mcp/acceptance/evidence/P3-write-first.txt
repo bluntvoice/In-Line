@@ -1,0 +1,45 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error[E0277]: `DataVersion` doesn't implement `std::fmt::Debug`
+   --> src\database\mcp_write_tests.rs:151:5
+    |
+151 |     assert_eq!(db.mcp_basis().unwrap(), basis);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::fmt::Debug` is not implemented for `DataVersion`
+    |
+    = note: add `#[derive(Debug)]` to `DataVersion` or manually `impl std::fmt::Debug for DataVersion`
+help: consider annotating `DataVersion` with `#[derive(Debug)]`
+   --> src\mcp\basis.rs:7:1
+    |
+  7 + #[derive(Debug)]
+  8 | pub struct DataVersion {
+    |
+
+error[E0277]: `DataVersion` doesn't implement `std::fmt::Debug`
+   --> src\database\mcp_write_tests.rs:173:5
+    |
+173 |     assert_eq!(db.mcp_basis().unwrap(), basis);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::fmt::Debug` is not implemented for `DataVersion`
+    |
+    = note: add `#[derive(Debug)]` to `DataVersion` or manually `impl std::fmt::Debug for DataVersion`
+help: consider annotating `DataVersion` with `#[derive(Debug)]`
+   --> src\mcp\basis.rs:7:1
+    |
+  7 + #[derive(Debug)]
+  8 | pub struct DataVersion {
+    |
+
+error[E0277]: `DataVersion` doesn't implement `std::fmt::Debug`
+   --> src\database\mcp_write_tests.rs:223:5
+    |
+223 |     assert_eq!(db.mcp_basis().unwrap(), basis);
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the trait `std::fmt::Debug` is not implemented for `DataVersion`
+    |
+    = note: add `#[derive(Debug)]` to `DataVersion` or manually `impl std::fmt::Debug for DataVersion`
+help: consider annotating `DataVersion` with `#[derive(Debug)]`
+   --> src\mcp\basis.rs:7:1
+    |
+  7 + #[derive(Debug)]
+  8 | pub struct DataVersion {
+    |
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `in-line` (lib test) due to 6 previous errors

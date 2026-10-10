@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const API_VERSION: u32 = 1;
-pub const TOOLS: [&str; 7] = [
+pub const TOOLS: [&str; 10] = [
     "get_capabilities",
     "get_report_summary",
     "list_report_items",
@@ -11,6 +11,9 @@ pub const TOOLS: [&str; 7] = [
     "query_task_history",
     "query_work_calendar",
     "manage_saved_query",
+    "mutate_task",
+    "manage_preferences",
+    "request_undo",
 ];
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -42,8 +45,14 @@ impl McpError {
             "unauthenticated" => "请在In Line软件设置中为当前客户端授权并配置环境凭证",
             "revoked" => "客户端授权已撤销，请由用户在软件内重新授权",
             "paused" => "MCP已由用户暂停，请由用户在软件内恢复",
-            "forbidden" => "当前客户端没有所需读取权限",
-            "authorization_changed" => "读取期间授权发生变化，结果未释放；请按当前权限重新查询",
+            "forbidden" => "当前客户端没有所需权限或事项超出授权范围",
+            "conflict" => "字段、版本或业务状态已改变，请重新读取并由用户确认冲突",
+            "idempotency_conflict" => "该请求键已用于不同操作，未重复写入",
+            "possible_duplicate" => "发现同名候选事项，请先检索并由用户确认是否仍需新建；未合并或写入",
+            "needs_disambiguation" => "存在多个匹配事项，请用户指定稳定ID或永久编号",
+            "business_rule" => "操作违反软件业务规则，未提交任何变更",
+            "result_unknown" => "提交结果不确定；禁止换新请求键或盲目重放，请用原请求键核验回执",
+            "authorization_changed" => "操作期间授权发生变化，结果未释放；写入可能已提交，禁止换键重做，请按当前权限用原幂等键核验",
             "incompatible" => "接口或授权存储版本不兼容，请升级并重新检查连接",
             "rate_limited" => "调用过于频繁，请等待冷却后重试",
             "invalid_arguments" => "参数无效：只接受白名单字段；日期须为YYYY-MM-DD，时间范围为RFC3339；分页1至100，后续offset必须绑定快照且不能与cursor混用",

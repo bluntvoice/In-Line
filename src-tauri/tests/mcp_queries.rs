@@ -38,9 +38,21 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
         .unwrap();
     let sec = security.clone();
     let data = db.clone();
+    let response_fault = std::sync::atomic::AtomicBool::new(false);
     ipc::start(
         security.clone(),
-        Arc::new(move |creds, tool, args| service::execute(&sec, &data, creds, tool, args)),
+        Arc::new(move |creds, tool, args| {
+            let inject = args["reason"] == "synthetic response loss"
+                && !response_fault.swap(true, std::sync::atomic::Ordering::SeqCst);
+            let result = service::execute(&sec, &data, creds, tool, args);
+            if inject && result.is_ok() {
+                Err(in_line_lib::mcp::contract::McpError::new(
+                    "host_unavailable",
+                ))
+            } else {
+                result
+            }
+        }),
     )
     .unwrap();
     let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_in-line-mcp"))
@@ -90,7 +102,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             .await
             .unwrap();
         let list = request(&mut input, &mut output, 2, "tools/list", json!({})).await;
-        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 7);
+        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 10);
         let first = request(
             &mut input,
             &mut output,
@@ -144,6 +156,156 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             "explicit_intent_required"
         );
         assert_eq!(saved["result"]["isError"], true);
+        let intent = json!({"summary":"synthetic user edits title","explicitUserRequest":true});
+        let mutation = json!({"action":"patch","target":{"taskId":1},"fieldBase":{"title":{"value":"original-first","version":0}},"patch":{"title":"MCP changed"},"idempotencyKey":"p3-real-patch","intent":intent,"reason":"synthetic exact title"});
+        let denied = request(
+            &mut input,
+            &mut output,
+            8,
+            "tools/call",
+            json!({"name":"mutate_task","arguments":mutation}),
+        )
+        .await;
+        assert_eq!(
+            denied["result"]["structuredContent"]["error"]["code"],
+            "forbidden"
+        );
+        assert_eq!(db.get_task(1).unwrap().title, "original-first");
+        let write = Permissions {
+            regular_read: true,
+            full_read: false,
+            write: true,
+        };
+        security.set_groups(write.clone()).unwrap();
+        security
+            .update_client(
+                &issued.client_id,
+                write,
+                Scope {
+                    departments: Some(vec!["synthetic A".into()]),
+                    task_types: Some(vec!["synthetic T".into()]),
+                },
+            )
+            .unwrap();
+        let result = request(
+            &mut input,
+            &mut output,
+            9,
+            "tools/call",
+            json!({"name":"mutate_task","arguments":mutation}),
+        )
+        .await;
+        assert_eq!(result["result"]["structuredContent"]["status"], "ok");
+        assert_eq!(
+            result["result"]["structuredContent"]["data"]["verificationStatus"],
+            "verified_after_commit"
+        );
+        assert!(!result.to_string().contains("secret-"));
+        let audit = result["result"]["structuredContent"]["data"]["auditId"].clone();
+        let repeated = request(
+            &mut input,
+            &mut output,
+            10,
+            "tools/call",
+            json!({"name":"mutate_task","arguments":mutation}),
+        )
+        .await;
+        assert_eq!(
+            repeated["result"]["structuredContent"]["data"]["auditId"],
+            audit
+        );
+        assert_eq!(
+            repeated["result"]["structuredContent"]["data"]["replayed"],
+            true
+        );
+        let undo=request(&mut input,&mut output,11,"tools/call",json!({"name":"request_undo","arguments":{"auditId":audit,"idempotencyKey":"p3-real-undo","intent":intent,"reason":"synthetic approval required"}})).await;
+        assert_eq!(
+            undo["result"]["structuredContent"]["data"]["status"],
+            "needs_user_approval"
+        );
+        assert_eq!(db.get_task(1).unwrap().title, "MCP changed");
+        db.mcp_resolve_undo(
+            undo["result"]["structuredContent"]["data"]["undoRequestId"]
+                .as_i64()
+                .unwrap(),
+            true,
+        )
+        .unwrap();
+        assert_eq!(db.get_task(1).unwrap().title, "original-first");
+        let history = request(
+            &mut input,
+            &mut output,
+            12,
+            "tools/call",
+            json!({"name":"query_task_history","arguments":{"taskId":1,"kinds":["audit"]}}),
+        )
+        .await;
+        assert_eq!(history["result"]["structuredContent"]["status"], "ok");
+        assert!(
+            history["result"]["structuredContent"]["data"]["items"]
+                .as_array()
+                .unwrap()
+                .len()
+                >= 2
+        );
+        assert!(!history.to_string().contains("secret-"));
+        let uncertain = json!({"action":"create","task":{"title":"uncertain-create","departments":["synthetic A"],"contacts":["synthetic C"],"taskType":"synthetic T"},"idempotencyKey":"original-uncertain-key","intent":intent,"reason":"synthetic response loss"});
+        let lost = request(
+            &mut input,
+            &mut output,
+            14,
+            "tools/call",
+            json!({"name":"mutate_task","arguments":uncertain}),
+        )
+        .await;
+        assert_eq!(
+            lost["result"]["structuredContent"]["error"]["code"],
+            "result_unknown"
+        );
+        assert_eq!(
+            db.mcp_audit_state().unwrap()["audits"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|a| a["action"] == "create")
+                .count(),
+            1
+        );
+        let recovered = request(
+            &mut input,
+            &mut output,
+            15,
+            "tools/call",
+            json!({"name":"mutate_task","arguments":uncertain}),
+        )
+        .await;
+        assert_eq!(
+            recovered["result"]["structuredContent"]["data"]["replayed"],
+            true
+        );
+        assert_eq!(
+            db.mcp_audit_state().unwrap()["audits"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|a| a["action"] == "create")
+                .count(),
+            1
+        );
+        security.pause(true).unwrap();
+        let paused = request(
+            &mut input,
+            &mut output,
+            13,
+            "tools/call",
+            json!({"name":"mutate_task","arguments":mutation}),
+        )
+        .await;
+        assert_eq!(
+            paused["result"]["structuredContent"]["error"]["code"],
+            "paused"
+        );
+        assert_eq!(db.get_task(1).unwrap().title, "original-first");
     };
     tokio::time::timeout(std::time::Duration::from_secs(30), execute)
         .await

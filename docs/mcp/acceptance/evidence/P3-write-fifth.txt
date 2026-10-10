@@ -1,0 +1,32 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.87s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 11 tests
+test database::mcp_write_tests::p3_preference_whitelist_atomic_and_user_approved_undo ... ok
+test database::mcp_write_tests::p3_atomic_failure_rolls_back_business_dictionary_versions_and_receipt ... ok
+test database::mcp_write_tests::p3_preference_aba_and_cross_client_undo_do_not_bypass_permissions ... ok
+test database::mcp_write_tests::p3_gui_changes_invalidate_versions_urgent_neighbour_scope_and_undo_are_checked ... FAILED
+test database::mcp_write_tests::p3_receipts_survive_reopen_concurrent_retry_and_do_not_leak ... ok
+test database::mcp_write_tests::p3_explicit_real_work_and_future_undo_preserve_history_and_reservations ... ok
+test database::mcp_write_tests::p3_status_no_change_and_gui_share_domain_rules ... ok
+test database::mcp_write_tests::p3_duplicates_disambiguation_whole_text_and_scope_are_explicit ... ok
+test database::mcp_write_tests::p3_unrelated_fields_merge_same_field_and_aba_conflict ... ok
+test database::mcp_write_tests::p3_patch_undo_is_gui_only_preserves_unrelated_and_rejects_conflict ... ok
+test database::mcp_write_tests::p3_schema11_upgrade_preserves_uuid_tasks_and_backs_up_before_mutation ... ok
+
+failures:
+
+---- database::mcp_write_tests::p3_gui_changes_invalidate_versions_urgent_neighbour_scope_and_undo_are_checked stdout ----
+
+thread 'database::mcp_write_tests::p3_gui_changes_invalidate_versions_urgent_neighbour_scope_and_undo_are_checked' (35160) panicked at src\database\mcp_write_tests.rs:37:31:
+called `Result::unwrap()` on an `Err` value: Error("missing field `reason`", line: 0, column: 0)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    database::mcp_write_tests::p3_gui_changes_invalidate_versions_urgent_neighbour_scope_and_undo_are_checked
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 96 filtered out; finished in 0.24s
+
+error: test failed, to rerun pass `--lib`

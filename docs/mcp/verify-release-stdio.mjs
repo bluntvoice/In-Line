@@ -22,19 +22,20 @@ try {
  send({jsonrpc:'2.0',method:'notifications/initialized'});
  const list=await request(2,'tools/list',{});
  const names=list.result.tools.map(tool=>tool.name).sort();
- if(JSON.stringify(names)!==JSON.stringify(['get_capabilities','get_report_summary','list_report_items','manage_saved_query','query_task_history','query_tasks','query_work_calendar']))throw new Error('Unexpected tools');
+ if(JSON.stringify(names)!==JSON.stringify(['get_capabilities','get_report_summary','list_report_items','manage_preferences','manage_saved_query','mutate_task','query_task_history','query_tasks','query_work_calendar','request_undo']))throw new Error('Unexpected tools');
  for(const [index,name] of names.entries()) {
-   const args=name==='get_capabilities'||name==='query_tasks'?{}:name==='query_task_history'?{taskId:1}:name==='manage_saved_query'?{action:'list'}:{startDate:'2026-08-08',endDate:'2026-08-08'};
+   const intent={summary:'synthetic request',explicitUserRequest:true};
+   const args=name==='manage_preferences'?{action:'get'}:name==='request_undo'?{auditId:1,idempotencyKey:'anonymous-undo',intent,reason:'synthetic'}:name==='mutate_task'?{action:'create',task:{title:'synthetic',departments:['D'],contacts:['C'],taskType:'T'},idempotencyKey:'anonymous-create',intent,reason:'synthetic'}:name==='get_capabilities'||name==='query_tasks'?{}:name==='query_task_history'?{taskId:1}:name==='manage_saved_query'?{action:'list'}:{startDate:'2026-08-08',endDate:'2026-08-08'};
    const result=await request(3+index,'tools/call',{name,arguments:args});
    const body=result.result;
    const expected=index<5?'unauthenticated':'rate_limited';
    if(body?.isError!==true||body.structuredContent?.status!=='error'||body.structuredContent.data!==null||body.structuredContent.error.code!==expected)throw new Error('Anonymous authorization gate failed');
  }
  for(const [index,expected] of ['rate_limited','rate_limited','rate_limited'].entries()) {
-   const result=await request(10+index,'tools/call',{name:'get_capabilities',arguments:{}});
+   const result=await request(20+index,'tools/call',{name:'get_capabilities',arguments:{}});
    const body=result.result;
    if(body?.isError!==true||body.structuredContent?.status!=='error'||body.structuredContent.data!==null||body.structuredContent.error.code!==expected)throw new Error('Release preflight rate limit gate failed');
  }
  if(protocolFailure)throw protocolFailure;
- console.log('PASS: P2 sidecar initialize/tools/list/7 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.');
+ console.log('PASS: P3 sidecar initialize/tools/list/10 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.');
 } finally {clearTimeout(timer);child.kill();}

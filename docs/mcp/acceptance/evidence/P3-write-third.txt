@@ -1,0 +1,15 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.49s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 7 tests
+test database::mcp_write_tests::p3_atomic_failure_rolls_back_business_dictionary_versions_and_receipt ... ok
+test database::mcp_write_tests::p3_preference_whitelist_atomic_and_user_approved_undo ... ok
+test database::mcp_write_tests::p3_receipts_survive_reopen_concurrent_retry_and_do_not_leak ... ok
+test database::mcp_write_tests::p3_duplicates_disambiguation_whole_text_and_scope_are_explicit ... ok
+test database::mcp_write_tests::p3_status_no_change_and_gui_share_domain_rules ... ok
+test database::mcp_write_tests::p3_unrelated_fields_merge_same_field_and_aba_conflict ... ok
+test database::mcp_write_tests::p3_patch_undo_is_gui_only_preserves_unrelated_and_rejects_conflict ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 96 filtered out; finished in 0.17s
+

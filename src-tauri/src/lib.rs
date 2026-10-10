@@ -5,6 +5,28 @@ pub mod models;
 pub mod recommended_font;
 pub mod updater;
 
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_audit_state(db: tauri::State<database::Database>) -> Result<serde_json::Value, String> {
+    db.mcp_audit_state()
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_resolve_undo(
+    app: tauri::AppHandle,
+    db: tauri::State<database::Database>,
+    request_id: i64,
+    approve: bool,
+) -> Result<serde_json::Value, String> {
+    let result = db
+        .mcp_resolve_undo(request_id, approve)
+        .map_err(|e| e.to_string())?;
+    if approve {
+        let _ = emit_change(&app);
+    }
+    Ok(result)
+}
+
 use database::Database;
 use models::*;
 use std::sync::Mutex;
@@ -960,6 +982,15 @@ pub fn run() {
         }
         context
     };
+    // Invisible windows still default to focus=true in Tauri's WindowConfig.
+    // Set both flags before window creation; hiding later cannot undo focus theft.
+    let mut context = context;
+    if background {
+        for window in &mut context.config_mut().app.windows {
+            window.visible = false;
+            window.focus = false;
+        }
+    }
     #[cfg(windows)]
     let host_gate = std::sync::Arc::new(
         mcp::platform::HostGate::enter(&context.config().identifier)
@@ -1024,13 +1055,20 @@ pub fn run() {
                     if mcp::ipc::start(
                         security.clone(),
                         std::sync::Arc::new(move |credentials, tool, args| {
-                            mcp::service::execute(
+                            let result = mcp::service::execute(
                                 &service_security,
                                 &handle.state::<Database>(),
                                 credentials,
                                 tool,
                                 args,
-                            )
+                            );
+                            if matches!(tool, "mutate_task" | "manage_preferences" | "request_undo")
+                                && result.is_ok()
+                            {
+                                let _ = handle.emit("data-changed", ());
+                                let _ = handle.emit("mcp-audit-changed", ());
+                            }
+                            result
                         }),
                     )
                     .is_err()
@@ -1192,6 +1230,8 @@ pub fn run() {
             mcp_update_client,
             mcp_set_groups,
             mcp_set_paused,
+            mcp_audit_state,
+            mcp_resolve_undo,
             delete_backup,
             cleanup_backups,
             set_setting,

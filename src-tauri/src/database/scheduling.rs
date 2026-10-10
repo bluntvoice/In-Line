@@ -439,7 +439,7 @@ mod tests {
             tx.execute("INSERT INTO queue_number_allocations(permanent_number,queue_date,daily_sequence,allocated_at,voided_at) VALUES('deleted-task',?,?,?,?)",params![date,one,now(),now()]).map_err(display_error)?;
             tx.execute("DELETE FROM daily_sequences WHERE ticket_date=?",[date]).map_err(display_error)?;
             assert_eq!(next_daily_sequence(tx,date)?,one+1);
-            assert_eq!(Database::schema_version(tx)?,11);
+            assert_eq!(Database::schema_version(tx)?,12);
             Ok(())
         }).unwrap();
     }

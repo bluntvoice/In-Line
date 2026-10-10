@@ -1,0 +1,35 @@
+
+> in-line@0.5.0 dist
+> tauri build --bundles nsis
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm.cmd run build:bundle`
+
+> in-line@0.5.0 build:bundle
+> npm.cmd run build && node scripts/prepare-mcp-sidecar.mjs
+
+
+> in-line@0.5.0 build
+> tsc -p tsconfig.renderer.json --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1653 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.56 kB │ gzip:   0.37 kB
+dist/assets/index-CkoqT4sD.css  110.13 kB │ gzip:  19.45 kB
+dist/assets/index-lezMeeag.js   452.76 kB │ gzip: 138.80 kB
+✓ built in 4.28s
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `release` profile [optimized] target(s) in 2m 45s
+MCP sidecar ready: C:\Users\KB\Documents\inline\In-Line\src-tauri\binaries\in-line-mcp-x86_64-pc-windows-msvc.exe
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `release` profile [optimized] target(s) in 4m 26s
+       Built application at: C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\in-line.exe
+        Info Patching C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\in-line.exe with bundle type information: nsis
+        Info Target: x64
+     Running makensis to produce C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\bundle\nsis\In Line_0.5.0_x64-setup.exe
+    Finished 1 bundle at:
+        C:\Users\KB\Documents\inline\In-Line\src-tauri\target\release\bundle\nsis\In Line_0.5.0_x64-setup.exe
+

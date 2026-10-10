@@ -18,7 +18,7 @@ pub const ALL_STATUSES: [&str; 10] = [
 pub const PRIORITIES: [&str; 4] = ["normal", "elevated", "urgent", "critical"];
 pub const WORKLOADS: [&str; 4] = ["simple", "standard", "complex", "major"];
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LegalTask {
     pub id: i64,

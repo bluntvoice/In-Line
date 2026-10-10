@@ -1,5 +1,6 @@
 use in_line_lib::mcp::contract::*;
 use in_line_lib::mcp::query_types::*;
+use in_line_lib::mcp::write_types::*;
 use rmcp::{
     handler::server::wrapper::Parameters, model::CallToolResult, tool, tool_router,
     transport::stdio, ServiceExt,
@@ -28,6 +29,48 @@ impl InLineMcp {
 }
 #[tool_router]
 impl InLineMcp {
+    #[tool(
+        description = "按用户明确指令单事项创建、局部编辑、状态、加急或记录真实办理。先检索疑似重复和准确目标，使用query_tasks的字段版本/原值或taskVersion；敏感字段不可回显。操作缘由必填，业务/权限冲突不重试，结果不明只用原幂等键核验，禁止换键盲目重放。",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn mutate_task(&self, Parameters(args): Parameters<MutateArgs>) -> CallToolResult {
+        self.call("mutate_task", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
+        description = "读取或按明确用户指令调整白名单普通偏好（字体、缩放、编号色等），patch需写权限、原值与幂等键。禁止安全、恢复、更新和自启动设置。",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn manage_preferences(
+        &self,
+        Parameters(args): Parameters<PreferenceArgs>,
+    ) -> CallToolResult {
+        self.call("manage_preferences", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
+        description = "请求撤销本客户端AI操作，必须在In Line软件内由用户审阅前后变化并批准；此工具只提交申请，不执行逆向写入。",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn request_undo(&self, Parameters(args): Parameters<UndoArgs>) -> CallToolResult {
+        self.call("request_undo", serde_json::to_value(args).unwrap())
+            .await
+    }
     #[tool(
         description = "认证后按白名单组合条件检索事项，常规/完整投影及限域强制执行；每页最多100，后续使用原条件和不透明cursor或snapshot。不得将关联推断保存为事实。",
         annotations(

@@ -1,0 +1,81 @@
+Diff in \\?\C:\Users\KB\Documents\inline\In-Line\src-tauri\tests\mcp_queries.rs:38:
+         .unwrap();
+     let sec = security.clone();
+     let data = db.clone();
+-    let response_fault=std::sync::atomic::AtomicBool::new(false);
++    let response_fault = std::sync::atomic::AtomicBool::new(false);
+     ipc::start(
+         security.clone(),
+-        Arc::new(move |creds, tool, args| {let inject=args["reason"]=="synthetic response loss"&&!response_fault.swap(true,std::sync::atomic::Ordering::SeqCst);let result=service::execute(&sec,&data,creds,tool,args);if inject&&result.is_ok(){Err(in_line_lib::mcp::contract::McpError::new("host_unavailable"))}else{result}}),
++        Arc::new(move |creds, tool, args| {
++            let inject = args["reason"] == "synthetic response loss"
++                && !response_fault.swap(true, std::sync::atomic::Ordering::SeqCst);
++            let result = service::execute(&sec, &data, creds, tool, args);
++            if inject && result.is_ok() {
++                Err(in_line_lib::mcp::contract::McpError::new(
++                    "host_unavailable",
++                ))
++            } else {
++                result
++            }
++        }),
+     )
+     .unwrap();
+     let mut child = tokio::process::Command::new(env!("CARGO_BIN_EXE_in-line-mcp"))
+Diff in \\?\C:\Users\KB\Documents\inline\In-Line\src-tauri\tests\mcp_queries.rs:238:
+                 >= 2
+         );
+         assert!(!history.to_string().contains("secret-"));
+-        let uncertain=json!({"action":"create","task":{"title":"uncertain-create","departments":["synthetic A"],"contacts":["synthetic C"],"taskType":"synthetic T"},"idempotencyKey":"original-uncertain-key","intent":intent,"reason":"synthetic response loss"});
+-        let lost=request(&mut input,&mut output,14,"tools/call",json!({"name":"mutate_task","arguments":uncertain})).await;
+-        assert_eq!(lost["result"]["structuredContent"]["error"]["code"],"result_unknown");
+-        assert_eq!(db.mcp_audit_state().unwrap()["audits"].as_array().unwrap().iter().filter(|a|a["action"]=="create").count(),1);
+-        let recovered=request(&mut input,&mut output,15,"tools/call",json!({"name":"mutate_task","arguments":uncertain})).await;
+-        assert_eq!(recovered["result"]["structuredContent"]["data"]["replayed"],true);
+-        assert_eq!(db.mcp_audit_state().unwrap()["audits"].as_array().unwrap().iter().filter(|a|a["action"]=="create").count(),1);
++        let uncertain = json!({"action":"create","task":{"title":"uncertain-create","departments":["synthetic A"],"contacts":["synthetic C"],"taskType":"synthetic T"},"idempotencyKey":"original-uncertain-key","intent":intent,"reason":"synthetic response loss"});
++        let lost = request(
++            &mut input,
++            &mut output,
++            14,
++            "tools/call",
++            json!({"name":"mutate_task","arguments":uncertain}),
++        )
++        .await;
++        assert_eq!(
++            lost["result"]["structuredContent"]["error"]["code"],
++            "result_unknown"
++        );
++        assert_eq!(
++            db.mcp_audit_state().unwrap()["audits"]
++                .as_array()
++                .unwrap()
++                .iter()
++                .filter(|a| a["action"] == "create")
++                .count(),
++            1
++        );
++        let recovered = request(
++            &mut input,
++            &mut output,
++            15,
++            "tools/call",
++            json!({"name":"mutate_task","arguments":uncertain}),
++        )
++        .await;
++        assert_eq!(
++            recovered["result"]["structuredContent"]["data"]["replayed"],
++            true
++        );
++        assert_eq!(
++            db.mcp_audit_state().unwrap()["audits"]
++                .as_array()
++                .unwrap()
++                .iter()
++                .filter(|a| a["action"] == "create")
++                .count(),
++            1
++        );
+         security.pause(true).unwrap();
+         let paused = request(
+             &mut input,

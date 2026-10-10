@@ -1,0 +1,7 @@
+已确认 GitHub Action 运行时：actions/checkout@v7
+已确认 GitHub Action 运行时：actions/setup-node@v7
+已确认 GitHub Action 运行时：actions/upload-artifact@v7
+已确认 GitHub Action 运行时：dtolnay/rust-toolchain@stable（复合 Action）
+已确认 GitHub Action 运行时：softprops/action-gh-release@v3
+已确认 GitHub Action 运行时：Swatinem/rust-cache@v2
+GitHub Actions 运行时策略检查通过。

@@ -1,0 +1,1 @@
+PASS: synthetic browser review shows exact before/after; reviewing alone never submits; explicit approval sends one call; conflict remains pending; rejection is independent. Production program/data/config not accessed.

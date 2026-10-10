@@ -1,0 +1,19 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error[E0382]: use of moved value: `task`
+   --> src\mcp\query.rs:526:45
+    |
+518 |         for mut task in tasks {
+    |             -------- move occurs because `task` has type `models::LegalTask`, which does not implement the `Copy` trait
+...
+525 |             let mut raw = serde_json::to_value(task).map_err(|_| invalid())?;
+    |                                                ---- value moved here
+526 |             let basis = s.db.mcp_task_basis(task.id, auth.permissions.full_read)?;
+    |                                             ^^^^^^^ value used here after move
+    |
+help: consider borrowing `task`
+    |
+525 |             let mut raw = serde_json::to_value(&task).map_err(|_| invalid())?;
+    |                                                +
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `in-line` (lib) due to 1 previous error

@@ -5,6 +5,7 @@ import { Image } from "@tauri-apps/api/image";
 import { writeImage,writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { ArchiveTaskInput,ArchiveTaskResult,BackupInfo,BackupMergeResult,BootstrapData,CompleteTaskInput,CompleteTaskResult,CreateSubtaskInput,DeleteTaskInput,DeleteTaskResult,LegalTask,MasterData,MergeTaskInput,MoveDirection,QueueInput,ReorderSubtasksInput,StatisticsDetail,StatisticsResult,SubtaskCompletionState,TaskInput,TaskLog,TaskStatus,TaskUiAction,TaskView,TaskWorkEvent,TicketSnapshot,UpdateCheckResponse,UpdateProgress,WorkCalendarResult } from "./types";
 import { renderTicketPng,renderTicketRgba,warmTicketRenderer } from "./lib/ticket-image";
+import type {McpAuditState} from "./lib/mcp-audit";
 
 let pngImageSupported=true;
 
@@ -170,6 +171,8 @@ export const api={
     }
     return snapshot.task;
   },
+  mcpAuditState:()=>invoke<McpAuditState>("mcp_audit_state"),
+  mcpResolveUndo:(requestId:number,approve:boolean)=>invoke("mcp_resolve_undo",{requestId,approve}),
   setLaunchAtLogin:(enabled:boolean)=>invoke<void>("set_launch_at_login",{enabled}),
   launchAtLogin:()=>invoke<boolean>("get_launch_at_login")
 };

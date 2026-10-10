@@ -19,6 +19,8 @@ use std::{
 
 const TTL: Duration = Duration::from_secs(600);
 const REGULAR: &[&str] = &[
+    "taskVersion",
+    "fieldVersions",
     "id",
     "permanentNumber",
     "dailySequence",
@@ -520,7 +522,10 @@ pub fn tasks(
             {
                 task.parent_task_id = None;
             }
-            let raw = serde_json::to_value(task).map_err(|_| invalid())?;
+            let mut raw = serde_json::to_value(&task).map_err(|_| invalid())?;
+            let basis = s.db.mcp_task_basis(task.id, auth.permissions.full_read)?;
+            raw["taskVersion"] = basis["taskVersion"].clone();
+            raw["fieldVersions"] = basis["fieldVersions"].clone();
             let mut row = serde_json::Map::new();
             for field in &fields {
                 row.insert(field.clone(), raw[field].clone());
@@ -560,8 +565,9 @@ pub fn history(
     }
     if args.kinds.as_ref().is_some_and(|k| {
         k.len() > 5
-            || k.iter()
-                .any(|s| !["status", "queue", "work", "log", "urgent"].contains(&s.as_str()))
+            || k.iter().any(|s| {
+                !["status", "queue", "work", "log", "urgent", "audit"].contains(&s.as_str())
+            })
     }) {
         return Err(invalid());
     }

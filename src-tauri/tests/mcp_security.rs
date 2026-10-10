@@ -163,7 +163,16 @@ fn scope_filters_summary_denominator_trend_details_and_cross_client_calls() {
     );
     let caps = service::execute(&security, &db, &a, "get_capabilities", json!({})).unwrap();
     assert_eq!(caps["permissions"]["write"], false);
-    assert_eq!(caps["writeTools"], json!([]));
+    assert_eq!(
+        caps["writeTools"],
+        json!(["mutate_task", "manage_preferences", "request_undo"])
+    );
+    assert_eq!(
+        service::execute(&security, &db, &a, "mutate_task", json!({}))
+            .unwrap_err()
+            .code,
+        "forbidden"
+    );
 }
 #[test]
 fn scope_all_departments_missing_departments_and_literal_names() {

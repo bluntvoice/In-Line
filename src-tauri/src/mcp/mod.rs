@@ -15,3 +15,4 @@ pub mod scope;
 pub mod security;
 #[cfg(windows)]
 pub mod service;
+pub mod write_types;

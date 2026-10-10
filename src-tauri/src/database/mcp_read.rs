@@ -101,7 +101,7 @@ mod tests {
             serde_json::to_value(upgraded.get_task(task.id).unwrap()).unwrap(),
             original
         );
-        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 11);
+        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 12);
         assert!(!upgraded.list_backups().unwrap().is_empty());
     }
     #[test]
@@ -138,7 +138,7 @@ impl Database {
     pub(crate) fn mcp_basis(&self) -> Result<DataVersion, McpError> {
         self.with_conn(|conn| conn.query_row("SELECT database_uuid,data_generation,commit_sequence FROM mcp_data_basis WHERE singleton=1",[],|r|Ok(DataVersion{
             database_uuid:r.get(0)?,data_generation:r.get(1)?,commit_sequence:r.get(2)?,
-            schema_version:11,query_schema_version:1,statistics_definition_version:1,
+            schema_version:12,query_schema_version:1,statistics_definition_version:1,
         })).map_err(display_error)).map_err(Into::into)
     }
     pub(crate) fn mcp_snapshot(&self) -> Result<Self, McpError> {
@@ -164,6 +164,8 @@ impl Database {
             Ok(Self {
                 backup_dir: PathBuf::new(),
                 connection: Mutex::new(Some(copy)),
+                #[cfg(test)]
+                fail_mcp_verification: std::sync::atomic::AtomicBool::new(false),
             })
         })
         .map_err(|e| {
@@ -272,6 +274,9 @@ impl Database {
                     if kind=="queue"{if let Some(closed)=from{let mut closure=entries.last().unwrap().clone();closure["at"]=json!(closed);closure["phase"]=json!("closed");entries.push(closure);}}
                 }
             }
+            let mut audit=conn.prepare("SELECT id,created_at,action,client_id,reason,undo_of FROM mcp_ai_audit WHERE task_id=? ORDER BY id").map_err(display_error)?;
+            let audits=audit.query_map([id],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,Option<i64>>(5)?))).map_err(display_error)?;
+            for row in audits {let (aid,at,action,client,reason,undo)=row.map_err(display_error)?;let mut value=json!({"id":aid,"taskId":id,"kind":"audit","at":at,"action":action,"clientId":client,"undoOf":undo});if full&&!redact_cross_task{value["text"]=json!(reason);}else{value["redactedFields"]=json!(["text"]);}entries.push(value);}
             let timestamp=|value:&serde_json::Value|value["at"].as_str().and_then(|s|chrono::DateTime::parse_from_rfc3339(s).ok()).map(|t|t.timestamp_millis());
             entries.sort_by(|a,b|timestamp(b).cmp(&timestamp(a)).then_with(||a["kind"].as_str().cmp(&b["kind"].as_str())).then_with(||b["id"].as_i64().cmp(&a["id"].as_i64())).then_with(||a["phase"].as_str().cmp(&b["phase"].as_str())));
             Ok(entries)

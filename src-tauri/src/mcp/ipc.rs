@@ -243,7 +243,12 @@ pub async fn call_at(
             .collect::<String>()
         )
     };
-    tokio::time::timeout(DEADLINE, async {
+    let write_request = matches!(
+        tool,
+        "mutate_task" | "request_undo" | "manage_preferences" | "manage_saved_query"
+    );
+    let sent = std::sync::atomic::AtomicBool::new(false);
+    let result = tokio::time::timeout(DEADLINE, async {
         let mut spawned = false;
         let mut stream = loop {
             match ClientOptions::new().open(&name) {
@@ -299,6 +304,7 @@ pub async fn call_at(
             )?,
             payload,
         };
+        sent.store(true, std::sync::atomic::Ordering::SeqCst);
         send(&mut stream, &signed, MAX_REQUEST).await?;
         let response: Signed = receive(&mut stream, MAX_RESPONSE).await?;
         if !super::security::constant_equal(
@@ -313,7 +319,14 @@ pub async fn call_at(
         serde_json::from_str(&response.payload).map_err(|_| McpError::new("host_unavailable"))?
     })
     .await
-    .map_err(|_| McpError::new("host_unavailable"))?
+    .unwrap_or_else(|_| Err(McpError::new("host_unavailable")));
+    if write_request
+        && sent.load(std::sync::atomic::Ordering::SeqCst)
+        && result.as_ref().is_err_and(|e| e.code == "host_unavailable")
+    {
+        return Err(McpError::new("result_unknown"));
+    }
+    result
 }
 fn launch_host() -> Result<(), McpError> {
     use std::os::windows::process::CommandExt;
