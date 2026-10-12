@@ -1,0 +1,14 @@
+{
+  "total": 144,
+  "unique": 144,
+  "fields": 13,
+  "p8Rows": 16,
+  "p9NotEntered": 3,
+  "strictCurrentSession": false,
+  "userAcceptance": "P0 only; P1–P8 pending",
+  "oldToolsRemoved": false,
+  "productionInstalled": false,
+  "originalDecisionsUnchanged": true,
+  "testsQuarantined": false,
+  "syntheticTestData": true
+}

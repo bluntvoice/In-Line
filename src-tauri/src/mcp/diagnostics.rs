@@ -91,6 +91,7 @@ impl Diagnostics {
             .ok_or_else(|| McpError::new("security_unavailable"))?;
         let mut next = original.clone();
         let result = action(&mut next)?;
+        validate_state(&next)?;
         if let Err(error) =
             durable::write(&self.root, FILE_ID, &next, MAX_BYTES, MAX_BYTES + 65536, 4)
         {
@@ -103,6 +104,9 @@ impl Diagnostics {
     }
     /// Host-owned typed outcome only. Callers supply no free-text diagnostics.
     pub fn record(&self, mut e: Event, current_verified: bool) -> Result<(), McpError> {
+        if !valid_time(e.at) {
+            return Err(McpError::new("invalid_arguments"));
+        }
         e.code = known_code(&e.code).into();
         if !super::contract::TOOLS.contains(&e.tool.as_str()) {
             e.tool = "unsupported".into();
@@ -166,7 +170,13 @@ impl Diagnostics {
                     if ["P0", "P1"].contains(&f.severity.as_str()) {
                         alert = true;
                     }
-                    let number = f.episodes.last().map_or(1, |r| r.number + 1);
+                    let number = match f.episodes.last() {
+                        Some(r) => r
+                            .number
+                            .checked_add(1)
+                            .ok_or_else(|| McpError::new("resource_limit"))?,
+                        None => 1,
+                    };
                     f.episodes.push(Episode {
                         receipt_hash: e.receipt_hash.clone(),
                         job_id: e.job_id.clone(),
@@ -193,7 +203,10 @@ impl Diagnostics {
                 let r = f.episodes.last_mut().unwrap();
                 r.last_seen = e.at;
                 r.last_error_id = e.request_id.clone();
-                r.evidence_count += 1;
+                r.evidence_count = r
+                    .evidence_count
+                    .checked_add(1)
+                    .ok_or_else(|| McpError::new("resource_limit"))?;
                 r.state = "unresolved".into();
                 r.verification_started = None;
                 r.verification_successes = 0;
@@ -232,7 +245,10 @@ impl Diagnostics {
                         continue;
                     }
                     r.state = "pending".into();
-                    r.verification_successes += 1;
+                    r.verification_successes = r
+                        .verification_successes
+                        .checked_add(1)
+                        .ok_or_else(|| McpError::new("resource_limit"))?;
                     let first = *r.verification_started.get_or_insert(e.at);
                     // Two real related successes and a 30-second stable window; intentions do not count.
                     if r.verification_successes >= 2 && e.at - first >= 30 {
@@ -258,6 +274,9 @@ impl Diagnostics {
         self.own_at(client, error, chrono::Utc::now().timestamp())
     }
     pub fn own_at(&self, client: &str, error: &str, now: i64) -> Result<Value, McpError> {
+        if !valid_time(now) {
+            return Err(McpError::new("invalid_arguments"));
+        }
         if !hex(error, 64) {
             return Err(McpError::new("not_found"));
         }
@@ -284,6 +303,9 @@ impl Diagnostics {
         )
     }
     pub fn action(&self, id: &str, action: &str, now: i64) -> Result<(), McpError> {
+        if !valid_time(now) {
+            return Err(McpError::new("invalid_arguments"));
+        }
         self.change(|s| {
             cleanup(s, now);
             let f = s
@@ -331,6 +353,9 @@ impl Diagnostics {
         })
     }
     pub fn local(&self, filter: &str, now: i64) -> Result<Value, McpError> {
+        if !valid_time(now) {
+            return Err(McpError::new("invalid_arguments"));
+        }
         if !["all", "unresolved", "pending", "resolved", "archived"].contains(&filter) {
             return Err(McpError::new("invalid_arguments"));
         }
@@ -541,6 +566,90 @@ mod tests {
         assert_eq!(d.action(&fault, "mute", 101).unwrap_err().code, "forbidden");
     }
     #[test]
+    fn extreme_live_values_cannot_panic_or_replace_the_last_valid_snapshot() {
+        let d = fixture();
+        d.record(event("internal_error", 100), false).unwrap();
+        let file = d.root.join(format!("{FILE_ID}.json"));
+        let original = std::fs::read(&file).unwrap();
+        let fault = d.state.lock().unwrap().as_ref().unwrap().faults[0]
+            .id
+            .clone();
+        for at in [i64::MIN, i64::MAX] {
+            assert_eq!(
+                d.record(event("internal_error", at), false)
+                    .unwrap_err()
+                    .code,
+                "invalid_arguments"
+            );
+            assert_eq!(
+                d.action(&fault, "mute", at).unwrap_err().code,
+                "invalid_arguments"
+            );
+            assert_eq!(d.local("all", at).unwrap_err().code, "invalid_arguments");
+            assert!(d.own_at(&"a".repeat(64), &"1".repeat(64), at).is_err());
+            assert_eq!(std::fs::read(&file).unwrap(), original);
+        }
+        d.state.lock().unwrap().as_mut().unwrap().faults[0].episodes[0].evidence_count = u64::MAX;
+        assert_eq!(
+            d.record(event("internal_error", 101), false)
+                .unwrap_err()
+                .code,
+            "resource_limit"
+        );
+        assert_eq!(std::fs::read(&file).unwrap(), original);
+    }
+    #[test]
+    fn typed_numeric_corruption_is_rejected_without_overwriting_evidence() {
+        for (field, value) in [
+            ("started", json!(i64::MIN)),
+            ("lastSeen", json!(i64::MAX)),
+            ("resolvedAt", json!(i64::MIN)),
+            ("number", json!(u32::MAX)),
+            ("evidenceCount", json!(u64::MAX)),
+            ("verificationSuccesses", json!(u32::MAX)),
+            ("mutedUntil", json!(i64::MAX)),
+        ] {
+            let d = fixture();
+            d.record(event("internal_error", 100), false).unwrap();
+            let file = d.root.join(format!("{FILE_ID}.json"));
+            let mut state: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+            state["faults"][0]["episodes"][0][field] = value;
+            let bytes = serde_json::to_vec(&state).unwrap();
+            std::fs::write(&file, &bytes).unwrap();
+            let reopened = Diagnostics::new(d.root.parent().unwrap().to_path_buf());
+            assert!(
+                reopened.state.lock().unwrap().is_none(),
+                "accepted corrupt {field}"
+            );
+            assert_eq!(
+                reopened.local("all", 101).unwrap_err().code,
+                "security_unavailable"
+            );
+            assert!(reopened
+                .record(event("internal_error", 101), false)
+                .is_err());
+            assert_eq!(
+                std::fs::read(&file).unwrap(),
+                bytes,
+                "overwrote corrupt {field}"
+            );
+        }
+        for at in [i64::MIN, i64::MAX] {
+            let d = fixture();
+            d.record(event("internal_error", 100), false).unwrap();
+            let file = d.root.join(format!("{FILE_ID}.json"));
+            let mut state: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+            state["events"][0]["at"] = json!(at);
+            state["lastClients"][0]["at"] = json!(at);
+            let bytes = serde_json::to_vec(&state).unwrap();
+            std::fs::write(&file, &bytes).unwrap();
+            let reopened = Diagnostics::new(d.root.parent().unwrap().to_path_buf());
+            assert!(reopened.state.lock().unwrap().is_none());
+            assert!(reopened.local("all", 101).is_err());
+            assert_eq!(std::fs::read(&file).unwrap(), bytes);
+        }
+    }
+    #[test]
     fn persistence_failure_is_atomic_and_corrupt_store_is_never_overwritten() {
         let d = fixture();
         std::fs::write(d.root.join("occupied.data"), vec![0u8; 9 * 1024 * 1024]).unwrap();
@@ -579,7 +688,13 @@ fn validate_basis(v: Option<&super::basis::DataVersion>) -> Result<(), McpError>
     Ok(())
 }
 fn validate_state(s: &State) -> Result<(), McpError> {
+    if s.events.len() > 2000 || s.last_clients.len() > 256 || s.faults.len() > 256 {
+        return Err(McpError::new("security_unavailable"));
+    }
     for e in s.events.iter().chain(s.last_clients.iter()) {
+        if !valid_time(e.at) {
+            return Err(McpError::new("security_unavailable"));
+        }
         if e.receipt_hash.as_deref().is_some_and(|h| !hex(h, 64)) {
             return Err(McpError::new("security_unavailable"));
         }
@@ -596,6 +711,26 @@ fn validate_state(s: &State) -> Result<(), McpError> {
             return Err(McpError::new("security_unavailable"));
         }
         for r in &f.episodes {
+            if !valid_time(r.started)
+                || !valid_time(r.last_seen)
+                || [
+                    r.resolved_at,
+                    r.verification_started,
+                    r.muted_at,
+                    r.muted_until,
+                ]
+                .into_iter()
+                .flatten()
+                .any(|at| !valid_time(at))
+                || r.number == 0
+                || r.number == u32::MAX
+                || r.evidence_count == 0
+                || r.evidence_count == u64::MAX
+                || r.verification_successes == u32::MAX
+                || (r.state == "resolved") != r.resolved_at.is_some()
+            {
+                return Err(McpError::new("security_unavailable"));
+            }
             if r.receipt_hash.as_deref().is_some_and(|h| !hex(h, 64))
                 || r.job_id.as_deref().is_some_and(|h| !hex(h, 64))
             {
@@ -608,6 +743,11 @@ fn validate_state(s: &State) -> Result<(), McpError> {
         }
     }
     Ok(())
+}
+fn valid_time(at: i64) -> bool {
+    // Unix seconds between 1970 and the end of year 9999. Differences and mute
+    // deadlines stay safely inside i64; clock rollback remains separately handled.
+    (0..=253_402_300_799).contains(&at)
 }
 fn sanitize_state(s: &mut State) {
     for f in &mut s.faults {

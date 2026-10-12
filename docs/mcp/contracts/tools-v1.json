@@ -1,0 +1,3670 @@
+{
+  "apiVersion": 1,
+  "reviewedPhase": "P7",
+  "baselineCommit": "ba38b1002d3da15192fffab896168708918f6748",
+  "securityExceptions": [
+    "All tools including the two legacy report tools require independent authentication; pagination maximum is 100."
+  ],
+  "tools": [
+    {
+      "name": "batch_mutate",
+      "inputSchema": {
+        "$defs": {
+          "BatchItem": {
+            "additionalProperties": false,
+            "properties": {
+              "operation": {
+                "$ref": "#/$defs/TaskAction"
+              },
+              "refKey": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "operation"
+            ],
+            "type": "object"
+          },
+          "DataVersion": {
+            "additionalProperties": false,
+            "properties": {
+              "commitSequence": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "dataGeneration": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "databaseUuid": {
+                "type": "string"
+              },
+              "indexEpoch": {
+                "description": "Derived index repair invalidates cache, cursor and job baseline without changing business rows.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "querySchemaVersion": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "schemaVersion": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "statisticsDefinitionVersion": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "databaseUuid",
+              "dataGeneration",
+              "commitSequence",
+              "schemaVersion",
+              "querySchemaVersion",
+              "statisticsDefinitionVersion"
+            ],
+            "type": "object"
+          },
+          "FieldBase": {
+            "additionalProperties": false,
+            "properties": {
+              "value": true,
+              "version": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "value",
+              "version"
+            ],
+            "type": "object"
+          },
+          "Intent": {
+            "additionalProperties": false,
+            "properties": {
+              "allowPossibleDuplicate": {
+                "default": false,
+                "type": "boolean"
+              },
+              "confirmedRealWork": {
+                "default": false,
+                "type": "boolean"
+              },
+              "explicitUserRequest": {
+                "type": "boolean"
+              },
+              "replaceWholeText": {
+                "default": false,
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "explicitUserRequest"
+            ],
+            "type": "object"
+          },
+          "NewTask": {
+            "additionalProperties": false,
+            "properties": {
+              "contacts": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "details": {
+                "default": "",
+                "type": "string"
+              },
+              "internalNotes": {
+                "default": "",
+                "type": "string"
+              },
+              "plannedDate": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priority": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requestedDeadline": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskType": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "workload": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "title",
+              "departments",
+              "contacts",
+              "taskType"
+            ],
+            "type": "object"
+          },
+          "Target": {
+            "additionalProperties": false,
+            "properties": {
+              "batchRef": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "permanentNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "TaskAction": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "createSubtask",
+                    "type": "string"
+                  },
+                  "enqueueToday": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "parent": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "parentVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "task": {
+                    "$ref": "#/$defs/NewTask"
+                  }
+                },
+                "required": [
+                  "action",
+                  "parent",
+                  "parentVersion",
+                  "task"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "setParent",
+                    "type": "string"
+                  },
+                  "parent": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Target"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "parentVersion": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "reorderSubtasks",
+                    "type": "string"
+                  },
+                  "parent": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "parentVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "taskIds": {
+                    "items": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "taskVersions": {
+                    "additionalProperties": {
+                      "format": "int64",
+                      "type": "integer"
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "action",
+                  "parent",
+                  "parentVersion",
+                  "taskIds",
+                  "taskVersions"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "queue",
+                    "type": "string"
+                  },
+                  "inheritDeadline": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "mode": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion",
+                  "mode"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "reschedule",
+                    "type": "string"
+                  },
+                  "plannedDate": {
+                    "type": "string"
+                  },
+                  "requestedDeadline": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion",
+                  "plannedDate"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "archive",
+                    "type": "string"
+                  },
+                  "includeCompletedSubtasks": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "trash",
+                    "type": "string"
+                  },
+                  "includeSubtasks": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "restore",
+                    "type": "string"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "correctWorkEvent",
+                    "type": "string"
+                  },
+                  "confirmHistoricalImpact": {
+                    "type": "boolean"
+                  },
+                  "eventId": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "handledAt": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "resultStatus": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion",
+                  "eventId",
+                  "resultStatus",
+                  "handledAt",
+                  "note",
+                  "confirmHistoricalImpact"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "voidWorkEvent",
+                    "type": "string"
+                  },
+                  "confirmHistoricalImpact": {
+                    "type": "boolean"
+                  },
+                  "eventId": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion",
+                  "eventId",
+                  "confirmHistoricalImpact"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "create",
+                    "type": "string"
+                  },
+                  "task": {
+                    "$ref": "#/$defs/NewTask"
+                  }
+                },
+                "required": [
+                  "action",
+                  "task"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "patch",
+                    "type": "string"
+                  },
+                  "fieldBase": {
+                    "additionalProperties": {
+                      "$ref": "#/$defs/FieldBase"
+                    },
+                    "type": "object"
+                  },
+                  "patch": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "textEdits": {
+                    "default": [],
+                    "items": {
+                      "$ref": "#/$defs/TextEdit"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "fieldBase",
+                  "patch"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "setStatus",
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion",
+                  "status"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "setUrgent",
+                    "type": "string"
+                  },
+                  "isUrgent": {
+                    "type": "boolean"
+                  },
+                  "requester": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  },
+                  "urgentReason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion",
+                  "isUrgent",
+                  "requester",
+                  "urgentReason"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "const": "recordWorkEvent",
+                    "type": "string"
+                  },
+                  "handledAt": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "resultStatus": {
+                    "type": "string"
+                  },
+                  "syncStatus": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "target": {
+                    "$ref": "#/$defs/Target"
+                  },
+                  "taskVersion": {
+                    "format": "int64",
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "action",
+                  "target",
+                  "taskVersion",
+                  "resultStatus",
+                  "handledAt",
+                  "note"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "TextEdit": {
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "find": {
+                "type": "string"
+              },
+              "replace": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "field",
+              "find",
+              "replace"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "expectedBasis": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DataVersion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "intent": {
+            "$ref": "#/$defs/Intent"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/$defs/BatchItem"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "operations",
+          "idempotencyKey",
+          "intent",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "get_capabilities",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "get_diagnostic",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "errorId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "errorId"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "get_report_summary",
+      "inputSchema": {
+        "$defs": {
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "endDate": {
+            "type": "string"
+          },
+          "explicitRequery": {
+            "default": false,
+            "type": "boolean"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QueryFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "timezoneOffsetMinutes": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "inspect_data",
+      "inputSchema": {
+        "$defs": {
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "ReportItemsArgs": {
+            "additionalProperties": false,
+            "properties": {
+              "cursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "endDate": {
+                "type": "string"
+              },
+              "filters": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/QueryFilters"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "limit": {
+                "description": "每页1至100条，默认100；超过上限明确拒绝。",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "offset": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "snapshot": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "startDate": {
+                "type": "string"
+              },
+              "timezoneOffsetMinutes": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "startDate",
+              "endDate"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "health/trace/compare/cache/recompute; no business repair or arbitrary SQL.",
+            "type": "string"
+          },
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dimension": {
+            "description": "Exact task type or department for dimensional metrics.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metric": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "periodStart": {
+            "description": "Existing trend bucket's YYYY-MM-DD start; never guesses a missing bucket.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReportItemsArgs"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "right": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReportItemsArgs"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "list_report_items",
+      "inputSchema": {
+        "$defs": {
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QueryFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "每页1至100条，默认100；超过上限明确拒绝。",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "offset": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "snapshot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "timezoneOffsetMinutes": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "manage_business_data",
+      "inputSchema": {
+        "$defs": {
+          "Intent": {
+            "additionalProperties": false,
+            "properties": {
+              "allowPossibleDuplicate": {
+                "default": false,
+                "type": "boolean"
+              },
+              "confirmedRealWork": {
+                "default": false,
+                "type": "boolean"
+              },
+              "explicitUserRequest": {
+                "type": "boolean"
+              },
+              "replaceWholeText": {
+                "default": false,
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "explicitUserRequest"
+            ],
+            "type": "object"
+          },
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QueryFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "format": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "intent": {
+            "$ref": "#/$defs/Intent"
+          },
+          "projection": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "idempotencyKey",
+          "intent",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "manage_jobs",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "start/list/get/result/cancelWaiter/cancelJob. No business write tool can be scheduled.",
+            "type": "string"
+          },
+          "allowLatestAfterInvalidation": {
+            "default": false,
+            "type": "boolean"
+          },
+          "arguments": true,
+          "explicitRequery": {
+            "default": false,
+            "type": "boolean"
+          },
+          "explicitUserRequest": {
+            "default": false,
+            "type": "boolean"
+          },
+          "jobId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "format": "uint",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "offset": {
+            "format": "uint",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "waiterId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "manage_preferences",
+      "inputSchema": {
+        "$defs": {
+          "Intent": {
+            "additionalProperties": false,
+            "properties": {
+              "allowPossibleDuplicate": {
+                "default": false,
+                "type": "boolean"
+              },
+              "confirmedRealWork": {
+                "default": false,
+                "type": "boolean"
+              },
+              "explicitUserRequest": {
+                "type": "boolean"
+              },
+              "replaceWholeText": {
+                "default": false,
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "explicitUserRequest"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "fieldBase": {
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "fieldVersions": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "idempotencyKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "intent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Intent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "patch": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "manage_saved_query",
+      "inputSchema": {
+        "$defs": {
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "list/get/save/delete; save/delete require explicit user intent and write permission.",
+            "type": "string"
+          },
+          "explicitIntent": {
+            "default": false,
+            "type": "boolean"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QueryFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "projection": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "mutate_task",
+      "inputSchema": {
+        "$defs": {
+          "FieldBase": {
+            "additionalProperties": false,
+            "properties": {
+              "value": true,
+              "version": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "value",
+              "version"
+            ],
+            "type": "object"
+          },
+          "Intent": {
+            "additionalProperties": false,
+            "properties": {
+              "allowPossibleDuplicate": {
+                "default": false,
+                "type": "boolean"
+              },
+              "confirmedRealWork": {
+                "default": false,
+                "type": "boolean"
+              },
+              "explicitUserRequest": {
+                "type": "boolean"
+              },
+              "replaceWholeText": {
+                "default": false,
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "explicitUserRequest"
+            ],
+            "type": "object"
+          },
+          "NewTask": {
+            "additionalProperties": false,
+            "properties": {
+              "contacts": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "details": {
+                "default": "",
+                "type": "string"
+              },
+              "internalNotes": {
+                "default": "",
+                "type": "string"
+              },
+              "plannedDate": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priority": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requestedDeadline": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskType": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "workload": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "title",
+              "departments",
+              "contacts",
+              "taskType"
+            ],
+            "type": "object"
+          },
+          "Target": {
+            "additionalProperties": false,
+            "properties": {
+              "batchRef": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "permanentNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "TextEdit": {
+            "additionalProperties": false,
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "find": {
+                "type": "string"
+              },
+              "replace": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "field",
+              "find",
+              "replace"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "oneOf": [
+          {
+            "properties": {
+              "action": {
+                "const": "createSubtask",
+                "type": "string"
+              },
+              "enqueueToday": {
+                "default": true,
+                "type": "boolean"
+              },
+              "parent": {
+                "$ref": "#/$defs/Target"
+              },
+              "parentVersion": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "task": {
+                "$ref": "#/$defs/NewTask"
+              }
+            },
+            "required": [
+              "action",
+              "parent",
+              "parentVersion",
+              "task"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "setParent",
+                "type": "string"
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Target"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "parentVersion": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "reorderSubtasks",
+                "type": "string"
+              },
+              "parent": {
+                "$ref": "#/$defs/Target"
+              },
+              "parentVersion": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "taskIds": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "taskVersions": {
+                "additionalProperties": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "action",
+              "parent",
+              "parentVersion",
+              "taskIds",
+              "taskVersions"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "queue",
+                "type": "string"
+              },
+              "inheritDeadline": {
+                "default": false,
+                "type": "boolean"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion",
+              "mode"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "reschedule",
+                "type": "string"
+              },
+              "plannedDate": {
+                "type": "string"
+              },
+              "requestedDeadline": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion",
+              "plannedDate"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "archive",
+                "type": "string"
+              },
+              "includeCompletedSubtasks": {
+                "default": false,
+                "type": "boolean"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "trash",
+                "type": "string"
+              },
+              "includeSubtasks": {
+                "default": false,
+                "type": "boolean"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "restore",
+                "type": "string"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "correctWorkEvent",
+                "type": "string"
+              },
+              "confirmHistoricalImpact": {
+                "type": "boolean"
+              },
+              "eventId": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "handledAt": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              },
+              "resultStatus": {
+                "type": "string"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion",
+              "eventId",
+              "resultStatus",
+              "handledAt",
+              "note",
+              "confirmHistoricalImpact"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "voidWorkEvent",
+                "type": "string"
+              },
+              "confirmHistoricalImpact": {
+                "type": "boolean"
+              },
+              "eventId": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion",
+              "eventId",
+              "confirmHistoricalImpact"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "create",
+                "type": "string"
+              },
+              "task": {
+                "$ref": "#/$defs/NewTask"
+              }
+            },
+            "required": [
+              "action",
+              "task"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "patch",
+                "type": "string"
+              },
+              "fieldBase": {
+                "additionalProperties": {
+                  "$ref": "#/$defs/FieldBase"
+                },
+                "type": "object"
+              },
+              "patch": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "textEdits": {
+                "default": [],
+                "items": {
+                  "$ref": "#/$defs/TextEdit"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "fieldBase",
+              "patch"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "setStatus",
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion",
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "setUrgent",
+                "type": "string"
+              },
+              "isUrgent": {
+                "type": "boolean"
+              },
+              "requester": {
+                "type": "string"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "urgentReason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion",
+              "isUrgent",
+              "requester",
+              "urgentReason"
+            ],
+            "type": "object"
+          },
+          {
+            "properties": {
+              "action": {
+                "const": "recordWorkEvent",
+                "type": "string"
+              },
+              "handledAt": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              },
+              "resultStatus": {
+                "type": "string"
+              },
+              "syncStatus": {
+                "default": false,
+                "type": "boolean"
+              },
+              "target": {
+                "$ref": "#/$defs/Target"
+              },
+              "taskVersion": {
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "action",
+              "target",
+              "taskVersion",
+              "resultStatus",
+              "handledAt",
+              "note"
+            ],
+            "type": "object"
+          }
+        ],
+        "properties": {
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "intent": {
+            "$ref": "#/$defs/Intent"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey",
+          "intent",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "query_changes",
+      "inputSchema": {
+        "$defs": {
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QueryFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mode": {
+            "description": "events (every indexed mutation) or current (one current state per affected task).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "projection": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "since": {
+            "description": "Optional RFC3339 event lower bound; initial current-state sync remains mandatory.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "query_task_history",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "includeTrash": {
+            "default": false,
+            "type": "boolean"
+          },
+          "includeVoided": {
+            "default": false,
+            "type": "boolean"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "snapshot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "taskId": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "taskId"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "query_tasks",
+      "inputSchema": {
+        "$defs": {
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QueryFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "projection": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "snapshot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "query_work_calendar",
+      "inputSchema": {
+        "$defs": {
+          "QueryFilters": {
+            "additionalProperties": false,
+            "properties": {
+              "activeQueue": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "archive": {
+                "description": "all (default), active or archived. Trash still needs explicit includeTrash.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "deadlineTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "departments": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "handledFrom": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "handledTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "includeTrash": {
+                "default": false,
+                "type": "boolean"
+              },
+              "parentTaskId": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "permanentNumbers": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "plannedFrom": {
+                "description": "Date-only inclusive bounds; timestamps below are RFC3339, half-open.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plannedTo": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priorities": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "scheduled": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "statuses": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "structure": {
+                "description": "all (default), topLevel or subtask.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "taskTypes": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              },
+              "text": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "urgent": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "workloads": {
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endDate": {
+            "type": "string"
+          },
+          "filters": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/QueryFilters"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "snapshot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "startDate": {
+            "type": "string"
+          },
+          "timezoneOffsetMinutes": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "startDate",
+          "endDate"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    },
+    {
+      "name": "request_undo",
+      "inputSchema": {
+        "$defs": {
+          "Intent": {
+            "additionalProperties": false,
+            "properties": {
+              "allowPossibleDuplicate": {
+                "default": false,
+                "type": "boolean"
+              },
+              "confirmedRealWork": {
+                "default": false,
+                "type": "boolean"
+              },
+              "explicitUserRequest": {
+                "type": "boolean"
+              },
+              "replaceWholeText": {
+                "default": false,
+                "type": "boolean"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "explicitUserRequest"
+            ],
+            "type": "object"
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "additionalProperties": false,
+        "properties": {
+          "auditId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "intent": {
+            "$ref": "#/$defs/Intent"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "auditId",
+          "idempotencyKey",
+          "intent",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-10-12",
+  "mountedInLineTools": [
+    "mcp__in_line__get_capabilities",
+    "mcp__in_line__get_report_summary",
+    "mcp__in_line__list_report_items"
+  ],
+  "result": {
+    "apiVersion": 1,
+    "data": null,
+    "error": {
+      "code": "unauthenticated",
+      "message": "请在In Line软件设置中为当前客户端授权并配置环境凭证",
+      "retryAfterSeconds": null,
+      "retryable": false
+    },
+    "requestId": "791ef0b13b32d675d6afc84ee6cf19c321b813090a593e7dda84796a4cbf43c2",
+    "status": "error"
+  },
+  "authorizedAccessVerified": false,
+  "automaticImportReloadVerified": false,
+  "configurationChanged": false,
+  "productionServiceStarted": false
+}

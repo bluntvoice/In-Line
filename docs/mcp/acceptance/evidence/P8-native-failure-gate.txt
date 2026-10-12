@@ -1,0 +1,1 @@
+PASS: actual child pwsh native failure exited 7; following command did not run. Workflow guards use the same explicit LASTEXITCODE exit.

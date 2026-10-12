@@ -1,4 +1,4 @@
-当前P6开发：数据健康、报告比较、指标溯源及内存缓存；[使用指南](quality-and-cache-guide.md)、[阶段报告](acceptance/PHASE-06.md)，待P8统一验收。
+当前P8统一验收准备：16工具/schema14，各阶段开发已独立提交推送；[P8报告](acceptance/PHASE-08.md)、[统一验收清单](acceptance/UNIFIED-P8-CHECKLIST.md)、[集成规程](integration-and-regression.md)。严格Codex当前会话自动导入/重载仍未通过，入口关闭。P1–P8未用户验收，未进入P9/Release。下文旧进度为历史。
 
 # In-Line MCP 阶段开发
 
@@ -16,4 +16,4 @@
 
 ## 阶段门禁
 
-P1未用户验收，不得提交、推送、建立P1 Tag或进入P2。每阶段明确验收后Commit → Push → 固定阶段Tag → 下一阶段；正式Release需独立授权。本地NSIS验证不代表发布或完成实际安装验收。
+按最新用户授权，各阶段独立开发Commit/Push，P8集中验收后停止等待；开发提交不建accepted Tag。旧P1等待限制已由最新推进授权调整。正式Release需独立授权；本地NSIS构建不代表安装升级或用户验收。

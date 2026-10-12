@@ -1,0 +1,1 @@
+PASS: P7 actual 16-tool schema baseline captured; legacy tool removal, parameter type change, readonly annotation change each rejected. Baseline generation is a one-time local helper, absent from CI.

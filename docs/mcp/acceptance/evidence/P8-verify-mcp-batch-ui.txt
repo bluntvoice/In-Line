@@ -1,0 +1,1 @@
+PASS: exact preview, review/cancel no write, once-per-batch explicit approval, conflict retains pending, independent reject, local limit 1..100. Synthetic data only.

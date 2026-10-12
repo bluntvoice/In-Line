@@ -1,0 +1,22 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 35s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 1 test
+test mcp::diagnostics::tests::typed_numeric_corruption_is_rejected_without_overwriting_evidence ... FAILED
+
+failures:
+
+---- mcp::diagnostics::tests::typed_numeric_corruption_is_rejected_without_overwriting_evidence stdout ----
+
+thread 'mcp::diagnostics::tests::typed_numeric_corruption_is_rejected_without_overwriting_evidence' (17880) panicked at src\mcp\diagnostics.rs:562:13:
+accepted corrupt started
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mcp::diagnostics::tests::typed_numeric_corruption_is_rejected_without_overwriting_evidence
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 163 filtered out; finished in 0.03s
+
+error: test failed, to rerun pass `--lib`

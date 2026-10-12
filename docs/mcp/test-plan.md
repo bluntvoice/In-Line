@@ -1,4 +1,8 @@
-# 隔离测试设计与P1证据
+# 当前 P8 集成回归
+
+最新结果见[PHASE-08](acceptance/PHASE-08.md)；可执行人工出口见[统一清单](acceptance/UNIFIED-P8-CHECKLIST.md)，长期测试/CI首次失败/历史迁移规程见[集成规程](integration-and-regression.md)。P2–P7已实际执行，不再是计划；下文P0/P1现状与未来测试表为历史设计。未执行的原生安装、严格接入和性能预算明确保留待验收。
+
+# 隔离测试历史设计与P1证据
 
 > 当前进度：P0已验收并推送固定Tag，C1–C4均A；P1实际实现及未执行项以[PHASE-01](acceptance/PHASE-01.md)和[接入指南](connection-guide.md)为准。下文的P0现状表和未来草案是历史设计，不能视为当前工具清单或已实现能力。P1尚未用户验收。
 

@@ -82,14 +82,31 @@ jobs:
         run: npm ci
 
       - name: Run tests
+        shell: pwsh
         run: |
           npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo test --locked --manifest-path src-tauri/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build NSIS installer
         run: npm run dist
+
+      - name: Verify packaged MCP sidecar contracts and authorization
+        shell: pwsh
+        run: |
+          node scripts/verify-mcp-contract.mjs src-tauri/target/release/in-line-mcp.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node docs/mcp/verify-release-stdio.mjs src-tauri/target/release/in-line-mcp.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/verify-mcp-contract.mjs src-tauri/binaries/in-line-mcp-x86_64-pc-windows-msvc.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node docs/mcp/verify-release-stdio.mjs src-tauri/binaries/in-line-mcp-x86_64-pc-windows-msvc.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Prepare updater-compatible release asset
         id: asset

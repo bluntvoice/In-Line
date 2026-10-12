@@ -1,0 +1,14 @@
+{
+  "phase": "P8",
+  "path": "C:\\Users\\KB\\Documents\\inline\\In-Line\\release\\In-Line-P8-local-20261012.exe",
+  "bytes": 4213972,
+  "sha256": "2AD7D37CD5475FDB0532A3C0A4A84539C9D6CFBC901DBA105A005B456E9A0B94",
+  "sourceFrozenFiles": 163,
+  "sourceVerifiedUnchanged": true,
+  "installed": false,
+  "releaseCreated": false,
+  "baselineCommit": "ba38b1002d3da15192fffab896168708918f6748",
+  "exactEmbeddedCommit": null,
+  "sourceDirty": true,
+  "currentSessionAutoImportVerified": false
+}

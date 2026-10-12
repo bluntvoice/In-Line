@@ -1,0 +1,1 @@
+PASS: actual cache component, technical state/space/source, explicit single clear, retained-category explanation, sustained quota hint, read-only health refresh and explicit derived-only repair; synthetic API only.

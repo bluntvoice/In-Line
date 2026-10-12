@@ -1,0 +1,1 @@
+PASS: right-click main/floating, 16 colors, invalid HEX, failed save/retry, per-task isolation, cross-window sync, reload, future/urgent custom colors, overdue/critical overrides and restoration, reset, narrow dialog, Escape; future subtask auto-reservation status, date switching, inherited future date, today toggle and submit payload; synthetic API only.

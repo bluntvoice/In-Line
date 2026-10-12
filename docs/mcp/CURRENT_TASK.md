@@ -1,4 +1,18 @@
-# 2026-10-12 P7开发验证完成，准备独立提交推送
+# 2026-10-12 P8开发验证完成，提交推送后停在统一验收
+
+最终173 Rust（165库+2sidecar+6集成）、115前端、六组合成UI、真实更纱四字体两档胶囊、16工具契约/匿名认证负例、fmt/TS/Vite、144原决定/文档/Actions政策通过。数值损坏文件保留原字节、计数checked_add及持久化前验证永久回归，用户A批准；首次失败仍保存，未削弱/隔离测试。
+
+NSIS会话41880已成功关闭，sidecar3m51/main5m54，163份冻结源码未变；本地release/In-Line-P8-local-20261012.exe，4,213,972字节，SHA256 2AD7D37CD5475FDB0532A3C0A4A84539C9D6CFBC901DBA105A005B456E9A0B94。主/两sidecar输入真实契约和匿名协议回读通过，未安装/未验证升级，生产两exe保持原摘要。构建嵌入P7基线ba38b1002d3da15192fffab896168708918f6748/dirty，exactCommit=null。
+
+本次独立P8开发提交标题test(mcp): 完成P8契约门禁数值校验与统一验收准备，最终SHA从Git历史与远端独立回读，避免自引用未来SHA。按现有授权提交推送后停止在P8；P1–P8未验收、不建accepted Tag、不进入P9/Release或安装生产程序。统一清单acceptance/UNIFIED-P8-CHECKLIST.md，结果acceptance/PHASE-08.md。当前会话get_capabilities仍unauthenticated，严格自动导入/重载未通过且入口关闭，不改配置/授权/另起服务。下文所有构建中与早期状态为历史。
+
+# 2026-10-12 P8统一验收准备，NSIS构建中（历史）
+
+P7独立提交ba38b1002d3da15192fffab896168708918f6748已推送，远端/main/P0 Tag精确回读，P7 CI38215281440 success。P8数值诊断损坏首次测试已失败证明原实现接受极值，用户选A批准补校验、保留原文件及长期回归；修复后173 Rust（165库+2sidecar+6集成）、115前端、实际16工具契约与匿名认证、六组合成浏览器均通过。真实更纱胶囊复验在途。163份包源码已冻结release/P8-frozen-source.json，NSIS构建会话41880、日志P8-nsis-first.txt；禁止改包源码直到完成。144原决定/原文档及当前映射校验通过，首次数值/文档旧036映射失败保留并已修复；Actions政策通过，生产两exe未变。
+
+当前会话get_capabilities仍unauthenticated（P8-current-session.json），公开CLI/help复核无可用当前会话reload出口，严格入口关闭，不改授权/Codex配置或另起业务服务。详见acceptance/PHASE-08.md、UNIFIED-P8-CHECKLIST.md及integration-and-regression.md。完成本阶段包/证据后独立提交推送，停在P8等待用户统一实机验收；P1–P8未验收、不建accepted Tag、不进P9/Release。以下P7与之前进度均为历史。
+
+# 2026-10-12 P7开发验证完成，准备独立提交推送（历史）
 
 171 Rust/115前端/真实16工具stdio与认证管道/合成维护UI/fmt/TS/Vite/文档/冻结NSIS双sidecar输入回读通过，163份冻结源码未变。包4,214,129字节，SHA256 EF3CAC9A6A3459A55EA03B234A920DCAEF13F212B53EADE9B2F7086F013018DC，保留release/In-Line-P7-local-20261012.exe；生产两exe摘要未变，未安装。P6 CI success且精确SHA。P7准备提交推送后继续P8集成验收准备并等待用户，不建accepted Tag/Release，不进入P9。严格Codex零额外操作自动导入/当前会话重载仍未证明，入口关闭，MCP-100部分实现如实列出。详细结果见acceptance/PHASE-07.md。下文构建中记录为历史；NSIS会话48632已成功关闭。
 

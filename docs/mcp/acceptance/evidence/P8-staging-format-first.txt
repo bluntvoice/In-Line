@@ -1,0 +1,28 @@
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:7: trailing whitespace.
++  list
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:8: trailing whitespace.
++  get
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:9: trailing whitespace.
++  add
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:10: trailing whitespace.
++  remove
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:11: trailing whitespace.
++  login
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:12: trailing whitespace.
++  logout
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:20: trailing whitespace.
++
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:48: trailing whitespace.
++
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:68: trailing whitespace.
++
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:76: trailing whitespace.
++
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:79: trailing whitespace.
++
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:83: trailing whitespace.
++
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:85: trailing whitespace.
++
+docs/mcp/acceptance/evidence/P8-codex-public-channel.txt:90: trailing whitespace.
++
