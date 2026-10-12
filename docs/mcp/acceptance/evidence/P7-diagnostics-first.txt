@@ -1,0 +1,12 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 54.06s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 4 tests
+test mcp::diagnostics::tests::persistence_failure_is_atomic_and_corrupt_store_is_never_overwritten ... ok
+test mcp::diagnostics::tests::critical_faults_cannot_mute_and_risk_increase_unmutes_existing_episode ... ok
+test mcp::diagnostics::tests::ownership_redaction_retention_and_ordinary_mute_never_reveal_raw_fields ... ok
+test mcp::diagnostics::tests::duplicates_are_one_episode_and_recovery_requires_two_actual_stable_successes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 150 filtered out; finished in 0.27s
+

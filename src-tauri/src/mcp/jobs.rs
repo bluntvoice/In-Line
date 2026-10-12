@@ -34,6 +34,8 @@ struct Round {
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Job {
+    #[serde(default)]
+    request_id: Option<String>,
     id: String,
     client: String,
     revision: u64,
@@ -91,7 +93,7 @@ fn fingerprint(
     )
 }
 fn view(j: &Job) -> Value {
-    json!({"jobId":j.id,"clientId":j.client,"kind":j.kind,"state":j.state,"createdAt":j.created,"checkpointAt":j.checkpoint,"finishedAt":j.finished,"sourceSnapshotId":j.meta["snapshotId"],"reuseValidationStatus":"requires_current_request_validation","firstPausedAt":j.first_paused,"progress":{"processed":j.rows.len(),"total":j.total},"rounds":j.rounds,"finalRound":if j.state=="completed"{j.rounds.last().map(|r|r.number)}else{None},"errorCode":j.error,"complete":j.state=="completed"})
+    json!({"requestId":j.request_id,"jobId":j.id,"clientId":j.client,"kind":j.kind,"state":j.state,"createdAt":j.created,"checkpointAt":j.checkpoint,"finishedAt":j.finished,"sourceSnapshotId":j.meta["snapshotId"],"reuseValidationStatus":"requires_current_request_validation","firstPausedAt":j.first_paused,"progress":{"processed":j.rows.len(),"total":j.total},"rounds":j.rounds,"finalRound":if j.state=="completed"{j.rounds.last().map(|r|r.number)}else{None},"errorCode":j.error,"complete":j.state=="completed"})
 }
 fn save(root: &std::path::Path, j: &Job) -> Result<(), McpError> {
     durable::write(root, &j.id, j, MAX_FILE, 64 * 1024 * 1024, 256)
@@ -163,11 +165,15 @@ pub struct Jobs {
     state: Arc<Mutex<State>>,
     store: Arc<Mutex<Store>>,
     limits: Arc<Mutex<Limiter>>,
+    terminal_notice: Arc<Mutex<Option<Arc<dyn Fn(&str) + Send + Sync>>>>,
+    diagnostics: Arc<Mutex<Option<Arc<super::diagnostics::Diagnostics>>>>,
     changed: Arc<Mutex<Option<Arc<dyn Fn() + Send + Sync>>>>,
 }
 impl Jobs {
     pub fn new(root: PathBuf, store: Arc<Mutex<Store>>, limits: Arc<Mutex<Limiter>>) -> Self {
         Self {
+            terminal_notice: Arc::new(Mutex::new(None)),
+            diagnostics: Arc::new(Mutex::new(None)),
             root: root.join("jobs"),
             state: Arc::new(Mutex::new(State {
                 initialized: false,
@@ -176,6 +182,75 @@ impl Jobs {
             store,
             limits,
             changed: Arc::new(Mutex::new(None)),
+        }
+    }
+    pub fn set_terminal_notice(&self, f: Arc<dyn Fn(&str) + Send + Sync>) {
+        if let Ok(mut g) = self.terminal_notice.lock() {
+            *g = Some(f);
+        }
+    }
+    pub fn set_diagnostics(&self, d: Arc<super::diagnostics::Diagnostics>) {
+        if let Ok(mut g) = self.diagnostics.lock() {
+            *g = Some(d);
+        }
+    }
+    pub fn with_no_active<T>(
+        &self,
+        f: impl FnOnce() -> Result<T, McpError>,
+    ) -> Result<T, McpError> {
+        let s = self
+            .state
+            .lock()
+            .map_err(|_| McpError::new("internal_error"))?;
+        if s.jobs.values().any(|j| active(&j.state)) {
+            return Err(McpError::new("conflict"));
+        }
+        f()
+    }
+    fn record_terminal(&self, db: &Database, id: &str) {
+        let j = self.state.lock().ok().and_then(|s| s.jobs.get(id).cloned());
+        let Some(j) = j.filter(|j| !active(&j.state)) else {
+            return;
+        };
+        if let Ok(g) = self.terminal_notice.lock() {
+            if let Some(f) = g.as_ref() {
+                f(&j.state);
+            }
+        }
+        let d = self.diagnostics.lock().ok().and_then(|d| d.clone());
+        if let Some(d) = d {
+            let current = j.state == "completed"
+                && self
+                    .store
+                    .lock()
+                    .ok()
+                    .is_some_and(|s| authorization(&s, &j).is_ok())
+                && db
+                    .mcp_basis()
+                    .is_ok_and(|b| j.rounds.last().is_some_and(|r| r.basis == b));
+            let e = super::diagnostic_types::Event {
+                receipt_hash: None,
+                request_id: j.request_id.clone().unwrap_or_else(|| j.id.clone()),
+                client: Some(j.client.clone()),
+                tool: "manage_jobs".into(),
+                module: "jobs".into(),
+                code: j.error.clone().unwrap_or_else(|| {
+                    if j.state == "completed" {
+                        "ok"
+                    } else {
+                        "cancelled"
+                    }
+                    .into()
+                }),
+                at: chrono::Utc::now().timestamp(),
+                duration_ms: 0,
+                job_id: Some(j.id.clone()),
+                round: j.rounds.last().map(|r| r.number),
+                audit_id: None,
+                data_version: j.rounds.last().map(|r| r.basis.clone()),
+                build: super::build_identity::current(),
+            };
+            let _ = d.record(e, current);
         }
     }
     fn notify(&self) {
@@ -211,9 +286,11 @@ impl Jobs {
         }
         let now = Utc::now().timestamp();
         let mut resume = vec![];
+        let mut stopped = vec![];
         for id in durable::ids(&root)? {
             let mut j: Job = durable::read(&root, &id, MAX_FILE)?;
-            if active(&j.state) {
+            let was_active = active(&j.state);
+            if was_active {
                 if let Some(e) = expired(j.first_paused, j.checkpoint, true, now) {
                     finish(&mut j, "failed", Some(e), now);
                     save(&root, &j)?;
@@ -226,11 +303,17 @@ impl Jobs {
                     resume.push(id.clone());
                 }
             }
+            if was_active && !active(&j.state) {
+                stopped.push(id.clone());
+            }
             state.jobs.insert(id, j);
         }
         // Every persisted active job retains its original anchor, even when queued.
         state.initialized = true;
         drop(state);
+        for id in stopped {
+            self.record_terminal(db, &id);
+        }
         for id in resume {
             self.spawn(db.clone(), id, true);
         }
@@ -248,6 +331,7 @@ impl Jobs {
                 }
                 this.notify();
             }
+            this.record_terminal(&db, &id);
         });
     }
     pub fn execute(
@@ -320,6 +404,7 @@ impl Jobs {
             }
             let id = platform::random_secret()?;
             let j = Job {
+                request_id: super::observation::current(),
                 id: id.clone(),
                 client: client.into(),
                 revision: auth.revision,

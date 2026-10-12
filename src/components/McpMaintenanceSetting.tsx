@@ -1,0 +1,17 @@
+import {useEffect,useRef,useState} from "react";
+import {save} from "@tauri-apps/plugin-dialog";
+import {Download,Trash2,X,Copy} from "lucide-react";
+import {api} from "../api";
+import type {MaintenancePreview} from "../lib/mcp-maintenance";
+export default function McpMaintenanceSetting({source,filter="all",onChanged}:{source:"faults"|"audit";filter?:string;onChanged?:()=>void}){
+  const [format,setFormat]=useState("json"),[preview,setPreview]=useState<MaintenancePreview|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState("");const lock=useRef(false);
+  const currentNonce=useRef<string|null>(null);useEffect(()=>{currentNonce.current=preview?.nonce??null;},[preview]);useEffect(()=>()=>{if(currentNonce.current)void api.mcpMaintenanceCancel(currentNonce.current).catch(()=>undefined);},[]);
+  const act=async(f:()=>Promise<void>)=>{if(lock.current)return;lock.current=true;setBusy(true);setMessage("");try{await f();}catch(e){setMessage(String(e));}finally{lock.current=false;setBusy(false);}};
+  const cancel=()=>void act(async()=>{if(preview)await api.mcpMaintenanceCancel(preview.nonce);setPreview(null);});
+  const prepare=(action:string)=>void act(async()=>{if(preview)await api.mcpMaintenanceCancel(preview.nonce);setPreview(await api.mcpMaintenancePreview(source,action,format,filter));});
+  const confirm=()=>void act(async()=>{if(!preview)return;if(Date.now()>=preview.expiresAt*1000)throw Error("预览已过期，请重新生成");let path:string|null=null;if(preview.action==="export"){path=await save({title:"确认并保存已预览的内容",defaultPath:preview.suggestedName,filters:[{name:preview.format.toUpperCase(),extensions:[preview.format]}]});if(!path)return;}await api.mcpMaintenanceConfirm(preview.nonce,path);setPreview(null);setMessage(preview.action==="clear"?"审计已清理，待撤销证据已保留；旧查询请重新开始。":"文件已保存，内容与预览一致。");onChanged?.();});
+  return <div className="mcp-maintenance"><div className="mcp-security-controls"><label>导出格式<select aria-label={source+"导出格式"} value={format} disabled={busy||!!preview} onChange={e=>setFormat(e.target.value)}><option value="json">JSON</option><option value="csv">CSV</option></select></label><button className="button secondary" disabled={busy} onClick={()=>prepare("export")}><Download size={16}/>预览导出</button>{source==="audit"&&<button className="button secondary danger" disabled={busy} onClick={()=>prepare("clear")}><Trash2 size={16}/>预览清理</button>}</div>
+    {preview&&<div className="mcp-issued"><strong>{preview.action==="clear"?"清理审计确认":"导出内容预览"}</strong><p>{source==="audit"?"导出包含业务内容，请确认保存位置。清理保护待撤销证据并保留业务、回执及正式导出；有后台任务或记录变化时停止。":"仅含脱敏技术摘要。事实与待验证假设分开；不会上传或自动调用 AI。"}</p><textarea aria-label="确认内容预览" readOnly rows={8} value={preview.content}/><div className="mcp-security-controls"><button className={"button secondary"+(preview.action==="clear"?" danger":"")} disabled={busy} onClick={confirm}>{preview.action==="clear"?<Trash2 size={16}/>:<Download size={16}/>}确认{preview.action==="clear"?"清理":"并保存"}</button><button className="button secondary" disabled={busy} onClick={cancel}><X size={16}/>取消</button></div>{preview.prompt&&<details><summary>手动转交 Codex 的提示词</summary><p>{preview.prompt}</p><button className="button secondary" disabled={busy} onClick={()=>void act(async()=>{await api.copyText(preview.prompt);setMessage("提示词已复制，请自行附上确认导出的摘要。");})}><Copy size={16}/>复制提示词</button></details>}</div>}
+    {message&&<p role="status">{message}</p>}
+  </div>;
+}

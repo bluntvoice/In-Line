@@ -13,6 +13,23 @@ struct InLineMcp {
 #[tool_router]
 impl InLineMcp {
     #[tool(
+        description = "仅按错误编号读取当前已认证客户端自身的脱敏技术诊断。不含业务正文、Token、路径、完整日志或其他客户端信息。",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn get_diagnostic(
+        &self,
+        Parameters(args): Parameters<in_line_lib::mcp::diagnostic_types::DiagnosticArgs>,
+    ) -> CallToolResult {
+        self.call("get_diagnostic", serde_json::to_value(args).unwrap())
+            .await
+    }
+
+    #[tool(
         description = "认证后只读检查数据健康、按原报告快照分页溯源指标、比较同客户端报告或重算内存缓存。不能修复业务库或读取其他客户端信息。",
         annotations(
             read_only_hint = true,
@@ -58,9 +75,13 @@ impl InLineMcp {
         let id =
             in_line_lib::mcp::platform::random_secret().unwrap_or_else(|_| "unavailable".into());
         #[cfg(windows)]
-        let result = in_line_lib::mcp::ipc::call(self.credentials.clone(), tool, args).await;
+        let result =
+            in_line_lib::mcp::ipc::call_with_id(self.credentials.clone(), tool, args, id.clone())
+                .await;
         #[cfg(not(windows))]
         let result = Err(McpError::new("unsupported"));
+        #[cfg(windows)]
+        let result=result.map(|mut v|{if tool=="get_capabilities"{v["sidecarBuild"]=in_line_lib::mcp::build_identity::current();v["compatibility"]=serde_json::json!({"toolSetMatches":v["tools"]==serde_json::json!(TOOLS),"schemaVersionMatches":v["schemaVersion"]==serde_json::json!(in_line_lib::database::DATABASE_SCHEMA_VERSION),"currentSessionAutoImportVerified":false});}v});
         let failed = result.is_err();
         let value =
             serde_json::to_value(Envelope::result(id, result)).expect("envelope serializable");

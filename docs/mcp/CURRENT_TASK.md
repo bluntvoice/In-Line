@@ -1,3 +1,19 @@
+# 2026-10-12 P7开发验证完成，准备独立提交推送
+
+171 Rust/115前端/真实16工具stdio与认证管道/合成维护UI/fmt/TS/Vite/文档/冻结NSIS双sidecar输入回读通过，163份冻结源码未变。包4,214,129字节，SHA256 EF3CAC9A6A3459A55EA03B234A920DCAEF13F212B53EADE9B2F7086F013018DC，保留release/In-Line-P7-local-20261012.exe；生产两exe摘要未变，未安装。P6 CI success且精确SHA。P7准备提交推送后继续P8集成验收准备并等待用户，不建accepted Tag/Release，不进入P9。严格Codex零额外操作自动导入/当前会话重载仍未证明，入口关闭，MCP-100部分实现如实列出。详细结果见acceptance/PHASE-07.md。下文构建中记录为历史；NSIS会话48632已成功关闭。
+
+# 2026-10-12 P7源码已冻结，NSIS构建中（待P8统一验收）
+
+P7最终171 Rust（163库+2sidecar+6集成）全量通过，真实16工具/认证管道/自身错误编号关联通过；115前端此前通过，最终重测在途；P7维护组件最终浏览器验证、fmt、TS/Vite通过。源码冻结release/P7-frozen-source.json，NSIS正在构建，执行会话48632、日志acceptance/evidence/P7-nsis-first.txt。禁止期间修改被冻结的Rust/前端/清单。P7尚未提交，完成包双sidecar回读及文档校验后独立提交推送，再进入P8准备并等待用户统一验收。严格Codex零额外操作当前会话导入/重载仍未通过，入口关闭。原安装/授权/Codex配置未动。
+
+新增代码：mcp/{diagnostic_types,diagnostics,observation,maintenance,build_identity,p7_tests}.rs、database/mcp_maintenance.rs；实际IPC统一请求ID，后台request/job/round及audit/原回执散列关联；危险未知写入只关联原回执核验，不由新写入成功解除；故障聚合/3轮30天/2次真实成功30秒/P0P1不可静音/7天静音/未解决长期保留/已恢复30天；RAM精确预览nonce、CSV/JSON本地确认及共享只读文件句柄字节回读；审计清理保护待撤销关联连通证据/回执/业务/正式导出，拒绝活动任务/预览变化，更新代际及派生基准使旧查询失效；首次敏感权限提示未确认时锁定授权字段，确认不直接授予权限；维护技术事件/重大故障和复发阈值合并应用内提醒；主/sidecar实际构建兼容元数据，不猜未来Commit。GUI详情折叠，无高级故障搜索、无故障校验文件、无自动上传/调用AI。
+
+首次失败均保留：wire脚本编码失败导致两项缺失接口；State闭包类型推断；测试误用private open_root；两个旧15工具断言；stdio参数在RMCP层拒绝未到主机的夹具错误；缓存状态Mutex需要mut。最终Rust见P7-rust-frozen.txt，历史P7-rust-final.txt为首次mut失败不可作最终通过；UIfirst为受控checkbox check误用，second为对话框mock优化依赖问题，third/final均通过，虚拟mock不涉及生产。P7尚需NSIS包结果、独立Git提交/推送及P8集成验收准备。下文为历史。
+
+# 2026-10-12 当前进入P7（待P8统一验收）
+
+P6独立开发提交d7b103ccb8c6673d9b1748d56c09c8239da74aa7已推送、远端精确回读，初始工作区干净；157 Rust/115前端、真实15工具stdio、缓存/任务合成UI、冻结NSIS及双sidecar输入回读通过。包4,152,687字节、SHA256 6B003EB798ED4A3B2BABD10051958242880BB71410A14FC182ECF8F7C24D0664，保留release/In-Line-P6-local-20261012.exe，生产安装未变。P6 CI 38199299111 success（精确SHA）。按授权实施P7界面/诊断/故障/脱敏导出，安排见[PHASE-07](acceptance/PHASE-07.md)，独立提交推送后P8统一验收准备并等待用户；P1自动接入继续关闭，不建accepted Tag/Release。下文P6提交准备及早期状态为历史。
+
 # 2026-10-12 P6开发验证完成，准备独立提交推送
 
 157 Rust、115前端、真实15工具stdio、缓存/任务组件浏览器、fmt/TypeScript/Vite、文档及冻结NSIS双sidecar包输入回读通过。包4,152,687字节、SHA256 6B003EB798ED4A3B2BABD10051958242880BB71410A14FC182ECF8F7C24D0664，保留release/In-Line-P6-local-20261012.exe；生产安装未变。P5 CI 38195294658 success，21e856a5精确SHA。详见[PHASE-06](acceptance/PHASE-06.md)。准备P6独立提交推送后继续P7，P8统一验收；自动接入仍关闭，不建accepted Tag/Release。下文P6开始及早期状态为历史。

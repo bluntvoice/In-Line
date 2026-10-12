@@ -53,7 +53,7 @@ pub fn execute(
         let _: CapabilityArgs =
             serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
         return Ok(
-            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":crate::database::DATABASE_SCHEMA_VERSION,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":["mutate_task","manage_preferences","request_undo","batch_mutate","manage_business_data"],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["permanent_delete","restore_database","attachments","remote_transport"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"batchLimit":db.mcp_batch_limit()?,"batchHardLimit":100,"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"backgroundJobs":{"globalActiveLimit":2,"perClientActiveLimit":1,"resultMaxBytes":16777216,"checkpointDiskMaxBytes":67108864,"resultRetentionDays":7,"summaryRetentionDays":30,"maxPauseSeconds":1800,"maxRecoverySeconds":86400,"maxFullRequeries":1,"nativeScheduler":false},"changes":{"modes":["events","current"],"initialFullSyncRequired":true,"incrementalCursorTtlSeconds":86400,"metadataDiskMaxBytes":16777216},"inspection":{"actions":["health","trace","compare","cache","recompute"],"businessRepairAllowed":false},"reportCache":{"tier":"memory","ttlSeconds":60,"capacityBytes":8388608,"entryMaxBytes":2097152,"maxEntries":16,"perClientMaxEntries":4,"diskCacheEnabled":false,"explicitRequerySupported":true},"connectionVerified":true}),
+            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":crate::database::DATABASE_SCHEMA_VERSION,"commit":super::build_identity::current()["exactCommit"],"build":super::build_identity::current(),"diagnostics":{"ownErrorIdOnly":true,"rawLogsAvailableToAi":false},"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":["mutate_task","manage_preferences","request_undo","batch_mutate","manage_business_data"],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["permanent_delete","restore_database","attachments","remote_transport"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"batchLimit":db.mcp_batch_limit()?,"batchHardLimit":100,"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"backgroundJobs":{"globalActiveLimit":2,"perClientActiveLimit":1,"resultMaxBytes":16777216,"checkpointDiskMaxBytes":67108864,"resultRetentionDays":7,"summaryRetentionDays":30,"maxPauseSeconds":1800,"maxRecoverySeconds":86400,"maxFullRequeries":1,"nativeScheduler":false},"changes":{"modes":["events","current"],"initialFullSyncRequired":true,"incrementalCursorTtlSeconds":86400,"metadataDiskMaxBytes":16777216},"inspection":{"actions":["health","trace","compare","cache","recompute"],"businessRepairAllowed":false},"reportCache":{"tier":"memory","ttlSeconds":60,"capacityBytes":8388608,"entryMaxBytes":2097152,"maxEntries":16,"perClientMaxEntries":4,"diskCacheEnabled":false,"explicitRequerySupported":true},"connectionVerified":true}),
         );
     }
     if !TOOLS.contains(&tool) {
@@ -61,6 +61,13 @@ pub fn execute(
     }
     if !auth.permissions.regular_read {
         return Err(McpError::new("forbidden"));
+    }
+    if tool == "get_diagnostic" {
+        let args: super::diagnostic_types::DiagnosticArgs =
+            serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
+        return security
+            .diagnostics
+            .own(&credentials.client_id, &args.error_id);
     }
     if tool != "inspect_data" && db.mcp_quality_health()?["healthy"] != true {
         return Err(McpError::new("resync_required"));

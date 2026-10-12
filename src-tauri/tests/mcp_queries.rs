@@ -105,7 +105,44 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             .await
             .unwrap();
         let list = request(&mut input, &mut output, 2, "tools/list", json!({})).await;
-        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 15);
+        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 16);
+        let schema = &list["result"]["tools"];
+        assert!(schema
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| t["name"] == "get_diagnostic" && t["annotations"]["readOnlyHint"] == true));
+        let failure = request(
+            &mut input,
+            &mut output,
+            700,
+            "tools/call",
+            json!({"name":"query_tasks","arguments":{"limit":101,"projection":["id","secret-business-canary"]}}),
+        )
+        .await;
+        let error_id = &failure["result"]["structuredContent"]["requestId"];
+        assert_eq!(
+            failure["result"]["structuredContent"]["error"]["errorId"],
+            *error_id
+        );
+        let diagnostic = request(
+            &mut input,
+            &mut output,
+            701,
+            "tools/call",
+            json!({"name":"get_diagnostic","arguments":{"errorId":error_id}}),
+        )
+        .await;
+        assert_eq!(diagnostic["result"]["structuredContent"]["status"], "ok");
+        assert_eq!(
+            diagnostic["result"]["structuredContent"]["data"]["requestId"],
+            *error_id
+        );
+        assert_eq!(
+            diagnostic["result"]["structuredContent"]["data"]["code"],
+            "invalid_arguments"
+        );
+        assert!(!diagnostic.to_string().contains("secret-business-canary"));
         let first = request(
             &mut input,
             &mut output,

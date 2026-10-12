@@ -1,4 +1,8 @@
-# 当前P6开发契约
+# 当前P7开发契约
+
+当前16工具/schema14：新增`get_diagnostic`按错误编号只读自身脱敏摘要；主/sidecar构建身份及兼容事实分别返回。技术故障/业务审计在软件内分开预览维护，详见[诊断指南](diagnostics-and-maintenance-guide.md)。P1–P7均待P8统一验收，严格零额外操作Codex当前会话导入/重载仍未证明，入口关闭。下文P6与P1章节为各阶段历史设计说明，工具数量和当前能力以本节及实际`get_capabilities`为准。
+
+## P6开发契约（历史）
 
 15工具/schema14，新增inspect_data及受控内存缓存，见[数据与缓存指南](quality-and-cache-guide.md)。各阶段分别提交推送、P8统一验收；P1自动接入仍关闭。下文早期状态为历史。
 

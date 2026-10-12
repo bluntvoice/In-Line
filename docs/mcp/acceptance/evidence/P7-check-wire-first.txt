@@ -1,0 +1,20 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error[E0599]: no method named `mcp_data_version` found for reference `&database::Database` in the current scope
+  --> src\mcp\observation.rs:42:48
+   |
+42 |         let basis = db.as_ref().and_then(|d| d.mcp_data_version().ok());
+   |                                                ^^^^^^^^^^^^^^^^ method not found in `&database::Database`
+
+error[E0599]: no method named `set_diagnostics` found for struct `Jobs` in the current scope
+   --> src\mcp\security.rs:218:23
+    |
+218 |         security.jobs.set_diagnostics(diagnostics);
+    |                       ^^^^^^^^^^^^^^^ method not found in `Jobs`
+    |
+   ::: src\mcp\jobs.rs:161:1
+    |
+161 | pub struct Jobs {
+    | --------------- method `set_diagnostics` not found for this struct
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `in-line` (lib) due to 2 previous errors

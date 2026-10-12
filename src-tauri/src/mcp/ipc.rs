@@ -25,6 +25,10 @@ struct Challenge {
 #[derive(Serialize, Deserialize)]
 struct Request {
     credentials: Credentials,
+    #[serde(default)]
+    request_id: Option<String>,
+    #[serde(default)]
+    peer_build: Option<Value>,
     tool: String,
     args: Value,
 }
@@ -168,6 +172,36 @@ pub async fn serve(
                 let request: Request = serde_json::from_str(&signed.payload)
                     .map_err(|_| McpError::new("invalid_arguments"))?;
                 let caller = request.credentials.clone();
+                let original_owner = security
+                    .store
+                    .lock()
+                    .map_err(|_| McpError::new("security_unavailable"))?
+                    .credential_owner(&caller);
+                let request_id = request
+                    .request_id
+                    .clone()
+                    .filter(|s| s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit()))
+                    .unwrap_or(platform::random_secret()?);
+                let receipt_hash = if matches!(
+                    request.tool.as_str(),
+                    "mutate_task" | "batch_mutate" | "manage_preferences"
+                ) {
+                    request.args["idempotencyKey"].as_str().map(|k| {
+                        use sha2::Digest;
+                        format!(
+                            "{:x}",
+                            sha2::Sha256::digest(format!(
+                                "{}:{}:{k}",
+                                request.credentials.client_id, request.tool
+                            ))
+                        )
+                    })
+                } else {
+                    None
+                };
+                let context_id = request_id.clone();
+                let tool = request.tool.clone();
+                let started = std::time::Instant::now();
                 let revision = security
                     .store
                     .lock()
@@ -175,12 +209,45 @@ pub async fn serve(
                     .revision;
                 let result = tokio::task::spawn_blocking(move || {
                     let _work_permit = _permit;
-                    dispatch(&request.credentials, &request.tool, request.args)
+                    super::observation::with_request(context_id, || {
+                        dispatch(&request.credentials, &request.tool, request.args)
+                    })
                 })
                 .await
                 .map_err(|_| McpError::new("internal_error"))?;
                 // Do not release a materialized result under a superseded authorization epoch.
-                let result = super::service::recheck_result(&security, &caller, revision, result);
+                let mut refs = result
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({}));
+                refs["_diagnosticKeyHash"] = serde_json::json!(receipt_hash);
+                refs["_diagnosticOwner"] = serde_json::json!(original_owner);
+                let result = super::service::recheck_result(&security, &caller, revision, result)
+                    .map_err(|e| {
+                        if e.code == "host_unavailable"
+                            && matches!(
+                                tool.as_str(),
+                                "mutate_task"
+                                    | "batch_mutate"
+                                    | "manage_preferences"
+                                    | "manage_business_data"
+                                    | "request_undo"
+                            )
+                        {
+                            McpError::new("result_unknown")
+                        } else {
+                            e
+                        }
+                    });
+                security.observe(
+                    &caller,
+                    &tool,
+                    request_id,
+                    &result,
+                    started.elapsed().as_millis().try_into().unwrap_or(u64::MAX),
+                    &refs,
+                );
                 let payload =
                     serde_json::to_string(&result).map_err(|_| McpError::new("internal_error"))?;
                 let response = Signed {
@@ -198,14 +265,30 @@ pub async fn serve(
 }
 
 pub async fn call(credentials: Credentials, tool: &str, args: Value) -> Result<Value, McpError> {
-    let root = platform::root()?;
-    call_at(root, credentials, tool, args).await
+    call_with_id(credentials, tool, args, platform::random_secret()?).await
+}
+pub async fn call_with_id(
+    credentials: Credentials,
+    tool: &str,
+    args: Value,
+    id: String,
+) -> Result<Value, McpError> {
+    call_at_with_id(platform::root()?, credentials, tool, args, id).await
 }
 pub async fn call_at(
     root: std::path::PathBuf,
     credentials: Credentials,
     tool: &str,
     args: Value,
+) -> Result<Value, McpError> {
+    call_at_with_id(root, credentials, tool, args, platform::random_secret()?).await
+}
+pub async fn call_at_with_id(
+    root: std::path::PathBuf,
+    credentials: Credentials,
+    tool: &str,
+    args: Value,
+    request_id: String,
 ) -> Result<Value, McpError> {
     fn local_limit(credentials: &Credentials, valid: bool) -> Result<(), McpError> {
         use super::security::Limiter;
@@ -298,6 +381,8 @@ pub async fn call_at(
         // Credentials are sent only after authenticated server challenge proof.
         let payload = serde_json::to_string(&Request {
             credentials,
+            request_id: Some(request_id),
+            peer_build: Some(super::build_identity::current()),
             tool: tool.into(),
             args,
         })

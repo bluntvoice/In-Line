@@ -1,0 +1,1 @@
+PASS: actual P7 components; risk cancel/once acknowledgement, closed Codex entry, P1 mute disabled, intention not recovery, preview/chooser cancellation no write, explicit single export, basic-only status filter and audit-clear cancellation. Synthetic API only.

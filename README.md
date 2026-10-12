@@ -35,6 +35,8 @@ MCP P3新增单事项写入、幂等与字段冲突检查、操作审计及软�
 
 MCP P4新增队列、子任务、原子批次、整批改期确认及本地业务备份/受限导出，待 P8 统一验收；详见 [P4批量指南](docs/mcp/batch-guide.md)。
 
+MCP P7新增自身脱敏诊断、故障及审计维护预览、权限提示，16工具，待P8统一验收；详见[P7诊断指南](docs/mcp/diagnostics-and-maintenance-guide.md)。
+
 ## 主界面
 
 ![待办队列](docs/images/main-queue.png)

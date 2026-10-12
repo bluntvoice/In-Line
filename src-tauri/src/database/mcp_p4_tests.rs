@@ -75,6 +75,7 @@ fn rows(db: &Database) -> Json {
 }
 fn state(_db: &Database) -> Store {
     Store {
+        sensitive_notice_acknowledged: false,
         version: 1,
         machine: "synthetic".into(),
         sid: "synthetic".into(),

@@ -7,6 +7,8 @@ mod mcp_batch;
 mod mcp_changes;
 #[cfg(windows)]
 mod mcp_complex;
+#[cfg(windows)]
+mod mcp_maintenance;
 mod mcp_metrics;
 mod mcp_quality;
 mod mcp_read;

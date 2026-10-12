@@ -1,0 +1,18 @@
+import {useEffect,useRef,useState} from "react";
+import {RefreshCw,BellOff,Archive,CheckCircle2,Trash2} from "lucide-react";
+import {api} from "../api";
+import type {FaultState} from "../lib/mcp-maintenance";
+import McpMaintenanceSetting from "./McpMaintenanceSetting";
+const labels:Record<string,string>={all:"全部",unresolved:"未解决",pending:"待验证",resolved:"已恢复",archived:"已归档"};
+export default function McpFaultSetting(){
+  const [filter,setFilter]=useState("all"),[state,setState]=useState<FaultState|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[clear,setClear]=useState<string|null>(null);const lock=useRef(false);
+  const load=()=>api.mcpFaultState(filter).then(setState).catch(e=>setError(String(e)));
+  useEffect(()=>{let alive=true;void api.mcpFaultState(filter).then(v=>{if(alive)setState(v);}).catch(e=>{if(alive)setError(String(e));});return()=>{alive=false;};},[filter]);
+  const action=async(id:string,kind:string)=>{if(lock.current)return;lock.current=true;setBusy(true);setError("");try{await api.mcpFaultAction(id,kind);setClear(null);await load();}catch(e){setError(String(e));}finally{lock.current=false;setBusy(false);}};
+  return <details className="mcp-security-setting"><summary>技术故障与诊断</summary><p>未解决摘要持续保留；已恢复摘要保留30天。普通故障可静音7天，P0/P1不可静音。重复异常累积证据；实际恢复后再次发生才算新轮次。</p><div className="mcp-security-controls"><label>状态<select value={filter} disabled={busy} onChange={e=>{setFilter(e.target.value);setClear(null);}}>{Object.entries(labels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label><button className="button secondary" disabled={busy} onClick={()=>void load()}><RefreshCw size={16}/>刷新</button></div>
+    {error&&<p role="alert">{error}</p>}{state?.storageError&&<p role="alert">技术诊断存储不可用。原记录已保留，请检查本机状态；业务结果不会因此被回滚。</p>}
+    {!state?.unavailable&&state?.items.map(f=>{const r=f.episodes.at(-1)!;return <details key={f.id}><summary>{f.severity} · {f.code} · {labels[r.state]??r.state}{f.attention==="raised"?" · 需重点排查":""}{r.mutedUntil?" · 已静音":""}</summary><p>{f.tool} · 第{r.number}轮 · {r.evidenceCount}条证据</p><p>错误编号：{r.lastErrorId}</p><p>记录结果尚未单独证明根因。标为待验证不会自动恢复；相关功能需真实成功并经过稳定窗口。</p><div className="mcp-security-controls">{r.state!=="resolved"&&<><button className="button secondary" disabled={busy} onClick={()=>void action(f.id,"verify")}><CheckCircle2 size={16}/>待验证</button><button className="button secondary" disabled={busy||["P0","P1"].includes(f.severity)} onClick={()=>void action(f.id,r.mutedUntil?"unmute":"mute")}><BellOff size={16}/>{r.mutedUntil?"取消静音":"静音7天"}</button></>}<button className="button secondary" disabled={busy||r.archived} onClick={()=>void action(f.id,"archive")}><Archive size={16}/>归档</button>{r.state==="resolved"&&(clear===f.id?<><span>清理此故障已恢复的摘要？</span><button className="button secondary danger" disabled={busy} onClick={()=>void action(f.id,"clearResolved")}>确认清理</button><button className="button secondary" onClick={()=>setClear(null)}>取消</button></>:<button className="button secondary danger" disabled={busy} onClick={()=>setClear(f.id)}><Trash2 size={16}/>清理已恢复</button>)}</div><details><summary>各轮记录</summary>{f.episodes.map(e=><p key={e.id}>第{e.number}轮 · {labels[e.state]} · {e.evidenceCount}条证据 · {e.lastErrorId}</p>)}</details></details>;})}
+    <details><summary>最近认证后的调用</summary><p>这些记录只表示已收到的调用，与授权、在线状态及当前会话自动接入验证分别核验。</p>{state?.latestClients.map(c=><p key={c.client??c.requestId}>{c.client?.slice(-8)} · {c.tool} · {c.code} · {new Date(c.at*1000).toLocaleString()}</p>)}{!state?.latestClients.length&&<p>未收到认证后的调用。</p>}</details>
+    <McpMaintenanceSetting source="faults" filter={filter}/>
+  </details>;
+}

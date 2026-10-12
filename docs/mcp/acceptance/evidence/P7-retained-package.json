@@ -1,0 +1,13 @@
+{
+  "phase": "P7",
+  "path": "C:\\Users\\KB\\Documents\\inline\\In-Line\\release\\In-Line-P7-local-20261012.exe",
+  "bytes": 4214129,
+  "sha256": "EF3CAC9A6A3459A55EA03B234A920DCAEF13F212B53EADE9B2F7086F013018DC",
+  "sourceFrozenFiles": 163,
+  "sourceVerifiedUnchanged": true,
+  "installed": false,
+  "releaseCreated": false,
+  "baselineCommit": "d7b103ccb8c6673d9b1748d56c09c8239da74aa7",
+  "exactEmbeddedCommit": null,
+  "sourceDirty": true
+}

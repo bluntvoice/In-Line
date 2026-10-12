@@ -60,6 +60,8 @@ pub struct Store {
     pub paused: bool,
     pub groups: Permissions,
     pub clients: Vec<Client>,
+    #[serde(default)]
+    pub sensitive_notice_acknowledged: bool,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -78,6 +80,7 @@ pub struct SecurityView {
     pub groups: Permissions,
     pub revision: u64,
     pub clients: Vec<ClientView>,
+    pub sensitive_notice_acknowledged: bool,
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -111,6 +114,15 @@ pub fn constant_equal(a: &str, b: &str) -> bool {
     a.bytes().zip(b.bytes()).fold(0u8, |x, (a, b)| x | (a ^ b)) == 0
 }
 impl Store {
+    pub fn credential_owner(&self, c: &Credentials) -> Option<String> {
+        if c.client_id.len() != 64 || c.token.len() != 64 {
+            return None;
+        }
+        self.clients
+            .iter()
+            .find(|x| x.id == c.client_id && constant_equal(&x.token_hash, &digest(&c.token)))
+            .map(|x| x.id.clone())
+    }
     pub fn authorize(&self, credentials: &Credentials) -> Result<Authorization, McpError> {
         if credentials.client_id.len() != 64 || credentials.token.len() != 64 {
             return Err(McpError::new("unauthenticated"));
@@ -135,6 +147,7 @@ impl Store {
     }
     pub fn view(&self) -> SecurityView {
         SecurityView {
+            sensitive_notice_acknowledged: self.sensitive_notice_acknowledged,
             paused: self.paused,
             groups: self.groups.clone(),
             revision: self.revision,
@@ -156,6 +169,9 @@ impl Store {
 pub struct Security {
     pub(crate) store: std::sync::Arc<Mutex<Store>>,
     path: PathBuf,
+    pub previews: super::maintenance::Previews,
+    pub diagnostics: std::sync::Arc<super::diagnostics::Diagnostics>,
+    pub(crate) diagnostic_db: Mutex<Option<crate::database::Database>>,
     pub(crate) limits: std::sync::Arc<Mutex<Limiter>>,
     pub(crate) queries: Mutex<super::query::QueryState>,
     pub(crate) changes: Mutex<super::changes::Changes>,
@@ -183,11 +199,16 @@ impl Security {
                 paused: false,
                 groups: Permissions::default(),
                 clients: vec![],
+                sensitive_notice_acknowledged: false,
             }
         };
         let store = std::sync::Arc::new(Mutex::new(store));
         let limits = std::sync::Arc::new(Mutex::new(Limiter::default()));
+        let diagnostics = std::sync::Arc::new(super::diagnostics::Diagnostics::new(root.clone()));
         let security = Self {
+            previews: super::maintenance::Previews::default(),
+            diagnostics: diagnostics.clone(),
+            diagnostic_db: Mutex::new(None),
             cache: Mutex::new(super::cache::Cache::default()),
             jobs: super::jobs::Jobs::new(root.clone(), store.clone(), limits.clone()),
             changes: Mutex::new(super::changes::Changes::new(root.clone())),
@@ -196,6 +217,7 @@ impl Security {
             limits,
             queries: Mutex::new(super::query::QueryState::new(root.clone())),
         };
+        security.jobs.set_diagnostics(diagnostics);
         if !security.path.exists() {
             let guard = security
                 .store
@@ -204,6 +226,42 @@ impl Security {
             security.save(&guard)?;
         }
         Ok(security)
+    }
+    pub(crate) fn private_root(&self) -> &Path {
+        self.path.parent().unwrap_or(&self.path)
+    }
+    pub fn verify_private_store(&self) -> Result<(), McpError> {
+        let stored = Self::read_at(
+            self.path
+                .parent()
+                .ok_or_else(|| McpError::new("security_unavailable"))?,
+        )?;
+        let live = self
+            .store
+            .lock()
+            .map_err(|_| McpError::new("security_unavailable"))?;
+        if stored.revision != live.revision {
+            return Err(McpError::new("authorization_changed"));
+        }
+        Ok(())
+    }
+    pub fn acknowledge_sensitive_notice(&self) -> Result<(), McpError> {
+        self.change(|s| {
+            s.sensitive_notice_acknowledged = true;
+            Ok(())
+        })
+    }
+    pub fn require_sensitive_notice(&self, p: &Permissions) -> Result<(), McpError> {
+        if (p.full_read || p.write)
+            && !self
+                .store
+                .lock()
+                .map_err(|_| McpError::new("security_unavailable"))?
+                .sensitive_notice_acknowledged
+        {
+            return Err(McpError::new("sensitive_notice_required"));
+        }
+        Ok(())
     }
     pub fn read_at(root: &Path) -> Result<Store, McpError> {
         let path = root.join("authorization.dpapi");

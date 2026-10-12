@@ -66,6 +66,48 @@ fn first_anchors_cannot_be_renewed_by_restart_or_repeated_limits() {
     assert_eq!(expired(None, 100, true, 86500), Some("recovery_expired"));
     assert_eq!(expired(None, 100, true, 99), Some("clock_invalid"));
 }
+
+#[test]
+fn audit_cleanup_blocks_active_job_and_terminal_diagnostic_keeps_request_round() {
+    let (db, s, a, _) = fixture();
+    let request = platform::random_secret().unwrap();
+    let start = super::super::observation::with_request(request.clone(), || {
+        call(
+            &s,
+            &db,
+            &a,
+            json!({"action":"start","kind":"query_tasks","arguments":{}}),
+        )
+    });
+    let id = start["job"]["jobId"].as_str().unwrap();
+    let j = wait(&s, id);
+    // Preserve a deterministic queued checkpoint under the same host lock; no worker races.
+    {
+        let mut state = s.jobs.state.lock().unwrap();
+        state.jobs.get_mut(id).unwrap().state = "queued".into();
+    }
+    let executed = std::sync::atomic::AtomicBool::new(false);
+    let error = s
+        .jobs
+        .with_no_active(|| {
+            executed.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.code, "conflict");
+    assert!(!executed.load(std::sync::atomic::Ordering::SeqCst));
+    {
+        let mut state = s.jobs.state.lock().unwrap();
+        state.jobs.insert(id.into(), j.clone());
+    }
+    s.jobs.with_no_active(|| Ok(())).unwrap();
+    s.jobs.record_terminal(&db, id);
+    let d = s.diagnostics.own(&a.client_id, &request).unwrap();
+    assert_eq!(d["jobId"], id);
+    assert_eq!(d["round"], 1);
+    assert_eq!(j.request_id.as_deref(), Some(request.as_str()));
+    assert!(!d.to_string().contains("secret"));
+}
 fn seed_interrupted(s: &Security, mut j: Job) -> String {
     j.id = platform::random_secret().unwrap();
     j.state = "running".into();

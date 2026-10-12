@@ -1,0 +1,36 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.check: Clicking the checkbox did not change its state
+Call log:
+  - waiting for getByRole('checkbox', { name: '完整读取', exact: true }).first()
+    - locator resolved to <input type="checkbox"/>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+    - click action done
+    - waiting for scheduled navigations to finish
+    - navigations have finished
+
+    at C:\Users\KB\Documents\inline\In-Line\scripts\verify-mcp-maintenance-ui.mjs:21:121 {
+  log: [
+    "  - waiting for getByRole('checkbox', { name: '完整读取', exact: true }).first()",
+    '    - locator resolved to <input type="checkbox"/>',
+    '  - attempting click action',
+    '    - waiting for element to be visible, enabled and stable',
+    '    - element is visible, enabled and stable',
+    '    - scrolling into view if needed',
+    '    - done scrolling',
+    '    - performing click action',
+    '    - click action done',
+    '    - waiting for scheduled navigations to finish',
+    '    - navigations have finished'
+  ],
+  name: 'Error'
+}
+
+Node.js v24.19.0

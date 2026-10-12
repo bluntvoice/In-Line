@@ -95,7 +95,7 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
     )?;
     let client = ().serve(transport).await?;
     let tools = client.list_all_tools().await?;
-    assert_eq!(tools.len(), 15);
+    assert_eq!(tools.len(), 16);
     assert!(tools.iter().any(|tool| tool.name == "get_capabilities"));
     assert!(tools.iter().any(|tool| tool.name == "get_report_summary"));
     assert!(tools.iter().any(|tool| tool.name == "list_report_items"));
@@ -110,6 +110,7 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         "batch_mutate",
         "manage_business_data",
         "inspect_data",
+        "get_diagnostic",
         "query_changes",
         "manage_jobs",
     ] {

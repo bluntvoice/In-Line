@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const API_VERSION: u32 = 1;
-pub const TOOLS: [&str; 15] = [
+pub const TOOLS: [&str; 16] = [
     "get_capabilities",
     "get_report_summary",
     "list_report_items",
@@ -19,6 +19,7 @@ pub const TOOLS: [&str; 15] = [
     "query_changes",
     "manage_jobs",
     "inspect_data",
+    "get_diagnostic",
 ];
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -50,6 +51,7 @@ impl McpError {
             "unauthenticated" => "请在In Line软件设置中为当前客户端授权并配置环境凭证",
             "revoked" => "客户端授权已撤销，请由用户在软件内重新授权",
             "paused" => "MCP已由用户暂停，请由用户在软件内恢复",
+            "sensitive_notice_required" => "首次启用完整读取或写入须在软件内确认风险提示",
             "forbidden" => "当前客户端没有所需权限或事项超出授权范围",
             "conflict" => "字段、版本或业务状态已改变，请重新读取并由用户确认冲突",
             "idempotency_conflict" => "该请求键已用于不同操作，未重复写入",
@@ -125,13 +127,18 @@ impl Envelope {
                 data: Some(data),
                 error: None,
             },
-            Err(error) => Self {
-                api_version: API_VERSION,
-                request_id: id,
-                status: "error".into(),
-                data: None,
-                error: Some(serde_json::to_value(error).expect("error serializable")),
-            },
+            Err(error) => {
+                let mut detail = serde_json::to_value(error).expect("error serializable");
+                detail["errorId"] = serde_json::json!(id);
+                detail["diagnosticAvailability"] = serde_json::json!("host_record_if_reached");
+                Self {
+                    api_version: API_VERSION,
+                    request_id: id,
+                    status: "error".into(),
+                    data: None,
+                    error: Some(detail),
+                }
+            }
         }
     }
 }

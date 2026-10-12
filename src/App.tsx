@@ -1,6 +1,8 @@
 import { useEffect,useLayoutEffect,useMemo,useState } from "react";
 import { Archive,ArrowDown,ArrowUp,BarChart3,BookOpen,CalendarDays,ClockAlert,Copy,Inbox,Info,PauseCircle,Plus,RotateCcw,Search,Settings,Trash2,X } from "lucide-react";
 import { api } from "./api";
+import {listen} from "@tauri-apps/api/event";
+import {operationNotice} from "./lib/mcp-maintenance";
 import type { BootstrapData,LegalTask,MasterData,SubtaskCompletionState,TaskView } from "./types";
 import { commonContacts,commonDepartments,displayTicket,formatDateTime,formatDeadline,historyTimestamp,isDeferredStatus,isOverdue,sortDeferredQueue,taskDetailView,visibleQueueTasks } from "./lib/task-utils";
 import StatusBadge from "./components/StatusBadge";
@@ -73,6 +75,7 @@ export default function App(){
 
   useEffect(()=>{try{window.localStorage.setItem(COLUMN_LAYOUT_KEY,serializeTaskColumnLayouts(columnLayouts));}catch{/* 界面配置写入失败不应阻断队列 */}},[columnLayouts]);
 
+  useEffect(()=>{let active=true,dispose:(()=>void)|undefined,timer:ReturnType<typeof setTimeout>|undefined;let counts:Record<string,number>={};void listen<string>("mcp-operation-notice",event=>{if(!active||!["write","approval","completed","failed","cancelled","attention"].includes(event.payload))return;counts[event.payload]=(counts[event.payload]??0)+1;if(!timer)timer=setTimeout(()=>{if(active)setMessage(operationNotice(counts));counts={};timer=undefined;setTimeout(()=>{if(active)setMessage("");},4000);},500);}).then(fn=>{if(active)dispose=fn;else fn();}).catch(()=>undefined);return()=>{active=false;dispose?.();if(timer)clearTimeout(timer);};},[]);
   const toast=(text:string)=>{setMessage(text);window.setTimeout(()=>setMessage(""),2300);};
   const showTaskDetails=(task:LegalTask)=>{
     setSettings(false);

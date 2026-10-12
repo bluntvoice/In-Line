@@ -7,7 +7,11 @@ pub mod updater;
 
 #[cfg(windows)]
 #[tauri::command]
-fn mcp_audit_state(db: tauri::State<database::Database>) -> Result<serde_json::Value, String> {
+fn mcp_audit_state(
+    window: tauri::WebviewWindow,
+    db: tauri::State<database::Database>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
     db.mcp_audit_state()
 }
 #[cfg(windows)]
@@ -56,11 +60,13 @@ fn mcp_resolve_batch(
 #[cfg(windows)]
 #[tauri::command]
 fn mcp_resolve_undo(
+    window: tauri::WebviewWindow,
     app: tauri::AppHandle,
     db: tauri::State<database::Database>,
     request_id: i64,
     approve: bool,
 ) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
     let result = db
         .mcp_resolve_undo(request_id, approve)
         .map_err(|e| e.to_string())?;
@@ -547,6 +553,115 @@ fn mcp_local(window: &tauri::WebviewWindow) -> Result<(), String> {
 fn mcp_error(error: mcp::contract::McpError) -> String {
     format!("{}：{}", error.code, error.message)
 }
+
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_acknowledge_sensitive_notice(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security.acknowledge_sensitive_notice().map_err(mcp_error)
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_fault_state(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    filter: String,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    match security
+        .diagnostics
+        .local(&filter, chrono::Utc::now().timestamp())
+    {
+        Ok(v) => Ok(v),
+        Err(_) => Ok(
+            serde_json::json!({"items":[],"latestClients":[],"storageError":true,"unavailable":true}),
+        ),
+    }
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_fault_action(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    id: String,
+    action: String,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security
+        .diagnostics
+        .action(&id, &action, chrono::Utc::now().timestamp())
+        .map_err(mcp_error)
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_maintenance_preview(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    db: State<Database>,
+    source: String,
+    action: String,
+    format: String,
+    filter: String,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    security
+        .previews
+        .preview(
+            &security,
+            &db,
+            &source,
+            &action,
+            &format,
+            &filter,
+            chrono::Utc::now().timestamp(),
+        )
+        .map_err(mcp_error)
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_maintenance_cancel(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    nonce: String,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security.previews.cancel(&nonce);
+    Ok(())
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_maintenance_confirm(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    security: State<McpSecurity>,
+    db: State<Database>,
+    nonce: String,
+    path: Option<String>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    let result = security
+        .previews
+        .confirm(
+            &security,
+            &db,
+            &nonce,
+            path.as_deref(),
+            chrono::Utc::now().timestamp(),
+        )
+        .map_err(mcp_error)?;
+    if result["removed"].as_u64().is_some_and(|n| n > 0) {
+        security
+            .diagnostics
+            .maintenance("audit_cleared", db.mcp_basis().ok());
+        let _ = app.emit("mcp-audit-changed", ());
+    }
+    Ok(result)
+}
+
+#[cfg(windows)]
 #[tauri::command]
 fn mcp_security_state(
     window: tauri::WebviewWindow,
@@ -584,19 +699,31 @@ fn mcp_clear_cache(
     security: State<McpSecurity>,
 ) -> Result<serde_json::Value, String> {
     mcp_local(&window)?;
-    Ok(security
+    let result = security
         .cache
         .lock()
         .map_err(|_| "缓存状态不可用")?
-        .clear(None))
+        .clear(None);
+    security.diagnostics.maintenance("cache_cleared", None);
+    Ok(result)
 }
 #[tauri::command]
 fn mcp_rebuild_index(
     window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
     db: State<Database>,
 ) -> Result<serde_json::Value, String> {
     mcp_local(&window)?;
-    db.mcp_repair_derived().map_err(mcp_error)
+    let result = db.mcp_repair_derived();
+    security.diagnostics.maintenance(
+        if result.is_ok() {
+            "index_rebuilt"
+        } else {
+            "resync_required"
+        },
+        db.mcp_basis().ok(),
+    );
+    result.map_err(mcp_error)
 }
 #[tauri::command]
 fn mcp_cancel_job(
@@ -625,6 +752,9 @@ fn mcp_prepare_onboarding(
     args: mcp::onboarding::PrepareArgs,
 ) -> Result<mcp::onboarding::Receipt, String> {
     mcp_local(&window)?;
+    security
+        .require_sensitive_notice(&args.permissions)
+        .map_err(mcp_error)?;
     mcp::onboarding::require_available(&args.client).map_err(mcp_error)?;
     mcp::onboarding::prepare_at(
         &security,
@@ -671,6 +801,9 @@ fn mcp_update_client(
 ) -> Result<(), String> {
     mcp_local(&window)?;
     security
+        .require_sensitive_notice(&permissions)
+        .map_err(mcp_error)?;
+    security
         .update_client(&id, permissions, scope)
         .map_err(mcp_error)
 }
@@ -681,6 +814,9 @@ fn mcp_set_groups(
     groups: mcp::security::Permissions,
 ) -> Result<(), String> {
     mcp_local(&window)?;
+    security
+        .require_sensitive_notice(&groups)
+        .map_err(mcp_error)?;
     security.set_groups(groups).map_err(mcp_error)
 }
 #[tauri::command]
@@ -1153,6 +1289,18 @@ pub fn run() {
                 if let Ok(security) = mcp::security::Security::open() {
                     let security = std::sync::Arc::new(security);
                     let handle = app.handle().clone();
+                    let fault_handle = handle.clone();
+                    security
+                        .diagnostics
+                        .set_notice(std::sync::Arc::new(move || {
+                            let _ = fault_handle.emit("mcp-operation-notice", "attention");
+                        }));
+                    let notice_handle = handle.clone();
+                    security
+                        .jobs
+                        .set_terminal_notice(std::sync::Arc::new(move |state| {
+                            let _ = notice_handle.emit("mcp-operation-notice", state);
+                        }));
                     let job_handle = handle.clone();
                     if security
                         .jobs
@@ -1166,6 +1314,7 @@ pub fn run() {
                     {
                         eprintln!("MCP后台检查点不可用，任务恢复已拒绝");
                     }
+                    security.bind_diagnostic_database(handle.state::<Database>().inner().clone());
                     let service_security = security.clone();
                     if mcp::ipc::start(
                         security.clone(),
@@ -1177,6 +1326,19 @@ pub fn run() {
                                 tool,
                                 args,
                             );
+                            if let Ok(v) = &result {
+                                if v["replayed"] != true && v["dryRun"] != true {
+                                    let status =
+                                        v["commitStatus"].as_str().or(v["status"].as_str());
+                                    if let Some(kind) = match status {
+                                        Some("committed" | "artifact_created") => Some("write"),
+                                        Some("needs_user_approval") => Some("approval"),
+                                        _ => None,
+                                    } {
+                                        let _ = handle.emit("mcp-operation-notice", kind);
+                                    }
+                                }
+                            }
                             if matches!(
                                 tool,
                                 "mutate_task"
@@ -1345,6 +1507,12 @@ pub fn run() {
             open_backup_directory,
             mcp_connection_guide,
             mcp_security_state,
+            mcp_acknowledge_sensitive_notice,
+            mcp_fault_state,
+            mcp_fault_action,
+            mcp_maintenance_preview,
+            mcp_maintenance_cancel,
+            mcp_maintenance_confirm,
             mcp_jobs_state,
             mcp_cache_state,
             mcp_clear_cache,
