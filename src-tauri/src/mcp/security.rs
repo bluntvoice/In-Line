@@ -154,10 +154,12 @@ impl Store {
     }
 }
 pub struct Security {
-    pub(crate) store: Mutex<Store>,
+    pub(crate) store: std::sync::Arc<Mutex<Store>>,
     path: PathBuf,
-    pub(crate) limits: Mutex<Limiter>,
+    pub(crate) limits: std::sync::Arc<Mutex<Limiter>>,
     pub(crate) queries: Mutex<super::query::QueryState>,
+    pub(crate) changes: Mutex<super::changes::Changes>,
+    pub jobs: super::jobs::Jobs,
 }
 impl Security {
     pub fn open() -> Result<Self, McpError> {
@@ -182,10 +184,14 @@ impl Security {
                 clients: vec![],
             }
         };
+        let store = std::sync::Arc::new(Mutex::new(store));
+        let limits = std::sync::Arc::new(Mutex::new(Limiter::default()));
         let security = Self {
-            store: Mutex::new(store),
+            jobs: super::jobs::Jobs::new(root.clone(), store.clone(), limits.clone()),
+            changes: Mutex::new(super::changes::Changes::new(root.clone())),
+            store,
             path,
-            limits: Mutex::new(Limiter::default()),
+            limits,
             queries: Mutex::new(super::query::QueryState::new(root.clone())),
         };
         if !security.path.exists() {
@@ -398,6 +404,12 @@ pub struct Limiter {
     entries: HashMap<String, Window>,
 }
 impl Limiter {
+    pub(crate) fn is_limited(&self, client: &str, now: Instant) -> bool {
+        self.entries
+            .get(&format!("valid:{client}"))
+            .and_then(|w| w.until)
+            .is_some_and(|until| now < until)
+    }
     pub fn check(&mut self, key: String, valid: bool, now: Instant) -> Result<(), McpError> {
         self.entries
             .retain(|_, w| now.saturating_duration_since(w.since) < Duration::from_secs(600));

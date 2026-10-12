@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {api} from "../api";
 import McpAuditSetting from "./McpAuditSetting";
 import McpBatchSetting from "./McpBatchSetting";
+import McpJobsSetting from "./McpJobsSetting";
 import {canPrepare,defaultPermissions,parseScope,prepareAndCopy,receiptExpired} from "../lib/mcp-onboarding";
 import type {McpClient,McpClientPreset,McpPermissions,McpReceipt,McpSecurityState} from "../lib/mcp-onboarding";
 
@@ -46,5 +47,5 @@ export default function McpSecuritySetting({notify}:{notify:(text:string)=>void}
       <div className="mcp-security-controls"><button className="button secondary" disabled={editing?busy:!canPrepare(preset,busy)} onClick={save}>{editing?"保存客户端权限":receipt&&!expired?"再次复制接入提示词":"授权并复制接入提示词"}</button>{editing&&<button className="button secondary" disabled={busy} onClick={reset}>取消</button>}</div>
       {receipt&&<div className="mcp-issued"><p role="status">{expired?"接入提示词已过期，请重新发起接入。":"接入提示词已准备，10 分钟内有效。授权、配置验证和当前会话连接分别核验。"}</p><button className="button secondary" disabled={busy||expired} onClick={()=>void act(()=>copy(receipt))}>再次复制</button><button className="button secondary" disabled={busy} onClick={()=>setReceipt(null)}>收起提示词</button></div>}
     </>}
-  </details><McpBatchSetting/><McpAuditSetting/></>;
+  </details><McpBatchSetting/><McpAuditSetting/><McpJobsSetting/></>;
 }

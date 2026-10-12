@@ -1,0 +1,14 @@
+    Checking in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+warning: value assigned to `begun` is never read
+   --> src\mcp\jobs.rs:599:21
+    |
+599 |                     begun = false;
+    |                     ^^^^^^^^^^^^^ this value is reassigned later and never used
+...
+611 |             begun = true;
+    |             ------------ `begun` is overwritten here before the previous value is read
+    |
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `in-line` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.61s

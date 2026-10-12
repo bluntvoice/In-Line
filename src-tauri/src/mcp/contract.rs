@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const API_VERSION: u32 = 1;
-pub const TOOLS: [&str; 12] = [
+pub const TOOLS: [&str; 14] = [
     "get_capabilities",
     "get_report_summary",
     "list_report_items",
@@ -16,6 +16,8 @@ pub const TOOLS: [&str; 12] = [
     "request_undo",
     "batch_mutate",
     "manage_business_data",
+    "query_changes",
+    "manage_jobs",
 ];
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -71,6 +73,13 @@ impl McpError {
             "snapshot_expired" => "查询快照已过期或服务已重启，请重新开始查询",
             "cursor_invalid" => "分页参数、客户端或查询条件与快照不一致，请重新查询",
             "snapshot_invalid" => "数据代际或事项授权范围变化，旧快照结果未释放",
+            "resync_required" => "变更游标或派生索引失效，请重新全量同步；缺失历史不能重建为真实事件",
+            "waiter_cancelled" => "本次等待已取消，共享任务不受影响",
+            "job_not_complete" => "后台任务尚未完整成功，不能领取部分结果为最终结果",
+            "result_expired" => "临时任务结果已过7天保留期，请明确重新查询",
+            "pause_expired" => "后台任务自首次限流暂停已达30分钟，已停止并释放资源",
+            "recovery_expired" => "持久检查点已超过原24小时恢复窗口，未自动续期或重放",
+            "clock_invalid" => "本机时钟倒退，无法可靠核验任务有效期，已停止恢复",
             "resource_limit" => "查询资源超过本机安全上限，请缩小范围或结束旧查询",
             "not_found" => "未找到当前授权范围内的事项或查询",
             "explicit_intent_required" => "保存或删除命名查询须有用户明确要求及写入授权",

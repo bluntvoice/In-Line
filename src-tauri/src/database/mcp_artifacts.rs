@@ -15,6 +15,15 @@ fn job_request(args: &BusinessDataArgs, auth: &Authorization) -> Json {
     json!({"tool":"manage_business_data","args":args,"permissions":auth.permissions,"scope":auth.scope})
 }
 impl Database {
+    pub(crate) fn mcp_validate_artifact_intent(
+        auth: &Authorization,
+        args: &BusinessDataArgs,
+    ) -> Result<(), McpError> {
+        if !auth.permissions.write || !auth.permissions.regular_read {
+            return Err(err("forbidden"));
+        }
+        validate_intent(&args.idempotency_key, &args.intent, &args.reason)
+    }
     pub fn mcp_artifact(
         &self,
         client: &str,
@@ -22,10 +31,25 @@ impl Database {
         args: BusinessDataArgs,
         export: impl FnOnce() -> Result<Vec<u8>, McpError>,
     ) -> Result<Json, McpError> {
-        if !auth.permissions.write || !auth.permissions.regular_read {
-            return Err(err("forbidden"));
-        }
-        validate_intent(&args.idempotency_key, &args.intent, &args.reason)?;
+        self.mcp_artifact_impl(client, auth, args, true, export)
+    }
+    pub(crate) fn mcp_artifact_receipt(
+        &self,
+        client: &str,
+        auth: &Authorization,
+        args: BusinessDataArgs,
+    ) -> Result<Json, McpError> {
+        self.mcp_artifact_impl(client, auth, args, false, || Err(err("result_unknown")))
+    }
+    fn mcp_artifact_impl(
+        &self,
+        client: &str,
+        auth: &Authorization,
+        args: BusinessDataArgs,
+        allow_fresh: bool,
+        export: impl FnOnce() -> Result<Vec<u8>, McpError>,
+    ) -> Result<Json, McpError> {
+        Self::mcp_validate_artifact_intent(auth, &args)?;
         if !matches!(args.action.as_str(), "backup" | "export") {
             return Err(err("invalid_arguments"));
         }
@@ -88,6 +112,9 @@ impl Database {
                 }
                 false
             } else {
+                if !allow_fresh {
+                    return Err(err("result_unknown"));
+                }
                 if path.exists() {
                     return Err(err("result_unknown"));
                 }

@@ -105,7 +105,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             .await
             .unwrap();
         let list = request(&mut input, &mut output, 2, "tools/list", json!({})).await;
-        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 12);
+        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 14);
         let first = request(
             &mut input,
             &mut output,
@@ -408,6 +408,58 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 .count(),
             1
         );
+        let full = request(
+            &mut input,
+            &mut output,
+            23,
+            "tools/call",
+            json!({"name":"query_changes","arguments":{"projection":["id","title"]}}),
+        )
+        .await;
+        assert_eq!(
+            full["result"]["structuredContent"]["data"]["fullSyncComplete"], true,
+            "{full}"
+        );
+        let incremental=request(&mut input,&mut output,24,"tools/call",json!({"name":"query_changes","arguments":{"projection":["id","title"],"cursor":full["result"]["structuredContent"]["data"]["nextCursor"]}})).await;
+        assert_eq!(
+            incremental["result"]["structuredContent"]["data"]["items"],
+            json!([]),
+            "{incremental}"
+        );
+        let start=request(&mut input,&mut output,25,"tools/call",json!({"name":"manage_jobs","arguments":{"action":"start","kind":"query_tasks","arguments":{"projection":["id","title"]}}})).await;
+        let job = start["result"]["structuredContent"]["data"]["job"]["jobId"]
+            .as_str()
+            .unwrap();
+        let mut completed = false;
+        for n in 0..20 {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            let status = request(
+                &mut input,
+                &mut output,
+                30 + n,
+                "tools/call",
+                json!({"name":"manage_jobs","arguments":{"action":"get","jobId":job}}),
+            )
+            .await;
+            if status["result"]["structuredContent"]["data"]["state"] == "completed" {
+                completed = true;
+                break;
+            }
+        }
+        assert!(completed, "stdio job must complete");
+        let result = request(
+            &mut input,
+            &mut output,
+            55,
+            "tools/call",
+            json!({"name":"manage_jobs","arguments":{"action":"result","jobId":job}}),
+        )
+        .await;
+        assert_eq!(
+            result["result"]["structuredContent"]["data"]["complete"], true,
+            "{result}"
+        );
+        assert!(!result.to_string().contains("secret-"));
         security.pause(true).unwrap();
         let paused = request(
             &mut input,

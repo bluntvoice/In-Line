@@ -38,7 +38,7 @@ pub fn execute(
         }
     })
 }
-fn csv(value: &str) -> String {
+pub(super) fn csv(value: &str) -> String {
     let mut value = value.to_owned();
     if value.trim_start().starts_with(['=', '+', '-', '@']) || value.starts_with(['\t', '\r', '\n'])
     {

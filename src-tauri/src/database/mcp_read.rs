@@ -101,7 +101,7 @@ mod tests {
             serde_json::to_value(upgraded.get_task(task.id).unwrap()).unwrap(),
             original
         );
-        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 13);
+        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 14);
         assert!(!upgraded.list_backups().unwrap().is_empty());
     }
     #[test]
@@ -138,7 +138,7 @@ impl Database {
     pub(crate) fn mcp_basis(&self) -> Result<DataVersion, McpError> {
         self.with_conn(|conn| conn.query_row("SELECT database_uuid,data_generation,commit_sequence FROM mcp_data_basis WHERE singleton=1",[],|r|Ok(DataVersion{
             database_uuid:r.get(0)?,data_generation:r.get(1)?,commit_sequence:r.get(2)?,
-            schema_version:13,query_schema_version:1,statistics_definition_version:1,
+            schema_version:DATABASE_SCHEMA_VERSION as u32,query_schema_version:1,statistics_definition_version:1,
         })).map_err(display_error)).map_err(Into::into)
     }
     pub(crate) fn mcp_snapshot(&self) -> Result<Self, McpError> {
@@ -163,9 +163,9 @@ impl Database {
                 .map_err(display_error)?;
             Ok(Self {
                 backup_dir: PathBuf::new(),
-                connection: Mutex::new(Some(copy)),
+                connection: Arc::new(Mutex::new(Some(copy))),
                 #[cfg(test)]
-                fail_mcp_verification: std::sync::atomic::AtomicBool::new(false),
+                fail_mcp_verification: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             })
         })
         .map_err(|e| {

@@ -1,4 +1,5 @@
 use in_line_lib::mcp::contract::*;
+use in_line_lib::mcp::job_types::*;
 use in_line_lib::mcp::query_types::*;
 use in_line_lib::mcp::write_types::*;
 use rmcp::{
@@ -9,7 +10,34 @@ use serde_json::Value;
 struct InLineMcp {
     credentials: Credentials,
 }
+#[tool_router]
 impl InLineMcp {
+    #[tool(
+        description = "认证后增量读取事项。首次必须完成全量同步，随后使用同条件cursor读取事件或当前状态；失效必须重同步，不推断缺失历史。",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn query_changes(&self, Parameters(args): Parameters<ChangesArgs>) -> CallToolResult {
+        self.call("query_changes", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
+        description = "启动或查看本客户端只读长任务及明确授权业务导出。断开可继续，结果重新鉴权。cancelWaiter只取消等待；cancelJob必须用户明确要求。禁止后台事项写入及恢复重放。",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn manage_jobs(&self, Parameters(args): Parameters<JobsArgs>) -> CallToolResult {
+        self.call("manage_jobs", serde_json::to_value(args).unwrap())
+            .await
+    }
     async fn call(&self, tool: &str, args: Value) -> CallToolResult {
         let id =
             in_line_lib::mcp::platform::random_secret().unwrap_or_else(|_| "unavailable".into());
@@ -26,9 +54,6 @@ impl InLineMcp {
             CallToolResult::structured(value)
         }
     }
-}
-#[tool_router]
-impl InLineMcp {
     #[tool(
         description = "按用户明确指令模拟或原子执行混合批次，默认20项。先dryRun查看逐字段影响，歧义整批停止，不猜测。多事项改期需在软件内一次确认整批。始终保留原幂等键，结果不明不得盲目重放。",
         annotations(

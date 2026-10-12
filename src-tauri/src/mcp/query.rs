@@ -79,6 +79,12 @@ pub struct QueryState {
     snapshots: HashMap<String, Snapshot>,
 }
 impl QueryState {
+    pub(super) fn dependencies(&self, id: &str) -> Result<Vec<i64>, McpError> {
+        self.snapshots
+            .get(id)
+            .map(|s| s.ids.clone())
+            .ok_or_else(|| McpError::new("snapshot_expired"))
+    }
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
@@ -280,7 +286,10 @@ fn limit(value: Option<i64>) -> Result<i64, McpError> {
 fn invalid() -> McpError {
     McpError::new("invalid_arguments")
 }
-fn projection(fields: Option<&Vec<String>>, auth: &Authorization) -> Result<Vec<String>, McpError> {
+pub(super) fn projection(
+    fields: Option<&Vec<String>>,
+    auth: &Authorization,
+) -> Result<Vec<String>, McpError> {
     let list = fields.cloned().unwrap_or_else(|| {
         REGULAR
             .iter()
@@ -305,7 +314,7 @@ fn projection(fields: Option<&Vec<String>>, auth: &Authorization) -> Result<Vec<
     }
     Ok(list)
 }
-fn validate(f: &QueryFilters, auth: &Authorization) -> Result<(), McpError> {
+pub(super) fn validate(f: &QueryFilters, auth: &Authorization) -> Result<(), McpError> {
     if f.ids
         .as_ref()
         .is_some_and(|ids| ids.len() > 100 || ids.iter().any(|id| *id <= 0))
@@ -409,7 +418,7 @@ fn contains(list: &Option<Vec<String>>, value: &str) -> bool {
     list.as_ref()
         .is_none_or(|values| values.iter().any(|v| v == value))
 }
-fn matches_task(
+pub(super) fn matches_task(
     db: &Database,
     t: &LegalTask,
     f: &QueryFilters,

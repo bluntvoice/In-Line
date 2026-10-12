@@ -1,0 +1,3 @@
+10:02:02 [vite] (client) ✨ new dependencies optimized: react/jsx-dev-runtime
+10:02:02 [vite] (client) ✨ optimized dependencies changed. reloading
+PASS: real component progress, explicit whole-job review, dismiss without mutation, exactly one cancellation, terminal status, manual cleanup and retention explanation; synthetic data only.

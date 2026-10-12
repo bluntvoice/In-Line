@@ -1,0 +1,16 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+warning: methods `mcp_change_index` and `mcp_changes_after` are never used
+  --> src\database\mcp_changes.rs:41:19
+   |
+40 | impl Database {
+   | ------------- methods in this implementation
+41 |     pub(crate) fn mcp_change_index(&self) -> Result<Json, McpError> {
+   |                   ^^^^^^^^^^^^^^^^
+...
+44 |     pub(crate) fn mcp_changes_after(
+   |                   ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `in-line` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.79s

@@ -4,6 +4,7 @@ mod domain;
 mod mcp_artifacts;
 #[cfg(windows)]
 mod mcp_batch;
+mod mcp_changes;
 #[cfg(windows)]
 mod mcp_complex;
 mod mcp_read;
@@ -25,8 +26,10 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fs, io,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Arc, Mutex},
 };
+
+pub const DATABASE_SCHEMA_VERSION: i64 = 14;
 
 const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order, requested_deadline_label,
     (SELECT count(*) FROM task_work_events work WHERE work.task_id=tasks.id AND work.voided_at IS NULL),
@@ -40,11 +43,12 @@ const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ti
     FROM tasks";
 const OVERDUE_RANK_SQL: &str = "CASE WHEN requested_deadline IS NOT NULL AND strftime('%s',requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END";
 
+#[derive(Clone)]
 pub struct Database {
     #[cfg(test)]
-    fail_mcp_verification: std::sync::atomic::AtomicBool,
+    fail_mcp_verification: Arc<std::sync::atomic::AtomicBool>,
     backup_dir: PathBuf,
-    connection: Mutex<Option<Connection>>,
+    connection: Arc<Mutex<Option<Connection>>>,
 }
 
 impl Database {
@@ -67,10 +71,10 @@ impl Database {
         Self::normalize_backup_names(&backup_dir)?;
         let existed = path.exists();
         let mut connection = Self::connect(&path)?;
-        if existed && Self::schema_version(&connection)? > 13 {
+        if existed && Self::schema_version(&connection)? > DATABASE_SCHEMA_VERSION {
             return Err("数据库版本高于本程序，请升级软件；未执行迁移".into());
         }
-        if existed && Self::schema_version(&connection)? < 13 {
+        if existed && Self::schema_version(&connection)? < DATABASE_SCHEMA_VERSION {
             Self::check_integrity(&connection)?;
             let backup = backup_dir.join(Self::backup_name("before-migration"));
             Self::backup_connection(&connection, &backup)?;
@@ -102,9 +106,9 @@ impl Database {
         Self::prune_backups(&backup_dir, 30)?;
         Ok(Self {
             backup_dir,
-            connection: Mutex::new(Some(connection)),
+            connection: Arc::new(Mutex::new(Some(connection))),
             #[cfg(test)]
-            fail_mcp_verification: std::sync::atomic::AtomicBool::new(false),
+            fail_mcp_verification: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -129,15 +133,15 @@ impl Database {
         connection
             .execute_batch("PRAGMA query_only=ON; PRAGMA busy_timeout=5000;")
             .map_err(display_error)?;
-        if Self::schema_version(&connection)? < 13 {
+        if Self::schema_version(&connection)? < DATABASE_SCHEMA_VERSION {
             return Err("数据库版本过旧，请先启动 In Line 完成升级".into());
         }
         let backup_dir = path.parent().ok_or("数据库路径无效")?.join("backups");
         Ok(Self {
             backup_dir,
-            connection: Mutex::new(Some(connection)),
+            connection: Arc::new(Mutex::new(Some(connection))),
             #[cfg(test)]
-            fail_mcp_verification: std::sync::atomic::AtomicBool::new(false),
+            fail_mcp_verification: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -154,9 +158,9 @@ impl Database {
         Self::migrate(&mut connection)?;
         Ok(Self {
             backup_dir,
-            connection: Mutex::new(Some(connection)),
+            connection: Arc::new(Mutex::new(Some(connection))),
             #[cfg(test)]
-            fail_mcp_verification: std::sync::atomic::AtomicBool::new(false),
+            fail_mcp_verification: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -540,6 +544,7 @@ impl Database {
         mcp_read::migrate_basis(&transaction, version)?;
         mcp_schema::migrate(&transaction, version)?;
         mcp_schema::migrate_p4(&transaction, version)?;
+        mcp_changes::migrate(&transaction, version)?;
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -579,7 +584,7 @@ impl Database {
                 ensure_master(&transaction, "contact", &contact)?;
             }
         }
-        if version < 13 {
+        if version < DATABASE_SCHEMA_VERSION {
             Self::check_integrity(&transaction)?;
         }
         transaction.commit().map_err(display_error)
@@ -2914,7 +2919,7 @@ impl Database {
             }
         }
         let version = Self::schema_version(&connection)?;
-        if version > 13 {
+        if version > DATABASE_SCHEMA_VERSION {
             return Err("该备份来自更高版本的 In Line，请先升级软件".into());
         }
         Ok(())
@@ -3065,6 +3070,13 @@ impl Database {
                 applied_settings: 0,
                 conflicts: Vec::new(),
             };
+            // Business restore changes the data generation; old cursors/jobs must resync.
+            transaction
+                .execute(
+                    "UPDATE mcp_data_basis SET data_generation=data_generation+1 WHERE singleton=1",
+                    [],
+                )
+                .map_err(display_error)?;
             let mut imported_task_ids = HashMap::new();
             let mut inserted_task_ids = HashSet::new();
             merge_sequence_watermarks_on(&source, &transaction)?;
@@ -4216,7 +4228,7 @@ mod tests {
         assert_eq!(current.permanent_number, original.permanent_number);
         assert_eq!(current.updated_at, original.updated_at);
         assert_eq!(current.ticket_color, None);
-        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 13);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 14);
         let backups = db.list_backups().unwrap();
         let before = backups
             .iter()
@@ -4853,7 +4865,7 @@ mod tests {
         db.with_conn(|conn|conn.execute_batch("DROP INDEX idx_scheduled_due; DROP TABLE queue_number_allocations; ALTER TABLE tasks DROP COLUMN planned_date; ALTER TABLE tasks DROP COLUMN is_scheduled; ALTER TABLE tasks DROP COLUMN schedule_action; ALTER TABLE tasks DROP COLUMN schedule_action_at; UPDATE schema_meta SET version=8;").map_err(display_error)).unwrap();
         drop(db);
         let db = Database::open_root(root.clone()).unwrap();
-        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 13);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 14);
         let after = db.get_task(child.id).unwrap();
         assert_eq!(after.parent_task_id, Some(parent.id));
         assert_eq!(after.permanent_number, child.permanent_number);
@@ -5152,7 +5164,7 @@ mod tests {
         create_v7_database(&upgraded_path);
 
         let upgraded = Database::open_at(upgraded_path.clone()).unwrap();
-        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 13);
+        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 14);
         let task = upgraded.get_task(1).unwrap();
         assert_eq!(task.parent_task_id, None);
         assert_eq!(task.subtask_sort_order, 0);
@@ -6528,7 +6540,7 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 13);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 14);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);

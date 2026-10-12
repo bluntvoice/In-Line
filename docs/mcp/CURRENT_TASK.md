@@ -1,3 +1,11 @@
+# 2026-10-12 P5开发验证完成，准备独立提交推送（待P8验收）
+
+147 Rust、115前端、真实stdio、合成任务UI、fmt/TypeScript/Vite、原文档/144决定校验及冻结NSIS/双sidecar14工具包回读通过。包4,107,375字节、SHA256 313634A8D871D03F71071A8B520A0D942E0C459B28E6CD30954878FDD6B50D07，保留release/In-Line-P5-local-20261012.exe；生产安装未变。详见[PHASE-05](acceptance/PHASE-05.md)。准备独立P5开发Commit/Push后继续P6、P7，到P8统一验收；P1自动导入/当前会话重载入口仍关闭，不建accepted Tag/Release。下文P5开始及更早阶段为历史。
+
+# 2026-10-12 当前进入P5（待P8统一验收）
+
+P4开发提交4dc2e35db4dbe988e6bb1e027db79134190d3f67已推送、远端回读一致，131 Rust/115前端/浏览器整批批准/冻结NSIS及双sidecar回读通过。包4,039,704字节、SHA256 293948468D7FAFF6D74D49738ADD148CF931E68CD5C5CD531CA33285A6095C5E，保留release/In-Line-P4-local-20261012.exe；未安装生产。P4 CI 38192183467已success且精确SHA回读。按用户指示继续P5长任务及增量读取，安排见[PHASE-05](acceptance/PHASE-05.md)，之后P6/P7、P8统一验收；P1自动接入仍关闭。下文P4提交准备为历史，最新本节优先。
+
 # 2026-10-10 P4 开发检查点（待 P8 验收）
 
 最新用户授权各阶段分别提交推送，验收集中于 P8。P4新增12工具契约、共享复杂领域动作、批次/改期确认/业务文件及schema13；验证结果见 [P4报告](acceptance/PHASE-04.md)。P1自动接入门禁保持关闭，各开发阶段不标验收通过。完成P4提交推送后继续P5/P6/P7，P8汇总验收并等待用户；不进入P9或Release。

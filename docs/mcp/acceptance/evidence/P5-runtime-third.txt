@@ -1,0 +1,14 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 26.10s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 6 tests
+test mcp::jobs::tests::first_anchors_cannot_be_renewed_by_restart_or_repeated_limits ... ok
+test mcp::jobs::tests::writes_cannot_be_scheduled_and_explicit_requery_is_independent ... ok
+test mcp::jobs::tests::private_jobs_dedup_waiter_cancel_result_and_revocation ... ok
+test mcp::jobs::tests::full_sync_pagination_generation_and_event_modes ... ok
+test mcp::jobs::tests::changes_capture_gui_events_leave_scope_without_leaking_body_and_bind_client ... ok
+test mcp::jobs::tests::limited_jobs_cancel_and_cleanup_preserves_running_checkpoints ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 0.42s
+

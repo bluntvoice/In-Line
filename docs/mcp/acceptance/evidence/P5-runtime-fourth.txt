@@ -1,0 +1,20 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 25.41s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 12 tests
+test mcp::jobs::tests::first_anchors_cannot_be_renewed_by_restart_or_repeated_limits ... ok
+test mcp::jobs::tests::cursor_survives_restart_metadata_only_and_detects_index_loss ... ok
+test mcp::jobs::tests::completed_result_live_scope_and_retention_are_rechecked ... ok
+test mcp::jobs::tests::writes_cannot_be_scheduled_and_explicit_requery_is_independent ... ok
+test mcp::jobs::tests::full_sync_pagination_generation_and_event_modes ... ok
+test mcp::jobs::tests::private_jobs_dedup_waiter_cancel_result_and_revocation ... ok
+test mcp::jobs::tests::asynchronous_export_requires_intent_and_publishing_recovery_never_generates_again ... ok
+test mcp::jobs::tests::changes_capture_gui_events_leave_scope_without_leaking_body_and_bind_client ... ok
+test mcp::jobs::tests::limited_jobs_cancel_and_cleanup_preserves_running_checkpoints ... ok
+test mcp::jobs::tests::interrupted_deadlines_pause_and_global_revocation_do_not_renew ... ok
+test mcp::jobs::tests::original_intent_permits_only_one_independent_full_requery ... ok
+test mcp::jobs::tests::persisted_partial_pages_recover_same_basis_without_duplicate_or_mixed_rows ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 1.95s
+

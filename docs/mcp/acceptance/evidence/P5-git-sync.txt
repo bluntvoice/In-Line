@@ -1,0 +1,2 @@
+First attempt: git fetch origin --prune --tags failed: schannel TLS handshake; remote tracking relation 0/0 was not treated as live verification.
+Retry exit: 0

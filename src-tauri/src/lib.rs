@@ -560,6 +560,34 @@ fn mcp_security_state(
     Ok(view)
 }
 #[tauri::command]
+fn mcp_jobs_state(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    security.jobs.local_list().map_err(mcp_error)
+}
+#[tauri::command]
+fn mcp_cancel_job(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    id: String,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    security.jobs.local_cancel(&id).map_err(mcp_error)
+}
+#[tauri::command]
+fn mcp_cleanup_jobs(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    security
+        .jobs
+        .local_cleanup(chrono::Utc::now().timestamp())
+        .map_err(mcp_error)
+}
+#[tauri::command]
 fn mcp_prepare_onboarding(
     window: tauri::WebviewWindow,
     security: State<McpSecurity>,
@@ -1094,6 +1122,19 @@ pub fn run() {
                 if let Ok(security) = mcp::security::Security::open() {
                     let security = std::sync::Arc::new(security);
                     let handle = app.handle().clone();
+                    let job_handle = handle.clone();
+                    if security
+                        .jobs
+                        .initialize(
+                            &handle.state::<Database>(),
+                            Some(std::sync::Arc::new(move || {
+                                let _ = job_handle.emit("mcp-jobs-changed", ());
+                            })),
+                        )
+                        .is_err()
+                    {
+                        eprintln!("MCP后台检查点不可用，任务恢复已拒绝");
+                    }
                     let service_security = security.clone();
                     if mcp::ipc::start(
                         security.clone(),
@@ -1273,6 +1314,9 @@ pub fn run() {
             open_backup_directory,
             mcp_connection_guide,
             mcp_security_state,
+            mcp_jobs_state,
+            mcp_cancel_job,
+            mcp_cleanup_jobs,
             mcp_prepare_onboarding,
             mcp_rotate_onboarding,
             mcp_revoke_client,
