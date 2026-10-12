@@ -6,7 +6,7 @@ use in_line_lib::{
         security::{Grant, Permissions, Scope, Security},
         service,
     },
-    models::TaskInput,
+    models::{TaskInput, TaskView},
 };
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -39,11 +39,14 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
     let sec = security.clone();
     let data = db.clone();
     let response_fault = std::sync::atomic::AtomicBool::new(false);
+    let batch_response_fault = std::sync::atomic::AtomicBool::new(false);
     ipc::start(
         security.clone(),
         Arc::new(move |creds, tool, args| {
-            let inject = args["reason"] == "synthetic response loss"
-                && !response_fault.swap(true, std::sync::atomic::Ordering::SeqCst);
+            let inject = (args["reason"] == "synthetic response loss"
+                && !response_fault.swap(true, std::sync::atomic::Ordering::SeqCst))
+                || (args["reason"] == "synthetic batch response loss"
+                    && !batch_response_fault.swap(true, std::sync::atomic::Ordering::SeqCst));
             let result = service::execute(&sec, &data, creds, tool, args);
             if inject && result.is_ok() {
                 Err(in_line_lib::mcp::contract::McpError::new(
@@ -102,7 +105,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             .await
             .unwrap();
         let list = request(&mut input, &mut output, 2, "tools/list", json!({})).await;
-        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 10);
+        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 12);
         let first = request(
             &mut input,
             &mut output,
@@ -289,6 +292,119 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 .unwrap()
                 .iter()
                 .filter(|a| a["action"] == "create")
+                .count(),
+            1
+        );
+        let batch_args = json!({"action":"dryRun","operations":[{"operation":{"action":"create","task":{"title":"p4-stdio-created","departments":["synthetic A"],"contacts":["synthetic C"],"taskType":"synthetic T"}}}],"idempotencyKey":"p4-wire","intent":intent,"reason":"explicit synthetic batch"});
+        let dry = request(
+            &mut input,
+            &mut output,
+            16,
+            "tools/call",
+            json!({"name":"batch_mutate","arguments":batch_args}),
+        )
+        .await;
+        assert_eq!(
+            dry["result"]["structuredContent"]["data"]["commitStatus"], "dry_run",
+            "{dry}"
+        );
+        assert!(!db
+            .list_tasks(TaskView::Queue)
+            .unwrap()
+            .iter()
+            .any(|t| t.title == "p4-stdio-created"));
+        let mut apply = batch_args;
+        apply["action"] = json!("apply");
+        let actual = request(
+            &mut input,
+            &mut output,
+            17,
+            "tools/call",
+            json!({"name":"batch_mutate","arguments":apply}),
+        )
+        .await;
+        assert_eq!(
+            actual["result"]["structuredContent"]["data"]["verificationStatus"],
+            "verified_after_commit"
+        );
+        let repeat = request(
+            &mut input,
+            &mut output,
+            18,
+            "tools/call",
+            json!({"name":"batch_mutate","arguments":apply}),
+        )
+        .await;
+        assert_eq!(
+            repeat["result"]["structuredContent"]["data"]["replayed"],
+            true
+        );
+        assert_eq!(
+            db.list_tasks(TaskView::Queue)
+                .unwrap()
+                .iter()
+                .filter(|t| t.title == "p4-stdio-created")
+                .count(),
+            1
+        );
+        for (index, action, extra) in [
+            (19, "backup", json!({})),
+            (20, "export", json!({"format":"json"})),
+        ] {
+            let mut args = json!({"action":action,"idempotencyKey":format!("p4-wire-{action}"),"intent":intent,"reason":"explicit synthetic artifact"});
+            for (k, v) in extra.as_object().unwrap() {
+                args[k] = v.clone();
+            }
+            let response = request(
+                &mut input,
+                &mut output,
+                index,
+                "tools/call",
+                json!({"name":"manage_business_data","arguments":args}),
+            )
+            .await;
+            assert_eq!(
+                response["result"]["structuredContent"]["data"]["commitStatus"], "artifact_created",
+                "{response}"
+            );
+            assert!(!response.to_string().contains("secret-"));
+            if action == "backup" {
+                assert!(db.list_backups().unwrap().iter().any(|b| b.name
+                    == response["result"]["structuredContent"]["data"]["artifactName"]
+                        .as_str()
+                        .unwrap()));
+            }
+        }
+        let uncertain_batch = json!({"action":"apply","operations":[{"operation":{"action":"create","task":{"title":"p4-uncertain-once","departments":["synthetic A"],"contacts":["synthetic C"],"taskType":"synthetic T"}}}],"idempotencyKey":"p4-original-uncertain","intent":intent,"reason":"synthetic batch response loss"});
+        let loss = request(
+            &mut input,
+            &mut output,
+            21,
+            "tools/call",
+            json!({"name":"batch_mutate","arguments":uncertain_batch}),
+        )
+        .await;
+        assert_eq!(
+            loss["result"]["structuredContent"]["error"]["code"], "result_unknown",
+            "{loss}"
+        );
+        let recovery = request(
+            &mut input,
+            &mut output,
+            22,
+            "tools/call",
+            json!({"name":"batch_mutate","arguments":uncertain_batch}),
+        )
+        .await;
+        assert_eq!(
+            recovery["result"]["structuredContent"]["data"]["replayed"], true,
+            "{recovery}"
+        );
+        assert_eq!(
+            db.list_tasks(TaskView::Queue)
+                .unwrap()
+                .iter()
+                .filter(|t| t.title == "p4-uncertain-once")
                 .count(),
             1
         );

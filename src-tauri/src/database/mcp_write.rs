@@ -14,13 +14,13 @@ const PREFS: &[&str] = &[
     "week_start_day",
     "statistics_rate_mode",
 ];
-fn err(code: &str) -> McpError {
+pub(super) fn err(code: &str) -> McpError {
     McpError::new(code)
 }
-fn sql(_: rusqlite::Error) -> McpError {
+pub(super) fn sql(_: rusqlite::Error) -> McpError {
     err("internal_error")
 }
-fn domain(error: String) -> McpError {
+pub(super) fn domain(error: String) -> McpError {
     // Existing domain errors are local validation messages, never SQL or data contents.
     let mut e = err("business_rule");
     if !error.contains("SQL") && !error.contains("sqlite") {
@@ -29,13 +29,17 @@ fn domain(error: String) -> McpError {
     e
 }
 
-fn allowed(task: &LegalTask, auth: &Authorization) -> bool {
+pub(super) fn allowed(task: &LegalTask, auth: &Authorization) -> bool {
     auth.scope.allows(
         &serde_json::to_string(&task.departments).unwrap(),
         &task.task_type,
     )
 }
-fn related_scope(conn: &Connection, state: &Json, auth: &Authorization) -> Result<(), McpError> {
+pub(super) fn related_scope(
+    conn: &Connection,
+    state: &Json,
+    auth: &Authorization,
+) -> Result<(), McpError> {
     if let Some(rows) = state["relatedTasks"].as_array() {
         for row in rows {
             let id = row["task"]["id"]
@@ -48,7 +52,14 @@ fn related_scope(conn: &Connection, state: &Json, auth: &Authorization) -> Resul
     }
     Ok(())
 }
-fn target(conn: &Connection, target: &Target, auth: &Authorization) -> Result<LegalTask, McpError> {
+pub(super) fn target(
+    conn: &Connection,
+    target: &Target,
+    auth: &Authorization,
+) -> Result<LegalTask, McpError> {
+    if target.batch_ref.is_some() {
+        return Err(err("invalid_arguments"));
+    }
     if usize::from(target.task_id.is_some())
         + usize::from(target.permanent_number.is_some())
         + usize::from(target.title.is_some())
@@ -71,7 +82,7 @@ fn target(conn: &Connection, target: &Target, auth: &Authorization) -> Result<Le
     }
     matches.into_iter().next().ok_or_else(|| err("not_found"))
 }
-fn version(conn: &Connection, id: i64) -> Result<i64, McpError> {
+pub(super) fn version(conn: &Connection, id: i64) -> Result<i64, McpError> {
     conn.query_row(
         "SELECT version FROM mcp_task_versions WHERE task_id=?",
         [id],
@@ -124,7 +135,7 @@ fn field_versions(conn: &Connection, id: i64, full: bool) -> Result<Json, McpErr
     }
     Ok(Json::Object(map))
 }
-fn proof(conn: &Connection, id: i64) -> Result<Json, McpError> {
+pub(super) fn proof(conn: &Connection, id: i64) -> Result<Json, McpError> {
     let task = get_task_on(conn, id).map_err(domain)?;
     let mut statement = conn
         .prepare(
@@ -136,11 +147,13 @@ fn proof(conn: &Connection, id: i64) -> Result<Json, McpError> {
         .map_err(sql)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(sql)?;
+    let mut detail=conn.prepare("SELECT id,result_status,handled_at,task_type_snapshot,source,note,voided_at,correction_of FROM task_work_events WHERE task_id=? ORDER BY id").map_err(sql)?;
+    let work_events=detail.query_map([id],|r|Ok(json!({"id":r.get::<_,i64>(0)?,"resultStatus":r.get::<_,String>(1)?,"handledAt":r.get::<_,String>(2)?,"taskType":r.get::<_,String>(3)?,"source":r.get::<_,String>(4)?,"note":r.get::<_,String>(5)?,"voidedAt":r.get::<_,Option<String>>(6)?,"correctionOf":r.get::<_,Option<i64>>(7)?}))).map_err(sql)?.collect::<Result<Vec<_>,_>>().map_err(sql)?;
     Ok(
-        json!({"task":task,"taskVersion":version(conn,id)?,"fieldVersions":field_versions(conn,id,true)?,"workEventIds":events}),
+        json!({"task":task,"taskVersion":version(conn,id)?,"fieldVersions":field_versions(conn,id,true)?,"workEventIds":events,"workEvents":work_events,"childIds":child_ids_on(conn,id).map_err(domain)?}),
     )
 }
-fn validate_intent(key: &str, intent: &Intent, reason: &str) -> Result<(), McpError> {
+pub(super) fn validate_intent(key: &str, intent: &Intent, reason: &str) -> Result<(), McpError> {
     if !intent.explicit_user_request {
         return Err(err("explicit_intent_required"));
     }
@@ -156,10 +169,10 @@ fn validate_intent(key: &str, intent: &Intent, reason: &str) -> Result<(), McpEr
     }
     Ok(())
 }
-fn fingerprint(value: &Json) -> String {
+pub(super) fn fingerprint(value: &Json) -> String {
     format!("{:x}", Sha256::digest(serde_json::to_vec(value).unwrap()))
 }
-fn replay(
+pub(super) fn replay(
     conn: &Connection,
     client: &str,
     key: &str,
@@ -181,12 +194,47 @@ fn replay(
             return Err(err("idempotency_conflict"));
         }
         let mut result: Json = serde_json::from_str(&receipt).map_err(|_| err("internal_error"))?;
+        if !auth.permissions.full_read {
+            if let Some(items) = result["items"].as_array_mut() {
+                for item in items {
+                    if let Some(rows) = item["differences"].as_array_mut() {
+                        for row in rows {
+                            if row["field"] == "workEvents" {
+                                for side in ["before", "after"] {
+                                    if let Some(events) = row[side].as_array_mut() {
+                                        for event in events {
+                                            if let Some(m) = event.as_object_mut() {
+                                                m.remove("note");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if matches!(
+                                row["field"].as_str(),
+                                Some(
+                                    "contacts"
+                                        | "contact"
+                                        | "details"
+                                        | "internalNotes"
+                                        | "urgentRequester"
+                                        | "urgentReason"
+                                )
+                            ) {
+                                row["before"] = json!("[需完整读取权限]");
+                                row["after"] = json!("[需完整读取权限]");
+                            }
+                        }
+                    }
+                }
+            }
+        }
         result["replayed"] = json!(true);
         return Ok(Some(result));
     }
     Ok(None)
 }
-fn receipt(
+pub(super) fn receipt(
     conn: &Connection,
     client: &str,
     key: &str,
@@ -209,7 +257,7 @@ fn receipt(
     .map_err(sql)?;
     Ok(())
 }
-fn audit(
+pub(super) fn audit(
     conn: &Connection,
     client: &str,
     action: &str,
@@ -224,10 +272,10 @@ fn audit(
     conn.execute("INSERT INTO mcp_ai_audit(client_id,action,task_id,reason,intent,before_json,after_json,request_json,created_at,undo_of) VALUES(?,?,?,?,?,?,?,?,?,?)",params![client,action,id,reason,intent.summary,before.to_string(),after.to_string(),request.to_string(),now(),undo]).map_err(sql)?;
     Ok(conn.last_insert_rowid())
 }
-fn task_input(task: &LegalTask) -> Result<TaskInput, McpError> {
+pub(super) fn task_input(task: &LegalTask) -> Result<TaskInput, McpError> {
     serde_json::from_value(serde_json::to_value(task).unwrap()).map_err(|_| err("internal_error"))
 }
-fn changed(before: &Json, after: &Json) -> Vec<String> {
+pub(super) fn changed(before: &Json, after: &Json) -> Vec<String> {
     let a = &before["task"];
     let b = &after["task"];
     let mut result = Vec::new();
@@ -240,11 +288,21 @@ fn changed(before: &Json, after: &Json) -> Vec<String> {
     }
     result
 }
-fn execute_action(
+pub(super) fn execute_action(
     conn: &Connection,
     auth: &Authorization,
     args: &MutateArgs,
 ) -> Result<(Option<i64>, Json, Json, String, bool), McpError> {
+    if !matches!(
+        &args.operation,
+        TaskAction::Create { .. }
+            | TaskAction::Patch { .. }
+            | TaskAction::SetStatus { .. }
+            | TaskAction::SetUrgent { .. }
+            | TaskAction::RecordWorkEvent { .. }
+    ) {
+        return super::mcp_complex::execute(conn, auth, args);
+    }
     match &args.operation {
         TaskAction::Create { task } => {
             if !auth.scope.allows(
@@ -265,7 +323,7 @@ fn execute_action(
             }
             let input = TaskInput {
                 id: None,
-                planned_date: None,
+                planned_date: task.planned_date.clone(),
                 confirm_schedule_change: false,
                 department: task.departments.first().cloned().unwrap_or_default(),
                 departments: task.departments.clone(),
@@ -467,26 +525,9 @@ impl Database {
         }
         validate_intent(&args.idempotency_key, &args.intent, &args.reason)?;
         let request = json!({"tool":"mutate_task","args":args});
-        self.mcp_transaction(|conn|{
-            if let Some(r)=replay(conn,client,&args.idempotency_key,&request,auth)?{return Ok(r);}
-            let prior=load_all_tasks(conn).map_err(domain)?.into_iter().map(|t|(t.id,t)).collect::<HashMap<_,_>>();
-            let (id,mut before,mut after,action,skipped)=execute_action(conn,auth,&args)?;
-            let mut related_before=vec![];let mut related_after=vec![];
-            // Domain rules can reorder neighbours. Validate ALL resulting changes, not only input.
-            for t in load_all_tasks(conn).map_err(domain)? {
-                if prior.get(&t.id).is_none_or(|old|serde_json::to_value(old).unwrap()!=serde_json::to_value(&t).unwrap()) {
-                    if !allowed(&t,auth) || prior.get(&t.id).is_some_and(|old|!allowed(old,auth)) {return Err(err("forbidden"));}
-                    if Some(t.id)!=id {related_before.push(json!(prior.get(&t.id)));related_after.push(proof(conn,t.id)?);}
-                }
-            }
-            if !related_after.is_empty(){before["relatedTasks"]=json!(related_before);after["relatedTasks"]=json!(related_after);}
-            let audit_id=if skipped{None}else{Some(audit(conn,client,&action,id,&args.intent,&args.reason,&before,&after,&request,None)?)};
-            // Receipt never contains existing field values, even with full-read permissions.
-            let result=json!({"commitStatus":if skipped{"no_change"}else{"committed"},"verificationStatus":"verified_in_transaction","taskId":id,"auditId":audit_id,"changedFields":changed(&before,&after),"taskVersion":after["taskVersion"],"replayed":false});
-            receipt(conn,client,&args.idempotency_key,&request,id,audit_id,&result)?;Ok(result)
-        })
+        self.mcp_transaction(|conn| mutate_on(conn, client, auth, &args, &request))
     }
-    fn mcp_transaction(
+    pub(super) fn mcp_transaction(
         &self,
         operation: impl FnOnce(&Connection) -> Result<Json, McpError>,
     ) -> Result<Json, McpError> {
@@ -496,7 +537,16 @@ impl Database {
         let mut result = operation(&tx)?;
         tx.commit().map_err(|_| err("result_unknown"))?;
         // Keep the same database mutex across commit and independent readback.
-        if let Some(id) = result["taskId"].as_i64() {
+        if let Some(versions) = result["taskVersions"].as_object() {
+            let valid = versions.iter().all(|(id, expected)| {
+                id.parse::<i64>().ok().and_then(|id| version(conn, id).ok()) == expected.as_i64()
+            });
+            result["verificationStatus"] = json!(if valid {
+                "verified_after_commit"
+            } else {
+                "verification_failed"
+            });
+        } else if let Some(id) = result["taskId"].as_i64() {
             if let Some(expected) = result["taskVersion"].as_i64() {
                 result["verificationStatus"] = json!(if version(conn, id).ok() == Some(expected) {
                     "verified_after_commit"
@@ -654,7 +704,8 @@ impl Database {
         let request = json!({"tool":"request_undo","args":args});
         self.mcp_transaction(|conn|{
             if let Some(r)=replay(conn,client,&args.idempotency_key,&request,auth)?{return Ok(r);}
-            let (owner,_,id,_,after)=audit_row(conn,args.audit_id)?;
+            let (owner,action,id,_,after)=audit_row(conn,args.audit_id)?;
+            if matches!(action.as_str(),"backup"|"export"|"approvedUndo"){return Err(err("unsupported"));}
             if owner!=client {return Err(err("not_found"));}
             related_scope(conn,&after,auth)?;
             if let Some(id)=id {if !allowed(&get_task_on(conn,id).map_err(domain)?,auth){return Err(err("forbidden"));}}
@@ -682,9 +733,9 @@ impl Database {
             if status!="pending"{return Err(err("conflict"));}
             if !approve {conn.execute("UPDATE mcp_undo_requests SET status='rejected',resolved_at=? WHERE id=?",params![now(),request_id]).map_err(sql)?;return Ok(json!({"status":"rejected"}));}
             let(owner,action,id,before,after)=audit_row(conn,aid)?;
-            let mut current=if let Some(id)=id{proof(conn,id)?}else{preference_state(conn,after.as_object().unwrap().keys().filter(|k|k.as_str()!="fieldVersions").cloned())?};
+            let mut current=if action=="batch"{json!({})}else if let Some(id)=id{proof(conn,id)?}else{preference_state(conn,after.as_object().unwrap().keys().filter(|k|k.as_str()!="fieldVersions").cloned())?};
             if let Some(related)=after["relatedTasks"].as_array(){let mut current_related=vec![];for t in related{current_related.push(proof(conn,t["task"]["id"].as_i64().ok_or_else(||err("internal_error"))?)?);}current["relatedTasks"]=json!(current_related);}
-            if action=="preferences" {
+            if action=="batch" {if current!=after{return Err(err("conflict"));}super::mcp_batch::undo_batch(conn,&before)?;}else if action=="preferences" {
                 for(k,v)in after.as_object().ok_or_else(||err("internal_error"))? {if k=="fieldVersions"{continue;}
                     let value:Option<String>=conn.query_row("SELECT value FROM settings WHERE key=?",[k],|r|r.get(0)).optional().map_err(sql)?;
                     if json!(value)!=*v || after["fieldVersions"][k].as_i64()!=Some(preference_version(conn,k)?){return Err(err("conflict"));}
@@ -723,19 +774,85 @@ impl Database {
                             conn.execute("UPDATE tasks SET custom_sort_order=? WHERE id=?",params![old.custom_sort_order,id]).map_err(sql)?;
                             if let Some(related)=before["relatedTasks"].as_array(){for t in related{conn.execute("UPDATE tasks SET custom_sort_order=? WHERE id=?",params![t["customSortOrder"].as_i64().ok_or_else(||err("internal_error"))?,t["id"].as_i64().ok_or_else(||err("internal_error"))?]).map_err(sql)?;}}
                         },
-                        _=>return Err(err("unsupported"))
+                        _=>super::mcp_complex::undo(conn,&action,id,&before,&after)?
                     }
                 }
                 add_log(conn,id,"audit","用户在软件内批准撤销AI操作；历史记录保留").map_err(domain)?;
             }
-            let mut final_state=if let Some(id)=id{proof(conn,id)?}else{preference_state(conn,before.as_object().unwrap().keys().filter(|k|k.as_str()!="fieldVersions").cloned())?};
+            let mut final_state=if action=="batch"{json!({})}else if let Some(id)=id{proof(conn,id)?}else{preference_state(conn,before.as_object().unwrap().keys().filter(|k|k.as_str()!="fieldVersions").cloned())?};
             if let Some(related)=after["relatedTasks"].as_array(){let mut final_related=vec![];for t in related{final_related.push(proof(conn,t["task"]["id"].as_i64().unwrap())?);}final_state["relatedTasks"]=json!(final_related);}
             let intent=Intent{summary:"用户在软件内批准撤销".into(),explicit_user_request:true,replace_whole_text:true,confirmed_real_work:true,allow_possible_duplicate:false};
             let undo_audit=audit(conn,&owner,"approvedUndo",id,&intent,"用户批准的补偿操作；不回收编号、不删除原历史",&current,&final_state,&json!({"requestId":request_id}),Some(aid))?;
             conn.execute("UPDATE mcp_undo_requests SET status='approved',resolved_at=? WHERE id=?",params![now(),request_id]).map_err(sql)?;
             let mut result=json!({"status":"approved","commitStatus":"committed","auditId":undo_audit,"taskId":id,"taskVersion":final_state["taskVersion"]});
-            if id.is_none(){let versions=final_state.as_object_mut().unwrap().remove("fieldVersions").unwrap();result["preferences"]=final_state;result["fieldVersions"]=versions;}
+            if action=="batch"{let mut versions=serde_json::Map::new();for t in final_state["relatedTasks"].as_array().ok_or_else(||err("internal_error"))?{let task=t["task"]["id"].as_i64().ok_or_else(||err("internal_error"))?;versions.insert(task.to_string(),json!(version(conn,task)?));}result["taskVersions"]=json!(versions);}else if id.is_none(){let versions=final_state.as_object_mut().unwrap().remove("fieldVersions").unwrap();result["preferences"]=final_state;result["fieldVersions"]=versions;}
             Ok(result)
         })
     }
+}
+
+pub(super) fn mutate_on(
+    conn: &Connection,
+    client: &str,
+    auth: &Authorization,
+    args: &MutateArgs,
+    request: &Json,
+) -> Result<Json, McpError> {
+    if let Some(r) = replay(conn, client, &args.idempotency_key, &request, auth)? {
+        return Ok(r);
+    }
+    let prior = load_all_tasks(conn)
+        .map_err(domain)?
+        .into_iter()
+        .map(|t| (t.id, t))
+        .collect::<HashMap<_, _>>();
+    let (id, mut before, mut after, action, skipped) = execute_action(conn, auth, &args)?;
+    let mut related_before = vec![];
+    let mut related_after = vec![];
+    // Domain rules can reorder neighbours. Validate ALL resulting changes, not only input.
+    for t in load_all_tasks(conn).map_err(domain)? {
+        if prior.get(&t.id).is_none_or(|old| {
+            serde_json::to_value(old).unwrap() != serde_json::to_value(&t).unwrap()
+        }) {
+            if !allowed(&t, auth) || prior.get(&t.id).is_some_and(|old| !allowed(old, auth)) {
+                return Err(err("forbidden"));
+            }
+            if Some(t.id) != id {
+                related_before.push(json!(prior.get(&t.id)));
+                related_after.push(proof(conn, t.id)?);
+            }
+        }
+    }
+    if !related_after.is_empty() {
+        before["relatedTasks"] = json!(related_before);
+        after["relatedTasks"] = json!(related_after);
+    }
+    let audit_id = if skipped {
+        None
+    } else {
+        Some(audit(
+            conn,
+            client,
+            &action,
+            id,
+            &args.intent,
+            &args.reason,
+            &before,
+            &after,
+            &request,
+            None,
+        )?)
+    };
+    // Receipt never contains existing field values, even with full-read permissions.
+    let result = json!({"commitStatus":if skipped{"no_change"}else{"committed"},"verificationStatus":"verified_in_transaction","taskId":id,"auditId":audit_id,"changedFields":changed(&before,&after),"taskVersion":after["taskVersion"],"replayed":false});
+    receipt(
+        conn,
+        client,
+        &args.idempotency_key,
+        &request,
+        id,
+        audit_id,
+        &result,
+    )?;
+    Ok(result)
 }

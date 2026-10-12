@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const API_VERSION: u32 = 1;
-pub const TOOLS: [&str; 10] = [
+pub const TOOLS: [&str; 12] = [
     "get_capabilities",
     "get_report_summary",
     "list_report_items",
@@ -14,6 +14,8 @@ pub const TOOLS: [&str; 10] = [
     "mutate_task",
     "manage_preferences",
     "request_undo",
+    "batch_mutate",
+    "manage_business_data",
 ];
 
 #[derive(Clone, Serialize, Deserialize)]

@@ -172,6 +172,9 @@ export const api={
     return snapshot.task;
   },
   mcpAuditState:()=>invoke<McpAuditState>("mcp_audit_state"),
+  mcpBatchState:()=>invoke<{batchLimit:number;pending:{id:number;clientId:string;request:{reason:string;operations:unknown[]};preview:{items:{taskId:number;differences:{field:string;before?:unknown;after?:unknown;taskId?:number}[]}[]};createdAt:string}[]}>("mcp_batch_state"),
+  mcpSetBatchLimit:(value:number)=>invoke<void>("mcp_set_batch_limit",{value}),
+  mcpResolveBatch:(requestId:number,approve:boolean)=>invoke("mcp_resolve_batch",{requestId,approve}),
   mcpResolveUndo:(requestId:number,approve:boolean)=>invoke("mcp_resolve_undo",{requestId,approve}),
   setLaunchAtLogin:(enabled:boolean)=>invoke<void>("set_launch_at_login",{enabled}),
   launchAtLogin:()=>invoke<boolean>("get_launch_at_login")

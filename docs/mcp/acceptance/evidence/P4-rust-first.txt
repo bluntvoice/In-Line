@@ -1,0 +1,25 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error[E0624]: method `mcp_tasks` is private
+   --> tests\mcp_queries.rs:309:14
+    |
+309 |             .mcp_tasks()
+    |              ^^^^^^^^^ private method
+    |
+   ::: src\database\mcp_read.rs:179:5
+    |
+179 |     pub(crate) fn mcp_tasks(&self) -> Result<Vec<LegalTask>, McpError> {
+    |     ------------------------------------------------------------------ private method defined here
+
+error[E0624]: method `mcp_tasks` is private
+   --> tests\mcp_queries.rs:340:16
+    |
+340 |             db.mcp_tasks()
+    |                ^^^^^^^^^ private method
+    |
+   ::: src\database\mcp_read.rs:179:5
+    |
+179 |     pub(crate) fn mcp_tasks(&self) -> Result<Vec<LegalTask>, McpError> {
+    |     ------------------------------------------------------------------ private method defined here
+
+For more information about this error, try `rustc --explain E0624`.
+error: could not compile `in-line` (test "mcp_queries") due to 2 previous errors

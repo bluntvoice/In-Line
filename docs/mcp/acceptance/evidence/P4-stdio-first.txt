@@ -1,0 +1,21 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.84s
+     Running tests\mcp_queries.rs (src-tauri\target\debug\deps\mcp_queries-3db3912457d2d1ba.exe)
+
+running 1 test
+
+thread 'p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction' (39072) panicked at tests\mcp_queries.rs:304:9:
+assertion `left == right` failed: {"id":16,"jsonrpc":"2.0","result":{"content":[{"text":"{\"apiVersion\":1,\"data\":null,\"error\":{\"code\":\"business_rule\",\"message\":\"请填写对接人\",\"retryAfterSeconds\":null,\"retryable\":false},\"requestId\":\"0f46353d95883e63cadbd6ac70b5cdd3d744c21e365b40fe49317b5f9a5d6dc7\",\"status\":\"error\"}","type":"text"}],"isError":true,"structuredContent":{"apiVersion":1,"data":null,"error":{"code":"business_rule","message":"请填写对接人","retryAfterSeconds":null,"retryable":false},"requestId":"0f46353d95883e63cadbd6ac70b5cdd3d744c21e365b40fe49317b5f9a5d6dc7","status":"error"}}}
+  left: Null
+ right: "dry_run"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction ... FAILED
+
+failures:
+
+failures:
+    p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+error: test failed, to rerun pass `--test mcp_queries`

@@ -1,0 +1,32 @@
+    Checking in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+warning: value assigned to `meta` is never read
+  --> src\mcp\business_data.rs:23:62
+   |
+23 |         let mut cursor=None;let mut rows=vec![];let mut meta=Value::Null;let mut projection=Value::Null;let mut redacted=Value::Null;
+   |                                                              ^^^^^^^^^^^ this value is reassigned later and never used
+...
+28 |             meta=page["meta"].clone();projection=page["projection"].clone();redacted=page["redactedFields"].clone();
+   |             ---- `meta` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `projection` is never read
+  --> src\mcp\business_data.rs:23:93
+   |
+23 |         let mut cursor=None;let mut rows=vec![];let mut meta=Value::Null;let mut projection=Value::Null;let mut redacted=Value::Null;
+   |                                                                                             ^^^^^^^^^^^ this value is reassigned later and never used
+...
+28 |             meta=page["meta"].clone();projection=page["projection"].clone();redacted=page["redactedFields"].clone();
+   |                                       ---------- `projection` is overwritten here before the previous value is read
+
+warning: value assigned to `redacted` is never read
+  --> src\mcp\business_data.rs:23:122
+   |
+23 |         let mut cursor=None;let mut rows=vec![];let mut meta=Value::Null;let mut projection=Value::Null;let mut redacted=Value::Null;
+   |                                                                                                                          ^^^^^^^^^^^ this value is reassigned later and never used
+...
+28 |             meta=page["meta"].clone();projection=page["projection"].clone();redacted=page["redactedFields"].clone();
+   |                                                                             -------- `redacted` is overwritten here before the previous value is read
+
+warning: `in-line` (lib) generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.40s

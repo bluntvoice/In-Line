@@ -165,7 +165,13 @@ fn scope_filters_summary_denominator_trend_details_and_cross_client_calls() {
     assert_eq!(caps["permissions"]["write"], false);
     assert_eq!(
         caps["writeTools"],
-        json!(["mutate_task", "manage_preferences", "request_undo"])
+        json!([
+            "mutate_task",
+            "manage_preferences",
+            "request_undo",
+            "batch_mutate",
+            "manage_business_data"
+        ])
     );
     assert_eq!(
         service::execute(&security, &db, &a, "mutate_task", json!({}))

@@ -1,0 +1,1 @@
+PASS: 3 original inputs and copies unchanged; 144 unique original decisions, 13 nonempty fields, 21 P1 mappings, no P1 user acceptance claim; 5 versions 0.5.0; P0 tag fixed and development HEAD descends from P0; local documentation links valid. User authorized a development commit without accepting P1.

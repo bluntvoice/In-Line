@@ -1,0 +1,32 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error[E0599]: no associated function or constant named `default` found for struct `QueryState` in the current scope
+   --> src\database\mcp_p4_tests.rs:403:54
+    |
+403 |     let mut queries = crate::mcp::query::QueryState::default();
+    |                                                      ^^^^^^^ associated function or constant not found in `QueryState`
+    |
+   ::: src\mcp\query.rs:77:1
+    |
+ 77 | pub struct QueryState {
+    | --------------------- associated function or constant `default` not found for this struct
+    |
+note: if you're trying to build a new `QueryState`, consider using `QueryState::new` which returns `QueryState`
+   --> src\mcp\query.rs:82:5
+    |
+ 82 |     pub fn new(root: PathBuf) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `default`, perhaps you need to implement it:
+            candidate #1: `std::default::Default`
+
+warning: unused variable: `db`
+  --> src\database\mcp_p4_tests.rs:76:10
+   |
+76 | fn state(db: &Database) -> Store {
+   |          ^^ help: if this is intentional, prefix it with an underscore: `_db`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `in-line` (lib test) generated 1 warning
+error: could not compile `in-line` (lib test) due to 1 previous error; 1 warning emitted

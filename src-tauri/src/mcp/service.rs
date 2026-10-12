@@ -53,7 +53,7 @@ pub fn execute(
         let _: CapabilityArgs =
             serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
         return Ok(
-            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":12,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":["mutate_task","manage_preferences","request_undo"],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["batch_write","queue_write","subtask_write","permanent_delete","restore_database","attachments","remote_transport"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"connectionVerified":true}),
+            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":13,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":["mutate_task","manage_preferences","request_undo","batch_mutate","manage_business_data"],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["permanent_delete","restore_database","attachments","remote_transport"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"batchLimit":db.mcp_batch_limit()?,"batchHardLimit":100,"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"connectionVerified":true}),
         );
     }
     if !TOOLS.contains(&tool) {
@@ -62,10 +62,22 @@ pub fn execute(
     if !auth.permissions.regular_read {
         return Err(McpError::new("forbidden"));
     }
-    if matches!(tool, "mutate_task" | "request_undo") && !auth.permissions.write {
+    if matches!(
+        tool,
+        "mutate_task" | "request_undo" | "batch_mutate" | "manage_business_data"
+    ) && !auth.permissions.write
+    {
         return Err(McpError::new("forbidden"));
     }
     match tool {
+        "batch_mutate" => {
+            return db.mcp_batch(
+                &credentials.client_id,
+                &auth,
+                serde_json::from_value::<BatchArgs>(args)
+                    .map_err(|_| McpError::new("invalid_arguments"))?,
+            )
+        }
         "mutate_task" => {
             return db.mcp_mutate(
                 &credentials.client_id,
@@ -97,6 +109,14 @@ pub fn execute(
         .lock()
         .map_err(|_| McpError::new("security_unavailable"))?;
     match tool {
+        "manage_business_data" => super::business_data::execute(
+            &mut queries,
+            db,
+            &credentials.client_id,
+            &auth,
+            serde_json::from_value::<BusinessDataArgs>(args)
+                .map_err(|_| McpError::new("invalid_arguments"))?,
+        ),
         "get_report_summary" => {
             let args: DateRangeArgs =
                 serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;

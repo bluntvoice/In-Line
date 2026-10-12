@@ -245,7 +245,12 @@ pub async fn call_at(
     };
     let write_request = matches!(
         tool,
-        "mutate_task" | "request_undo" | "manage_preferences" | "manage_saved_query"
+        "mutate_task"
+            | "request_undo"
+            | "batch_mutate"
+            | "manage_business_data"
+            | "manage_preferences"
+            | "manage_saved_query"
     );
     let sent = std::sync::atomic::AtomicBool::new(false);
     let result = tokio::time::timeout(DEADLINE, async {

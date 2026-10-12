@@ -50,3 +50,17 @@ pub(super) fn migrate(tx: &Transaction<'_>, version: i64) -> Result<(), String> 
     tx.execute_batch("DELETE FROM schema_meta; INSERT INTO schema_meta VALUES(12);")
         .map_err(display_error)
 }
+
+pub(super) fn migrate_p4(tx: &Transaction<'_>, version: i64) -> Result<(), String> {
+    if version >= 13 {
+        return Ok(());
+    }
+    let exists:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM pragma_table_info('task_work_events') WHERE name='correction_of')",[],|r|r.get(0)).map_err(display_error)?;
+    if !exists {
+        tx.execute_batch("ALTER TABLE task_work_events ADD COLUMN correction_of INTEGER REFERENCES task_work_events(id);").map_err(display_error)?;
+    }
+    tx.execute_batch("CREATE TABLE IF NOT EXISTS mcp_batch_approvals(id INTEGER PRIMARY KEY AUTOINCREMENT,client_id TEXT NOT NULL,request_key TEXT NOT NULL,request_json TEXT NOT NULL,basis_json TEXT NOT NULL,preview_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL,resolved_at TEXT,UNIQUE(client_id,request_key));
+    CREATE TABLE IF NOT EXISTS mcp_batch_usage(client_id TEXT PRIMARY KEY,window_start INTEGER NOT NULL,item_count INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS mcp_artifact_jobs(client_id TEXT NOT NULL,request_key TEXT NOT NULL,request_hash TEXT NOT NULL,kind TEXT NOT NULL,path TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',result_json TEXT,created_at TEXT NOT NULL,PRIMARY KEY(client_id,request_key));
+    DELETE FROM schema_meta;INSERT INTO schema_meta VALUES(13);") .map_err(display_error)
+}

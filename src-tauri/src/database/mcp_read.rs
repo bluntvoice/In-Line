@@ -101,7 +101,7 @@ mod tests {
             serde_json::to_value(upgraded.get_task(task.id).unwrap()).unwrap(),
             original
         );
-        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 12);
+        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 13);
         assert!(!upgraded.list_backups().unwrap().is_empty());
     }
     #[test]
@@ -138,7 +138,7 @@ impl Database {
     pub(crate) fn mcp_basis(&self) -> Result<DataVersion, McpError> {
         self.with_conn(|conn| conn.query_row("SELECT database_uuid,data_generation,commit_sequence FROM mcp_data_basis WHERE singleton=1",[],|r|Ok(DataVersion{
             database_uuid:r.get(0)?,data_generation:r.get(1)?,commit_sequence:r.get(2)?,
-            schema_version:12,query_schema_version:1,statistics_definition_version:1,
+            schema_version:13,query_schema_version:1,statistics_definition_version:1,
         })).map_err(display_error)).map_err(Into::into)
     }
     pub(crate) fn mcp_snapshot(&self) -> Result<Self, McpError> {
@@ -256,7 +256,7 @@ impl Database {
                     if kind=="log"&&!full{continue;}
                     let mut value=json!({"id":event_id,"taskId":id,"kind":kind,"at":at,"from":from,"to":to});
                     if kind=="queue"{value["phase"]=json!("enqueued");value["enqueuedAt"]=json!(at);value["closedAt"]=json!(from);}
-                    if kind=="work"{value["voidedAt"]=if to.is_empty(){serde_json::Value::Null}else{json!(to)};}
+                    if kind=="work"{value["voidedAt"]=if to.is_empty(){serde_json::Value::Null}else{json!(to)};value["correctionOf"]=json!(conn.query_row("SELECT correction_of FROM task_work_events WHERE id=?",[event_id],|r|r.get::<_,Option<i64>>(0)).map_err(display_error)?);}
                     if full{
                         // Legacy relationship/merge logs contain other task titles
                         // but lack stable referenced IDs. Limited clients must not

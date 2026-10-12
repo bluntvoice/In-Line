@@ -1,0 +1,27 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 48.45s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 9 tests
+test database::mcp_p4_tests::p4_dry_run_and_mixed_failure_preserve_every_business_number_version_dictionary_and_receipt ... ok
+test database::mcp_p4_tests::p4_postcommit_batch_verification_failure_does_not_replay_business_writes ... ok
+test database::mcp_p4_tests::p4_scope_all_affected_batch_receipts_and_permission_downgrade_are_enforced ... ok
+test database::mcp_p4_tests::p4_limit_configuration_cumulative_budget_and_ambiguous_batch_are_safe ... ok
+test database::mcp_p4_tests::p4_future_creation_queue_real_work_and_correction_keep_linked_history ... ok
+test database::mcp_p4_tests::p4_backup_is_local_full_business_only_durable_idempotent_and_unreadable_via_api ... ok
+
+thread 'database::mcp_p4_tests::p4_batch_refs_two_level_structure_and_group_undo_are_atomic' (12800) panicked at src\database\mcp_p4_tests.rs:163:64:
+called `Result::unwrap()` on an `Err` value: McpError { code: "conflict", message: "字段、版本或业务状态已改变，请重新读取并由用户确认冲突", retryable: false, retry_after_seconds: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test database::mcp_p4_tests::p4_business_export_filters_scope_fields_and_csv_formulas_without_backup_access ... ok
+test database::mcp_p4_tests::p4_batch_refs_two_level_structure_and_group_undo_are_atomic ... FAILED
+test database::mcp_p4_tests::p4_bulk_date_approval_is_once_rechecks_revocation_conflicts_and_preserves_number_history ... ok
+
+failures:
+
+failures:
+    database::mcp_p4_tests::p4_batch_refs_two_level_structure_and_group_undo_are_atomic
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 108 filtered out; finished in 0.25s
+
+error: test failed, to rerun pass `--lib`

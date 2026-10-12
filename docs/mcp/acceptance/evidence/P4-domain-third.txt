@@ -1,0 +1,17 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 11.85s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 9 tests
+test database::mcp_p4_tests::p4_postcommit_batch_verification_failure_does_not_replay_business_writes ... ok
+test database::mcp_p4_tests::p4_dry_run_and_mixed_failure_preserve_every_business_number_version_dictionary_and_receipt ... ok
+test database::mcp_p4_tests::p4_scope_all_affected_batch_receipts_and_permission_downgrade_are_enforced ... ok
+test database::mcp_p4_tests::p4_limit_configuration_cumulative_budget_and_ambiguous_batch_are_safe ... ok
+test database::mcp_p4_tests::p4_future_creation_queue_real_work_and_correction_keep_linked_history ... ok
+test database::mcp_p4_tests::p4_business_export_filters_scope_fields_and_csv_formulas_without_backup_access ... ok
+test database::mcp_p4_tests::p4_backup_is_local_full_business_only_durable_idempotent_and_unreadable_via_api ... ok
+test database::mcp_p4_tests::p4_batch_refs_two_level_structure_and_group_undo_are_atomic ... ok
+test database::mcp_p4_tests::p4_bulk_date_approval_is_once_rechecks_revocation_conflicts_and_preserves_number_history ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 108 filtered out; finished in 0.27s
+

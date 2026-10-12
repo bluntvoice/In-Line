@@ -550,6 +550,15 @@ pub fn tasks(
     Ok(result)
 }
 
+pub(super) fn validate_export(
+    auth: &Authorization,
+    args: &super::write_types::BusinessDataArgs,
+) -> Result<(), McpError> {
+    validate(&args.filters.clone().unwrap_or_default(), auth)?;
+    projection(args.projection.as_ref(), auth)?;
+    Ok(())
+}
+
 pub fn history(
     state: &mut QueryState,
     db: &Database,

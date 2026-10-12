@@ -30,6 +30,36 @@ impl InLineMcp {
 #[tool_router]
 impl InLineMcp {
     #[tool(
+        description = "按用户明确指令模拟或原子执行混合批次，默认20项。先dryRun查看逐字段影响，歧义整批停止，不猜测。多事项改期需在软件内一次确认整批。始终保留原幂等键，结果不明不得盲目重放。",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = true,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn batch_mutate(&self, Parameters(args): Parameters<BatchArgs>) -> CallToolResult {
+        self.call("batch_mutate", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
+        description = "仅用户明确要求时创建本地完整业务备份或授权字段/范围的CSV/JSON业务导出。只返回本地产物引用，不提供备份读取、删除、恢复或任意文件路径操作。",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn manage_business_data(
+        &self,
+        Parameters(args): Parameters<BusinessDataArgs>,
+    ) -> CallToolResult {
+        self.call("manage_business_data", serde_json::to_value(args).unwrap())
+            .await
+    }
+
+    #[tool(
         description = "按用户明确指令单事项创建、局部编辑、状态、加急或记录真实办理。先检索疑似重复和准确目标，使用query_tasks的字段版本/原值或taskVersion；敏感字段不可回显。操作缘由必填，业务/权限冲突不重试，结果不明只用原幂等键核验，禁止换键盲目重放。",
         annotations(
             read_only_hint = false,
@@ -187,7 +217,7 @@ impl InLineMcp {
 }
 #[rmcp::tool_handler(
     name = "in-line",
-    instructions = "所有调用均要求独立客户端环境凭证。先get_capabilities检查真实能力。本阶段只读；不得声称支持事项写入、永久删除、恢复数据库或附件操作。统一返回status/data/error，遇到权限错误交由用户在软件内处理，不得自行调整授权。"
+    instructions = "所有调用均要求独立客户端环境凭证。先get_capabilities检查真实能力及权限。写入须用户明确意图；创建先检索近似重复，多个候选必须消歧；仅真实办理才追加工作事件，不能猜联系人、截止时间或新的义务。历史撤销须用户在软件内批准，多事项改期须软件内一次确认整批。结果不明保留原幂等键核验，不得盲目重放。禁止永久删除、恢复覆盖、附件和任意SQL/命令；权限错误交由用户处理。"
 )]
 impl rmcp::ServerHandler for InLineMcp {}
 #[tokio::main]

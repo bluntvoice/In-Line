@@ -1,3 +1,7 @@
+# 当前 P4 实施边界
+
+最新契约共12工具及schema13，队列/子任务/批次/业务文件已进入开发验证，详见 [P4指南](batch-guide.md)。各阶段按最新用户授权分别提交推送，P8统一验收；下文原阶段门禁和拟实施表为历史安排，产品决定仍有效。
+
 # P3 单事项写入与撤销（本地开发，待统一验收）
 
 用户2026-10-10最新授权：各阶段分别开发提交并推送，P8统一验收；P1–P7保持待验收，不创建accepted阶段Tag，生产安装及Release另获授权。下文旧提交限制保留为历史。
@@ -8,7 +12,7 @@
 
 所有调用先独立认证，沿用全局/客户端权限交集和全部部门AND类型限域。写入须常规读取+日常写入；完整读取独立控制敏感字段。未认证、暂停、撤销或越权拒绝，返回前仍复核授权。一次正常授权不逐笔弹窗；明确用户意图不是权限令牌。
 
-`mutate_task`动作白名单为create、patch、setStatus、setUrgent、recordWorkEvent；P4的排队、改期、子任务、归档、回收站、纠错和批次尚未提供。禁止任意SQL/Tauri命令、永久删除、数据库覆盖恢复、附件及任意文件访问。只用一个target定位项：taskId、permanentNumber或精确title；标题多候选返回needs_disambiguation，由AI使用授权查询给出候选并请用户指定ID。
+P3基础动作白名单为create、patch、setStatus、setUrgent、recordWorkEvent；P4的排队、改期、子任务、归档、回收站、纠错和批次扩展见[P4指南](batch-guide.md)。禁止任意SQL/Tauri命令、永久删除、数据库覆盖恢复、附件及任意文件访问。只用一个target定位项：taskId、permanentNumber或精确title；标题多候选返回needs_disambiguation，由AI使用授权查询给出候选并请用户指定ID。
 
 ## 请求示例
 

@@ -578,3 +578,576 @@ pub(super) fn void_work_event_on(
     .map_err(display_error)?;
     add_log(tx, task_id, "audit", "作废一条结构化处理活动")
 }
+
+// P4: original GUI transaction bodies, also used by atomic MCP batches.
+pub(super) fn create_subtask_on_domain(
+    connection: &Connection,
+    input: CreateSubtaskInput,
+) -> Result<LegalTask, String> {
+    let transaction = connection;
+    let parent = get_task_on(transaction, input.parent_task_id)?;
+    if parent.deleted_at.is_some() {
+        return Err("回收站中的事项不能新增子任务".into());
+    }
+    if parent.parent_task_id.is_some() {
+        return Err("子任务不能继续新增下级任务，当前仅支持两级结构".into());
+    }
+
+    let departments = input
+        .departments
+        .clone()
+        .unwrap_or_else(|| parent.departments.clone());
+    let contacts = input
+        .contacts
+        .clone()
+        .unwrap_or_else(|| parent.contacts.clone());
+    let task = TaskInput {
+        planned_date: input.planned_date.clone(),
+        confirm_schedule_change: false,
+        id: None,
+        department: departments.first().cloned().unwrap_or_default(),
+        departments,
+        contact: contacts.first().cloned().unwrap_or_default(),
+        contacts,
+        task_type: input
+            .task_type
+            .clone()
+            .unwrap_or_else(|| parent.task_type.clone()),
+        title: input.title.clone(),
+        details: input.details.clone(),
+        status: "pending".into(),
+        priority: input.priority.clone().unwrap_or_else(|| "normal".into()),
+        workload: input.workload.clone().unwrap_or_else(|| "standard".into()),
+        is_urgent: input.is_urgent,
+        urgent_requester: input.urgent_requester.clone(),
+        urgent_reason: input.urgent_reason.clone(),
+        requested_deadline: input.requested_deadline.clone(),
+        requested_deadline_label: input.requested_deadline_label.clone(),
+        internal_notes: input.internal_notes.clone(),
+    };
+    validate_task_input(&task)?;
+    let contacts = normalized_contacts(&task);
+    let departments = normalized_departments(&task);
+    let stored_contacts = contact_storage(&contacts)?;
+    let stored_departments = contact_storage(&departments)?;
+    let identity_date = today();
+    let date = input
+        .planned_date
+        .clone()
+        .unwrap_or_else(|| parent.planned_date.clone().max(identity_date.clone()));
+    validate_plan(&date, task.requested_deadline.as_deref(), true)?;
+    let scheduled = date > identity_date;
+    let identity_sequence = next_daily_sequence(transaction, &identity_date)?;
+    let sequence = if scheduled {
+        next_daily_sequence(transaction, &date)?
+    } else {
+        identity_sequence
+    };
+    let permanent = format!(
+        "{}-{:02}",
+        identity_date.replace('-', ""),
+        identity_sequence
+    );
+    let custom_order: i64 = transaction
+        .query_row(
+            "SELECT COALESCE(MAX(custom_sort_order),0)+1 FROM tasks",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    let subtask_order: i64 = transaction
+        .query_row(
+            "SELECT COALESCE(MAX(subtask_sort_order),0)+1 FROM tasks WHERE parent_task_id=?",
+            [parent.id],
+            |row| row.get(0),
+        )
+        .map_err(display_error)?;
+    let stamp = now();
+    transaction
+            .execute(
+                "INSERT INTO tasks(
+                   permanent_number,daily_sequence,ticket_date,department,contact,task_type,title,details,
+                   status,priority,workload,is_urgent,urgent_requester,urgent_reason,requested_deadline,
+                   requested_deadline_label,internal_notes,created_at,updated_at,custom_sort_order,
+                   parent_task_id,subtask_sort_order
+                 ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                params![
+                    permanent,
+                    sequence,
+                    date,
+                    stored_departments,
+                    stored_contacts,
+                    task.task_type.trim(),
+                    task.title.trim(),
+                    task.details.trim(),
+                    task.status,
+                    task.priority,
+                    task.workload,
+                    task.is_urgent as i64,
+                    task.urgent_requester.trim(),
+                    task.urgent_reason.trim(),
+                    task.requested_deadline,
+                    task.requested_deadline_label,
+                    task.internal_notes.trim(),
+                    stamp,
+                    stamp,
+                    custom_order,
+                    parent.id,
+                    subtask_order
+                ],
+            )
+            .map_err(display_error)?;
+    let id = transaction.last_insert_rowid();
+    transaction
+        .execute(
+            "UPDATE tasks SET planned_date=?,is_scheduled=? WHERE id=?",
+            params![date, scheduled as i64, id],
+        )
+        .map_err(display_error)?;
+    allocate_number_on(transaction, id, &date, sequence)?;
+    if scheduled {
+        add_log(
+            transaction,
+            id,
+            "scheduled_created",
+            &format!(
+                "子任务提前取号：计划 {}，队列 {}-{:02}；未实际入队",
+                date, date, sequence
+            ),
+        )?;
+    }
+
+    if input.enqueue_today && !scheduled {
+        transaction
+                .execute(
+                    "INSERT INTO task_queue_entries(
+                       task_id,queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+                       enqueued_at,created_at,updated_at
+                     ) VALUES(?,?,?,?,?,?,?,?)",
+                    params![
+                        id,
+                        date,
+                        sequence,
+                        task.requested_deadline,
+                        task.requested_deadline_label,
+                        stamp,
+                        stamp,
+                        stamp
+                    ],
+                )
+                .map_err(display_error)?;
+    }
+    if input.enqueue_today && !scheduled {
+        transaction
+            .execute(
+                "UPDATE queue_number_allocations SET activated_at=? WHERE task_id=?",
+                params![stamp, id],
+            )
+            .map_err(display_error)?;
+    }
+    add_log(
+        transaction,
+        id,
+        "created",
+        &if input.enqueue_today && !scheduled {
+            format!("创建子任务并取号：{permanent}")
+        } else {
+            format!("创建子任务（未加入今日队列）：{permanent}")
+        },
+    )?;
+    add_log(
+        transaction,
+        id,
+        "relation",
+        &format!("设置所属任务：{}", parent.title),
+    )?;
+    add_status(transaction, id, None, "pending", "创建子任务")?;
+    if task.is_urgent {
+        record_urgent(transaction, id, &task)?;
+        if input.enqueue_today && !scheduled {
+            promote_one(transaction, id)?;
+        }
+    }
+    ensure_master(transaction, "task_type", &task.task_type)?;
+    bump_master_use(transaction, "task_type", &task.task_type)?;
+    for department in &departments {
+        ensure_master(transaction, "department", department)?;
+        bump_master_use(transaction, "department", department)?;
+    }
+    for contact in &contacts {
+        ensure_master(transaction, "contact", contact)?;
+        bump_master_use(transaction, "contact", contact)?;
+    }
+    get_task_on(transaction, id)
+}
+
+pub(super) fn set_parent_task_on_domain(
+    connection: &Connection,
+    task_id: i64,
+    parent_task_id: Option<i64>,
+) -> Result<(), String> {
+    let transaction = connection;
+    let task = get_task_on(transaction, task_id)?;
+    if task.parent_task_id == parent_task_id {
+        return Ok(());
+    }
+    let old_parent = task
+        .parent_task_id
+        .map(|id| get_task_on(transaction, id))
+        .transpose()?;
+    let stamp = now();
+    let log_content = if let Some(parent_task_id) = parent_task_id {
+        let (_, parent) = validate_parent_assignment(transaction, task_id, parent_task_id)?;
+        let next_order: i64 = transaction
+            .query_row(
+                "SELECT COALESCE(MAX(subtask_sort_order),0)+1
+                     FROM tasks WHERE parent_task_id=?",
+                [parent_task_id],
+                |row| row.get(0),
+            )
+            .map_err(display_error)?;
+        transaction
+            .execute(
+                "UPDATE tasks SET parent_task_id=?,subtask_sort_order=?,updated_at=? WHERE id=?",
+                params![parent_task_id, next_order, stamp, task_id],
+            )
+            .map_err(display_error)?;
+        if let Some(old_parent) = old_parent.as_ref() {
+            format!("更换所属任务：{} → {}", old_parent.title, parent.title)
+        } else {
+            format!("设置所属任务：{}", parent.title)
+        }
+    } else {
+        transaction
+            .execute(
+                "UPDATE tasks SET parent_task_id=NULL,subtask_sort_order=0,updated_at=? WHERE id=?",
+                params![stamp, task_id],
+            )
+            .map_err(display_error)?;
+        format!(
+            "解除所属任务：{}",
+            old_parent
+                .as_ref()
+                .map(|parent| parent.title.as_str())
+                .unwrap_or("未知事项")
+        )
+    };
+    if let Some(old_parent_id) = task.parent_task_id {
+        normalize_subtask_order(transaction, old_parent_id)?;
+    }
+    add_log(transaction, task_id, "relation", &log_content)
+}
+
+pub(super) fn reorder_subtasks_on_domain(
+    connection: &Connection,
+    input: ReorderSubtasksInput,
+) -> Result<(), String> {
+    let transaction = connection;
+    get_task_on(transaction, input.parent_task_id)?;
+    let current = {
+        let mut statement = transaction
+            .prepare(
+                "SELECT id FROM tasks WHERE parent_task_id=?
+                     ORDER BY subtask_sort_order,id",
+            )
+            .map_err(display_error)?;
+        let rows = statement
+            .query_map([input.parent_task_id], |row| row.get::<_, i64>(0))
+            .map_err(display_error)?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(display_error)?;
+        rows
+    };
+    let requested = input.task_ids.iter().copied().collect::<HashSet<_>>();
+    let existing = current.iter().copied().collect::<HashSet<_>>();
+    if input.task_ids.len() != requested.len() || requested != existing {
+        return Err("子任务排序列表与当前所属关系不一致，请刷新后重试".into());
+    }
+    for (index, id) in input.task_ids.iter().enumerate() {
+        transaction
+            .execute(
+                "UPDATE tasks SET subtask_sort_order=? WHERE id=? AND parent_task_id=?",
+                params![index as i64 + 1, id, input.parent_task_id],
+            )
+            .map_err(display_error)?;
+    }
+    Ok(())
+}
+
+pub(super) fn complete_task_on_domain(
+    connection: &Connection,
+    input: CompleteTaskInput,
+) -> Result<CompleteTaskResult, String> {
+    let transaction = connection;
+    let task = get_task_on(transaction, input.task_id)?;
+    let mut completed_task_ids = Vec::new();
+    if input.include_eligible_subtasks && task.parent_task_id.is_none() {
+        let child_ids = {
+            let mut statement = transaction
+                .prepare(
+                    "SELECT id FROM tasks
+                         WHERE parent_task_id=? AND deleted_at IS NULL AND archived_at IS NULL
+                           AND status NOT IN ('completed','cancelled','archived')
+                         ORDER BY subtask_sort_order,id",
+                )
+                .map_err(display_error)?;
+            let rows = statement
+                .query_map([task.id], |row| row.get::<_, i64>(0))
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            rows
+        };
+        for child_id in child_ids {
+            complete_task_on(transaction, child_id, "随所属任务一并完成")?;
+            completed_task_ids.push(child_id);
+        }
+    }
+    complete_task_on(transaction, task.id, "本轮已完成")?;
+    completed_task_ids.push(task.id);
+    let completion_state = subtask_completion_state_on(transaction, task.id)?;
+    Ok(CompleteTaskResult {
+        completed_task_ids,
+        completion_state,
+    })
+}
+
+pub(super) fn archive_task_group_on_domain(
+    connection: &Connection,
+    input: ArchiveTaskInput,
+) -> Result<ArchiveTaskResult, String> {
+    let transaction = connection;
+    let task = get_task_on(transaction, input.task_id)?;
+    let mut archived_task_ids = Vec::new();
+    if input.include_completed_subtasks && task.parent_task_id.is_none() {
+        let child_ids = {
+            let mut statement = transaction
+                .prepare(
+                    "SELECT id FROM tasks
+                         WHERE parent_task_id=? AND deleted_at IS NULL AND archived_at IS NULL
+                           AND status='completed'
+                         ORDER BY subtask_sort_order,id",
+                )
+                .map_err(display_error)?;
+            let rows = statement
+                .query_map([task.id], |row| row.get::<_, i64>(0))
+                .map_err(display_error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(display_error)?;
+            rows
+        };
+        for child_id in child_ids {
+            if archive_task_on(transaction, child_id, "随所属任务一并归档")? {
+                archived_task_ids.push(child_id);
+            }
+        }
+    }
+    if archive_task_on(transaction, task.id, "事项归档")? {
+        archived_task_ids.push(task.id);
+    }
+    Ok(ArchiveTaskResult { archived_task_ids })
+}
+
+pub(super) fn delete_task_group_on_domain(
+    connection: &Connection,
+    input: DeleteTaskInput,
+) -> Result<DeleteTaskResult, String> {
+    let transaction = connection;
+    let task = get_task_on(transaction, input.task_id)?;
+    if task.deleted_at.is_some() {
+        return Ok(DeleteTaskResult {
+            trashed_task_ids: Vec::new(),
+            detached_subtask_ids: Vec::new(),
+        });
+    }
+    let child_ids = child_ids_on(transaction, task.id)?;
+    let mut trashed_task_ids = Vec::new();
+    let mut detached_subtask_ids = Vec::new();
+    if !child_ids.is_empty() {
+        if input.include_subtasks {
+            for child_id in &child_ids {
+                if soft_delete_task_on(transaction, *child_id, "随所属任务移入回收站")? {
+                    trashed_task_ids.push(*child_id);
+                }
+            }
+        } else {
+            let stamp = now();
+            for child_id in &child_ids {
+                transaction
+                        .execute(
+                            "UPDATE tasks SET parent_task_id=NULL,subtask_sort_order=0,updated_at=? WHERE id=?",
+                            params![stamp, child_id],
+                        )
+                        .map_err(display_error)?;
+                add_log(
+                    transaction,
+                    *child_id,
+                    "relation",
+                    &format!("所属任务《{}》移入回收站，已自动解除所属关系", task.title),
+                )?;
+                detached_subtask_ids.push(*child_id);
+            }
+        }
+    }
+    if soft_delete_task_on(transaction, task.id, "事项移入回收站")? {
+        trashed_task_ids.push(task.id);
+    }
+    Ok(DeleteTaskResult {
+        trashed_task_ids,
+        detached_subtask_ids,
+    })
+}
+
+pub(super) fn move_task_on_domain(
+    connection: &Connection,
+    id: i64,
+    direction: MoveDirection,
+) -> Result<(), String> {
+    let transaction = connection;
+    let task = get_task_on(transaction, id)?;
+    if task.is_scheduled {
+        return Err("未来事项按加入日期及队列序号排序，不能人工调序".into());
+    }
+    let comparison = if matches!(direction, MoveDirection::Up) {
+        "<"
+    } else {
+        ">"
+    };
+    let order = if matches!(direction, MoveDirection::Up) {
+        "DESC"
+    } else {
+        "ASC"
+    };
+    let sql = format!("SELECT id,custom_sort_order FROM tasks WHERE deleted_at IS NULL AND archived_at IS NULL
+            AND status NOT IN ('completed','cancelled','archived')
+            AND EXISTS(SELECT 1 FROM task_queue_entries entry WHERE entry.task_id=tasks.id AND entry.closed_at IS NULL)
+            AND {OVERDUE_RANK_SQL}=(SELECT CASE WHEN target.requested_deadline IS NOT NULL AND strftime('%s',target.requested_deadline) < strftime('%s','now') THEN 0 ELSE 1 END FROM tasks target WHERE target.id=?)
+            AND custom_sort_order {comparison} ?
+            ORDER BY custom_sort_order {order},id {order} LIMIT 1");
+    let adjacent: Option<(i64, i64)> = transaction
+        .query_row(&sql, params![id, task.custom_sort_order], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .optional()
+        .map_err(display_error)?;
+    if let Some((other_id, other_order)) = adjacent {
+        transaction
+            .execute(
+                "UPDATE tasks SET custom_sort_order=? WHERE id=?",
+                params![other_order, id],
+            )
+            .map_err(display_error)?;
+        transaction
+            .execute(
+                "UPDATE tasks SET custom_sort_order=? WHERE id=?",
+                params![task.custom_sort_order, other_id],
+            )
+            .map_err(display_error)?;
+    }
+    Ok(())
+}
+
+pub(super) fn restore_on_domain(connection: &Connection, id: i64) -> Result<(), String> {
+    let tx = connection;
+    let task = get_task_on(tx, id)?;
+    if task.deleted_at.is_none() {
+        return Err("事项不在回收站中".into());
+    }
+    enqueue_on(
+        tx,
+        id,
+        "pending",
+        false,
+        Some((None, None)),
+        "从回收站恢复",
+        true,
+    )?;
+    add_log(tx, id, "restored", "事项已恢复并加入今日队列")
+}
+
+pub(super) fn enqueue_task_on_domain(
+    connection: &Connection,
+    input: QueueInput,
+) -> Result<(), String> {
+    let tx = connection;
+    enqueue_on(
+        tx,
+        input.id,
+        "pending",
+        input.inherit_deadline,
+        None,
+        &input.reason,
+        false,
+    )?;
+    Ok(())
+}
+
+pub(super) fn reopen_task_on_domain(
+    connection: &Connection,
+    input: QueueInput,
+) -> Result<(), String> {
+    let tx = connection;
+    let task = get_task_on(tx, input.id)?;
+    if task.deleted_at.is_some() {
+        return Err("回收站事项请先使用恢复操作".into());
+    }
+    if task.archived_at.is_none() && !matches!(task.status.as_str(), "completed" | "archived") {
+        return Err("只有已完成或已归档事项可以重新开启".into());
+    }
+    enqueue_on(
+        tx,
+        input.id,
+        "pending",
+        input.inherit_deadline,
+        None,
+        &input.reason,
+        true,
+    )?;
+    Ok(())
+}
+
+pub(super) fn process_round_on_domain(connection: &Connection, id: i64) -> Result<(), String> {
+    let tx = connection;
+    let task = enter_current_workflow_on(tx, id)?;
+    if task.deleted_at.is_some()
+        || task.archived_at.is_some()
+        || matches!(task.status.as_str(), "completed" | "cancelled" | "archived")
+    {
+        return Err("已完成或已归档事项需先重新开启".into());
+    }
+    let stamp = now();
+    let result_status = if matches!(
+        task.status.as_str(),
+        "waiting_materials" | "waiting_confirmation" | "waiting_counterparty_confirmation"
+    ) {
+        task.status.as_str()
+    } else {
+        "processed"
+    };
+    if matches!(task.status.as_str(), "pending" | "processing") {
+        tx.execute(
+            "UPDATE tasks SET status='processed',updated_at=? WHERE id=?",
+            params![stamp, id],
+        )
+        .map_err(display_error)?;
+        add_status(tx, id, Some(&task.status), "processed", "本轮已处理")?;
+    }
+    clear_urgent_on(tx, id, "事项进入暂缓队列")?;
+    close_active_queue(tx, id, "本轮已处理")?;
+    record_work_event_on(
+        tx,
+        id,
+        result_status,
+        &stamp,
+        &task.task_type,
+        "quick_action",
+        "",
+    )?;
+    add_log(tx, id, "work", "已记录本轮处理，事项进入暂缓队列")
+}
+
+pub(super) fn complete_round_on_domain(connection: &Connection, id: i64) -> Result<(), String> {
+    let tx = connection;
+    ensure_direct_completion_allowed(tx, id)?;
+    complete_task_on(tx, id, "本轮已完成")
+}

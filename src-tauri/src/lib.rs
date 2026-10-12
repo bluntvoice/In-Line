@@ -12,6 +12,49 @@ fn mcp_audit_state(db: tauri::State<database::Database>) -> Result<serde_json::V
 }
 #[cfg(windows)]
 #[tauri::command]
+fn mcp_batch_state(
+    window: tauri::WebviewWindow,
+    db: tauri::State<Database>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    db.mcp_batch_state().map_err(|e| e.to_string())
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_set_batch_limit(
+    window: tauri::WebviewWindow,
+    db: tauri::State<Database>,
+    value: usize,
+) -> Result<(), String> {
+    mcp_local(&window)?;
+    db.mcp_set_batch_limit(value).map_err(|e| e.to_string())
+}
+#[cfg(windows)]
+#[tauri::command]
+fn mcp_resolve_batch(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    db: tauri::State<Database>,
+    security: tauri::State<McpSecurity>,
+    request_id: i64,
+    approve: bool,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    let store = security
+        .store
+        .lock()
+        .map_err(|_| "安全存储不可用".to_string())?;
+    let result = db
+        .mcp_resolve_batch(request_id, approve, &store)
+        .map_err(|e| e.to_string())?;
+    if approve {
+        let _ = emit_change(&app);
+    }
+    let _ = app.emit("mcp-audit-changed", ());
+    Ok(result)
+}
+#[cfg(windows)]
+#[tauri::command]
 fn mcp_resolve_undo(
     app: tauri::AppHandle,
     db: tauri::State<database::Database>,
@@ -1062,8 +1105,14 @@ pub fn run() {
                                 tool,
                                 args,
                             );
-                            if matches!(tool, "mutate_task" | "manage_preferences" | "request_undo")
-                                && result.is_ok()
+                            if matches!(
+                                tool,
+                                "mutate_task"
+                                    | "manage_preferences"
+                                    | "request_undo"
+                                    | "batch_mutate"
+                                    | "manage_business_data"
+                            ) && result.is_ok()
                             {
                                 let _ = handle.emit("data-changed", ());
                                 let _ = handle.emit("mcp-audit-changed", ());
@@ -1232,6 +1281,9 @@ pub fn run() {
             mcp_set_paused,
             mcp_audit_state,
             mcp_resolve_undo,
+            mcp_batch_state,
+            mcp_set_batch_limit,
+            mcp_resolve_batch,
             delete_backup,
             cleanup_backups,
             set_setting,

@@ -1,0 +1,3 @@
+18:12:11 [vite] (client) ✨ new dependencies optimized: react/jsx-dev-runtime
+18:12:11 [vite] (client) ✨ optimized dependencies changed. reloading
+PASS: exact preview, review/cancel no write, once-per-batch explicit approval, conflict retains pending, independent reject, local limit 1..100. Synthetic data only.

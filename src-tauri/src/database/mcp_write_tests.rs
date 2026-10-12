@@ -455,7 +455,7 @@ fn p3_schema11_upgrade_preserves_uuid_tasks_and_backs_up_before_mutation() {
     .unwrap();
     drop(db);
     let reopened = Database::open_root(root).unwrap();
-    assert_eq!(reopened.mcp_basis().unwrap().schema_version, 12);
+    assert_eq!(reopened.mcp_basis().unwrap().schema_version, 13);
     assert_eq!(reopened.mcp_basis().unwrap().database_uuid, uuid);
     assert_eq!(
         serde_json::to_value(reopened.get_task(task.id).unwrap()).unwrap(),
