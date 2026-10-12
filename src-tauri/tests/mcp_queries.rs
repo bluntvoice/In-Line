@@ -105,7 +105,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             .await
             .unwrap();
         let list = request(&mut input, &mut output, 2, "tools/list", json!({})).await;
-        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 14);
+        assert_eq!(list["result"]["tools"].as_array().unwrap().len(), 15);
         let first = request(
             &mut input,
             &mut output,
@@ -460,6 +460,26 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             "{result}"
         );
         assert!(!result.to_string().contains("secret-"));
+        let health = request(
+            &mut input,
+            &mut output,
+            56,
+            "tools/call",
+            json!({"name":"inspect_data","arguments":{"action":"health"}}),
+        )
+        .await;
+        assert_eq!(
+            health["result"]["structuredContent"]["data"]["health"]["healthy"], true,
+            "{health}"
+        );
+        assert!(!health.to_string().contains("secret-"));
+        let report=request(&mut input,&mut output,57,"tools/call",json!({"name":"get_report_summary","arguments":{"startDate":day,"endDate":day,"timezoneOffsetMinutes":480}})).await;
+        let trace=request(&mut input,&mut output,58,"tools/call",json!({"name":"inspect_data","arguments":{"action":"trace","metric":"handledTasks","report":{"startDate":day,"endDate":day,"timezoneOffsetMinutes":480,"snapshot":report["result"]["structuredContent"]["data"]["meta"]["snapshotId"]}}})).await;
+        assert_eq!(
+            trace["result"]["structuredContent"]["status"], "ok",
+            "{trace}"
+        );
+        assert!(!trace.to_string().contains("secret-"));
         security.pause(true).unwrap();
         let paused = request(
             &mut input,

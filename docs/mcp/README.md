@@ -1,3 +1,5 @@
+当前P6开发：数据健康、报告比较、指标溯源及内存缓存；[使用指南](quality-and-cache-guide.md)、[阶段报告](acceptance/PHASE-06.md)，待P8统一验收。
+
 # In-Line MCP 阶段开发
 
 2026-10-09：P0已验收，C1–C4均选A；已推送提交`f2a97b34410f850f3da8c19d4ec6e21c7d63048f`及固定Tag`mcp-phase-00-accepted`。P1本地实现已加入，等待实机/用户验收，未提交或发布。

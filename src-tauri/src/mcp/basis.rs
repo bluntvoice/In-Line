@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq, Debug, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DataVersion {
+    /// Derived index repair invalidates cache, cursor and job baseline without changing business rows.
+    pub index_epoch: Option<String>,
     pub database_uuid: String,
     pub data_generation: u64,
     pub commit_sequence: u64,

@@ -1,0 +1,1 @@
+PASS: real component progress, explicit whole-job review, dismiss without mutation, exactly one cancellation, terminal status, manual cleanup, completion source time/validation explanation and retention explanation; synthetic data only.

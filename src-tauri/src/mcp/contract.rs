@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const API_VERSION: u32 = 1;
-pub const TOOLS: [&str; 14] = [
+pub const TOOLS: [&str; 15] = [
     "get_capabilities",
     "get_report_summary",
     "list_report_items",
@@ -18,6 +18,7 @@ pub const TOOLS: [&str; 14] = [
     "manage_business_data",
     "query_changes",
     "manage_jobs",
+    "inspect_data",
 ];
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -141,13 +142,15 @@ pub struct CapabilityArgs {}
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct DateRangeArgs {
+    #[serde(default)]
+    pub explicit_requery: bool,
     pub start_date: String,
     pub end_date: String,
     pub filters: Option<super::query_types::QueryFilters>,
     pub snapshot: Option<String>,
     pub timezone_offset_minutes: Option<i32>,
 }
-#[derive(Deserialize, Serialize, schemars::JsonSchema)]
+#[derive(Clone, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReportItemsArgs {
     pub start_date: String,

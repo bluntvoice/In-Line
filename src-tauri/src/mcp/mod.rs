@@ -2,12 +2,17 @@ pub mod basis;
 #[cfg(windows)]
 pub mod business_data;
 #[cfg(windows)]
+pub mod cache;
+#[cfg(windows)]
 pub mod changes;
 #[cfg(windows)]
 pub mod codex_import;
 pub mod contract;
 #[cfg(windows)]
 mod durable;
+#[cfg(windows)]
+mod inspect;
+pub mod inspect_types;
 #[cfg(windows)]
 pub mod ipc;
 pub mod job_types;

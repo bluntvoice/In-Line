@@ -53,7 +53,7 @@ pub fn execute(
         let _: CapabilityArgs =
             serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
         return Ok(
-            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":crate::database::DATABASE_SCHEMA_VERSION,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":["mutate_task","manage_preferences","request_undo","batch_mutate","manage_business_data"],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["permanent_delete","restore_database","attachments","remote_transport"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"batchLimit":db.mcp_batch_limit()?,"batchHardLimit":100,"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"backgroundJobs":{"globalActiveLimit":2,"perClientActiveLimit":1,"resultMaxBytes":16777216,"checkpointDiskMaxBytes":67108864,"resultRetentionDays":7,"summaryRetentionDays":30,"maxPauseSeconds":1800,"maxRecoverySeconds":86400,"maxFullRequeries":1,"nativeScheduler":false},"changes":{"modes":["events","current"],"initialFullSyncRequired":true,"incrementalCursorTtlSeconds":86400,"metadataDiskMaxBytes":16777216},"connectionVerified":true}),
+            json!({"clientId":credentials.client_id,"softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":crate::database::DATABASE_SCHEMA_VERSION,"commit":null,"transport":"stdio","permissions":auth.permissions,"scope":auth.scope,"authorizationRevision":auth.revision,"tools":TOOLS,"writeTools":["mutate_task","manage_preferences","request_undo","batch_mutate","manage_business_data"],"queryDefinitionWriteTools":["manage_saved_query"],"unsupported":["permanent_delete","restore_database","attachments","remote_transport"],"breakingChanges":["all_tools_require_credentials","enveloped_results","page_limit_100","work_note_requires_full_read","offset_requires_snapshot_after_first_page"],"batchLimit":db.mcp_batch_limit()?,"batchHardLimit":100,"pageLimit":100,"reportMaxDays":36501,"snapshotTtlSeconds":600,"snapshotDatabaseMaxBytes":33554432,"backgroundJobs":{"globalActiveLimit":2,"perClientActiveLimit":1,"resultMaxBytes":16777216,"checkpointDiskMaxBytes":67108864,"resultRetentionDays":7,"summaryRetentionDays":30,"maxPauseSeconds":1800,"maxRecoverySeconds":86400,"maxFullRequeries":1,"nativeScheduler":false},"changes":{"modes":["events","current"],"initialFullSyncRequired":true,"incrementalCursorTtlSeconds":86400,"metadataDiskMaxBytes":16777216},"inspection":{"actions":["health","trace","compare","cache","recompute"],"businessRepairAllowed":false},"reportCache":{"tier":"memory","ttlSeconds":60,"capacityBytes":8388608,"entryMaxBytes":2097152,"maxEntries":16,"perClientMaxEntries":4,"diskCacheEnabled":false,"explicitRequerySupported":true},"connectionVerified":true}),
         );
     }
     if !TOOLS.contains(&tool) {
@@ -61,6 +61,9 @@ pub fn execute(
     }
     if !auth.permissions.regular_read {
         return Err(McpError::new("forbidden"));
+    }
+    if tool != "inspect_data" && db.mcp_quality_health()?["healthy"] != true {
+        return Err(McpError::new("resync_required"));
     }
     if matches!(
         tool,
@@ -117,6 +120,14 @@ pub fn execute(
         .lock()
         .map_err(|_| McpError::new("security_unavailable"))?;
     match tool {
+        "inspect_data" => super::inspect::execute(
+            security,
+            &mut queries,
+            db,
+            &credentials.client_id,
+            &auth,
+            serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?,
+        ),
         "query_changes" => security
             .changes
             .lock()
@@ -137,9 +148,41 @@ pub fn execute(
                 .map_err(|_| McpError::new("invalid_arguments"))?,
         ),
         "get_report_summary" => {
-            let args: DateRangeArgs =
+            let mut args: DateRangeArgs =
                 serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?;
-            query::report(
+            args.timezone_offset_minutes = Some(
+                args.timezone_offset_minutes
+                    .unwrap_or_else(|| chrono::Local::now().offset().local_minus_utc() / 60),
+            );
+            let live = db.mcp_basis()?;
+            let cache_key = super::cache::Cache::key(
+                &credentials.client_id,
+                &serde_json::to_value(&args).map_err(|_| McpError::new("invalid_arguments"))?,
+                &auth,
+                &live,
+            );
+            if !args.explicit_requery && args.snapshot.is_none() {
+                if let Some(value) = security
+                    .cache
+                    .lock()
+                    .map_err(|_| McpError::new("security_unavailable"))?
+                    .get(&cache_key, &credentials.client_id, &auth, &live)
+                {
+                    if value["meta"]["snapshotId"]
+                        .as_str()
+                        .and_then(|id| {
+                            query::snapshot_health(&queries, db, &credentials.client_id, &auth, id)
+                                .ok()
+                        })
+                        .is_some_and(|v| v["valid"] == true)
+                        && db.mcp_basis()? == live
+                    {
+                        return Ok(value);
+                    }
+                }
+            }
+            let explicit_snapshot = args.snapshot.is_some();
+            let mut value = query::report(
                 &mut queries,
                 db,
                 &credentials.client_id,
@@ -155,7 +198,22 @@ pub fn execute(
                     cursor: None,
                 },
                 true,
-            )
+            )?;
+            value["meta"]["complete"] = json!(true);
+            value["meta"]["coverage"] = value["coverage"].clone();
+            let computed: super::basis::DataVersion =
+                serde_json::from_value(value["meta"]["dataVersion"].clone())
+                    .map_err(|_| McpError::new("internal_error"))?;
+            if !explicit_snapshot && computed == db.mcp_basis()? {
+                security
+                    .cache
+                    .lock()
+                    .map_err(|_| McpError::new("security_unavailable"))?
+                    .put(cache_key, &credentials.client_id, &auth, computed, value)
+            } else {
+                value["meta"]["cache"] = json!({"reused":false,"stored":false,"computedAt":chrono::Utc::now().timestamp(),"validationStatus":"explicit_or_changed_snapshot","sourceSnapshotId":value["meta"]["snapshotId"]});
+                Ok(value)
+            }
         }
         "list_report_items" => {
             let args: ReportItemsArgs =

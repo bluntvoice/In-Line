@@ -1,3 +1,11 @@
+# 2026-10-12 P6开发验证完成，准备独立提交推送
+
+157 Rust、115前端、真实15工具stdio、缓存/任务组件浏览器、fmt/TypeScript/Vite、文档及冻结NSIS双sidecar包输入回读通过。包4,152,687字节、SHA256 6B003EB798ED4A3B2BABD10051958242880BB71410A14FC182ECF8F7C24D0664，保留release/In-Line-P6-local-20261012.exe；生产安装未变。P5 CI 38195294658 success，21e856a5精确SHA。详见[PHASE-06](acceptance/PHASE-06.md)。准备P6独立提交推送后继续P7，P8统一验收；自动接入仍关闭，不建accepted Tag/Release。下文P6开始及早期状态为历史。
+
+# 2026-10-12 当前进入P6（待P8统一验收）
+
+P5独立开发提交21e856a533b0b72d200355339361470df6656035已推送且远端回读一致，初始工作区干净。147 Rust/115前端/真实stdio/合成任务UI/文档校验及冻结NSIS双sidecar14工具回读通过；包4,107,375字节，SHA256 313634A8D871D03F71071A8B520A0D942E0C459B28E6CD30954878FDD6B50D07，保留release/In-Line-P5-local-20261012.exe，生产安装未变。P5 CI 38195294658已success（精确SHA）。按用户授权继续P6数据健康、统计溯源及内存优先缓存，安排见[PHASE-06](acceptance/PHASE-06.md)，然后P7、P8统一验收；自动接入关闭，不建accepted Tag/Release。下文P5准备提交等均为历史。
+
 # 2026-10-12 P5开发验证完成，准备独立提交推送（待P8验收）
 
 147 Rust、115前端、真实stdio、合成任务UI、fmt/TypeScript/Vite、原文档/144决定校验及冻结NSIS/双sidecar14工具包回读通过。包4,107,375字节、SHA256 313634A8D871D03F71071A8B520A0D942E0C459B28E6CD30954878FDD6B50D07，保留release/In-Line-P5-local-20261012.exe；生产安装未变。详见[PHASE-05](acceptance/PHASE-05.md)。准备独立P5开发Commit/Push后继续P6、P7，到P8统一验收；P1自动导入/当前会话重载入口仍关闭，不建accepted Tag/Release。下文P5开始及更早阶段为历史。

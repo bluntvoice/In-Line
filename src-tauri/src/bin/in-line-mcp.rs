@@ -13,6 +13,22 @@ struct InLineMcp {
 #[tool_router]
 impl InLineMcp {
     #[tool(
+        description = "认证后只读检查数据健康、按原报告快照分页溯源指标、比较同客户端报告或重算内存缓存。不能修复业务库或读取其他客户端信息。",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            idempotent_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn inspect_data(
+        &self,
+        Parameters(args): Parameters<in_line_lib::mcp::inspect_types::InspectArgs>,
+    ) -> CallToolResult {
+        self.call("inspect_data", serde_json::to_value(args).unwrap())
+            .await
+    }
+    #[tool(
         description = "认证后增量读取事项。首次必须完成全量同步，随后使用同条件cursor读取事件或当前状态；失效必须重同步，不推断缺失历史。",
         annotations(
             read_only_hint = true,

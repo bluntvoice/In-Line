@@ -63,6 +63,380 @@ fn event(db: &Database, id: i64, at: &str, status: &str) {
 }
 
 #[test]
+fn metric_trace_all_counts_rates_dimensions_trend_and_scope_match_gui() {
+    let (db, s, a, b) = fixture();
+    let first = db.save_task(input("first", "A")).unwrap();
+    let second = db.save_task(input("second", "A")).unwrap();
+    let outside = db.save_task(input("outside", "B")).unwrap();
+    event(&db, first.id, "2026-08-08T09:00:00+08:00", "processed");
+    event(&db, first.id, "2026-08-08T10:00:00+08:00", "completed");
+    event(
+        &db,
+        second.id,
+        "2026-08-08T10:00:00+08:00",
+        "waiting_materials",
+    );
+    event(&db, outside.id, "2026-08-08T10:00:00+08:00", "completed");
+    db.record_work_event(WorkEventInput {
+        task_id: first.id,
+        result_status: "processed".into(),
+        handled_at: "2026-08-08T11:00:00+08:00".into(),
+        note: "secret-voided".into(),
+        sync_status: false,
+    })
+    .unwrap();
+    let voided = db
+        .list_work_events(first.id)
+        .unwrap()
+        .into_iter()
+        .find(|e| e.note == "secret-voided")
+        .unwrap();
+    db.void_work_event(voided.id, true).unwrap();
+    let trash = db.save_task(input("excluded-trash", "A")).unwrap();
+    event(&db, trash.id, "2026-08-08T11:00:00+08:00", "completed");
+    db.soft_delete(trash.id).unwrap();
+    for mode in ["processing", "closure"] {
+        db.set_setting("statistics_rate_mode".into(), mode.into())
+            .unwrap();
+        let report =
+            json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480});
+        let summary = call(&s, &db, &a, "get_report_summary", report.clone());
+        let native = db
+            .statistics_scoped(
+                "2026-08-08T00:00:00+08:00".into(),
+                "2026-08-09T00:00:00+08:00".into(),
+                480,
+                Scope {
+                    departments: Some(vec!["A".into()]),
+                    task_types: Some(vec!["T".into()]),
+                },
+            )
+            .unwrap();
+        assert_eq!(summary["statistics"], serde_json::to_value(native).unwrap());
+        let mut r = report;
+        r["snapshot"] = summary["meta"]["snapshotId"].clone();
+        for metric in [
+            "handledTasks",
+            "topLevelTasks",
+            "subtasks",
+            "processed",
+            "completed",
+            "waitingMaterials",
+            "waitingConfirmation",
+            "waitingCounterpartyConfirmation",
+            "rateNumerator",
+            "rateDenominator",
+            "completionRate",
+            "byTaskType.handledTasks",
+            "byTaskType.completed",
+            "byTaskType.pendingFollowUp",
+            "byDepartment.handledTasks",
+            "byDepartment.completed",
+            "byDepartment.pendingFollowUp",
+            "trend.handledTasks",
+            "trend.processed",
+            "trend.completed",
+        ] {
+            let mut args = json!({"action":"trace","report":r,"metric":metric});
+            if metric.starts_with("byTaskType.") {
+                args["dimension"] = json!("T");
+            }
+            if metric.starts_with("byDepartment.") {
+                args["dimension"] = json!("A");
+            }
+            if metric.starts_with("trend.") {
+                args["periodStart"] = json!("2026-08-08");
+            }
+            let trace = call(&s, &db, &a, "inspect_data", args);
+            assert_eq!(trace["complete"], true);
+            assert!(!trace.to_string().contains("secret-"));
+            assert!(!trace.to_string().contains("outside"));
+            assert!(!trace.to_string().contains("excluded-trash"));
+            for row in trace["items"].as_array().unwrap() {
+                assert!(!row["validEvents"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|e| e["id"] == voided.id));
+                if !row["winningEventId"].is_null() {
+                    assert!(row["validEvents"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|e| e["id"] == row["winningEventId"]));
+                }
+            }
+        }
+        assert_eq!(
+            err(
+                &s,
+                &db,
+                &b,
+                "inspect_data",
+                json!({"action":"trace","report":r,"metric":"handledTasks"})
+            ),
+            "cursor_invalid"
+        );
+    }
+}
+
+#[test]
+fn trace_pagination_is_bound_to_metric_client_and_original_snapshot() {
+    let (db, s, a, b) = fixture();
+    for n in 0..101 {
+        let t = db.save_task(input(&format!("source-{n}"), "A")).unwrap();
+        event(&db, t.id, "2026-08-08T10:00:00+08:00", "completed");
+    }
+    let mut r = json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480,"limit":100});
+    let sum = call(
+        &s,
+        &db,
+        &a,
+        "get_report_summary",
+        json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480}),
+    );
+    r["snapshot"] = sum["meta"]["snapshotId"].clone();
+    let args = json!({"action":"trace","report":r,"metric":"handledTasks"});
+    let first = call(&s, &db, &a, "inspect_data", args.clone());
+    assert_eq!(first["items"].as_array().unwrap().len(), 100);
+    let cursor = first["nextCursor"].clone();
+    s.cache.lock().unwrap().clear(None);
+    let mut update = input("changed-later", "A");
+    update.id = Some(101);
+    db.save_task(update).unwrap();
+    let mut next = args.clone();
+    next["cursor"] = cursor.clone();
+    let second = call(&s, &db, &a, "inspect_data", next.clone());
+    assert_eq!(second["items"].as_array().unwrap().len(), 1);
+    assert_eq!(second["items"][0]["title"], "source-100");
+    assert!(second["nextCursor"].is_null());
+    let mut mismatch = next.clone();
+    mismatch["metric"] = json!("completed");
+    assert_eq!(err(&s, &db, &a, "inspect_data", mismatch), "cursor_invalid");
+    assert_eq!(
+        err(&s, &db, &b, "inspect_data", next.clone()),
+        "cursor_invalid"
+    );
+    let before = db.mcp_basis().unwrap();
+    let compare = call(
+        &s,
+        &db,
+        &a,
+        "inspect_data",
+        json!({"action":"compare","report":r,"right":{"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480}}),
+    );
+    assert!(compare["differences"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|v| v["field"] == "dataVersion"));
+    assert_eq!(before, db.mcp_basis().unwrap());
+    let auth = s.store.lock().unwrap().authorize(&a).unwrap();
+    s.update_client(
+        &a.client_id,
+        auth.permissions,
+        Scope {
+            departments: Some(vec!["B".into()]),
+            task_types: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        err(&s, &db, &a, "inspect_data", next),
+        "authorization_changed"
+    );
+}
+
+#[test]
+fn report_cache_is_short_client_owned_invalidates_on_basis_auth_and_explicit_requery() {
+    let (db, s, a, b) = fixture();
+    let t = db.save_task(input("first", "A")).unwrap();
+    event(&db, t.id, "2026-08-08T10:00:00+08:00", "completed");
+    let report =
+        json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480});
+    let first = call(&s, &db, &a, "get_report_summary", report.clone());
+    assert_eq!(first["meta"]["cache"]["reused"], false);
+    let reused = call(&s, &db, &a, "get_report_summary", report.clone());
+    assert_eq!(reused["meta"]["cache"]["reused"], true);
+    assert_eq!(
+        reused["meta"]["cache"]["computedAt"],
+        first["meta"]["cache"]["computedAt"]
+    );
+    let separate = call(&s, &db, &b, "get_report_summary", report.clone());
+    assert_eq!(separate["meta"]["cache"]["reused"], false);
+    let mut explicit = report.clone();
+    explicit["explicitRequery"] = json!(true);
+    assert_eq!(
+        call(&s, &db, &a, "get_report_summary", explicit)["meta"]["cache"]["reused"],
+        false
+    );
+    db.set_setting("statistics_rate_mode".into(), "closure".into())
+        .unwrap();
+    assert_eq!(
+        call(&s, &db, &a, "get_report_summary", report.clone())["meta"]["cache"]["reused"],
+        false
+    );
+    let health = call(
+        &s,
+        &db,
+        &a,
+        "inspect_data",
+        json!({"action":"health","snapshot":first["meta"]["snapshotId"]}),
+    );
+    assert_eq!(health["health"]["healthy"], true);
+    assert!(!health.to_string().contains("secret-"));
+    s.pause(true).unwrap();
+    assert_eq!(
+        err(&s, &db, &a, "inspect_data", json!({"action":"cache"})),
+        "paused"
+    );
+    s.pause(false).unwrap();
+    assert_eq!(
+        call(&s, &db, &a, "get_report_summary", report.clone())["meta"]["cache"]["reused"],
+        false
+    );
+    s.revoke(&a.client_id).unwrap();
+    assert_eq!(err(&s, &db, &a, "get_report_summary", report), "revoked");
+}
+#[test]
+fn cache_default_timezone_is_resolved_before_identity_and_scalar_jobs_fail_without_panicking() {
+    let (db, s, a, _) = fixture();
+    let t = db.save_task(input("timezone", "A")).unwrap();
+    event(&db, t.id, "2026-08-08T10:00:00+08:00", "completed");
+    let raw = json!({"startDate":"2026-08-08","endDate":"2026-08-08"});
+    let first = call(&s, &db, &a, "get_report_summary", raw.clone());
+    let mut explicit = raw;
+    explicit["timezoneOffsetMinutes"] = first["timezoneOffsetMinutes"].clone();
+    assert_eq!(
+        call(&s, &db, &a, "get_report_summary", explicit)["meta"]["cache"]["reused"],
+        true
+    );
+    for arguments in [json!(42), json!(null), json!([]), json!("bad")] {
+        assert_eq!(
+            err(
+                &s,
+                &db,
+                &a,
+                "manage_jobs",
+                json!({"action":"start","kind":"get_report_summary","arguments":arguments})
+            ),
+            "invalid_arguments"
+        );
+    }
+    assert_eq!(
+        call(&s, &db, &a, "inspect_data", json!({"action":"health"}))["health"]["healthy"],
+        true
+    );
+    assert_eq!(
+        bounded(json!({"oversized":"x".repeat(7*1024*1024)}))
+            .unwrap_err()
+            .code,
+        "resource_limit"
+    );
+}
+
+#[test]
+fn cache_clear_preserves_actual_audit_snapshot_and_index_repair_invalidates_job_and_cursor() {
+    let (db, s, a, _) = fixture();
+    call(
+        &s,
+        &db,
+        &a,
+        "mutate_task",
+        json!({"action":"create","task":{"title":"audited","departments":["A"],"contacts":["secret-contact"],"taskType":"T"},"idempotencyKey":"p6-audit","intent":{"summary":"synthetic explicit create","explicitUserRequest":true},"reason":"synthetic"}),
+    );
+    let audit = db.mcp_audit_state().unwrap();
+    assert!(!audit["audits"].as_array().unwrap().is_empty());
+    let full = call(&s, &db, &a, "query_changes", json!({"projection":["id"]}));
+    let args = json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480});
+    let report = call(&s, &db, &a, "get_report_summary", args.clone());
+    let before = db.mcp_basis().unwrap();
+    s.cache.lock().unwrap().clear(None);
+    assert_eq!(audit, db.mcp_audit_state().unwrap());
+    assert_eq!(before, db.mcp_basis().unwrap());
+    let health = call(
+        &s,
+        &db,
+        &a,
+        "inspect_data",
+        json!({"action":"health","snapshot":report["meta"]["snapshotId"],"cursor":full["nextCursor"]}),
+    );
+    assert_eq!(health["snapshot"]["valid"], true);
+    assert_eq!(health["cursor"]["valid"], true);
+    let job = call(
+        &s,
+        &db,
+        &a,
+        "manage_jobs",
+        json!({"action":"start","kind":"query_tasks","arguments":{"projection":["id"]}}),
+    );
+    let id = job["job"]["jobId"].clone();
+    let mut complete = false;
+    for _ in 0..20 {
+        std::thread::sleep(std::time::Duration::from_millis(25));
+        if call(
+            &s,
+            &db,
+            &a,
+            "manage_jobs",
+            json!({"action":"get","jobId":id}),
+        )["state"]
+            == "completed"
+        {
+            complete = true;
+            break;
+        }
+    }
+    assert!(complete);
+    let path = s
+        .queries
+        .lock()
+        .unwrap()
+        .root
+        .parent()
+        .unwrap()
+        .join("inline.db");
+    rusqlite::Connection::open(path).unwrap().execute("DELETE FROM mcp_change_events WHERE sequence=(SELECT MIN(sequence) FROM mcp_change_events)",[]).unwrap();
+    let corrupt = call(
+        &s,
+        &db,
+        &a,
+        "inspect_data",
+        json!({"action":"health","cursor":full["nextCursor"]}),
+    );
+    assert_eq!(corrupt["health"]["healthy"], false);
+    assert_eq!(corrupt["cursor"]["valid"], false);
+    db.mcp_repair_derived().unwrap();
+    assert_eq!(audit, db.mcp_audit_state().unwrap());
+    let mut old = args;
+    old["snapshot"] = report["meta"]["snapshotId"].clone();
+    assert_eq!(
+        err(&s, &db, &a, "get_report_summary", old),
+        "snapshot_invalid"
+    );
+    assert_eq!(
+        err(
+            &s,
+            &db,
+            &a,
+            "query_changes",
+            json!({"projection":["id"],"cursor":full["nextCursor"]})
+        ),
+        "resync_required"
+    );
+    assert_eq!(
+        err(
+            &s,
+            &db,
+            &a,
+            "manage_jobs",
+            json!({"action":"result","jobId":id})
+        ),
+        "snapshot_invalid"
+    );
+}
+
+#[test]
 fn pages_freeze_content_and_order_over_100_items_and_concurrent_writes() {
     let (db, s, a, b) = fixture();
     for i in 0..101 {

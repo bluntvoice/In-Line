@@ -1,0 +1,15 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+error[E0609]: no field `id` on type `()`
+  --> src\mcp\query_tests.rs:89:31
+   |
+89 |     db.void_work_event(voided.id, true).unwrap();
+   |                               ^^ unknown field
+
+error[E0609]: no field `id` on type `()`
+   --> src\mcp\query_tests.rs:155:48
+    |
+155 |                     .any(|e| e["id"] == voided.id));
+    |                                                ^^ unknown field
+
+For more information about this error, try `rustc --explain E0609`.
+error: could not compile `in-line` (lib test) due to 2 previous errors

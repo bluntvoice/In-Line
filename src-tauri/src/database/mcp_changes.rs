@@ -13,7 +13,8 @@ const TABLES: &[(&str, &str)] = &[
     ("task_work_events", "task_id"),
     ("queue_number_allocations", "task_id"),
 ];
-pub(super) fn install(tx: &Connection) -> Result<(), String> {
+pub(super) fn definitions() -> Vec<(String, String)> {
+    let mut definitions = vec![];
     for (table, id) in TABLES {
         for action in ["INSERT", "UPDATE", "DELETE"] {
             let row = if action == "DELETE" { "OLD" } else { "NEW" };
@@ -22,12 +23,20 @@ pub(super) fn install(tx: &Connection) -> Result<(), String> {
             } else {
                 format!("{row}.{id}")
             };
-            tx.execute_batch(&format!("DROP TRIGGER IF EXISTS mcp_basis_{table}_{action}; CREATE TRIGGER mcp_basis_{table}_{action} AFTER {action} ON {table} BEGIN
+            let name = format!("mcp_basis_{table}_{action}");
+            definitions.push((name.clone(),format!("CREATE TRIGGER {name} AFTER {action} ON {table} BEGIN
           UPDATE mcp_data_basis SET commit_sequence=commit_sequence+1 WHERE singleton=1;
           UPDATE mcp_change_index SET total_events=total_events+1 WHERE singleton=1 AND {task} IS NOT NULL;
           INSERT INTO mcp_change_events(sequence,generation,task_id,source,operation,changed_at) SELECT commit_sequence,data_generation,{task},'{table}','{action}',strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM mcp_data_basis WHERE singleton=1 AND {task} IS NOT NULL;
-          END;" )).map_err(display_error)?;
+          END;" )));
         }
+    }
+    definitions
+}
+pub(super) fn install(tx: &Connection) -> Result<(), String> {
+    for (name, definition) in definitions() {
+        tx.execute_batch(&format!("DROP TRIGGER IF EXISTS {name};{definition}"))
+            .map_err(display_error)?;
     }
     Ok(())
 }

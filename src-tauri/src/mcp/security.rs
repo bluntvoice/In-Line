@@ -160,6 +160,7 @@ pub struct Security {
     pub(crate) queries: Mutex<super::query::QueryState>,
     pub(crate) changes: Mutex<super::changes::Changes>,
     pub jobs: super::jobs::Jobs,
+    pub(crate) cache: Mutex<super::cache::Cache>,
 }
 impl Security {
     pub fn open() -> Result<Self, McpError> {
@@ -187,6 +188,7 @@ impl Security {
         let store = std::sync::Arc::new(Mutex::new(store));
         let limits = std::sync::Arc::new(Mutex::new(Limiter::default()));
         let security = Self {
+            cache: Mutex::new(super::cache::Cache::default()),
             jobs: super::jobs::Jobs::new(root.clone(), store.clone(), limits.clone()),
             changes: Mutex::new(super::changes::Changes::new(root.clone())),
             store,

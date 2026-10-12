@@ -568,6 +568,37 @@ fn mcp_jobs_state(
     security.jobs.local_list().map_err(mcp_error)
 }
 #[tauri::command]
+fn mcp_cache_state(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    db: State<Database>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    Ok(
+        serde_json::json!({"cache":security.cache.lock().map_err(|_|"缓存状态不可用")?.info(None),"health":db.mcp_quality_health().map_err(mcp_error)?}),
+    )
+}
+#[tauri::command]
+fn mcp_clear_cache(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    Ok(security
+        .cache
+        .lock()
+        .map_err(|_| "缓存状态不可用")?
+        .clear(None))
+}
+#[tauri::command]
+fn mcp_rebuild_index(
+    window: tauri::WebviewWindow,
+    db: State<Database>,
+) -> Result<serde_json::Value, String> {
+    mcp_local(&window)?;
+    db.mcp_repair_derived().map_err(mcp_error)
+}
+#[tauri::command]
 fn mcp_cancel_job(
     window: tauri::WebviewWindow,
     security: State<McpSecurity>,
@@ -1315,6 +1346,9 @@ pub fn run() {
             mcp_connection_guide,
             mcp_security_state,
             mcp_jobs_state,
+            mcp_cache_state,
+            mcp_clear_cache,
+            mcp_rebuild_index,
             mcp_cancel_job,
             mcp_cleanup_jobs,
             mcp_prepare_onboarding,

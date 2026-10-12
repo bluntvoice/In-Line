@@ -9,7 +9,7 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 ## v0.5.0 开发构建
 
-MCP P5开发新增增量同步、后台查询/导出和任务取消/恢复管理，仍待P8统一验收；[使用说明](docs/mcp/jobs-and-changes-guide.md)。
+MCP P5/P6开发新增增量同步、后台查询/导出，以及统计溯源、数据健康和安全缓存清理；待P8统一验收。见[任务指南](docs/mcp/jobs-and-changes-guide.md)、[数据与缓存指南](docs/mcp/quality-and-cache-guide.md)。
 
 提前取号与未来事项已进入开发验收，当前正式版仍为 v0.4.0。开发安装包通过 Actions Artifact 分发，尚未发布 Tag 或 Release。
 

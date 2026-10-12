@@ -10,7 +10,7 @@ use crate::mcp::{
 use serde_json::{json, Value as Json};
 
 fn basis(conn: &Connection) -> Result<DataVersion, McpError> {
-    conn.query_row("SELECT database_uuid,data_generation,commit_sequence FROM mcp_data_basis WHERE singleton=1",[],|r|Ok(DataVersion{database_uuid:r.get(0)?,data_generation:r.get(1)?,commit_sequence:r.get(2)?,schema_version:DATABASE_SCHEMA_VERSION as u32,query_schema_version:1,statistics_definition_version:1})).map_err(sql)
+    conn.query_row("SELECT database_uuid,data_generation,commit_sequence,(SELECT epoch FROM mcp_change_index WHERE singleton=1) FROM mcp_data_basis WHERE singleton=1",[],|r|Ok(DataVersion{database_uuid:r.get(0)?,data_generation:r.get(1)?,commit_sequence:r.get(2)?,index_epoch:r.get(3)?,schema_version:DATABASE_SCHEMA_VERSION as u32,query_schema_version:1,statistics_definition_version:1})).map_err(sql)
 }
 fn limit(conn: &Connection) -> Result<usize, McpError> {
     let s: Option<String> = conn

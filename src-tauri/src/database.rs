@@ -7,6 +7,8 @@ mod mcp_batch;
 mod mcp_changes;
 #[cfg(windows)]
 mod mcp_complex;
+mod mcp_metrics;
+mod mcp_quality;
 mod mcp_read;
 mod mcp_schema;
 #[cfg(windows)]
@@ -90,6 +92,10 @@ impl Database {
             Self::check_integrity(&protected)?;
         }
         Self::migrate(&mut connection)?;
+        // Only derived indexes may be rebuilt; source history is not reconstructed.
+        if let Err(_error) = mcp_quality::repair(&mut connection) {
+            eprintln!("MCP派生索引校验失败；业务库未自动修复，请在本地检查");
+        }
         let date_marker = Local::now().format("%Y%m%d").to_string();
         let daily_exists = fs::read_dir(&backup_dir)
             .map_err(display_error)?
@@ -2005,21 +2011,7 @@ impl Database {
         let offset = FixedOffset::east_opt(offset_seconds).ok_or("本地时区无效")?;
         self.with_conn(|connection| {
             scope.register(connection)?;
-            let cte = "WITH ranged AS (
-                SELECT event.id,event.task_id,event.result_status,event.handled_at,
-                       tasks.task_type AS current_task_type,tasks.department AS current_department,
-                       tasks.parent_task_id AS current_parent_task_id
-                FROM task_work_events event
-                JOIN tasks ON tasks.id=event.task_id
-                WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
-                  AND strftime('%s',event.handled_at)>=strftime('%s',?1)
-                  AND strftime('%s',event.handled_at)<strftime('%s',?2)
-              ), ranked AS (
-                SELECT *,ROW_NUMBER() OVER(
-                  PARTITION BY task_id ORDER BY strftime('%s',handled_at) DESC,id DESC
-                ) AS position
-                FROM ranged
-              )";
+            let cte = mcp_metrics::RANGED_CTE;
             let summary_sql = format!(
                 "{cte}
                  SELECT count(*),
@@ -2059,25 +2051,7 @@ impl Database {
             let eligible_tasks = if rate_mode == "processing" {
                 connection
                     .query_row(
-                        "WITH eligible AS (
-                           SELECT entry.task_id
-                           FROM task_queue_entries entry
-                           JOIN tasks ON tasks.id=entry.task_id
-                           WHERE tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
-                             AND strftime('%s',entry.enqueued_at)<strftime('%s',?2)
-                             AND (entry.closed_at IS NULL OR strftime('%s',entry.closed_at)>strftime('%s',?1))
-                             AND (tasks.requested_deadline IS NULL OR (
-                               strftime('%s',tasks.requested_deadline)>=strftime('%s',?1)
-                               AND strftime('%s',tasks.requested_deadline)<strftime('%s',?2)
-                             ))
-                           UNION
-                           SELECT event.task_id
-                           FROM task_work_events event
-                           JOIN tasks ON tasks.id=event.task_id
-                           WHERE event.voided_at IS NULL AND tasks.deleted_at IS NULL AND mcp_scope(tasks.department,tasks.task_type)
-                             AND strftime('%s',event.handled_at)>=strftime('%s',?1)
-                             AND strftime('%s',event.handled_at)<strftime('%s',?2)
-                         ) SELECT count(*) FROM eligible",
+                        mcp_metrics::ELIGIBLE_COUNT_SQL,
                         params![start, end],
                         |row| row.get::<_, i64>(0),
                     )
@@ -2579,6 +2553,18 @@ fn clear_urgent_on(connection: &Connection, id: i64, reason: &str) -> Result<(),
     Ok(())
 }
 fn ensure_master(connection: &Connection, kind: &str, name: &str) -> Result<(), String> {
+    // Existing active values are a no-op, including startup contact discovery.
+    // A conflict must not manufacture basis changes or advance AUTOINCREMENT.
+    let active: bool = connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM master_values WHERE kind=? AND name=? AND is_active=1)",
+            params![kind, name.trim()],
+            |r| r.get(0),
+        )
+        .map_err(display_error)?;
+    if active {
+        return Ok(());
+    }
     connection
         .execute(
             "INSERT INTO master_values(kind,name,sort_order,is_active) VALUES(?,?,999,1)

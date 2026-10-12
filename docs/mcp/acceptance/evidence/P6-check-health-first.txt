@@ -1,0 +1,13 @@
+    Checking in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+warning: method `mcp_quality_health` is never used
+   --> src\database\mcp_quality.rs:152:19
+    |
+151 | impl Database {
+    | ------------- method in this implementation
+152 |     pub(crate) fn mcp_quality_health(&self) -> Result<Value, McpError> {
+    |                   ^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `in-line` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.77s

@@ -1,3 +1,7 @@
+# 当前P6开发契约
+
+15工具/schema14，新增inspect_data及受控内存缓存，见[数据与缓存指南](quality-and-cache-guide.md)。各阶段分别提交推送、P8统一验收；P1自动接入仍关闭。下文早期状态为历史。
+
 # 当前P5开发契约
 
 实际14工具/schema14，新增后台任务与增量同步，说明见[jobs-and-changes-guide](jobs-and-changes-guide.md)。各阶段分别开发提交推送，P8统一验收；P1自动接入仍关闭。下文更早“当前”说明为历史。

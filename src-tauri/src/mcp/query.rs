@@ -66,12 +66,15 @@ struct Snapshot {
     client: String,
     revision: u64,
     hash: String,
+    coverage: Value,
     ids: Vec<i64>,
     created: Instant,
     expires: i64,
     cursors: HashMap<String, (usize, i64)>,
     rows: Option<Vec<Value>>,
     summary: Option<Value>,
+    traces: HashMap<String, Vec<Value>>,
+    trace_cursors: HashMap<String, (String, usize, i64)>,
     bytes: usize,
 }
 pub struct QueryState {
@@ -166,12 +169,15 @@ impl QueryState {
                 client: client.into(),
                 revision: auth.revision,
                 hash,
+                coverage: json!({"scope":auth.scope,"filters":filters}),
                 ids: dependencies.into_iter().collect(),
                 created: Instant::now(),
                 expires: Utc::now().timestamp() + 600,
                 cursors: HashMap::new(),
                 rows: None,
                 summary: None,
+                traces: HashMap::new(),
+                trace_cursors: HashMap::new(),
                 bytes,
             },
         );
@@ -215,6 +221,7 @@ impl QueryState {
         let live = db.mcp_basis()?;
         if live.database_uuid != s.basis.database_uuid
             || live.data_generation != s.basis.data_generation
+            || live.index_epoch != s.basis.index_epoch
             || !db.mcp_in_scope(&s.ids, &auth.scope)?
         {
             return Err(McpError::new("snapshot_invalid"));
@@ -270,7 +277,7 @@ impl QueryState {
 }
 
 fn meta(id: &str, s: &Snapshot) -> Value {
-    json!({"snapshotId":id,"dataVersion":s.basis,"authorizationRevision":s.revision,"expiresAt":s.expires,"basis":"immutable_in_memory_sqlite","complete":false,"knownGaps":["Historical records predating event tracking may be absent; original free-form logs are not structured business events"],"cache":{"reused":false},"querySchemaVersion":1,"statisticsDefinitionVersion":1})
+    json!({"snapshotId":id,"dataVersion":s.basis,"authorizationRevision":s.revision,"expiresAt":s.expires,"basis":"immutable_in_memory_sqlite","complete":true,"historicalCompleteness":"unknown","coverage":s.coverage,"knownGaps":["Historical records predating event tracking may be absent; original free-form logs are not structured business events"],"cache":{"reused":false},"querySchemaVersion":1,"statisticsDefinitionVersion":1})
 }
 fn hash(value: Value) -> String {
     format!("{:x}", Sha256::digest(serde_json::to_vec(&value).unwrap()))
@@ -285,6 +292,16 @@ fn limit(value: Option<i64>) -> Result<i64, McpError> {
 }
 fn invalid() -> McpError {
     McpError::new("invalid_arguments")
+}
+pub(super) fn bounded(value: Value) -> Result<Value, McpError> {
+    if serde_json::to_vec(&value)
+        .map_err(|_| McpError::new("internal_error"))?
+        .len()
+        > 7 * 1024 * 1024
+    {
+        return Err(McpError::new("resource_limit"));
+    }
+    Ok(value)
 }
 pub(super) fn projection(
     fields: Option<&Vec<String>>,
@@ -681,6 +698,240 @@ fn range(start: &str, end: &str, offset: Option<i32>) -> Result<(String, String,
         .ok_or_else(invalid)?;
     Ok((a.to_rfc3339(), b.to_rfc3339(), minutes))
 }
+/// Validation is performed by the same report resolver before trace paging.
+pub fn trace(
+    state: &mut QueryState,
+    db: &Database,
+    client: &str,
+    auth: &Authorization,
+    args: super::inspect_types::InspectArgs,
+) -> Result<Value, McpError> {
+    let report_args = args.report.ok_or_else(invalid)?;
+    if report_args.snapshot.is_none()
+        || report_args.cursor.is_some()
+        || report_args.offset.is_some()
+    {
+        return Err(invalid());
+    }
+    let n = limit(report_args.limit)?;
+    let result = report(state, db, client, auth, report_args.clone(), true)?;
+    let id = result["meta"]["snapshotId"]
+        .as_str()
+        .ok_or_else(invalid)?
+        .to_string();
+    let metric = args.metric.as_deref().ok_or_else(invalid)?;
+    let context = hash(json!([metric, args.dimension, args.period_start, n]));
+    let (mut start, mut end, tz) = range(
+        &report_args.start_date,
+        &report_args.end_date,
+        report_args.timezone_offset_minutes,
+    )?;
+    let stats = &result["statistics"];
+    let summary = &stats["summary"];
+    let mode = summary["rateMode"].as_str().ok_or_else(invalid)?;
+    let (family, name) = metric.split_once('.').unwrap_or(("summary", metric));
+    let expected = match family {
+        "summary" => {
+            if args.dimension.is_some() || args.period_start.is_some() {
+                return Err(invalid());
+            }
+            match name {
+                "handledTasks"
+                | "topLevelTasks"
+                | "subtasks"
+                | "processed"
+                | "completed"
+                | "waitingMaterials"
+                | "waitingConfirmation"
+                | "waitingCounterpartyConfirmation"
+                | "rateNumerator"
+                | "rateDenominator"
+                | "completionRate" => summary[name].clone(),
+                _ => return Err(invalid()),
+            }
+        }
+        "byTaskType" | "byDepartment" => {
+            let dimension = args.dimension.as_deref().ok_or_else(invalid)?;
+            if dimension.len() > 400
+                || dimension.chars().any(char::is_control)
+                || args.period_start.is_some()
+                || !["handledTasks", "completed", "pendingFollowUp"].contains(&name)
+            {
+                return Err(invalid());
+            }
+            let field = if family == "byTaskType" {
+                "taskType"
+            } else {
+                "department"
+            };
+            stats[family]
+                .as_array()
+                .ok_or_else(invalid)?
+                .iter()
+                .find(|v| v[field] == dimension)
+                .ok_or_else(|| McpError::new("not_found"))?[name]
+                .clone()
+        }
+        "trend" => {
+            let period = args.period_start.as_deref().ok_or_else(invalid)?;
+            if args.dimension.is_some()
+                || !["handledTasks", "processed", "completed"].contains(&name)
+            {
+                return Err(invalid());
+            }
+            let entry = stats["trend"]
+                .as_array()
+                .ok_or_else(invalid)?
+                .iter()
+                .find(|v| v["periodStart"] == period)
+                .ok_or_else(|| McpError::new("not_found"))?;
+            let d = NaiveDate::parse_from_str(period, "%Y-%m-%d").map_err(|_| invalid())?;
+            let offset = FixedOffset::east_opt(tz * 60).ok_or_else(invalid)?;
+            let bucket = offset
+                .from_local_datetime(&d.and_hms_opt(0, 0, 0).ok_or_else(invalid)?)
+                .single()
+                .ok_or_else(invalid)?;
+            let bucket_end = bucket
+                + chrono::Duration::days(if stats["trendGranularity"] == "week" {
+                    7
+                } else {
+                    1
+                });
+            let a = DateTime::parse_from_rfc3339(&start).map_err(|_| invalid())?;
+            let b = DateTime::parse_from_rfc3339(&end).map_err(|_| invalid())?;
+            start = a.max(bucket).to_rfc3339();
+            end = b.min(bucket_end).to_rfc3339();
+            entry[name].clone()
+        }
+        _ => return Err(invalid()),
+    };
+    let remaining = 64 * 1024 * 1024 - state.snapshots.values().map(|s| s.bytes).sum::<usize>();
+    let s = state
+        .snapshots
+        .get_mut(&id)
+        .ok_or_else(|| McpError::new("snapshot_expired"))?;
+    let offset = if let Some(cursor) = args.cursor.as_deref() {
+        let (stored, offset, size) = s
+            .trace_cursors
+            .get(cursor)
+            .ok_or_else(|| McpError::new("cursor_invalid"))?;
+        if stored != &context || *size != n {
+            return Err(McpError::new("cursor_invalid"));
+        }
+        *offset
+    } else {
+        0
+    };
+    let rate = family == "summary"
+        && ["rateNumerator", "rateDenominator", "completionRate"].contains(&name);
+    if !s.traces.contains_key(&context) {
+        if s.traces.len() >= 32 {
+            return Err(McpError::new("resource_limit"));
+        }
+        let eligible = rate && mode == "processing" && name != "rateNumerator";
+        let mut rows =
+            s.db.mcp_metric_sources(start.clone(), end.clone(), auth.scope.clone(), eligible)?;
+        rows.retain(|r| {
+            if family == "byTaskType" && r["taskType"] != args.dimension.as_deref().unwrap() {
+                return false;
+            }
+            if family == "byDepartment" {
+                let list = r["departments"].as_array().unwrap();
+                if !(list.is_empty() && args.dimension.as_deref() == Some("未分类")
+                    || list.iter().any(|d| d == args.dimension.as_deref().unwrap()))
+                {
+                    return false;
+                }
+            }
+            let status = r["winningResult"].as_str();
+            match name {
+                "topLevelTasks" => r["isSubtask"] == false,
+                "subtasks" => r["isSubtask"] == true,
+                "processed" => status == Some("processed"),
+                "completed" => status == Some("completed"),
+                "waitingMaterials" => status == Some("waiting_materials"),
+                "waitingConfirmation" => status == Some("waiting_confirmation"),
+                "waitingCounterpartyConfirmation" => {
+                    status == Some("waiting_counterparty_confirmation")
+                }
+                "pendingFollowUp" => status.is_some_and(|v| v != "completed"),
+                "rateNumerator" if mode == "closure" => status == Some("completed"),
+                _ => true,
+            }
+        });
+        for row in &mut rows {
+            row["metricWeight"] = json!(1);
+            if rate {
+                row["numeratorWeight"] = json!(i64::from(if mode == "processing" {
+                    !row["winningEventId"].is_null()
+                } else {
+                    row["winningResult"] == "completed"
+                }));
+                row["denominatorWeight"] = json!(1);
+            }
+        }
+        // Fail rather than claim source completeness if the authoritative GUI count differs.
+        if name != "completionRate" && expected.as_u64() != Some(rows.len() as u64) {
+            return Err(McpError::new("verification_failed"));
+        }
+        if name == "completionRate"
+            && (rows.len() as i64 != summary["rateDenominator"].as_i64().unwrap_or(-1)
+                || rows
+                    .iter()
+                    .map(|r| r["numeratorWeight"].as_i64().unwrap())
+                    .sum::<i64>()
+                    != summary["rateNumerator"].as_i64().unwrap_or(-1))
+        {
+            return Err(McpError::new("verification_failed"));
+        }
+        let bytes = ensure_rows_budget(&rows)?;
+        if bytes > remaining {
+            return Err(McpError::new("resource_limit"));
+        }
+        s.bytes += bytes;
+        s.traces.insert(context.clone(), rows);
+    }
+    let rows = &s.traces[&context];
+    let end_offset = (offset + n as usize).min(rows.len());
+    if offset > rows.len() {
+        return Err(McpError::new("cursor_invalid"));
+    }
+    let page = rows[offset..end_offset].to_vec();
+    let next = if end_offset < rows.len() {
+        if s.trace_cursors.len() >= 4096 {
+            return Err(McpError::new("resource_limit"));
+        }
+        let token = platform::random_secret()?;
+        s.trace_cursors
+            .insert(token.clone(), (context, end_offset, n));
+        Some(token)
+    } else {
+        None
+    };
+    let value = json!({"metric":metric,"value":expected,"rateMode":mode,"rateNumerator":summary["rateNumerator"],"rateDenominator":summary["rateDenominator"],"formula":if rate{if mode=="processing"{"handled unique tasks / eligible queued-or-handled unique tasks"}else{"completed unique tasks / handled unique tasks"}}else{"count of tasks selected from last valid event in the metric range"},"items":page,"totalSources":rows.len(),"nextCursor":next,"sourceRange":{"start":start,"endExclusive":end,"timezoneOffsetMinutes":tz},"meta":meta(&id,s),"complete":true,"coverage":result["coverage"],"definition":result["definition"],"knownGaps":["Original missing work records cannot be reconstructed; current attribution is fixed at snapshot capture"],"omittedFields":["contacts","details","internalNotes","workEvent.note","queue.closeReason","outOfScopeParentId"]});
+    if serde_json::to_vec(&value).map_err(|_| invalid())?.len() > 7 * 1024 * 1024 {
+        return Err(McpError::new("resource_limit"));
+    }
+    Ok(value)
+}
+
+pub fn snapshot_health(
+    state: &QueryState,
+    db: &Database,
+    client: &str,
+    auth: &Authorization,
+    id: &str,
+) -> Result<Value, McpError> {
+    let s = state
+        .snapshots
+        .get(id)
+        .filter(|s| s.client == client)
+        .ok_or_else(|| McpError::new("not_found"))?;
+    let live = db.mcp_basis()?;
+    Ok(
+        json!({"snapshotId":id,"valid":s.created.elapsed()<TTL && s.revision==auth.revision && live.database_uuid==s.basis.database_uuid && live.data_generation==s.basis.data_generation && live.index_epoch==s.basis.index_epoch && db.mcp_in_scope(&s.ids,&auth.scope)?,"dataVersion":s.basis,"currentBasisEqual":s.basis==live,"expiresAt":s.expires,"businessBodyIncluded":false}),
+    )
+}
 pub fn report(
     state: &mut QueryState,
     db: &Database,
@@ -724,7 +975,7 @@ pub fn report(
     let s = state.snapshots.get_mut(&id).unwrap();
     if summary {
         let statistics = s.db.statistics_scoped(start, end, tz, auth.scope.clone())?;
-        return Ok(
+        return bounded(
             json!({"startDate":args.start_date,"endDate":args.end_date,"timezoneOffsetMinutes":tz,"statistics":statistics,"meta":meta(&id,s),"definition":{"aggregation":"last valid event per task in range; trend deduplication per existing UI bucket; archived included; trash and voided excluded","attribution":"current task type and departments at snapshot capture","departmentCountsMayOverlap":true},"coverage":{"startDate":args.start_date,"endDate":args.end_date,"scope":auth.scope,"filters":f}}),
         );
     }

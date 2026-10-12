@@ -39,6 +39,23 @@ pub struct Changes {
     root: PathBuf,
 }
 impl Changes {
+    pub(crate) fn health(
+        &self,
+        db: &Database,
+        client: &str,
+        auth: &Authorization,
+        token: &str,
+    ) -> Result<Value, McpError> {
+        let c: Cursor = durable::read(&self.root, token, 2 * 1024 * 1024)
+            .map_err(|_| McpError::new("not_found"))?;
+        if c.client != client {
+            return Err(McpError::new("not_found"));
+        }
+        let live = db.mcp_basis()?;
+        Ok(
+            json!({"valid":db.mcp_quality_health()?["healthy"]==true && db.mcp_change_index()?.get("historyFloor").and_then(Value::as_i64).is_some_and(|floor|c.after>=floor) && c.revision==auth.revision && c.expires>=Utc::now().timestamp() && live.database_uuid==c.basis.database_uuid && live.data_generation==c.basis.data_generation && live.index_epoch.as_deref()==Some(c.epoch.as_str()),"fullSyncInProgress":c.full,"expiresAt":c.expires,"indexEpoch":c.epoch,"historyFloor":c.floor,"watermark":c.after,"businessBodyIncluded":false}),
+        )
+    }
     pub fn new(parent: PathBuf) -> Self {
         Self {
             root: parent.join("changes"),

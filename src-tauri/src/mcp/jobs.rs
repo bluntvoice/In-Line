@@ -91,7 +91,7 @@ fn fingerprint(
     )
 }
 fn view(j: &Job) -> Value {
-    json!({"jobId":j.id,"clientId":j.client,"kind":j.kind,"state":j.state,"createdAt":j.created,"checkpointAt":j.checkpoint,"finishedAt":j.finished,"firstPausedAt":j.first_paused,"progress":{"processed":j.rows.len(),"total":j.total},"rounds":j.rounds,"finalRound":if j.state=="completed"{j.rounds.last().map(|r|r.number)}else{None},"errorCode":j.error,"complete":j.state=="completed"})
+    json!({"jobId":j.id,"clientId":j.client,"kind":j.kind,"state":j.state,"createdAt":j.created,"checkpointAt":j.checkpoint,"finishedAt":j.finished,"sourceSnapshotId":j.meta["snapshotId"],"reuseValidationStatus":"requires_current_request_validation","firstPausedAt":j.first_paused,"progress":{"processed":j.rows.len(),"total":j.total},"rounds":j.rounds,"finalRound":if j.state=="completed"{j.rounds.last().map(|r|r.number)}else{None},"errorCode":j.error,"complete":j.state=="completed"})
 }
 fn save(root: &std::path::Path, j: &Job) -> Result<(), McpError> {
     durable::write(root, &j.id, j, MAX_FILE, 64 * 1024 * 1024, 256)
@@ -274,10 +274,16 @@ impl Jobs {
                 .kind
                 .as_deref()
                 .ok_or_else(|| McpError::new("invalid_arguments"))?;
-            let arguments = args
+            let mut arguments = args
                 .arguments
                 .ok_or_else(|| McpError::new("invalid_arguments"))?;
             validate(kind, &arguments, auth)?;
+            if ["get_report_summary", "query_work_calendar"].contains(&kind)
+                && arguments["timezoneOffsetMinutes"].is_null()
+            {
+                arguments["timezoneOffsetMinutes"] =
+                    json!(chrono::Local::now().offset().local_minus_utc() / 60);
+            }
             let basis = db.mcp_basis()?;
             let hash = fingerprint(
                 kind,
@@ -287,18 +293,22 @@ impl Jobs {
                 args.allow_latest_after_invalidation,
             );
             let waiter = platform::random_secret()?;
-            if !args.explicit_requery {
+            if !args.explicit_requery
+                && !(kind == "get_report_summary" && arguments["explicitRequery"] == true)
+            {
                 if let Some(j) = s.jobs.values_mut().find(|j| {
                     j.client == client
                         && j.fingerprint == hash
                         && (active(&j.state)
                             || j.state == "completed"
-                                && j.finished.is_some_and(|at| now - at < 600))
+                                && j.finished.is_some_and(|at| now >= at && now - at < 600))
                         && j.waiters.len() < 256
                 }) {
                     j.waiters.insert(waiter.clone(), true);
                     save(&self.root, j)?;
-                    return Ok(json!({"job":view(j),"waiterId":waiter,"reused":true}));
+                    return Ok(
+                        json!({"job":view(j),"waiterId":waiter,"reused":true,"reuse":{"sourceJobId":j.id,"computedAt":j.finished,"sourceSnapshotId":j.meta["snapshotId"],"validatedAt":now,"validationStatus":"current_basis_and_authorization"}}),
+                    );
                 }
             }
             if s.jobs.values().filter(|j| active(&j.state)).count() >= 2
@@ -403,6 +413,7 @@ impl Jobs {
                 if !db.mcp_in_scope(&j.dependencies, &auth.scope)?
                     || live.data_generation != j.rounds.last().unwrap().basis.data_generation
                     || live.database_uuid != j.rounds.last().unwrap().basis.database_uuid
+                    || live.index_epoch != j.rounds.last().unwrap().basis.index_epoch
                 {
                     return Err(McpError::new("snapshot_invalid"));
                 }
@@ -412,7 +423,7 @@ impl Jobs {
                     return Err(McpError::new("invalid_arguments"));
                 }
                 let end = (offset + limit).min(j.rows.len());
-                let result = json!({"job":view(j),"items":j.rows[offset..end],"offset":offset,"hasMore":end<j.rows.len(),"nextOffset":if end<j.rows.len(){Some(end)}else{None},"meta":j.meta,"summary":j.summary,"complete":true});
+                let result = json!({"job":view(j),"items":j.rows[offset..end],"offset":offset,"hasMore":end<j.rows.len(),"nextOffset":if end<j.rows.len(){Some(end)}else{None},"meta":j.meta,"summary":j.summary,"complete":true,"reuse":{"sourceJobId":j.id,"computedAt":j.finished,"sourceSnapshotId":j.meta["snapshotId"],"validatedAt":now,"validationStatus":if live==j.rounds.last().unwrap().basis{"current_basis_and_authorization"}else{"authorized_historical_basis"}}});
                 if serde_json::to_vec(&result).unwrap().len() > 7 * 1024 * 1024 {
                     return Err(McpError::new("resource_limit"));
                 }
@@ -575,6 +586,7 @@ impl Jobs {
             if (recovering && &live != baseline)
                 || live.database_uuid != baseline.database_uuid
                 || live.data_generation != baseline.data_generation
+                || live.index_epoch != baseline.index_epoch
             {
                 if j.allow_latest && j.rounds.len() == 1 && j.kind != "export" {
                     let r = j.rounds.last_mut().unwrap();

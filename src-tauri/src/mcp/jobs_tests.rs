@@ -246,7 +246,16 @@ fn asynchronous_export_requires_intent_and_publishing_recovery_never_generates_a
         .unwrap()
         .join("backups/mcp-created")
         .join(receipt["artifactName"].as_str().unwrap());
-    let bytes = std::fs::read_to_string(synthetic_export).unwrap();
+    let bytes = std::fs::read_to_string(&synthetic_export).unwrap();
+    let checkpoint_path = s
+        .jobs
+        .root
+        .join(format!("{}.json", start["job"]["jobId"].as_str().unwrap()));
+    let checkpoint = std::fs::read(&checkpoint_path).unwrap();
+    let cleared = s.cache.lock().unwrap().clear(None);
+    assert_eq!(cleared["formalExportsRemoved"], 0);
+    assert_eq!(checkpoint, std::fs::read(&checkpoint_path).unwrap());
+    assert_eq!(bytes, std::fs::read_to_string(&synthetic_export).unwrap());
     assert!(bytes.contains("'=unsafe-formula"));
 }
 #[test]
@@ -436,6 +445,42 @@ fn background_report_matches_existing_statistical_definition() {
         job.summary.as_ref().unwrap()["definition"],
         synchronous["definition"]
     );
+    let mut explicit = json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480,"explicitRequery":true});
+    let one = call(
+        &s,
+        &db,
+        &a,
+        json!({"action":"start","kind":"get_report_summary","arguments":explicit}),
+    );
+    wait(&s, one["job"]["jobId"].as_str().unwrap());
+    let two = call(
+        &s,
+        &db,
+        &a,
+        json!({"action":"start","kind":"get_report_summary","arguments":explicit}),
+    );
+    assert_ne!(one["job"]["jobId"], two["job"]["jobId"]);
+    wait(&s, two["job"]["jobId"].as_str().unwrap());
+    explicit["explicitRequery"] = json!(false);
+    let shared = call(
+        &s,
+        &db,
+        &a,
+        json!({"action":"start","kind":"get_report_summary","arguments":explicit}),
+    );
+    wait(&s, shared["job"]["jobId"].as_str().unwrap());
+    let reused = call(
+        &s,
+        &db,
+        &a,
+        json!({"action":"start","kind":"get_report_summary","arguments":explicit}),
+    );
+    assert_eq!(reused["reused"], true);
+    assert_eq!(
+        reused["reuse"]["validationStatus"],
+        "current_basis_and_authorization"
+    );
+    assert_eq!(reused["reuse"]["sourceJobId"], shared["job"]["jobId"]);
 }
 #[test]
 fn publishing_recovery_without_receipt_does_not_reserve_or_write_a_file() {
