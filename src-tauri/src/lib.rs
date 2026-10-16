@@ -538,8 +538,10 @@ fn mcp_executable() -> Result<std::path::PathBuf, String> {
 fn mcp_connection_guide() -> Result<String, String> {
     let executable = mcp_executable()?;
     Ok(format!(
-        "In Line MCP（本机stdio）\n服务程序：{}\n\n新接入流程：选择AI客户端与权限，授权并复制提示词，发送给所选AI。长期凭证只由本机程序处理，不在提示词中显示。Codex当前会话自动接入仍在实机验证，入口暂未开放；既有授权仍可管理或撤销。\n\n工具：get_capabilities、get_report_summary、list_report_items。每页最多100；统一返回status/data/error。常规读取不返回办理自由文本；完整读取需全局及客户端双方启用。当前开发阶段尚无写入工具。\n\n配置与授权验证、当前AI会话连接验证分别记录；禁止用另起实例冒充当前会话自动重载成功。",
-        executable.display()
+        "In Line MCP（本机stdio）\n服务程序：{}\n\n接入流程：选择AI客户端与权限，授权并复制提示词，发送给所选AI。安全授权与配置导入可先执行；当前会话连接须另外实测，不会因配置写入成功而标记接入成功。长期凭证只由本机程序处理，不在提示词中显示。既有授权可管理或撤销。\n\n工具（{}个）：{}。每页最多100；统一返回status/data/error。常规读取不返回办理自由文本；完整读取需全局及客户端双方启用。写入需独立授权与明确用户指令，历史撤销须在软件内批准。\n\n配置与授权验证、当前AI会话连接验证分别记录；禁止用另起实例冒充当前会话自动重载成功。",
+        executable.display(),
+        mcp::contract::TOOLS.len(),
+        mcp::contract::TOOLS.join("、")
     ))
 }
 
@@ -755,7 +757,7 @@ fn mcp_prepare_onboarding(
     security
         .require_sensitive_notice(&args.permissions)
         .map_err(mcp_error)?;
-    mcp::onboarding::require_available(&args.client).map_err(mcp_error)?;
+    mcp::onboarding::require_authorization_available(&args.client).map_err(mcp_error)?;
     mcp::onboarding::prepare_at(
         &security,
         &mcp::platform::root().map_err(mcp_error)?,
@@ -772,7 +774,7 @@ fn mcp_rotate_onboarding(
     id: String,
 ) -> Result<mcp::onboarding::Receipt, String> {
     mcp_local(&window)?;
-    mcp::onboarding::require_available("codex").map_err(mcp_error)?;
+    mcp::onboarding::require_authorization_available("codex").map_err(mcp_error)?;
     mcp::onboarding::rotate_at(
         &security,
         &mcp::platform::root().map_err(mcp_error)?,

@@ -8,6 +8,9 @@ use rmcp::{
 };
 use serde_json::Value;
 struct InLineMcp {
+    #[cfg(windows)]
+    credentials: in_line_lib::mcp::runtime_credentials::Provider,
+    #[cfg(not(windows))]
     credentials: Credentials,
 }
 #[tool_router]
@@ -75,13 +78,17 @@ impl InLineMcp {
         let id =
             in_line_lib::mcp::platform::random_secret().unwrap_or_else(|_| "unavailable".into());
         #[cfg(windows)]
-        let result =
-            in_line_lib::mcp::ipc::call_with_id(self.credentials.clone(), tool, args, id.clone())
-                .await;
+        let (result, refreshed) = match self.credentials.resolve() {
+            Ok((credentials, refreshed)) => (
+                in_line_lib::mcp::ipc::call_with_id(credentials, tool, args, id.clone()).await,
+                refreshed,
+            ),
+            Err(error) => (Err(error), false),
+        };
         #[cfg(not(windows))]
         let result = Err(McpError::new("unsupported"));
         #[cfg(windows)]
-        let result=result.map(|mut v|{if tool=="get_capabilities"{v["sidecarBuild"]=in_line_lib::mcp::build_identity::current();v["compatibility"]=serde_json::json!({"toolSetMatches":v["tools"]==serde_json::json!(TOOLS),"schemaVersionMatches":v["schemaVersion"]==serde_json::json!(in_line_lib::database::DATABASE_SCHEMA_VERSION),"currentSessionAutoImportVerified":false});}v});
+        let result=result.map(|mut v|{if tool=="get_capabilities"{v["sidecarBuild"]=in_line_lib::mcp::build_identity::current();v["compatibility"]=serde_json::json!({"toolSetMatches":v["tools"]==serde_json::json!(TOOLS),"schemaVersionMatches":v["schemaVersion"]==serde_json::json!(in_line_lib::database::DATABASE_SCHEMA_VERSION),"sessionCredentialsRefreshed":refreshed,"currentSessionAutoImportVerified":refreshed});}v});
         let failed = result.is_err();
         let value =
             serde_json::to_value(Envelope::result(id, result)).expect("envelope serializable");
@@ -289,8 +296,7 @@ async fn main() {
         #[cfg(windows)]
         let result = if args.len() == 2 && args[0] == "--import-client" {
             let run = async {
-                #[cfg(not(debug_assertions))]
-                in_line_lib::mcp::onboarding::require_available("codex")?;
+                in_line_lib::mcp::onboarding::require_authorization_available("codex")?;
                 let root = in_line_lib::mcp::platform::root()?;
                 let home = in_line_lib::mcp::codex_import::codex_home()?;
                 let report = in_line_lib::mcp::codex_import::import_at(
@@ -323,6 +329,9 @@ async fn main() {
         return;
     }
     let service = InLineMcp {
+        #[cfg(windows)]
+        credentials: in_line_lib::mcp::runtime_credentials::Provider::new(Credentials::from_env()),
+        #[cfg(not(windows))]
         credentials: Credentials::from_env(),
     };
     match service.serve(stdio()).await {

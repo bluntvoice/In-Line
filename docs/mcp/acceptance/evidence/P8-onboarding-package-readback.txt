@@ -1,0 +1,12 @@
+src-tauri/target/release/bundle/nsis/In Line_0.5.0_x64-setup.exe | bytes=4229582 | SHA256=02BA681F51150A19DF6C15EBEBD872E6DEEF7FD34084654FB48FD2116AA85CE4 | modifiedUtc=2026-10-15T08:42:17.9285668Z
+src-tauri/target/release/in-line.exe | bytes=8717312 | SHA256=446BA491E5B47DA5200B813225C132F023C162E6748AE48B9AECABB806916FC0 | modifiedUtc=2026-10-15T08:42:20.2689744Z
+src-tauri/target/release/in-line-mcp.exe | bytes=2362368 | SHA256=45D86B9C86E568739D85041E84B89073F203EA8FFD4F0CBEE60A97EDC27C3CE7 | modifiedUtc=2026-10-15T08:42:08.9831586Z
+src-tauri/binaries/in-line-mcp-x86_64-pc-windows-msvc.exe | bytes=2339840 | SHA256=B952CF2002313F89EF123B6A739016146003D55D222C2BED36D99C87326D70CD | modifiedUtc=2026-10-15T08:34:26.1685606Z
+Two existing NSIS sidecar inputs: byteIdentical=False; record both hashes and test both binaries.
+PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.
+PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.
+Main PE productVersion=0.5.0, fileVersion=0.5.0
+PASS: installer and main/sidecar files newer than frozen Rust source; NSIS script version 0.5.0 and main/sidecar input paths verified; both sidecar inputs pass actual protocol/anonymous-authentication/rate-limit gates. This does not verify installed/upgrade behavior or extracted installed file hashes. Tauri restores main binary bundle metadata after packaging.
+Build-input hashes are software artifact provenance, not a fault-data export checksum list.
+PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.
+PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.

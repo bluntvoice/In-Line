@@ -1,0 +1,53 @@
+
+> in-line@0.5.0 test
+> vitest run src/lib/mcp-onboarding.test.ts --maxWorkers=1 --no-file-parallelism
+
+
+ RUN  v3.2.7 C:/Users/KB/Documents/inline/In-Line
+
+ ❯ src/lib/mcp-onboarding.test.ts (3 tests | 2 failed) 11ms
+   × first client authorization > allows a supported authorization adapter before current-session verification 9ms
+     → expected false to be true // Object.is equality
+   ✓ first client authorization > keeps unavailable adapters and busy operations disabled 0ms
+   × first client authorization > does not infer authorization support from verified availability when explicitly denied 1ms
+     → expected true to be false // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/lib/mcp-onboarding.test.ts > first client authorization > allows a supported authorization adapter before current-session verification
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/lib/mcp-onboarding.test.ts:6:119
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lib/mcp-onboarding.test.ts > first client authorization > does not infer authorization support from verified availability when explicitly denied
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/lib/mcp-onboarding.test.ts:15:116
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  15:52:06
+   Duration  1.57s (transform 56ms, setup 0ms, collect 56ms, tests 11ms, environment 0ms, prepare 157ms)
+
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.2.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+npm notice To update run: npm install -g npm@12.2.0
+npm notice

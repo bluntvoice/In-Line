@@ -30,7 +30,7 @@ export default function McpSecuritySetting({notify}:{notify:(text:string)=>void}
     const scope={departments:parseScope(departments),taskTypes:parseScope(types)};
     if(editing){await api.mcpUpdateClient(editing.id,permissions,scope);reset();return;}
     const preset=state?.onboardingClients.find(p=>p.id===client);
-    if(!canPrepare(preset,false))throw new Error("当前客户端自动接入仍在验证，入口暂未开放");
+    if(!canPrepare(preset,false))throw new Error("当前客户端尚不支持安全授权与配置导入");
     if(receipt&&!receiptExpired(receipt)){await copy(receipt);return;}
     await prepareAndCopy(()=>api.mcpPrepareOnboarding({client,permissions,scope}),remember,async text=>{try{await api.copyText(text);notify("接入提示词已复制，请发送给所选 AI 客户端");}catch{throw new Error("提示词已准备，复制失败；请点击“再次复制”，无需重复授权");}});
     reset();
@@ -46,7 +46,7 @@ export default function McpSecuritySetting({notify}:{notify:(text:string)=>void}
       <p>每个客户端独立授权。有效权限同时受全局开关限制；完整读取包含办理说明，日常写入支持单事项操作。历史撤销需要你在软件内批准。</p>
       <ul className="mcp-client-list">{state.clients.map(value=><li key={value.id}><div><strong>{value.name}</strong><small>{value.revoked?"已撤销":"已授权 · 连接仍需验证"}{value.scope.departments?" · 部门："+(value.scope.departments.join("、")||"无"):""}{value.scope.taskTypes?" · 类型："+(value.scope.taskTypes.join("、")||"无"):""}</small></div>{!value.revoked&&<div><button className="button secondary" disabled={busy} onClick={()=>edit(value)}>权限</button><button className="button secondary" disabled={busy||!canPrepare(state.onboardingClients.find(p=>p.id==="codex"),false)} onClick={()=>void act(async()=>{const next=await api.mcpRotateOnboarding(value.id);remember(next);await copy(next);})}>轮换并接入</button><button className="button secondary danger" disabled={busy} onClick={()=>void act(()=>api.mcpRevokeClient(value.id))}>撤销</button></div>}</li>)}</ul>
       <div className="mcp-grant-form">{editing?<strong>{editing.name} · 修改权限</strong>:<ClientChoice presets={state.onboardingClients} value={client} busy={busy||Boolean(receipt&&!expired)} onChange={setClient}/>}</div>
-      {!editing&&!preset?.available&&<p role="status">当前 Codex 自动接入验证中，通过后开放授权并复制提示词。</p>}
+      {!editing&&!preset?.available&&<p role="status">{canPrepare(preset,false)?"可先授权并复制接入提示词。配置导入与当前会话连接分别验证，只有实际验证后才显示接入成功。":"当前客户端尚不支持安全授权与配置导入。"}</p>}
       <div className="mcp-security-controls">{labels.map(([key,label])=><label key={key}><input type="checkbox" checked={permissions[key]} disabled={busy||(!editing&&Boolean(receipt&&!expired))} onChange={e=>setPermissions({...permissions,[key]:e.target.checked})}/>{label}</label>)}</div>
       <details className="mcp-scope-options"><summary>高级选项：限制部门或事项类型</summary><div className="mcp-grant-form"><label>部门范围<input value={departments} disabled={busy||(!editing&&Boolean(receipt&&!expired))} onChange={e=>setDepartments(e.target.value)} placeholder="留空不限制；多个用逗号分隔"/></label><label>事项类型范围<input value={types} disabled={busy||(!editing&&Boolean(receipt&&!expired))} onChange={e=>setTypes(e.target.value)} placeholder="留空不限制；多个用逗号分隔"/></label></div></details>
       <div className="mcp-security-controls"><button className="button secondary" disabled={editing?busy:!canPrepare(preset,busy)} onClick={save}>{editing?"保存客户端权限":receipt&&!expired?"再次复制接入提示词":"授权并复制接入提示词"}</button>{editing&&<button className="button secondary" disabled={busy} onClick={reset}>取消</button>}</div>

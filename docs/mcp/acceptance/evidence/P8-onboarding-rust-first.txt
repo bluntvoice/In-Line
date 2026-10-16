@@ -1,0 +1,58 @@
+   Compiling in-line v0.5.0 (C:\Users\KB\Documents\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 46s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 8 tests
+test mcp::onboarding::tests::production_gate_rejects_unverified_or_unknown_clients ... ok
+test mcp::onboarding::tests::package_failure_does_not_create_or_rotate_authorization ... ok
+test mcp::onboarding::tests::first_authorization_is_available_without_claiming_session_verification ... ok
+test mcp::onboarding::tests::receipt_has_no_long_credential_and_ticket_is_encrypted_private_and_bound ... ok
+test mcp::onboarding::tests::interrupted_or_completed_ticket_cannot_be_replayed ... ok
+test mcp::onboarding::tests::expiration_and_backward_clock_are_rejected_at_exact_boundary ... ok
+test mcp::onboarding::tests::preparing_a_new_ticket_cleans_expired_unused_ciphertext_without_revoking_client ... ok
+test mcp::onboarding::tests::binding_and_format_tampering_are_rejected ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 158 filtered out; finished in 0.37s
+
+     Running unittests src\main.rs (src-tauri\target\debug\deps\in_line-1dda1f32e9e393d6.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src\bin\in-line-mcp.rs (src-tauri\target\debug\deps\in_line_mcp-0c01e57c520cc382.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests\mcp_host.rs (src-tauri\target\debug\deps\mcp_host-0526299ce0877653.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests\mcp_onboarding.rs (src-tauri\target\debug\deps\mcp_onboarding-df660f552b41685a.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests\mcp_queries.rs (src-tauri\target\debug\deps\mcp_queries-3db3912457d2d1ba.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests\mcp_security.rs (src-tauri\target\debug\deps\mcp_security-ee0b1f626d148125.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests\mcp_stdio.rs (src-tauri\target\debug\deps\mcp_stdio-567058c1910bc2ae.exe)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

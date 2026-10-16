@@ -1,0 +1,23 @@
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 55s
+     Running tests\mcp_onboarding.rs (src-tauri\target\debug\deps\mcp_onboarding-df660f552b41685a.exe)
+
+running 2 tests
+test actual_importer_config_and_sidecar_verify_identity_intersection_scope_without_claiming_current_session ... ok
+test existing_stdio_connection_refreshes_authorized_identity_without_restarting ... FAILED
+
+failures:
+
+---- existing_stdio_connection_refreshes_authorized_identity_without_restarting stdout ----
+
+thread 'existing_stdio_connection_refreshes_authorized_identity_without_restarting' (31356) panicked at tests\mcp_onboarding.rs:145:5:
+assertion failed: rotated_output.status.success()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    existing_stdio_connection_refreshes_authorized_identity_without_restarting
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.66s
+
+error: test failed, to rerun pass `--test mcp_onboarding`

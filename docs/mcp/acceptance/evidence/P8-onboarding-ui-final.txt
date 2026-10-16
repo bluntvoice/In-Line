@@ -1,0 +1,1 @@
+PASS: actual maintenance components; risk cancel/once acknowledgement, first authorization before session verification, repeated copy grants once, P1 mute disabled, intention not recovery, preview/chooser cancellation no write, explicit single export, basic-only status filter and audit-clear cancellation. Synthetic API only.

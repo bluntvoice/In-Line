@@ -1,0 +1,15 @@
+{
+  "phase": "P8-first-authorization-followup",
+  "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\In-Line-P8-onboarding-local-20261016.exe",
+  "bytes": 4229582,
+  "sha256": "02BA681F51150A19DF6C15EBEBD872E6DEEF7FD34084654FB48FD2116AA85CE4",
+  "sourceFrozenFiles": 165,
+  "sourceVerifiedUnchanged": true,
+  "installed": false,
+  "releaseCreated": false,
+  "baselineCommit": "f9cf36fbc9ae6fc3f73471f881d92a5c86ea2db8",
+  "exactEmbeddedCommit": null,
+  "sourceDirty": true,
+  "currentSessionAutoImportVerified": false,
+  "isolatedExistingConnectionVerified": true
+}

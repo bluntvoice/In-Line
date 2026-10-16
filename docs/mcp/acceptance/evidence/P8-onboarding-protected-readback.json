@@ -1,0 +1,18 @@
+[
+  {
+    "path": "D:\\Application\\In Line\\in-line.exe",
+    "sha256": "6F7690F7D43F7FB1477FCA56673AB7874084D54481939327DF2D6914AB774239"
+  },
+  {
+    "path": "D:\\Application\\In Line\\in-line-mcp.exe",
+    "sha256": "B37F66A48F9271E3FD99B28BA3AC40B3CA495B511D2BB0F32562F2BC7125D804"
+  },
+  {
+    "path": "C:\\Users\\KB\\AppData\\Local\\in-line-mcp-security\\authorization.dpapi",
+    "sha256": "8048B7F21D533B48DFD21F1DDAF85BFE8E5A1D46477F41B69A53CDB00BCCCBD9"
+  },
+  {
+    "path": "D:\\codex-data\\codex-home\\config.toml",
+    "sha256": "385F03C5612ED324C88EA9D5390FFBBB29F7F1B8570E6A1234B610FD450C6411"
+  }
+]

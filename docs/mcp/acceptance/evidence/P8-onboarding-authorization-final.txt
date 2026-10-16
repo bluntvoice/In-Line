@@ -1,0 +1,14 @@
+
+> in-line@0.5.0 test
+> vitest run src/lib/mcp-onboarding.test.ts --maxWorkers=1 --no-file-parallelism
+
+
+ RUN  v3.2.7 C:/Users/KB/Documents/inline/In-Line
+
+ ✓ src/lib/mcp-onboarding.test.ts (3 tests) 6ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  15:52:37
+   Duration  1.51s (transform 81ms, setup 0ms, collect 87ms, tests 6ms, environment 0ms, prepare 211ms)
+

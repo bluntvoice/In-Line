@@ -11,6 +11,7 @@ use std::{
 };
 
 pub const TICKET_SECONDS: i64 = 600;
+pub const CODEX_AUTHORIZATION_AVAILABLE: bool = true;
 pub const CODEX_CURRENT_SESSION_VERIFIED: bool = false;
 const MAX_BYTES: u64 = 3 * 1024 * 1024;
 const RETENTION_SECONDS: i64 = 7 * 24 * 60 * 60;
@@ -21,6 +22,7 @@ pub struct ClientPreset {
     pub id: &'static str,
     pub label: &'static str,
     pub available: bool,
+    pub authorization_available: bool,
     pub status: &'static str,
 }
 pub fn presets() -> Vec<ClientPreset> {
@@ -28,8 +30,17 @@ pub fn presets() -> Vec<ClientPreset> {
         id: "codex",
         label: "Codex",
         available: CODEX_CURRENT_SESSION_VERIFIED,
+        authorization_available: CODEX_AUTHORIZATION_AVAILABLE,
         status: "自动接入验证中",
     }]
+}
+/// Authorization and local import must be usable to perform the first real
+/// session verification. This does not attest that Codex reloaded its config.
+pub fn require_authorization_available(client: &str) -> Result<(), McpError> {
+    if client != "codex" || !CODEX_AUTHORIZATION_AVAILABLE {
+        return Err(McpError::new("onboarding_unavailable"));
+    }
+    Ok(())
 }
 pub fn require_available(client: &str) -> Result<(), McpError> {
     if client != "codex" || !CODEX_CURRENT_SESSION_VERIFIED {
@@ -567,6 +578,22 @@ pub(crate) mod tests {
         assert!(!presets()[0].available);
         assert!(require_available("codex").is_err());
         assert!(require_available("other").is_err());
+    }
+    #[test]
+    fn first_authorization_is_available_without_claiming_session_verification() {
+        assert!(presets()[0].authorization_available);
+        require_authorization_available("codex").unwrap();
+        assert!(require_authorization_available("other").is_err());
+        assert!(require_authorization_available("").is_err());
+        assert!(!presets()[0].available);
+        assert!(require_available("codex").is_err());
+        let f = Fixture::new();
+        let receipt = f.prepare();
+        let stored = Security::read_at(&f.security_root()).unwrap();
+        assert_eq!(stored.clients.len(), 1);
+        assert_eq!(stored.clients[0].id, receipt.client_id);
+        assert!(!stored.clients[0].permissions.full_read);
+        assert!(!stored.clients[0].permissions.write);
     }
     #[test]
     fn preparing_a_new_ticket_cleans_expired_unused_ciphertext_without_revoking_client() {

@@ -17,6 +17,8 @@ pub struct ImportReport {
     pub client_id: String,
     pub configuration_verified: bool,
     pub current_session_verified: bool,
+    pub session_credential_refresh_prepared: bool,
+    pub session_credential_refresh_error: Option<String>,
     pub permissions: super::security::Permissions,
     pub scope: super::security::Scope,
     pub authorization_revision: u64,
@@ -26,11 +28,14 @@ pub fn codex_home() -> Result<PathBuf, McpError> {
     if let Some(home) = std::env::var_os("IN_LINE_MCP_TEST_CODEX_HOME") {
         return Ok(home.into());
     }
-    Ok(std::env::var_os("CODEX_HOME").map(PathBuf::from).unwrap_or(
+    let home = std::env::var_os("CODEX_HOME").map(PathBuf::from).unwrap_or(
         dirs::home_dir()
             .ok_or_else(|| McpError::new("import_invalid"))?
             .join(".codex"),
-    ))
+    );
+    // A selected user profile may itself be a junction after a drive migration.
+    // Verify the resolved directory, keeping reparse checks on all files below it.
+    std::fs::canonicalize(home).map_err(|_| McpError::new("import_invalid"))
 }
 fn same_command(a: &str, b: &Path) -> bool {
     let a = Path::new(a);
@@ -352,11 +357,23 @@ pub async fn import_at(
         if read_config(&path)?.as_deref() != Some(candidate.as_slice()) {
             return Err(McpError::new("import_in_doubt"));
         }
+        let refreshed = super::runtime_credentials::publish(root, original.as_deref(), &ticket);
+        let (session_credential_refresh_prepared, session_credential_refresh_error) =
+            match refreshed {
+                Ok(true) => (true, None),
+                Ok(false) => (
+                    false,
+                    Some("client_instance_not_identified_or_ambiguous".into()),
+                ),
+                Err(error) => (false, Some(error.code)),
+            };
         Ok(ImportReport {
             status: "configuration_verified_current_session_pending",
             client_id: ticket.credentials.client_id.clone(),
             configuration_verified: true,
             current_session_verified: false,
+            session_credential_refresh_prepared,
+            session_credential_refresh_error,
             permissions: auth.permissions,
             scope: auth.scope,
             authorization_revision: auth.revision,

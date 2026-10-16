@@ -14,6 +14,169 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 #[tokio::test]
+async fn existing_stdio_connection_refreshes_authorized_identity_without_restarting() {
+    use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
+    let root = std::env::temp_dir().join(format!(
+        "inline-live-credentials-{}",
+        platform::random_secret().unwrap()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let security_root = root.join("security");
+    let home = root.join("codex");
+    std::fs::create_dir_all(&home).unwrap();
+    let security = Arc::new(Security::open_at(security_root.clone()).unwrap());
+    let db = Arc::new(Database::open_at(root.join("synthetic.db")).unwrap());
+    let sec = security.clone();
+    let database = db.clone();
+    ipc::start(
+        security.clone(),
+        Arc::new(move |c, t, a| service::execute(&sec, &database, c, t, a)),
+    )
+    .unwrap();
+    let exe = std::path::Path::new(env!("CARGO_BIN_EXE_in-line-mcp"));
+    let test_exe = std::env::current_exe().unwrap();
+    let mut bare = tokio::process::Command::new(exe);
+    bare.env("IN_LINE_MCP_TEST_SECURITY_ROOT", &security_root)
+        .env("IN_LINE_MCP_TEST_HOST_EXE", &test_exe)
+        .env("IN_LINE_MCP_TEST_CLIENT_EXE", &test_exe)
+        .env_remove("IN_LINE_MCP_CLIENT_ID")
+        .env_remove("IN_LINE_MCP_TOKEN")
+        .creation_flags(0x08000000);
+    let client = ().serve(TokioChildProcess::new(bare).unwrap()).await.unwrap();
+    let request =
+        || CallToolRequestParams::new("get_capabilities").with_arguments(serde_json::Map::new());
+    assert_eq!(
+        client
+            .call_tool(request())
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap()["error"]["code"],
+        "unauthenticated"
+    );
+    let original=format!("# keep original settings\nmodel='keep-model'\n[mcp_servers.in_line]\ncommand={}\nargs=[]\n",toml_edit::Value::from(exe.to_str().unwrap()));
+    std::fs::write(home.join("config.toml"), original).unwrap();
+    let now = chrono::Utc::now().timestamp();
+    let receipt = onboarding::prepare_at(
+        &security,
+        &security_root,
+        exe,
+        PrepareArgs {
+            client: "codex".into(),
+            permissions: Permissions::default(),
+            scope: Scope::default(),
+        },
+        now,
+    )
+    .unwrap();
+    let run = |id: String| {
+        let mut command = tokio::process::Command::new(exe);
+        command
+            .args(["--import-client", &id])
+            .env("IN_LINE_MCP_TEST_SECURITY_ROOT", &security_root)
+            .env("IN_LINE_MCP_TEST_CODEX_HOME", &home)
+            .env("IN_LINE_MCP_TEST_HOST_EXE", &test_exe)
+            .env("IN_LINE_MCP_TEST_CLIENT_EXE", &test_exe)
+            .creation_flags(0x08000000);
+        command
+    };
+    let output = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        run(receipt.package_id).output(),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let response: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(
+        output.status.success(),
+        "redacted importer response: {response}"
+    );
+    assert!(output.stderr.is_empty());
+    assert_eq!(response["data"]["configurationVerified"], true);
+    assert_eq!(response["data"]["currentSessionVerified"], false);
+    assert_eq!(response["data"]["sessionCredentialRefreshPrepared"], true);
+    // Reuse the original client/stdio transport, never replace it with the verifier child.
+    let active = client
+        .call_tool(request())
+        .await
+        .unwrap()
+        .structured_content
+        .unwrap();
+    assert_eq!(active["status"], "ok");
+    assert_eq!(active["data"]["clientId"], receipt.client_id);
+    assert_eq!(
+        active["data"]["compatibility"]["sessionCredentialsRefreshed"],
+        true
+    );
+    assert_eq!(
+        active["data"]["compatibility"]["currentSessionAutoImportVerified"],
+        true
+    );
+    assert_eq!(
+        active["data"]["permissions"],
+        json!({"regularRead":true,"fullRead":false,"write":false})
+    );
+    security.pause(true).unwrap();
+    assert_eq!(
+        client
+            .call_tool(request())
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap()["error"]["code"],
+        "paused"
+    );
+    security.pause(false).unwrap();
+    let rotated = onboarding::rotate_at(
+        &security,
+        &security_root,
+        exe,
+        &receipt.client_id,
+        chrono::Utc::now().timestamp(),
+    )
+    .unwrap();
+    assert_eq!(
+        client
+            .call_tool(request())
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap()["error"]["code"],
+        "unauthenticated"
+    );
+    let rotated_output = run(rotated.package_id).output().await.unwrap();
+    assert!(
+        rotated_output.status.success(),
+        "redacted rotation result: {}",
+        String::from_utf8_lossy(&rotated_output.stdout)
+    );
+    assert_eq!(
+        client
+            .call_tool(request())
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap()["status"],
+        "ok"
+    );
+    security.revoke(&receipt.client_id).unwrap();
+    assert_eq!(
+        client
+            .call_tool(request())
+            .await
+            .unwrap()
+            .structured_content
+            .unwrap()["error"]["code"],
+        "revoked"
+    );
+    client.cancel().await.unwrap();
+    // Keep synthetic fixtures if the asynchronous host still retains a handle.
+    let _ = db;
+    let _ = root;
+}
+
+#[tokio::test]
 async fn actual_importer_config_and_sidecar_verify_identity_intersection_scope_without_claiming_current_session(
 ) {
     let root = std::env::temp_dir().join(format!(

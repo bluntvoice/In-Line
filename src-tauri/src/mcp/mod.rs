@@ -34,6 +34,8 @@ pub mod platform;
 #[cfg(windows)]
 pub mod query;
 pub mod query_types;
+#[cfg(windows)]
+pub mod runtime_credentials;
 pub mod scope;
 #[cfg(windows)]
 pub mod security;
