@@ -1,0 +1,11 @@
+{
+  "stage": "after-install-before-start",
+  "schemaBefore": 14,
+  "schemaAfter": 14,
+  "tasks": 310,
+  "tableCount": 23,
+  "changedTables": [],
+  "allTablesIdentical": true,
+  "integrity": "ok",
+  "foreignKeyErrors": 0
+}

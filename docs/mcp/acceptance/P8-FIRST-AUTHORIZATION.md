@@ -1,5 +1,7 @@
 # P8 首次授权与安全导入门禁修复
 
+2026-10-16最新：开发提交`2346273c8471ba78119d407e74d596378e64f5fa`已推送。用户随后明确批准本次本机安装窗口，现已安装并完成数据保留检查；尚待软件内用户授权及当前会话认证。安装结果见文末；下文“尚未安装”为构建交付时历史。
+
 日期：2026-10-15。基线`f9cf36fbc9ae6fc3f73471f881d92a5c86ea2db8`，分支`feat/scheduled-items`，开始时工作区干净。用户选择A，授权修复首次授权与验收门禁，保留零额外操作目标。仍在P8，不代表用户验收通过，不进入P9或Release。
 
 ## 已核实原因
@@ -70,3 +72,16 @@
 本地包：`release/In-Line-P8-onboarding-local-20261016.exe`，4,229,582字节；SHA256 `02BA681F51150A19DF6C15EBEBD872E6DEEF7FD34084654FB48FD2116AA85CE4`。构建基线`f9cf36fbc9ae6fc3f73471f881d92a5c86ea2db8`，本地dirty源码，`exactCommit=null`；不得将后续提交SHA冒充二进制内嵌SHA。旧P8包保留原样。
 
 尚未安装、尚未验证真实旧数据升级及用户数据保留、尚未在实际软件内由用户授权、尚未通过当前挂载`get_capabilities`认证。当前旧程序不能使用新刷新模块；首次部署需先更换程序。安装后用户按正常流程选择Codex与权限、授权并复制提示词给当前AI，再执行一次性导入并核对当前挂载调用的身份、权限及范围。禁止另起服务代替当前会话，不要求用户填写凭证、手动重连或重启Codex。P1–P8仍待统一验收，不进入P9或创建Tag/Release。
+
+## 2026-10-16 本机安装窗口（已获单独批准）
+
+用户选择A，允许中断现有In Line/MCP，先备份并保留回退，再安装核对数据，授权由用户在软件内操作。旧安装目录、业务目录含WAL、SQLite在线及离线一致快照、独立安全域和Codex配置均保存到仓库外私有目录（当前用户/System ACL）。仅停止路径精确匹配安装目录的1个主程序及4个旧sidecar，没有停止Codex。
+
+- 实际NSIS安装退出0，安装位置`D:/Application/In Line`；主程序和sidecar版本均0.5.0，新主程序启动且仅1实例。
+- 安装前、安装后、首次启动后23张表内容摘要完全一致，schema14、310事项；完整性和外键检查均通过。原库已经schema14，本轮没有触发跨schema迁移，不能称完成所有旧schema迁移验收。
+- 独立授权库及Codex配置与备份字节摘要一致；尚未创建生产客户端或修改其权限。
+- 安装sidecar SHA256 `45D86B9C86E568739D85041E84B89073F203EA8FFD4F0CBEE60A97EDC27C3CE7`，对应本轮NSIS输入；安装主程序`1E06E4426189BC8D5E11DD94889B02589A497D291C5E1BAB70E45296E0DEF3BE`。主程序打包元数据与构建目录恢复后的摘要不同，不据此误判旧程序。
+- 当前挂载`get_capabilities`直接调用结果为`Transport closed`：本次安装已停止其旧sidecar，不能把这个结果说成未认证响应或接入成功。未启动替代stdio服务验证当前会话。
+- 下一步由用户按正常流程选择Codex/权限、授权并复制提示词给本会话，再执行一次性导入和当前挂载验证；如传输仍关闭则如实保留阻断，不要求用户手填凭证或手动重连，不宣称零操作接入通过。
+
+证据：`P8-onboarding-local-install.json`、`P8-onboarding-database-after-install.json`、`P8-onboarding-database-after-start.json`、`P8-onboarding-installed-readback.json`、`P8-onboarding-current-session-after-install.json`。原保留包JSON的installed=false为构建时状态，本节记录后续安装事实；旧备份不自动还原，不覆盖验收期间的新业务数据。

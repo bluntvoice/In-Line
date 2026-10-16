@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-16",
+  "verificationMethod": "direct_current_mounted_get_capabilities",
+  "transportError": "Transport closed",
+  "serverEnvelopeReceived": false,
+  "authorizedAccessVerified": false,
+  "currentSessionAutoImportVerified": false,
+  "installationChanged": true,
+  "configurationChanged": false,
+  "productionAuthorizationCreated": false,
+  "replacementServiceStartedForVerification": false,
+  "note": "The user explicitly approved stopping the old installed host and sidecars for this upgrade window. Await the normal in-app user authorization and generated prompt; verify only the current mounted session afterward."
+}

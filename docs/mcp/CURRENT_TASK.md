@@ -1,4 +1,12 @@
-# 2026-10-16 P8首次授权与已运行sidecar刷新开发验证完成
+# 2026-10-16 最新：已安装接入修复包，等待软件内用户授权
+
+开发提交2346273c8471ba78119d407e74d596378e64f5fa已推送至origin/feat/scheduled-items，远端精确回读且工作区当时干净。随后用户明确选择A，允许本次本机升级测试窗口、中断In Line/MCP，要求先备份并保留回退，再安装核对数据，由用户在软件内选择权限并授权。
+
+旧程序/完整业务数据/独立安全域/Codex配置已保留于仓库外私有备份，位置见acceptance/evidence/P8-onboarding-local-install.json。已核对路径并停止1主程序+4旧sidecar；真实NSIS退出0，新程序启动且仅1个主实例。安装前/安装后/首次启动后23表内容摘要一致，schema14、310事项，integrity/FK通过，授权库及Codex配置摘要未改。新sidecar为45D86B9C86E568739D85041E84B89073F203EA8FFD4F0CBEE60A97EDC27C3CE7，对应本次打包输入。安装回读见P8-onboarding-installed-readback.json及database-after-install/after-start。
+
+**当前挂载get_capabilities在本次停止旧sidecar后为Transport closed**，不是unauthenticated或认证成功；见P8-onboarding-current-session-after-install.json。未另起服务替代当前会话。用户下一步在软件内选择Codex和权限→授权并复制提示词→发送本会话，导入后再通过当前挂载工具核对真实身份/权限/范围。不能要求手填Token、手动重连或重启Codex；如仍Transport closed如实保留阻断，不伪称刷新成功。AI未创建生产授权、未修改权限或Codex配置，不标统一验收通过，不进入P9/Tag/Release。下文“尚未安装/另待安装确认”为此前构建交付历史。
+
+# 2026-10-16 P8首次授权与已运行sidecar刷新开发验证完成（安装前历史）
 
 最新用户已确认A：允许绑定所选Codex客户端的已运行sidecar安全刷新用户已授权凭证，替代原生重载。177项Rust（168库+2sidecar+7集成）、119项前端、首次授权/重复复制/维护浏览器、fmt、TS/Vite、实际16工具契约及匿名认证全部通过。最终全量Rust日志P8-onboarding-runtime-full.txt；旧P8-onboarding-rust-final.txt为首次失败历史，不能作为通过证据。
 

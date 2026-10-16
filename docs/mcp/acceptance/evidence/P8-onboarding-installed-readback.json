@@ -1,0 +1,13 @@
+{
+  "hostProcessId": 14220,
+  "singleInstalledHost": true,
+  "schema": 14,
+  "tasks": 310,
+  "tableCount": 23,
+  "allTablesUnchanged": true,
+  "authorizationUnchanged": true,
+  "codexConfigUnchanged": true,
+  "installedMainSha256": "1E06E4426189BC8D5E11DD94889B02589A497D291C5E1BAB70E45296E0DEF3BE",
+  "installedSidecarSha256": "45D86B9C86E568739D85041E84B89073F203EA8FFD4F0CBEE60A97EDC27C3CE7",
+  "currentSessionVerified": false
+}
