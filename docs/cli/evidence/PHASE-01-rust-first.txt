@@ -1,0 +1,11 @@
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+error[E0786]: found invalid metadata files for crate `in_line_lib`
+ --> tests\mcp_stdio.rs:1:5
+  |
+1 | use in_line_lib::mcp::{
+  |     ^^^^^^^^^^^
+  |
+  = note: failed to mmap file '\\?\D:\codex-data\projects\inline\In-Line\src-tauri\target\debug\deps\libin_line_lib-080534f4a60cfa42.rlib': 页面文件太小，无法完成操作。 (os error 1455)
+
+For more information about this error, try `rustc --explain E0786`.
+error: could not compile `in-line` (test "mcp_stdio") due to 1 previous error

@@ -1,0 +1,19 @@
+{
+  "date": "2026-10-16",
+  "phase": "CLI Phase1",
+  "userSelection": "A：确认CLI Phase1通过并提交推送；实机验证留Phase6，暂不进入Phase2（推荐）",
+  "phaseAccepted": true,
+  "commitPushAuthorized": true,
+  "branch": "feat/scheduled-items",
+  "automatedRustTestsPassed": 182,
+  "frontendTestsPassed": 119,
+  "nativeInstallationVerified": false,
+  "nativeGuiVerified": false,
+  "currentSessionConnectionVerified": false,
+  "deferredNativeValidationPhase": "CLI Phase6",
+  "enterPhase2Authorized": false,
+  "actionsPackageAuthorized": false,
+  "tagOrReleaseAuthorized": false,
+  "packageRecord": "PHASE-01-retained-package.json",
+  "packageRecordNote": "Build-time userAcceptance=false is preserved; subsequent phase acceptance is recorded here. Package provenance and unverified native results are unchanged."
+}

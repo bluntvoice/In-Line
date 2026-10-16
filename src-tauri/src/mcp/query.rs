@@ -974,7 +974,7 @@ pub fn report(
     };
     let s = state.snapshots.get_mut(&id).unwrap();
     if summary {
-        let statistics = s.db.statistics_scoped(start, end, tz, auth.scope.clone())?;
+        let statistics = crate::application::statistics(&s.db, start, end, tz, auth.scope.clone())?;
         return bounded(
             json!({"startDate":args.start_date,"endDate":args.end_date,"timezoneOffsetMinutes":tz,"statistics":statistics,"meta":meta(&id,s),"definition":{"aggregation":"last valid event per task in range; trend deduplication per existing UI bucket; archived included; trash and voided excluded","attribution":"current task type and departments at snapshot capture","departmentCountsMayOverlap":true},"coverage":{"startDate":args.start_date,"endDate":args.end_date,"scope":auth.scope,"filters":f}}),
         );

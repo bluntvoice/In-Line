@@ -450,7 +450,8 @@ pub(super) fn execute_action(
                     if is_work_event_status(status) && !args.intent.confirmed_real_work {
                         return Err(err("explicit_intent_required"));
                     }
-                    set_status_on(conn, task.id, status.clone()).map_err(domain)?;
+                    crate::application::set_status_in_transaction(conn, task.id, status.clone())
+                        .map_err(domain)?;
                 }
                 TaskAction::SetUrgent {
                     task_version,
@@ -759,7 +760,7 @@ impl Database {
                             let old:LegalTask=serde_json::from_value(before["task"].clone()).map_err(|_|err("internal_error"))?;
                             if get_task_on(conn,id).map_err(domain)?.status!=old.status {
                                 let latest:i64=conn.query_row("SELECT COALESCE(MAX(id),0) FROM task_work_events WHERE task_id=?",[id],|r|r.get(0)).map_err(sql)?;
-                                set_status_on(conn,id,old.status.clone()).map_err(domain)?;
+                                crate::application::set_status_in_transaction(conn,id,old.status.clone()).map_err(domain)?;
                                 let mut statement=conn.prepare("SELECT id FROM task_work_events WHERE task_id=? AND id>? AND voided_at IS NULL").map_err(sql)?;
                                 let new_ids=statement.query_map(params![id,latest],|r|r.get::<_,i64>(0)).map_err(sql)?.collect::<Result<Vec<_>,_>>().map_err(sql)?;
                                 for event in new_ids {void_work_event_on(conn,event,true).map_err(domain)?;}

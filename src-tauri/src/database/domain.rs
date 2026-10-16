@@ -330,7 +330,7 @@ pub(super) fn save_task_on(
     }
     get_task_on(connection, id)
 }
-pub(super) fn set_status_on(
+pub(crate) fn set_status_on(
     connection: &Connection,
     id: i64,
     status: String,

@@ -1,0 +1,12 @@
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 23.58s
+     Running unittests src\lib.rs (src-tauri\target\debug\deps\in_line_lib-5a9d9f150403cab6.exe)
+
+running 4 tests
+test database::application_tests::application_phase1_external_guards_remain_after_gui_changes ... ok
+test database::application_tests::application_phase1_summary_matches_gui_and_preserves_scope_and_future_exclusion ... ok
+test database::application_tests::application_phase1_parent_completion_rolls_back_every_table_for_both_entries ... ok
+test database::application_tests::application_phase1_status_preserves_future_numbers_work_events_and_idempotence ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 168 filtered out; finished in 0.44s
+

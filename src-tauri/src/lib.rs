@@ -1,3 +1,4 @@
+pub(crate) mod application;
 pub mod database;
 pub mod fonts;
 pub mod mcp;
@@ -205,7 +206,7 @@ fn set_task_status(
     id: i64,
     status: String,
 ) -> Result<(), String> {
-    db.set_status(id, status)?;
+    application::set_status(&db, id, status)?;
     emit_change(&app)
 }
 #[tauri::command]
@@ -411,7 +412,13 @@ fn get_statistics(
     end: String,
     timezone_offset_minutes: i32,
 ) -> Result<StatisticsResult, String> {
-    db.statistics(start, end, timezone_offset_minutes)
+    application::statistics(
+        &db,
+        start,
+        end,
+        timezone_offset_minutes,
+        mcp::scope::Scope::default(),
+    )
 }
 #[tauri::command]
 fn get_work_calendar(

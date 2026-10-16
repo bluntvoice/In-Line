@@ -1,0 +1,11 @@
+{
+  "targetDirectory": "D:\\codex-data\\build-targets\\in-line-cli-phase1-test-20261016",
+  "buildJobs": 1,
+  "testDebugInfo": 0,
+  "devDebugInfo": 0,
+  "testThreads": 1,
+  "testsFiltered": false,
+  "assertionsChangedForResourceFailure": false,
+  "firstFailure": "PHASE-01-rust-first.txt",
+  "cause": "Windows mmap OS error 1455; system free virtual commit about 3.25 GiB after compiler exit"
+}

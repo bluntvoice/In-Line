@@ -1,0 +1,15 @@
+{
+  "phase": "CLI Phase1",
+  "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\In-Line-CLI-Phase1-local-20261016.exe",
+  "bytes": 4229305,
+  "sha256": "C8FFF7A016EEB0205D59C746D600B1ADE645B1762027895F03A087025BC17964",
+  "sourceFrozenFiles": 167,
+  "sourceVerifiedUnchanged": true,
+  "baselineCommit": "d4a56d3010ab94143ea2647688022ac61bc51d58",
+  "exactEmbeddedCommit": null,
+  "sourceDirty": true,
+  "installed": false,
+  "userAcceptance": false,
+  "currentSessionAutoImportVerified": false,
+  "releaseCreated": false
+}

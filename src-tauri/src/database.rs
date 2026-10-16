@@ -1,5 +1,5 @@
 use crate::models::*;
-mod domain;
+pub(crate) mod domain;
 #[cfg(windows)]
 mod mcp_artifacts;
 #[cfg(windows)]
@@ -16,6 +16,8 @@ mod mcp_schema;
 #[cfg(windows)]
 mod mcp_write;
 use domain::*;
+#[cfg(all(test, windows))]
+mod application_tests;
 #[cfg(all(test, windows))]
 mod mcp_p4_tests;
 #[cfg(all(test, windows))]
@@ -1306,7 +1308,7 @@ impl Database {
         self.with_transaction(|tx| create_subtask_on_domain(tx, input))
     }
 
-    fn with_transaction<T>(
+    pub(crate) fn with_transaction<T>(
         &self,
         operation: impl FnOnce(&Transaction<'_>) -> Result<T, String>,
     ) -> Result<T, String> {
@@ -1399,7 +1401,7 @@ impl Database {
     }
 
     pub fn set_status(&self, id: i64, status: String) -> Result<(), String> {
-        self.with_transaction(|tx| set_status_on(tx, id, status))
+        crate::application::set_status(self, id, status)
     }
 
     pub fn set_urgent(
@@ -1987,7 +1989,8 @@ impl Database {
         end: String,
         timezone_offset_minutes: i32,
     ) -> Result<StatisticsResult, String> {
-        self.statistics_scoped(
+        crate::application::statistics(
+            self,
             start,
             end,
             timezone_offset_minutes,

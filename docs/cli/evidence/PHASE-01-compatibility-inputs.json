@@ -1,0 +1,70 @@
+{
+  "baseline": "d4a56d3010ab94143ea2647688022ac61bc51d58",
+  "files": [
+    {
+      "path": "package.json",
+      "unchangedFromHead": true,
+      "normalizedSha256": "b271d5f9a97136563223d2cf3d5d7fa3e9539d192b6e10c33c59aebd755ec912"
+    },
+    {
+      "path": "package-lock.json",
+      "unchangedFromHead": true,
+      "normalizedSha256": "f35ea2621ede51f2049315bb02b7fed3cb3b8d460c0a1e4ab559fc9edd333259"
+    },
+    {
+      "path": "src-tauri/Cargo.toml",
+      "unchangedFromHead": true,
+      "normalizedSha256": "8165817b39a07f916b57430a36a37dc3cd2d727738a826b41a303b4dc1f5c7b1"
+    },
+    {
+      "path": "src-tauri/Cargo.lock",
+      "unchangedFromHead": true,
+      "normalizedSha256": "3943f0202ffa20515c041a36378ad78b8ac18e5f14d9fbe8f66e963f0c90c031"
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "unchangedFromHead": true,
+      "normalizedSha256": "b4738c50934964b813fb08a187d8e5076d559fc04e13ea47804fa0dc3bba9de3"
+    },
+    {
+      "path": "src-tauri/src/models.rs",
+      "unchangedFromHead": true,
+      "normalizedSha256": "ee688d18aedd84f5d8d6d73f0e630a8891d5f71fe7eb16dc842ac61cd70da22a"
+    },
+    {
+      "path": "src-tauri/src/mcp/contract.rs",
+      "unchangedFromHead": true,
+      "normalizedSha256": "8f35e5666031ed6a8e537241602c3d1d6f687583d83fadd96fcdedd72fdf1eff"
+    },
+    {
+      "path": "src-tauri/src/mcp/write_types.rs",
+      "unchangedFromHead": true,
+      "normalizedSha256": "977285641d95a77570efe0949ce8d1be718bd8459103eb897a498a3bf43084f9"
+    },
+    {
+      "path": "src-tauri/src/mcp/query_types.rs",
+      "unchangedFromHead": true,
+      "normalizedSha256": "672f19fb4a014dc31955e843460f2c50f3c8aa7d6e25197e91f0dea288104fb9"
+    },
+    {
+      "path": "src-tauri/src/mcp/security.rs",
+      "unchangedFromHead": true,
+      "normalizedSha256": "289318970d0b8e2db4aa44c9f10adfcf985e0f3edadcd8c147c2279125302eca"
+    },
+    {
+      "path": "src-tauri/src/mcp/ipc.rs",
+      "unchangedFromHead": true,
+      "normalizedSha256": "bd2eed2c01161cd3c343fd449cfc162683cd491f48a46cd67c3ffa69051cf69b"
+    },
+    {
+      "path": "docs/mcp/contracts/tools-v1.json",
+      "unchangedFromHead": true,
+      "normalizedSha256": "8b9164e05fffb24fbf254de3477ca95422c0aa2ce638f54a6eda677488e0a813"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "unchangedFromHead": true,
+      "normalizedSha256": "8f539f8b0f87920e988b057d1b52a243bdeffe0f701fe0850ed507e71a1be44d"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+PASS: docs\cli\PHASE-01-SERVICES.md links / UTF-8 / tables
+PASS: docs\cli\CURRENT_TASK.md links / UTF-8 / tables
+PASS: docs\prd\cli.md links / UTF-8 / tables
+PASS: 167 frozen source files unchanged; only scoped existing files changed; no staged files or new commit
