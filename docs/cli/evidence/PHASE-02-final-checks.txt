@@ -1,0 +1,9 @@
+PASS: docs/cli/PHASE-02-FOUNDATION.md: UTF-8, local links and code fences
+PASS: docs/cli/CURRENT_TASK.md: UTF-8, local links and code fences
+PASS: docs/prd/cli.md: UTF-8, local links and code fences
+PASS: README.md: UTF-8, local links and code fences
+PASS: RELEASE_NOTES.md: UTF-8, local links and code fences
+PASS: 194 frozen product/test/build input hashes unchanged
+PASS: installed binaries, authorization and Codex config unchanged since resume
+PASS: dependencies, versions, models, MCP contracts/security/IPC and workflows unchanged
+PASS: no staged files/new commits; Phase2 acceptance and Phase3 not implied

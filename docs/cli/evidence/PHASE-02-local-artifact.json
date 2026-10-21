@@ -1,0 +1,61 @@
+{
+  "phase": "CLI Phase2",
+  "artifactType": "local_debug_console_not_installer",
+  "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\CLI-Phase2-local-20261021\\in-line-cli.exe",
+  "bytes": 4160512,
+  "sha256": "4DCA0C80ADC13FFF36E712BE507B6E4A69A0094BF0BAFBDD571113E449D38032",
+  "build": {
+    "baselineCommit": "1dcc1b02253f3bd80ad72a58cf3c3c7fab608aa5",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "frozenSourceInputs": 194,
+  "subprocessChecks": [
+    {
+      "command": [
+        "--version",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "--help",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "doctor",
+        "--format",
+        "json"
+      ],
+      "exitCode": 6,
+      "status": "error"
+    },
+    {
+      "command": [
+        "status",
+        "--profile",
+        "missing",
+        "--format",
+        "json"
+      ],
+      "exitCode": 3,
+      "status": "error"
+    }
+  ],
+  "productionAuthorizationUsed": false,
+  "installed": false,
+  "userAccepted": false,
+  "releaseOrActionsCreated": false
+}
