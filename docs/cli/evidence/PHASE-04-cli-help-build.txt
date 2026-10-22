@@ -1,0 +1,4 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+    Finished `dev` profile [unoptimized] target(s) in 9.25s
+=== cargo stdout (tests) ===

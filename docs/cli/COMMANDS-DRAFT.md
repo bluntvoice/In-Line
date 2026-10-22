@@ -61,10 +61,10 @@ PowerShell中文空格路径示例（未来实现后）：
 | `task urgent set\|clear <id>` | SetUrgent；设加急的提出人/原因按既有校验 | 4 |
 | `task archive <id>` | Archive受控归档；不改回GUI按钮，不与complete混用 | 4 |
 | `task trash <id>` | Trash软删除；父子范围明确；没有permanent-delete命令 | 4 |
-| `task restore <id>` | Restore只恢复回收站目标；不会自动重开归档/加入队列 | 4 |
+| `task restore <id>` | Restore只接受回收站目标，沿用GUI/MCP恢复并加入今日队列；归档重开另用reopen | 4 |
 | `task reopen <id>` | Queue/reopen；归档/终态重开，按已有取号及截止时间规则 | 4 |
 | `task reschedule <id> --date` | Reschedule；版本与编号作废规则；多事项改期仍软件内整批确认 | 4 |
-| `task child create <parent-id>` | CreateSubtask；属性默认继承后独立；未来日期必预占 | 4 |
+| `task child create <parent-id>` | CLI内部受限适配，宿主按GUI继承缺省属性；复用领域/审计/回执事务，未来日期必预占 | 4 |
 | `task parent set <id> <parent-id>` | SetParent；双方版本、两级/无环/合法父任务及范围 | 4 |
 | `task parent clear <id>` | SetParent/null；不改队列/状态/统计 | 4 |
 | `task children reorder <parent-id>` | ReorderSubtasks；完整范围及版本，不改队列顺序 | 4 |
@@ -144,3 +144,15 @@ PowerShell中文空格路径示例（未来实现后）：
 ## Phase3 实现记录（2026-10-21）
 
 Phase0–2 已分别验收及提交推送。Phase3 的 GUI 独立 CLI 授权、一次性包导入及本表 Phase3 只读命令已实现并通过隔离自动检查，待用户独立验收。report daily/weekly/monthly 当前基础入口均需显式 --from/--to，返回原结构化摘要；完整期间便捷入口及日报文本仍留 Phase5。未实现的后续命令不能执行。详见 [Phase3报告](PHASE-03-READONLY.md)，不以本草案的历史停止点替代当前已明确的阶段授权。
+
+
+2026-10-22用户指示先提交推送阶段3并进入阶段4；另确认从回收站恢复遵循GUI/MCP现有入队规则。阶段3提交a6987f6已推送。阶段4完成后单独验收。
+
+
+## Phase4 实现记录（2026-10-22）
+
+阶段4已实现并通过209项Rust、122项前端和16工具契约检查，已由用户验收，授权提交推送后进入阶段5。原表Phase4命令可用，写入必须--execute及独立profile，意图/原因/原键/版本由调用者明确提供。父任务选择--parent-only或--include-eligible-subtasks时需给父taskVersion和完整子项taskVersions；缺省普通完成保留原MCP保护。子项创建缺省属性在宿主按GUI规则继承，输入task只须title，其余可选。JSON不得重复命令已确定的action/target/状态等字段。
+
+仅CLI内部补齐父候选、显式范围完成、继承式子项创建和只读原回执，不增加MCP工具。恢复遵循用户确认的恢复并入今日队列。回执只查原账本，不执行写入，不证明当前状态仍未变化。退出0须已提交/无变化且提交后核验成功；仅撤销申请8，不明结果9且保留原键；没有自动重放、approve或force。完整行为、证据及未验证边界见 [Phase4报告](PHASE-04-WRITES.md)，不批准阶段5。
+
+2026-10-22，用户确认阶段4通过并授权提交推送后进入阶段5；上文历史停止点不覆盖本次明确授权。实机安装与当前会话验证仍留阶段6。

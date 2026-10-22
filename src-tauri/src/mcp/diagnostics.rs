@@ -108,7 +108,7 @@ impl Diagnostics {
             return Err(McpError::new("invalid_arguments"));
         }
         e.code = known_code(&e.code).into();
-        if !super::contract::TOOLS.contains(&e.tool.as_str()) {
+        if !known_tool(&e.tool) {
             e.tool = "unsupported".into();
         }
         e.module = module(&e.tool).into();
@@ -299,7 +299,7 @@ impl Diagnostics {
             })
             .ok_or_else(|| McpError::new("not_found"))?;
         Ok(
-            json!({"errorId":error,"requestId":e.request_id,"tool":if super::contract::TOOLS.contains(&e.tool.as_str()){e.tool.as_str()}else{"unsupported"},"module":module(&e.tool),"code":known_code(&e.code),"observedAt":e.at,"jobId":e.job_id.as_deref().filter(|id|hex(id,64)),"round":e.round,"auditId":e.audit_id,"receiptReference":e.receipt_hash,"dataVersion":e.data_version,"build":safe_build(&e.build),"facts":"This request returned the recorded technical outcome; no root cause is inferred from it alone","suggestion":guidance(known_code(&e.code)),"businessBodyIncluded":false,"rawLogsAvailableToAi":false}),
+            json!({"errorId":error,"requestId":e.request_id,"tool":if known_tool(&e.tool){e.tool.as_str()}else{"unsupported"},"module":module(&e.tool),"code":known_code(&e.code),"observedAt":e.at,"jobId":e.job_id.as_deref().filter(|id|hex(id,64)),"round":e.round,"auditId":e.audit_id,"receiptReference":e.receipt_hash,"dataVersion":e.data_version,"build":safe_build(&e.build),"facts":"This request returned the recorded technical outcome; no root cause is inferred from it alone","suggestion":guidance(known_code(&e.code)),"businessBodyIncluded":false,"rawLogsAvailableToAi":false}),
         )
     }
     pub fn action(&self, id: &str, action: &str, now: i64) -> Result<(), McpError> {
@@ -751,7 +751,7 @@ fn valid_time(at: i64) -> bool {
 }
 fn sanitize_state(s: &mut State) {
     for f in &mut s.faults {
-        f.tool = if super::contract::TOOLS.contains(&f.tool.as_str()) {
+        f.tool = if known_tool(&f.tool) {
             f.tool.clone()
         } else {
             "unsupported".into()
@@ -774,7 +774,7 @@ fn sanitize_state(s: &mut State) {
     for e in &mut s.last_clients {
         e.build = safe_build(&e.build);
         e.module = module(&e.tool).into();
-        e.tool = if super::contract::TOOLS.contains(&e.tool.as_str()) {
+        e.tool = if known_tool(&e.tool) {
             e.tool.clone()
         } else {
             "unsupported".into()
@@ -814,4 +814,8 @@ pub(crate) fn safe_build(v: &Value) -> Value {
             && v["commitVerification"] == "clean_checkout_readback"
     });
     json!({"softwareVersion":v["softwareVersion"].as_str().filter(|s|s.len()<80 && semver::Version::parse(s).is_ok()),"mcpVersion":v["mcpVersion"].as_u64().filter(|n|*n<10000),"databaseSchemaVersion":v["databaseSchemaVersion"].as_u64().filter(|n|*n<10000),"baselineCommit":baseline,"exactCommit":exact,"sourceDirty":dirty,"commitVerification":if exact.is_some(){"clean_checkout_readback"}else{"unverified_local_source"}})
+}
+
+fn known_tool(tool: &str) -> bool {
+    super::contract::TOOLS.contains(&tool) || crate::application::cli::ROUTES.contains(&tool)
 }

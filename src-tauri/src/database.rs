@@ -1,4 +1,6 @@
 use crate::models::*;
+#[cfg(windows)]
+mod cli;
 pub(crate) mod domain;
 #[cfg(windows)]
 mod mcp_artifacts;
@@ -1389,7 +1391,7 @@ impl Database {
     }
 
     pub fn complete_task(&self, input: CompleteTaskInput) -> Result<CompleteTaskResult, String> {
-        self.with_transaction(|tx| complete_task_on_domain(tx, input))
+        crate::application::complete_task(self, input)
     }
 
     pub fn archive_task_group(&self, input: ArchiveTaskInput) -> Result<ArchiveTaskResult, String> {

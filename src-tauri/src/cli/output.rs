@@ -3,6 +3,43 @@ use std::io::Write;
 
 pub fn exit_code(envelope: &Envelope) -> i32 {
     if envelope.status == "ok" && envelope.error.is_none() && envelope.data.is_some() {
+        let data = envelope.data.as_ref().unwrap();
+        if let Some(receipt) = data.get("cliReceipt") {
+            if receipt["kind"] == "undo_request" && data["submissionOnly"] == true {
+                return 8;
+            }
+            return if matches!(
+                data["commitStatus"].as_str(),
+                Some("committed" | "no_change")
+            ) && data["verificationStatus"] == "verified_after_commit"
+            {
+                0
+            } else {
+                9
+            };
+        }
+        if data["submissionOnly"] == true
+            || matches!(
+                data["status"].as_str(),
+                Some("pending" | "needs_user_approval")
+            )
+        {
+            return 8;
+        }
+        if data.get("cliReceipt").is_some()
+            || data.get("commitStatus").is_some()
+            || data.get("verificationStatus").is_some()
+        {
+            return if matches!(
+                data["commitStatus"].as_str(),
+                Some("committed" | "no_change")
+            ) && data["verificationStatus"] == "verified_after_commit"
+            {
+                0
+            } else {
+                9
+            };
+        }
         return 0;
     }
     match envelope
@@ -100,6 +137,37 @@ mod tests {
         ] {
             assert_eq!(
                 exit_code(&Envelope::result("test".into(), Err(McpError::new(code)))),
+                expected
+            );
+        }
+        for (value, expected) in [
+            (
+                serde_json::json!({"commitStatus":"committed","verificationStatus":"verified_after_commit"}),
+                0,
+            ),
+            (
+                serde_json::json!({"commitStatus":"no_change","verificationStatus":"verified_after_commit"}),
+                0,
+            ),
+            (
+                serde_json::json!({"commitStatus":"committed","verificationStatus":"verification_failed"}),
+                9,
+            ),
+            (
+                serde_json::json!({"commitStatus":"unknown","verificationStatus":"verified_after_commit"}),
+                9,
+            ),
+            (
+                serde_json::json!({"cliReceipt":{"idempotencyKey":"original"}}),
+                9,
+            ),
+            (
+                serde_json::json!({"submissionOnly":true,"status":"needs_user_approval"}),
+                8,
+            ),
+        ] {
+            assert_eq!(
+                exit_code(&Envelope::result("test".into(), Ok(value))),
                 expected
             );
         }

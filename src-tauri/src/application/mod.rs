@@ -3,6 +3,23 @@
 //! the existing gateway; none of these crate-private functions is an IPC route.
 use crate::{database::Database, mcp::scope::Scope, models::StatisticsResult};
 use rusqlite::Connection;
+pub(crate) mod cli;
+
+pub(crate) fn complete_task(
+    db: &Database,
+    input: crate::models::CompleteTaskInput,
+) -> Result<crate::models::CompleteTaskResult, String> {
+    db.with_transaction(|tx| complete_in_transaction(tx, input))
+}
+pub(crate) fn complete_in_transaction(
+    connection: &Connection,
+    input: crate::models::CompleteTaskInput,
+) -> Result<crate::models::CompleteTaskResult, String> {
+    if connection.is_autocommit() {
+        return Err("事项完成必须在事务内执行".into());
+    }
+    crate::database::domain::complete_task_on_domain(connection, input)
+}
 
 /// Both local GUI queries and authorized, filtered MCP snapshots use the same
 /// report calculation. Callers supply the range/scope already validated by

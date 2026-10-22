@@ -194,41 +194,7 @@ pub(super) fn replay(
             return Err(err("idempotency_conflict"));
         }
         let mut result: Json = serde_json::from_str(&receipt).map_err(|_| err("internal_error"))?;
-        if !auth.permissions.full_read {
-            if let Some(items) = result["items"].as_array_mut() {
-                for item in items {
-                    if let Some(rows) = item["differences"].as_array_mut() {
-                        for row in rows {
-                            if row["field"] == "workEvents" {
-                                for side in ["before", "after"] {
-                                    if let Some(events) = row[side].as_array_mut() {
-                                        for event in events {
-                                            if let Some(m) = event.as_object_mut() {
-                                                m.remove("note");
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            if matches!(
-                                row["field"].as_str(),
-                                Some(
-                                    "contacts"
-                                        | "contact"
-                                        | "details"
-                                        | "internalNotes"
-                                        | "urgentRequester"
-                                        | "urgentReason"
-                                )
-                            ) {
-                                row["before"] = json!("[需完整读取权限]");
-                                row["after"] = json!("[需完整读取权限]");
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        result = redact_receipt(result, auth);
         result["replayed"] = json!(true);
         return Ok(Some(result));
     }
@@ -670,7 +636,7 @@ impl Database {
     }
 }
 
-fn audit_row(
+pub(super) fn audit_row(
     conn: &Connection,
     id: i64,
 ) -> Result<(String, String, Option<i64>, Json, Json), McpError> {
@@ -786,7 +752,7 @@ impl Database {
             let undo_audit=audit(conn,&owner,"approvedUndo",id,&intent,"用户批准的补偿操作；不回收编号、不删除原历史",&current,&final_state,&json!({"requestId":request_id}),Some(aid))?;
             conn.execute("UPDATE mcp_undo_requests SET status='approved',resolved_at=? WHERE id=?",params![now(),request_id]).map_err(sql)?;
             let mut result=json!({"status":"approved","commitStatus":"committed","auditId":undo_audit,"taskId":id,"taskVersion":final_state["taskVersion"]});
-            if action=="batch"{let mut versions=serde_json::Map::new();for t in final_state["relatedTasks"].as_array().ok_or_else(||err("internal_error"))?{let task=t["task"]["id"].as_i64().ok_or_else(||err("internal_error"))?;versions.insert(task.to_string(),json!(version(conn,task)?));}result["taskVersions"]=json!(versions);}else if id.is_none(){let versions=final_state.as_object_mut().unwrap().remove("fieldVersions").unwrap();result["preferences"]=final_state;result["fieldVersions"]=versions;}
+            if action=="batch" || action=="cliCompleteGroup" {let mut versions=serde_json::Map::new();if let Some(id)=id {versions.insert(id.to_string(),json!(version(conn,id)?));}if let Some(tasks)=final_state["relatedTasks"].as_array(){for t in tasks {let task=t["task"]["id"].as_i64().ok_or_else(||err("internal_error"))?;versions.insert(task.to_string(),json!(version(conn,task)?));}}result["taskVersions"]=json!(versions);}else if id.is_none(){let versions=final_state.as_object_mut().unwrap().remove("fieldVersions").unwrap();result["preferences"]=final_state;result["fieldVersions"]=versions;}
             Ok(result)
         })
     }
@@ -799,7 +765,28 @@ pub(super) fn mutate_on(
     args: &MutateArgs,
     request: &Json,
 ) -> Result<Json, McpError> {
-    if let Some(r) = replay(conn, client, &args.idempotency_key, &request, auth)? {
+    mutate_with(
+        conn,
+        client,
+        auth,
+        &args.idempotency_key,
+        &args.intent,
+        &args.reason,
+        request,
+        || execute_action(conn, auth, args),
+    )
+}
+pub(super) fn mutate_with(
+    conn: &Connection,
+    client: &str,
+    auth: &Authorization,
+    key: &str,
+    intent: &Intent,
+    reason: &str,
+    request: &Json,
+    execute: impl FnOnce() -> Result<(Option<i64>, Json, Json, String, bool), McpError>,
+) -> Result<Json, McpError> {
+    if let Some(r) = replay(conn, client, key, request, auth)? {
         return Ok(r);
     }
     let prior = load_all_tasks(conn)
@@ -807,7 +794,7 @@ pub(super) fn mutate_on(
         .into_iter()
         .map(|t| (t.id, t))
         .collect::<HashMap<_, _>>();
-    let (id, mut before, mut after, action, skipped) = execute_action(conn, auth, &args)?;
+    let (id, mut before, mut after, action, skipped) = execute()?;
     let mut related_before = vec![];
     let mut related_after = vec![];
     // Domain rules can reorder neighbours. Validate ALL resulting changes, not only input.
@@ -832,28 +819,50 @@ pub(super) fn mutate_on(
         None
     } else {
         Some(audit(
-            conn,
-            client,
-            &action,
-            id,
-            &args.intent,
-            &args.reason,
-            &before,
-            &after,
-            &request,
-            None,
+            conn, client, &action, id, intent, reason, &before, &after, &request, None,
         )?)
     };
     // Receipt never contains existing field values, even with full-read permissions.
     let result = json!({"commitStatus":if skipped{"no_change"}else{"committed"},"verificationStatus":"verified_in_transaction","taskId":id,"auditId":audit_id,"changedFields":changed(&before,&after),"taskVersion":after["taskVersion"],"replayed":false});
-    receipt(
-        conn,
-        client,
-        &args.idempotency_key,
-        &request,
-        id,
-        audit_id,
-        &result,
-    )?;
+    receipt(conn, client, key, &request, id, audit_id, &result)?;
     Ok(result)
+}
+
+pub(super) fn redact_receipt(mut result: Json, auth: &Authorization) -> Json {
+    if !auth.permissions.full_read {
+        if let Some(items) = result["items"].as_array_mut() {
+            for item in items {
+                if let Some(rows) = item["differences"].as_array_mut() {
+                    for row in rows {
+                        if row["field"] == "workEvents" {
+                            for side in ["before", "after"] {
+                                if let Some(events) = row[side].as_array_mut() {
+                                    for event in events {
+                                        if let Some(m) = event.as_object_mut() {
+                                            m.remove("note");
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if matches!(
+                            row["field"].as_str(),
+                            Some(
+                                "contacts"
+                                    | "contact"
+                                    | "details"
+                                    | "internalNotes"
+                                    | "urgentRequester"
+                                    | "urgentReason"
+                            )
+                        ) {
+                            row["before"] = json!("[需完整读取权限]");
+                            row["after"] = json!("[需完整读取权限]");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    result
 }

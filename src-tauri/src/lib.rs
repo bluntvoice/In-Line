@@ -838,16 +838,6 @@ fn mcp_update_client(
     scope: mcp::scope::Scope,
 ) -> Result<(), String> {
     mcp_local(&window)?;
-    if permissions.write
-        && security
-            .view()
-            .map_err(mcp_error)?
-            .clients
-            .iter()
-            .any(|c| c.id == id && c.kind.as_deref() == Some("cli"))
-    {
-        return Err("CLI 当前阶段仅支持读取权限".into());
-    }
     security
         .require_sensitive_notice(&permissions)
         .map_err(mcp_error)?;
@@ -1394,6 +1384,8 @@ pub fn run() {
                                     | "request_undo"
                                     | "batch_mutate"
                                     | "manage_business_data"
+                                    | "cli_complete_task"
+                                    | "cli_create_subtask"
                             ) && result.is_ok()
                             {
                                 let _ = handle.emit("data-changed", ());

@@ -1,0 +1,12 @@
+{
+  "changedFile": "src-tauri/src/cli/mod.rs",
+  "before": "对应既有只读请求JSON",
+  "after": "对应命令的请求JSON",
+  "nativeNewlineNormalization": true,
+  "functionalSourceOtherwiseIdenticalAfterNewlineNormalization": true,
+  "fullSuiteRetained": 209,
+  "targetedBuild": true,
+  "versionHelpExecuteRefusalReadback": true,
+  "previousDraftSha256": "6D6C66C942F9FBA880A07E9CFAA99B880A061AD2C5AE176C3D2CA3B43D2EBA4E",
+  "finalSha256": "7C9CD90A1683B24AEED542B3F3B97A588A5B3EC1BF6B15F117BA0282F136BC61"
+}

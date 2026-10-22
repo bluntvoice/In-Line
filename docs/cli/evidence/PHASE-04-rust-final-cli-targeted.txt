@@ -1,0 +1,23 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized] target(s) in 21.05s
+     Running tests\cli_foundation.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\cli_foundation-40ee9538d9a0612f.exe)
+=== cargo stdout (tests) ===
+
+running 14 tests
+test cli_full_read_requires_both_global_and_independent_client_permission ... ok
+test cli_import_failure_rolls_back_and_conflicts_never_overwrite_profiles ... ok
+test cli_import_real_process_and_scoped_read_pagination_match_host_and_gui ... ok
+test cli_read_command_families_preserve_readonly_scope_statistics_and_projection ... ok
+test console_utf8_bom_paths_single_envelope_offline_and_strict_arguments ... ok
+test explicit_cli_profile_uses_existing_authenticated_ipc_and_preserves_permissions ... ok
+test phase4::cli_and_actual_mcp_concurrent_versions_conflict_and_profiles_cannot_expand_scope ... ok
+test phase4::cli_real_parent_children_future_scope_completion_and_local_undo_approval ... ok
+test phase4::cli_task_edit_urgency_queue_real_work_archive_trash_restore_and_reopen_use_versions ... ok
+test phase4::cli_unknown_write_is_not_replayed_and_readonly_original_receipt_recovers_ledger ... ok
+test phase4::gui_cli_and_actual_mcp_stdio_share_task_queue_number_event_and_status_rules ... ok
+test phase4::parent_candidates_over_one_hundred_are_scoped_snapshot_pages_not_truncated ... ok
+test piped_input_without_eof_returns_bounded_error_instead_of_hanging ... ok
+test profiles_reject_foreign_binding_tampering_and_mcp_identity_without_fallback ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.38s

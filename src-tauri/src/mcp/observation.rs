@@ -79,6 +79,10 @@ impl Security {
                         && v["snapshot"].is_null()
                         && v["cursor"].is_null()
                 }
+                "cli_complete_task" | "cli_create_subtask" => {
+                    v["verificationStatus"] == "verified_after_commit"
+                        && matches!(v["commitStatus"].as_str(), Some("committed" | "no_change"))
+                }
                 "mutate_task" | "batch_mutate" | "manage_preferences" => {
                     v["verificationStatus"] == "verified_in_transaction"
                         && v["commitStatus"] == "committed"

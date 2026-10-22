@@ -184,7 +184,11 @@ pub async fn serve(
                     .unwrap_or(platform::random_secret()?);
                 let receipt_hash = if matches!(
                     request.tool.as_str(),
-                    "mutate_task" | "batch_mutate" | "manage_preferences"
+                    "mutate_task"
+                        | "batch_mutate"
+                        | "manage_preferences"
+                        | "cli_complete_task"
+                        | "cli_create_subtask"
                 ) {
                     request.args["idempotencyKey"].as_str().map(|k| {
                         use sha2::Digest;
@@ -233,6 +237,8 @@ pub async fn serve(
                                     | "manage_preferences"
                                     | "manage_business_data"
                                     | "request_undo"
+                                    | "cli_complete_task"
+                                    | "cli_create_subtask"
                             )
                         {
                             McpError::new("result_unknown")
@@ -334,6 +340,8 @@ pub async fn call_at_with_id(
             | "manage_business_data"
             | "manage_preferences"
             | "manage_saved_query"
+            | "cli_complete_task"
+            | "cli_create_subtask"
     );
     let sent = std::sync::atomic::AtomicBool::new(false);
     let result = tokio::time::timeout(DEADLINE, async {
@@ -396,7 +404,13 @@ pub async fn call_at_with_id(
         };
         sent.store(true, std::sync::atomic::Ordering::SeqCst);
         send(&mut stream, &signed, MAX_REQUEST).await?;
-        let response: Signed = receive(&mut stream, MAX_RESPONSE).await?;
+        let response: Signed = receive(&mut stream, MAX_RESPONSE).await.map_err(|e| {
+            if write_request {
+                McpError::new("result_unknown")
+            } else {
+                e
+            }
+        })?;
         if !super::security::constant_equal(
             &response.proof,
             &proof(
@@ -412,7 +426,17 @@ pub async fn call_at_with_id(
     .unwrap_or_else(|_| Err(McpError::new("host_unavailable")));
     if write_request
         && sent.load(std::sync::atomic::Ordering::SeqCst)
-        && result.as_ref().is_err_and(|e| e.code == "host_unavailable")
+        && result.as_ref().is_err_and(|e| {
+            matches!(
+                e.code.as_str(),
+                "host_unavailable"
+                    | "revoked"
+                    | "paused"
+                    | "unauthenticated"
+                    | "authorization_changed"
+                    | "security_unavailable"
+            )
+        })
     {
         return Err(McpError::new("result_unknown"));
     }

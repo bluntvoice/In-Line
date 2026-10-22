@@ -9,7 +9,8 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 ## v0.5.0 开发构建
 
-CLI Phase2已验收并推送；Phase3已实现并通过隔离自动检查，待阶段验收：GUI签发独立CLI授权、短期加密包导入、显式profile及事项/队列/日历/基础统计只读命令。当前安装包尚未包含CLI，不开放CLI写入；实机部署留Phase6。范围、证据及未验证项见[Phase3报告](docs/cli/PHASE-03-READONLY.md)。
+
+CLI Phase3已验收并推送（a6987f6）；Phase4已实现事项写入、父子管理、软件内撤销申请及原幂等键只读查回执，通过隔离自动检查，用户已确认阶段4通过。写入须独立授权、明确指令、执行开关、原键及版本；现有只读授权不自动升权。当前安装包尚未包含CLI，实机部署留Phase6。范围、证据及未验证项见[Phase4报告](docs/cli/PHASE-04-WRITES.md)。
 
 MCP P5/P6开发新增增量同步、后台查询/导出，以及统计溯源、数据健康和安全缓存清理；待P8统一验收。见[任务指南](docs/mcp/jobs-and-changes-guide.md)、[数据与缓存指南](docs/mcp/quality-and-cache-guide.md)。
 

@@ -15,6 +15,8 @@ use std::{
     sync::Arc,
 };
 use tokio::io::AsyncWriteExt;
+#[path = "cli/phase4.rs"]
+mod phase4;
 
 fn task(title: &str, dept: &str) -> in_line_lib::models::TaskInput {
     serde_json::from_value(json!({"title":title,"department":dept,"departments":[dept],"contact":"private-contact","contacts":["private-contact"],"taskType":"T","details":"private-details","internalNotes":"private-notes","status":"pending","priority":"normal","workload":"standard","isUrgent":false,"urgentRequester":"","urgentReason":""})).unwrap()

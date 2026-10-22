@@ -1,0 +1,1 @@
+PASS: actual sidecar initialize/tools/list, all 16 anonymous tools plus 3 repeats refused; first five unauthenticated, subsequent rate_limited; stdout protocol JSON only; no host, grant, profile or storage creation. This is isolated protocol validation, not current-session MCP verification.

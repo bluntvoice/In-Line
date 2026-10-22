@@ -65,7 +65,7 @@ pub(crate) fn presets() -> Vec<onboarding::ClientPreset> {
         available: false,
         authorization_available: available,
         status: if available {
-            "只读接入，导入后单独验证"
+            "独立授权，导入后单独验证"
         } else {
             "未安装 CLI 程序"
         },
@@ -221,7 +221,7 @@ fn issue(
         return Err(e);
     }
     let exe = command.to_string_lossy().replace('\'', "''");
-    let prompt = format!("我已在 In-Line 中选择 {client} 并独立授予只读权限。请在本机 PowerShell 10分钟内仅执行一次：\n& '{exe}' client import --package {id} --format json\n凭证仅由本机程序处理，不打开、复制、输出或上传授权包、profile、备份或配置，不把凭证放入环境变量、启动参数或聊天。成功后读取返回的 profileName，后续命令显式使用 --profile {name} --format json；先调用 capabilities 核对 clientId、权限和范围。失败时报告脱敏错误，不重复导入、不切换到其他身份、不增权、不修改数据。CLI连接验证与当前聊天MCP会话认证分别记录；不得以CLI验证冒充当前聊天MCP接入成功。CLI客户端名称只用于独立授权分类，不表示Codex配置已自动重载。");
+    let prompt = format!("我已在 In-Line 中选择 {client} 并按所选权限独立授权。请在本机 PowerShell 10分钟内仅执行一次：\n& '{exe}' client import --package {id} --format json\n凭证仅由本机程序处理，不打开、复制、输出或上传授权包、profile、备份或配置，不把凭证放入环境变量、启动参数或聊天。成功后读取返回的 profileName，后续命令显式使用 --profile {name} --format json；先调用 capabilities 核对 clientId、权限和范围。失败时报告脱敏错误，不重复导入、不切换到其他身份、不增权、不修改数据。CLI连接验证与当前聊天MCP会话认证分别记录；不得以CLI验证冒充当前聊天MCP接入成功。写入必须另有我的明确指令、独立写权限、--execute、原因、意图、版本及原幂等键。实际办理必须由我确认，不能猜联系人、截止时间或新义务；创建前检索候选，多个候选先消歧。任何不明结果都只能先用原键执行receipt get，不盲目重放；历史撤销只能申请，由我在软件内批准。CLI客户端名称只用于独立授权分类，不表示Codex配置已自动重载。");
     Ok(Receipt {
         package_id: id,
         client_id: issued.client_id,
@@ -238,9 +238,6 @@ pub(crate) fn prepare_at(
 ) -> Result<Receipt, McpError> {
     if !is_cli(&args.client) {
         return Err(McpError::new("onboarding_unavailable"));
-    }
-    if args.permissions.write {
-        return Err(McpError::new("invalid_arguments"));
     }
     checked_executable(command)?;
     let mut created = None;
@@ -287,9 +284,6 @@ pub(crate) fn rotate_at(
         .iter()
         .find(|c| c.id == id && c.kind.as_deref() == Some("cli") && !c.revoked)
         .ok_or_else(|| McpError::new("onboarding_unavailable"))?;
-    if client.permissions.write {
-        return Err(McpError::new("invalid_arguments"));
-    }
     let selected = if client.name == "Codex CLI" {
         "codex-cli"
     } else if client.name == "PowerShell CLI" {

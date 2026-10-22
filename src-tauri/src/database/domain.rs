@@ -874,7 +874,7 @@ pub(super) fn reorder_subtasks_on_domain(
     Ok(())
 }
 
-pub(super) fn complete_task_on_domain(
+pub(crate) fn complete_task_on_domain(
     connection: &Connection,
     input: CompleteTaskInput,
 ) -> Result<CompleteTaskResult, String> {

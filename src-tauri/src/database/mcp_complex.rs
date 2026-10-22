@@ -402,6 +402,7 @@ pub(super) fn undo(
             | "setStatus"
             | "setUrgent"
             | "recordWorkEvent"
+            | "cliCompleteGroup"
     ) {
         return Err(err("unsupported"));
     }
@@ -467,7 +468,60 @@ pub(super) fn undo(
     // Children first for restoring completion/archive constraints; relationship changes remain explicit.
     rows.sort_by_key(|t| if t.parent_task_id.is_some() { 0 } else { 1 });
     for old in rows {
+        if action == "cliCompleteGroup"
+            && !matches!(old.status.as_str(), "completed" | "cancelled" | "archived")
+        {
+            let current = get_task_on(conn, old.id).map_err(domain)?;
+            if matches!(
+                current.status.as_str(),
+                "completed" | "cancelled" | "archived"
+            ) || current.archived_at.is_some()
+            {
+                reopen_task_on_domain(
+                    conn,
+                    QueueInput {
+                        id: old.id,
+                        inherit_deadline: false,
+                        reason: "用户批准撤销父子事项完成，旧号不回收".into(),
+                    },
+                )
+                .map_err(domain)?;
+            }
+        }
         restore_state(conn, &old)?;
+    }
+    if action == "cliCompleteGroup" {
+        // The shared restore above compensates task/queue state. Each completed
+        // child's new work events must also be voided, preserving original rows.
+        for old in before["completionProofs"]
+            .as_array()
+            .ok_or_else(|| err("internal_error"))?
+        {
+            if let Some(new) = after["relatedTasks"]
+                .as_array()
+                .and_then(|rows| rows.iter().find(|v| v["task"]["id"] == old["task"]["id"]))
+            {
+                for event in new["workEvents"]
+                    .as_array()
+                    .ok_or_else(|| err("internal_error"))?
+                {
+                    if event["voidedAt"].is_null()
+                        && !old["workEvents"]
+                            .as_array()
+                            .ok_or_else(|| err("internal_error"))?
+                            .iter()
+                            .any(|v| v["id"] == event["id"])
+                    {
+                        void_work_event_on(
+                            conn,
+                            event["id"].as_i64().ok_or_else(|| err("internal_error"))?,
+                            true,
+                        )
+                        .map_err(domain)?;
+                    }
+                }
+            }
+        }
     }
     Ok(())
 }

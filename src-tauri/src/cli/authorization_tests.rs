@@ -42,9 +42,18 @@ fn gui_issues_distinct_cli_profiles_without_credentials_in_prompt_or_mcp_reuse()
     let count = f.security.view().unwrap().clients.len();
     let mut write = args("codex-cli");
     write.permissions.write = true;
-    assert!(prepare_at(&f.security, &root, &exe, write, 1000).is_err());
+    let granted = prepare_at(&f.security, &root, &exe, write, 1000).unwrap();
+    assert!(f
+        .security
+        .view()
+        .unwrap()
+        .clients
+        .iter()
+        .any(|c| c.id == granted.client_id
+            && c.permissions.write
+            && c.kind.as_deref() == Some("cli")));
     assert!(prepare_at(&f.security, &root, &exe, args("unknown"), 1000).is_err());
-    assert_eq!(count, f.security.view().unwrap().clients.len());
+    assert_eq!(count + 1, f.security.view().unwrap().clients.len());
 }
 #[test]
 fn sealed_package_binding_single_use_and_rotation_keep_failures_local() {

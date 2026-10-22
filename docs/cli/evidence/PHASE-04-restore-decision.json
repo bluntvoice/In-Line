@@ -1,0 +1,6 @@
+{
+  "date": "2026-10-22",
+  "question": "CLI恢复语义与现有GUI/MCP不一致时采用何种规则",
+  "userAnswer": "A：沿用GUI/MCP现有规则，恢复并加入今日队列，更正CLI草案（推荐）",
+  "effectiveRule": "Restore from trash enters today queue; archived reopen remains a separate action"
+}

@@ -62,6 +62,9 @@ pub(super) fn build(
     input: Value,
 ) -> Result<Request, McpError> {
     use ReadCommand::*;
+    if matches!(command, ParentCandidates(_) | Receipt) {
+        return private_read(command, options, input);
+    }
     let mut args = input.as_object().ok_or_else(arguments_error)?.clone();
     let task = matches!(
         command,
@@ -320,4 +323,58 @@ mod tests {
         }
         assert_eq!(p.push(page("a")).unwrap_err().code, "resource_limit");
     }
+}
+
+fn private_read(
+    command: &ReadCommand,
+    options: &Options,
+    input: Value,
+) -> Result<Request, McpError> {
+    let mut args = input.as_object().ok_or_else(arguments_error)?.clone();
+    let candidates = matches!(command, ReadCommand::ParentCandidates(_));
+    if options.all && !candidates {
+        return Err(arguments_error());
+    }
+    for (flag, value) in &options.flags {
+        let (key, value) = match flag.as_str() {
+            "--limit" if candidates => (
+                "limit",
+                json!(value.parse::<i64>().map_err(|_| arguments_error())?),
+            ),
+            "--cursor" if candidates => ("cursor", json!(value)),
+            "--snapshot" if candidates => ("snapshot", json!(value)),
+            "--idempotency-key" if !candidates => ("idempotencyKey", json!(value)),
+            _ => return Err(arguments_error()),
+        };
+        insert(&mut args, key, value)?;
+    }
+    if options.all && args.contains_key("cursor") {
+        return Err(arguments_error());
+    }
+    if args
+        .get("limit")
+        .is_some_and(|v| v.as_i64().is_none_or(|n| !(1..=100).contains(&n)))
+    {
+        return Err(arguments_error());
+    }
+    let (tool, value) = match command {
+        ReadCommand::ParentCandidates(id) => {
+            insert(&mut args, "taskId", json!(id))?;
+            (
+                "cli_parent_candidates",
+                typed::<crate::application::cli::CandidateArgs>(Value::Object(args))?,
+            )
+        }
+        ReadCommand::Receipt => (
+            "cli_get_receipt",
+            typed::<crate::application::cli::ReceiptArgs>(Value::Object(args))?,
+        ),
+        _ => return Err(arguments_error()),
+    };
+    Ok(Request {
+        tool,
+        args: value,
+        paginated: candidates,
+        exact: false,
+    })
 }

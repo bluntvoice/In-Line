@@ -7,6 +7,7 @@ pub(super) enum Command {
     Status,
     Import,
     Read(ReadCommand),
+    Write(WriteCommand),
 }
 #[derive(Clone)]
 pub(super) enum ReadCommand {
@@ -24,6 +25,32 @@ pub(super) enum ReadCommand {
     ReportItems,
     Health,
     Diagnostic(String),
+    ParentCandidates(i64),
+    Receipt,
+}
+#[derive(Clone)]
+pub(super) enum WriteCommand {
+    Create,
+    Update(i64),
+    Status(i64, String),
+    Complete(i64),
+    Urgent(i64, bool),
+    Archive(i64),
+    Trash(i64),
+    Restore(i64),
+    Reopen(i64),
+    Reschedule(i64),
+    ChildCreate(i64),
+    ParentSet(i64, Option<i64>),
+    Reorder(i64),
+    Enter(i64),
+    Move(i64, String),
+    Process(i64),
+    CompleteRound(i64),
+    Record(i64),
+    Correct(i64),
+    Void(i64),
+    Undo,
 }
 pub(super) struct Options {
     pub command: Command,
@@ -31,6 +58,7 @@ pub(super) struct Options {
     pub input: Option<String>,
     pub flags: BTreeMap<String, String>,
     pub all: bool,
+    pub execute: bool,
     pub package: Option<String>,
 }
 pub(super) fn requests_json(args: &[OsString]) -> bool {
@@ -53,7 +81,7 @@ pub(super) fn valid_profile(name: &str) -> bool {
             && (name.starts_with("com") || name.starts_with("lpt"))
             && bytes[3].is_ascii_digit())
 }
-// Every command is explicitly read-only; no generic tool dispatch.
+// Fixed command grammar only. Writes require --execute; no arbitrary dispatch.
 pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
     if args.len() > 128 {
         return Err(());
@@ -75,7 +103,22 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
         if arg.starts_with("--") && !matches!(arg.as_str(), "--help" | "--version") {
             let boolean = matches!(
                 arg.as_str(),
-                "--no-color" | "--all" | "--include-trash" | "--include-voided"
+                "--no-color"
+                    | "--all"
+                    | "--include-trash"
+                    | "--include-voided"
+                    | "--execute"
+                    | "--confirmed-real-work"
+                    | "--explicit-user-request"
+                    | "--allow-possible-duplicate"
+                    | "--replace-whole-text"
+                    | "--include-eligible-subtasks"
+                    | "--parent-only"
+                    | "--include-subtasks"
+                    | "--include-completed-subtasks"
+                    | "--inherit-deadline"
+                    | "--confirm-historical-impact"
+                    | "--sync-status"
             );
             let value = if boolean {
                 "true".into()
@@ -117,6 +160,52 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
         ["report", "items"] => Command::Read(ReadCommand::ReportItems),
         ["data", "health"] => Command::Read(ReadCommand::Health),
         ["diagnostic", "get", id] => Command::Read(ReadCommand::Diagnostic((*id).into())),
+        ["task", "parent", "candidates", id] => {
+            Command::Read(ReadCommand::ParentCandidates(positive_id(id)?))
+        }
+        ["receipt", "get"] => Command::Read(ReadCommand::Receipt),
+        ["task", "create"] => Command::Write(WriteCommand::Create),
+        ["task", "update", id] => Command::Write(WriteCommand::Update(positive_id(id)?)),
+        ["task", "status", "set", id, status] => {
+            Command::Write(WriteCommand::Status(positive_id(id)?, (*status).into()))
+        }
+        ["task", "complete", id] => Command::Write(WriteCommand::Complete(positive_id(id)?)),
+        ["task", "urgent", "set", id] => {
+            Command::Write(WriteCommand::Urgent(positive_id(id)?, true))
+        }
+        ["task", "urgent", "clear", id] => {
+            Command::Write(WriteCommand::Urgent(positive_id(id)?, false))
+        }
+        ["task", "archive", id] => Command::Write(WriteCommand::Archive(positive_id(id)?)),
+        ["task", "trash", id] => Command::Write(WriteCommand::Trash(positive_id(id)?)),
+        ["task", "restore", id] => Command::Write(WriteCommand::Restore(positive_id(id)?)),
+        ["task", "reopen", id] => Command::Write(WriteCommand::Reopen(positive_id(id)?)),
+        ["task", "reschedule", id] => Command::Write(WriteCommand::Reschedule(positive_id(id)?)),
+        ["task", "child", "create", id] => {
+            Command::Write(WriteCommand::ChildCreate(positive_id(id)?))
+        }
+        ["task", "parent", "set", id, parent] => Command::Write(WriteCommand::ParentSet(
+            positive_id(id)?,
+            Some(positive_id(parent)?),
+        )),
+        ["task", "parent", "clear", id] => {
+            Command::Write(WriteCommand::ParentSet(positive_id(id)?, None))
+        }
+        ["task", "children", "reorder", id] => {
+            Command::Write(WriteCommand::Reorder(positive_id(id)?))
+        }
+        ["queue", "enter", id] => Command::Write(WriteCommand::Enter(positive_id(id)?)),
+        ["queue", "move", id, direction] if matches!(*direction, "up" | "down") => {
+            Command::Write(WriteCommand::Move(positive_id(id)?, (*direction).into()))
+        }
+        ["work", "process-round", id] => Command::Write(WriteCommand::Process(positive_id(id)?)),
+        ["work", "complete-round", id] => {
+            Command::Write(WriteCommand::CompleteRound(positive_id(id)?))
+        }
+        ["work", "record", id] => Command::Write(WriteCommand::Record(positive_id(id)?)),
+        ["work", "correct", id] => Command::Write(WriteCommand::Correct(positive_id(id)?)),
+        ["work", "void", id] => Command::Write(WriteCommand::Void(positive_id(id)?)),
+        ["undo", "request"] => Command::Write(WriteCommand::Undo),
         _ => return Err(()),
     };
     if flags
@@ -138,11 +227,19 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
         return Err(());
     }
     let all = flags.remove("--all").is_some();
+    let execute = flags.remove("--execute").is_some();
+    if matches!(command, Command::Write(_)) != execute || (execute && all) {
+        return Err(());
+    }
     let package = flags.remove("--package");
     if matches!(command, Command::Help | Command::Version) && profile.is_some() {
         return Err(());
     }
-    if !matches!(command, Command::Status | Command::Read(_)) && input.is_some() {
+    if !matches!(
+        command,
+        Command::Status | Command::Read(_) | Command::Write(_)
+    ) && input.is_some()
+    {
         return Err(());
     }
     if matches!(command, Command::Import) {
@@ -157,7 +254,7 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
     } else if package.is_some() {
         return Err(());
     }
-    if !matches!(command, Command::Read(_)) && (!flags.is_empty() || all) {
+    if !matches!(command, Command::Read(_) | Command::Write(_)) && (!flags.is_empty() || all) {
         return Err(());
     }
     Ok(Options {
@@ -166,6 +263,7 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
         input,
         flags,
         all,
+        execute,
         package,
     })
 }

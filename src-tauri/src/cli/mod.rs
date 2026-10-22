@@ -7,6 +7,7 @@ mod parse;
 #[cfg(windows)]
 mod profile;
 mod read;
+mod write;
 
 use crate::mcp::{build_identity, contract::*};
 use serde_json::{json, Value};
@@ -21,7 +22,7 @@ pub use output::exit_code;
 use parse::{Command, Options};
 
 const MAX_INPUT: u64 = 1024 * 1024;
-const HELP: &str = "In Line CLI（Windows，Phase3只读）
+const HELP: &str = "In Line CLI（Windows，Phase4事项管理）
 用法：in-line-cli <命令> [选项]
   --help                 显示帮助；不启动主程序
   --version              显示版本和构建身份；不启动主程序
@@ -36,7 +37,7 @@ const HELP: &str = "In Line CLI（Windows，Phase3只读）
   queue list / future / history <id>
   calendar list / stats summary / report daily|weekly|monthly|items --from YYYY-MM-DD --to YYYY-MM-DD
   data health / diagnostic get <error-id>
-  --input <file|->       对应既有只读请求JSON；-读取管道；上限1MiB/10秒，支持UTF-8 BOM
+  --input <file|->       对应命令的请求JSON；-读取管道；上限1MiB/10秒，支持UTF-8 BOM
   --limit 1..100 / --cursor <值> / --snapshot <值> / --all
   --all                 同一快照逐页；上限100页/10000条/16MiB；不返回部分成功
   --projection <逗号分隔字段> / --ids <逗号分隔ID> / --text <文字>
@@ -47,7 +48,15 @@ const HELP: &str = "In Line CLI（Windows，Phase3只读）
   --timezone-offset-minutes <分钟>；history另支持--kinds及--include-voided
 同一字段不得同时在命令参数和JSON指定；状态、字段、日期口径由主程序校验。
 日报/周报/月报当前均需显式起止日期，返回原结构化摘要；完整文本留后续阶段。
-不提供写入、授权增权、任意工具调用或SQL。导入/CLI验证不代表当前聊天MCP已连接。
+写入命令：task create/update/status set/complete/urgent set|clear/archive/trash/restore/reopen/reschedule；
+  task child create/parent set|clear/children reorder；queue enter/move；work process-round/complete-round/record/correct/void；undo request。
+  写入必须--execute及显式--profile；--input提供意图、原因、原幂等键、版本或字段基准，禁止自动填版本或猜业务字段。
+  通用：--idempotency-key、--reason、--intent-summary、--explicit-user-request；真实办理另须--confirmed-real-work。
+  版本：--task-version、--parent-version；业务：--date、--event-id、--audit-id、--requester、--urgent-reason、--handled-at、--result-status、--note。
+  父任务完成须明确--include-eligible-subtasks或--parent-only，并提供当前所有子任务taskVersions；普通完成保留原保护。
+  归档/软删除可显式--include-completed-subtasks/--include-subtasks；恢复沿用GUI加入今日队列。
+  task parent candidates <id>；receipt get --idempotency-key <原键>仅查当前profile原回执，绝不重做写入。
+不提供授权增权、审批approve、force、任意工具调用或SQL。导入/CLI验证不代表当前聊天MCP已连接。
 首版通过完整路径调用，不自动修改PATH。长期凭证不得放入参数或聊天。";
 
 fn arguments_error() -> McpError {
@@ -163,6 +172,7 @@ async fn query(
         id.clone(),
     )
     .await?;
+    validate_private_route(&capabilities, request.tool)?;
     validate_status(capabilities, &credentials.client_id)?;
     let mut pages = read::Pages::new();
     loop {
@@ -218,7 +228,11 @@ fn validate_status(data: Value, client: &str) -> Result<Value, McpError> {
         "currentMcpSessionVerified":false,"cliBuild":build_identity::current(),"capabilities":data}))
 }
 
-async fn execute(options: &Options, id: String) -> Result<Value, McpError> {
+async fn execute(
+    options: &Options,
+    id: String,
+    receipt_key: &mut Option<String>,
+) -> Result<Value, McpError> {
     let input = options
         .input
         .as_deref()
@@ -228,7 +242,7 @@ async fn execute(options: &Options, id: String) -> Result<Value, McpError> {
     match &options.command {
         Command::Help => Ok(json!({"help":HELP})),
         Command::Version => {
-            Ok(json!({"name":"in-line-cli","build":build_identity::current(),"cliPhase":3}))
+            Ok(json!({"name":"in-line-cli","build":build_identity::current(),"cliPhase":4}))
         }
         Command::Doctor => {
             let exe = std::env::current_exe().map_err(|_| McpError::new("host_unavailable"))?;
@@ -263,6 +277,19 @@ async fn execute(options: &Options, id: String) -> Result<Value, McpError> {
                 Err(McpError::new("unsupported"))
             }
         }
+        Command::Write(command) => {
+            let request = write::build(command, options, input)?;
+            *receipt_key = Some(request.key.clone());
+            #[cfg(windows)]
+            {
+                dispatch_write(options, request, id).await
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = request;
+                Err(McpError::new("unsupported"))
+            }
+        }
         Command::Read(command) => {
             let request = read::build(command, options, input)?;
             #[cfg(windows)]
@@ -283,8 +310,9 @@ pub async fn run(args: impl Iterator<Item = OsString>) -> i32 {
     let json_output = parse::requests_json(&args);
     let id = crate::mcp::platform::random_secret().unwrap_or_else(|_| "cli-local-error".into());
     let parsed = parse::parse(args);
+    let mut receipt_key = None;
     let result = match &parsed {
-        Ok(options) => execute(options, id.clone()).await,
+        Ok(options) => execute(options, id.clone(), &mut receipt_key).await,
         Err(_) => Err(arguments_error()),
     };
     let mut envelope = Envelope::result(id, result);
@@ -302,6 +330,23 @@ pub async fn run(args: impl Iterator<Item = OsString>) -> i32 {
         }
         if let Some(error) = envelope.error.as_mut() {
             error["diagnosticAvailability"] = json!("local_cli_or_host_if_reached");
+        }
+    }
+    if let Some(key) = receipt_key {
+        let kind = if parsed
+            .as_ref()
+            .is_ok_and(|o| matches!(o.command, Command::Write(parse::WriteCommand::Undo)))
+        {
+            "undo_request"
+        } else {
+            "mutation"
+        };
+        let context = json!({"idempotencyKey":key,"kind":kind,"lookup":"receipt get --idempotency-key <original> --profile <same>","neverBlindlyReplay":true});
+        if let Some(data) = envelope.data.as_mut().and_then(Value::as_object_mut) {
+            data.insert("cliReceipt".into(), context.clone());
+        }
+        if let Some(error) = envelope.error.as_mut() {
+            error["cliReceipt"] = context;
         }
     }
     output::emit(&envelope, json_output)
@@ -374,4 +419,106 @@ mod tests {
             );
         }
     }
+}
+
+#[cfg(windows)]
+fn validate_private_route(capabilities: &Value, tool: &str) -> Result<(), McpError> {
+    if tool.starts_with("cli_")
+        && (capabilities["cli"]["version"] != 1
+            || capabilities["cli"]["phase"].as_u64().is_none_or(|p| p < 4)
+            || !capabilities["cli"]["privateRoutes"]
+                .as_array()
+                .is_some_and(|a| a.iter().any(|v| v == tool)))
+    {
+        return Err(McpError::new("incompatible"));
+    }
+    Ok(())
+}
+#[cfg(windows)]
+async fn dispatch_write(
+    options: &Options,
+    request: write::Request,
+    id: String,
+) -> Result<Value, McpError> {
+    let name = options
+        .profile
+        .as_deref()
+        .ok_or_else(|| McpError::new("unauthenticated"))?;
+    let root = crate::mcp::platform::root()?;
+    let exe = std::env::current_exe().map_err(|_| McpError::new("host_unavailable"))?;
+    let credentials = profile::load_at(&root, name, &exe)?;
+    let capability = crate::mcp::ipc::call_at_with_id(
+        root.clone(),
+        credentials.clone(),
+        "get_capabilities",
+        json!({}),
+        id.clone(),
+    )
+    .await?;
+    validate_status(capability.clone(), &credentials.client_id)?;
+    if capability["cli"]["version"] != 1
+        || capability["cli"]["phase"].as_u64().is_none_or(|p| p < 4)
+    {
+        return Err(McpError::new("incompatible"));
+    }
+    validate_private_route(&capability, request.tool)?;
+    if capability["permissions"]["write"] != true
+        || capability["permissions"]["regularRead"] != true
+    {
+        return Err(McpError::new("forbidden"));
+    }
+    if let Some(title) = &request.create_title {
+        if title.is_empty() {
+            return Err(arguments_error());
+        }
+        let recorded = crate::mcp::ipc::call_at_with_id(
+            root.clone(),
+            credentials.clone(),
+            "cli_get_receipt",
+            json!({"idempotencyKey":request.key}),
+            id.clone(),
+        )
+        .await;
+        let fresh = match recorded {
+            Ok(_) => false,
+            Err(e) if e.code == "not_found" => true,
+            Err(e) => return Err(e),
+        };
+        if fresh {
+            let candidates = crate::mcp::ipc::call_at_with_id(
+                root.clone(),
+                credentials.clone(),
+                "query_tasks",
+                json!({"filters":{"text":title},"projection":["id","title"],"limit":100}),
+                id.clone(),
+            )
+            .await?;
+            if candidates["items"]
+                .as_array()
+                .is_some_and(|a| !a.is_empty())
+                && request.args["intent"]["allowPossibleDuplicate"] != true
+            {
+                return Err(McpError::new("possible_duplicate"));
+            }
+        }
+    }
+    // Exactly one write dispatch. Connection/revision ambiguity is classified by IPC;
+    // no new key, replay, approval or fallback identity is attempted here.
+    let expected_audit = request.args["auditId"].clone();
+    let mut value =
+        crate::mcp::ipc::call_at_with_id(root, credentials, request.tool, request.args, id).await?;
+    if request.tool == "request_undo" {
+        if !value.is_object()
+            || !matches!(
+                value["status"].as_str(),
+                Some("needs_user_approval" | "approved" | "rejected")
+            )
+            || value["undoRequestId"].as_i64().is_none_or(|n| n <= 0)
+            || value["auditId"] != expected_audit
+        {
+            return Err(McpError::new("result_unknown"));
+        }
+        value["submissionOnly"] = json!(true);
+    }
+    write::validate_result(value)
 }

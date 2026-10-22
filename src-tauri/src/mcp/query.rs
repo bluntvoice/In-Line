@@ -517,11 +517,66 @@ pub fn tasks(
     auth: &Authorization,
     args: QueryArgs,
 ) -> Result<Value, McpError> {
+    tasks_with_source(state, db, client, auth, args, None)
+}
+pub(crate) fn cli_parent_candidates(
+    state: &mut QueryState,
+    db: &Database,
+    client: &str,
+    auth: &Authorization,
+    args: crate::application::cli::CandidateArgs,
+) -> Result<Value, McpError> {
+    if args.task_id <= 0 {
+        return Err(invalid());
+    }
+    let (eligible, version) = db.cli_candidate_source(auth, args.task_id)?;
+    tasks_with_source(
+        state,
+        db,
+        client,
+        auth,
+        QueryArgs {
+            filters: Some(QueryFilters {
+                structure: Some("topLevel".into()),
+                ..Default::default()
+            }),
+            projection: Some(
+                [
+                    "id",
+                    "title",
+                    "departments",
+                    "taskType",
+                    "status",
+                    "taskVersion",
+                ]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            ),
+            limit: args.limit,
+            cursor: args.cursor,
+            snapshot: args.snapshot,
+        },
+        Some((args.task_id, eligible, version)),
+    )
+}
+fn tasks_with_source(
+    state: &mut QueryState,
+    db: &Database,
+    client: &str,
+    auth: &Authorization,
+    args: QueryArgs,
+    source: Option<(i64, bool, i64)>,
+) -> Result<Value, McpError> {
     let f = args.filters.unwrap_or_default();
     validate(&f, auth)?;
     let fields = projection(args.projection.as_ref(), auth)?;
     let n = limit(args.limit)?;
-    let key = hash(json!(["tasks", f, fields]));
+    let key = hash(if let Some(source) = source {
+        json!(["cli_parent_candidates", f, fields, source])
+    } else {
+        json!(["tasks", f, fields])
+    });
     let (id, offset) = if args.snapshot.is_some() || args.cursor.is_some() {
         state.resolve(
             db,
@@ -542,6 +597,9 @@ pub fn tasks(
         let available: HashSet<_> = s.ids.iter().copied().collect();
         let mut rows = vec![];
         for mut task in tasks {
+            if source.is_some_and(|(id, eligible, _)| !eligible || task.id == id) {
+                continue;
+            }
             if task
                 .parent_task_id
                 .is_some_and(|id| !available.contains(&id))

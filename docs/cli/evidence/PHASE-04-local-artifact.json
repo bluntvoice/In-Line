@@ -1,0 +1,74 @@
+{
+  "phase": "CLI Phase4",
+  "artifactType": "local_debug_console_not_installer",
+  "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\CLI-Phase4-local-20261022\\in-line-cli.exe",
+  "bytes": 5485568,
+  "sha256": "7C9CD90A1683B24AEED542B3F3B97A588A5B3EC1BF6B15F117BA0282F136BC61",
+  "build": {
+    "baselineCommit": "a6987f6bae20c718eba4b128e6520aed1f1129f4",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "frozenSourceInputs": 203,
+  "sourceManifestSha256": "58AB45A0B542344849B73DDE75552290C92083A9789BC80287A86B53A9A2A33D",
+  "sourceReadbackMatched": true,
+  "subprocessChecks": [
+    {
+      "command": [
+        "--version",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "--help",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "doctor",
+        "--format",
+        "json"
+      ],
+      "exitCode": 6,
+      "status": "error"
+    },
+    {
+      "command": [
+        "status",
+        "--profile",
+        "missing",
+        "--format",
+        "json"
+      ],
+      "exitCode": 3,
+      "status": "error"
+    },
+    {
+      "command": [
+        "task",
+        "create",
+        "--format",
+        "json"
+      ],
+      "exitCode": 2,
+      "status": "error"
+    }
+  ],
+  "productionAuthorizationUsed": false,
+  "installed": false,
+  "userAccepted": false,
+  "releaseOrActionsCreated": false,
+  "lastChange": "Help wording and native source newlines only; guarded CLI build and help/version/execute-refusal readback passed; functional logic unchanged"
+}
