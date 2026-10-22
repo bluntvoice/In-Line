@@ -1,0 +1,63 @@
+{
+  "phase": "CLI Phase3",
+  "artifactType": "local_debug_console_not_installer",
+  "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\CLI-Phase3-local-20261021\\in-line-cli.exe",
+  "bytes": 4683776,
+  "sha256": "C5BFE2B9768BE61DCDD3D5B07D0459100CC22BCAA5EAFF69EC5EAD261ACE2B63",
+  "build": {
+    "baselineCommit": "97aa8ad831b4f01a4b03a35a7d9d4c30932c33c1",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "frozenSourceInputs": 198,
+  "sourceManifestSha256": "E70FCECAC3AD972B2F7BFE2001E20861FFB598456CA68A1F1FA28883BD884008",
+  "sourceReadbackMatched": true,
+  "subprocessChecks": [
+    {
+      "command": [
+        "--version",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "--help",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "command": [
+        "doctor",
+        "--format",
+        "json"
+      ],
+      "exitCode": 6,
+      "status": "error"
+    },
+    {
+      "command": [
+        "status",
+        "--profile",
+        "missing",
+        "--format",
+        "json"
+      ],
+      "exitCode": 3,
+      "status": "error"
+    }
+  ],
+  "productionAuthorizationUsed": false,
+  "installed": false,
+  "userAccepted": false,
+  "releaseOrActionsCreated": false
+}

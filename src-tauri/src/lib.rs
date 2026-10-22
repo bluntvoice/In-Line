@@ -680,8 +680,10 @@ fn mcp_security_state(
     mcp_local(&window)?;
     let mut view = serde_json::to_value(security.view().map_err(mcp_error)?)
         .map_err(|_| "无法读取授权状态".to_string())?;
-    view["onboardingClients"] = serde_json::to_value(mcp::onboarding::presets())
-        .map_err(|_| "无法读取客户端状态".to_string())?;
+    let mut presets = mcp::onboarding::presets();
+    presets.extend(cli::authorization::presets());
+    view["onboardingClients"] =
+        serde_json::to_value(presets).map_err(|_| "无法读取客户端状态".to_string())?;
     Ok(view)
 }
 #[tauri::command]
@@ -765,6 +767,16 @@ fn mcp_prepare_onboarding(
     security
         .require_sensitive_notice(&args.permissions)
         .map_err(mcp_error)?;
+    if cli::authorization::is_cli(&args.client) {
+        return cli::authorization::prepare_at(
+            &security,
+            &mcp::platform::root().map_err(mcp_error)?,
+            &cli::authorization::executable().map_err(mcp_error)?,
+            args,
+            chrono::Utc::now().timestamp(),
+        )
+        .map_err(mcp_error);
+    }
     mcp::onboarding::require_authorization_available(&args.client).map_err(mcp_error)?;
     mcp::onboarding::prepare_at(
         &security,
@@ -782,6 +794,22 @@ fn mcp_rotate_onboarding(
     id: String,
 ) -> Result<mcp::onboarding::Receipt, String> {
     mcp_local(&window)?;
+    if security
+        .view()
+        .map_err(mcp_error)?
+        .clients
+        .iter()
+        .any(|c| c.id == id && c.kind.as_deref() == Some("cli"))
+    {
+        return cli::authorization::rotate_at(
+            &security,
+            &mcp::platform::root().map_err(mcp_error)?,
+            &cli::authorization::executable().map_err(mcp_error)?,
+            &id,
+            chrono::Utc::now().timestamp(),
+        )
+        .map_err(mcp_error);
+    }
     mcp::onboarding::require_authorization_available("codex").map_err(mcp_error)?;
     mcp::onboarding::rotate_at(
         &security,
@@ -810,6 +838,16 @@ fn mcp_update_client(
     scope: mcp::scope::Scope,
 ) -> Result<(), String> {
     mcp_local(&window)?;
+    if permissions.write
+        && security
+            .view()
+            .map_err(mcp_error)?
+            .clients
+            .iter()
+            .any(|c| c.id == id && c.kind.as_deref() == Some("cli"))
+    {
+        return Err("CLI 当前阶段仅支持读取权限".into());
+    }
     security
         .require_sensitive_notice(&permissions)
         .map_err(mcp_error)?;

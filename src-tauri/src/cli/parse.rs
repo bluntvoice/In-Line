@@ -1,16 +1,37 @@
-use std::ffi::OsString;
-
-#[derive(Clone, Copy)]
+use std::{collections::BTreeMap, ffi::OsString};
+#[derive(Clone)]
 pub(super) enum Command {
     Help,
     Version,
     Doctor,
     Status,
+    Import,
+    Read(ReadCommand),
+}
+#[derive(Clone)]
+pub(super) enum ReadCommand {
+    Tasks,
+    Get(i64),
+    Search(String),
+    Ticket(i64),
+    Children(i64),
+    History(i64),
+    Queue,
+    Future,
+    QueueHistory(i64),
+    Calendar,
+    Summary,
+    ReportItems,
+    Health,
+    Diagnostic(String),
 }
 pub(super) struct Options {
     pub command: Command,
     pub profile: Option<String>,
     pub input: Option<String>,
+    pub flags: BTreeMap<String, String>,
+    pub all: bool,
+    pub package: Option<String>,
 }
 pub(super) fn requests_json(args: &[OsString]) -> bool {
     args.windows(2)
@@ -32,10 +53,9 @@ pub(super) fn valid_profile(name: &str) -> bool {
             && (name.starts_with("com") || name.starts_with("lpt"))
             && bytes[3].is_ascii_digit())
 }
-// Phase2 has four commands and five options: explicit matching avoids a new
-// dependency and rejects unknown/duplicate options without echoing their values.
+// Every command is explicitly read-only; no generic tool dispatch.
 pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
-    if args.len() > 32 {
+    if args.len() > 128 {
         return Err(());
     }
     let args: Vec<String> = args
@@ -48,58 +68,114 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
     {
         return Err(());
     }
-    let mut command = None;
-    let mut profile = None;
-    let mut input = None;
-    let mut format = false;
-    let mut no_color = false;
+    let mut words = Vec::new();
+    let mut flags = BTreeMap::new();
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
-        match arg.as_str() {
-            "--help" | "--version" | "doctor" | "status" if command.is_none() => {
-                command = Some(match arg.as_str() {
-                    "--version" => Command::Version,
-                    "doctor" => Command::Doctor,
-                    "status" => Command::Status,
-                    _ => Command::Help,
-                });
-            }
-            "--format" if !format => {
-                if !matches!(iter.next().map(String::as_str), Some("table" | "json")) {
+        if arg.starts_with("--") && !matches!(arg.as_str(), "--help" | "--version") {
+            let boolean = matches!(
+                arg.as_str(),
+                "--no-color" | "--all" | "--include-trash" | "--include-voided"
+            );
+            let value = if boolean {
+                "true".into()
+            } else {
+                let value = iter.next().ok_or(())?;
+                if value.is_empty() || value.starts_with("--") {
                     return Err(());
                 }
-                format = true;
+                value.clone()
+            };
+            if flags.insert(arg.clone(), value).is_some() {
+                return Err(());
             }
-            "--no-color" if !no_color => no_color = true,
-            "--profile" if profile.is_none() => {
-                let name = iter.next().ok_or(())?;
-                if !valid_profile(name) {
-                    return Err(());
-                }
-                profile = Some(name.clone());
-            }
-            "--input" if input.is_none() => {
-                let path = iter.next().ok_or(())?;
-                if path.is_empty() || (path.starts_with('-') && path != "-") {
-                    return Err(());
-                }
-                input = Some(path.clone());
-            }
-            _ => return Err(()),
+        } else {
+            words.push(arg.as_str());
         }
     }
-    let command = command.unwrap_or(Command::Help);
-    if input.is_some() && !matches!(command, Command::Status) {
+    let command = match words.as_slice() {
+        [] | ["--help"] => Command::Help,
+        ["--version"] => Command::Version,
+        ["doctor"] => Command::Doctor,
+        ["status"] | ["capabilities"] | ["client", "status"] => Command::Status,
+        ["client", "import"] => Command::Import,
+        ["task", "list"] => Command::Read(ReadCommand::Tasks),
+        ["task", "get", id] => Command::Read(ReadCommand::Get(positive_id(id)?)),
+        ["task", "search", text] if !text.is_empty() => {
+            Command::Read(ReadCommand::Search((*text).into()))
+        }
+        ["task", "ticket", id] => Command::Read(ReadCommand::Ticket(positive_id(id)?)),
+        ["task", "children", id] => Command::Read(ReadCommand::Children(positive_id(id)?)),
+        ["task", "history", id] => Command::Read(ReadCommand::History(positive_id(id)?)),
+        ["queue", "list"] => Command::Read(ReadCommand::Queue),
+        ["queue", "future"] => Command::Read(ReadCommand::Future),
+        ["queue", "history", id] => Command::Read(ReadCommand::QueueHistory(positive_id(id)?)),
+        ["calendar", "list"] => Command::Read(ReadCommand::Calendar),
+        ["stats", "summary"] | ["report", "daily" | "weekly" | "monthly"] => {
+            Command::Read(ReadCommand::Summary)
+        }
+        ["report", "items"] => Command::Read(ReadCommand::ReportItems),
+        ["data", "health"] => Command::Read(ReadCommand::Health),
+        ["diagnostic", "get", id] => Command::Read(ReadCommand::Diagnostic((*id).into())),
+        _ => return Err(()),
+    };
+    if flags
+        .remove("--format")
+        .is_some_and(|f| !matches!(f.as_str(), "table" | "json"))
+    {
         return Err(());
     }
-    if profile.is_some() && matches!(command, Command::Help | Command::Version) {
+    flags.remove("--no-color");
+    let profile = flags.remove("--profile");
+    if profile.as_deref().is_some_and(|p| !valid_profile(p)) {
+        return Err(());
+    }
+    let input = flags.remove("--input");
+    if input
+        .as_deref()
+        .is_some_and(|p| p.starts_with('-') && p != "-")
+    {
+        return Err(());
+    }
+    let all = flags.remove("--all").is_some();
+    let package = flags.remove("--package");
+    if matches!(command, Command::Help | Command::Version) && profile.is_some() {
+        return Err(());
+    }
+    if !matches!(command, Command::Status | Command::Read(_)) && input.is_some() {
+        return Err(());
+    }
+    if matches!(command, Command::Import) {
+        if package.as_deref().is_none_or(|p| {
+            !(p.len() == 64
+                && p.bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+        }) || profile.is_some()
+        {
+            return Err(());
+        }
+    } else if package.is_some() {
+        return Err(());
+    }
+    if !matches!(command, Command::Read(_)) && (!flags.is_empty() || all) {
         return Err(());
     }
     Ok(Options {
         command,
         profile,
         input,
+        flags,
+        all,
+        package,
     })
+}
+fn positive_id(s: &str) -> Result<i64, ()> {
+    let id = s.parse::<i64>().map_err(|_| ())?;
+    if id <= 0 || id.to_string() != s {
+        Err(())
+    } else {
+        Ok(id)
+    }
 }
 #[cfg(test)]
 mod tests {

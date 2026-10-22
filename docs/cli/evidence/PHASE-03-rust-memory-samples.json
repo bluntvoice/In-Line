@@ -1,0 +1,92 @@
+[
+  {
+    "Time": "2026-10-21T17:54:36.7771663+08:00",
+    "HeadroomGiB": 18.75,
+    "CommitPercent": 56,
+    "AvailableMiB": 6456
+  },
+  {
+    "Time": "2026-10-21T17:54:42.0834187+08:00",
+    "HeadroomGiB": 18.57,
+    "CommitPercent": 56,
+    "AvailableMiB": 6174
+  },
+  {
+    "Time": "2026-10-21T17:54:47.3902196+08:00",
+    "HeadroomGiB": 18.7,
+    "CommitPercent": 56,
+    "AvailableMiB": 6299
+  },
+  {
+    "Time": "2026-10-21T17:54:52.7071718+08:00",
+    "HeadroomGiB": 18.53,
+    "CommitPercent": 56,
+    "AvailableMiB": 6327
+  },
+  {
+    "Time": "2026-10-21T17:54:58.0127272+08:00",
+    "HeadroomGiB": 17.77,
+    "CommitPercent": 58,
+    "AvailableMiB": 6163
+  },
+  {
+    "Time": "2026-10-21T17:55:03.3222159+08:00",
+    "HeadroomGiB": 18.84,
+    "CommitPercent": 56,
+    "AvailableMiB": 6605
+  },
+  {
+    "Time": "2026-10-21T17:55:08.6223867+08:00",
+    "HeadroomGiB": 19.29,
+    "CommitPercent": 54,
+    "AvailableMiB": 6996
+  },
+  {
+    "Time": "2026-10-21T17:55:13.9154384+08:00",
+    "HeadroomGiB": 19.29,
+    "CommitPercent": 54,
+    "AvailableMiB": 7013
+  },
+  {
+    "Time": "2026-10-21T17:55:19.2200685+08:00",
+    "HeadroomGiB": 19.29,
+    "CommitPercent": 54,
+    "AvailableMiB": 7021
+  },
+  {
+    "Time": "2026-10-21T17:55:24.5184547+08:00",
+    "HeadroomGiB": 19.28,
+    "CommitPercent": 54,
+    "AvailableMiB": 7045
+  },
+  {
+    "Time": "2026-10-21T17:55:29.8182323+08:00",
+    "HeadroomGiB": 19.27,
+    "CommitPercent": 55,
+    "AvailableMiB": 7045
+  },
+  {
+    "Time": "2026-10-21T17:55:35.1241272+08:00",
+    "HeadroomGiB": 19.28,
+    "CommitPercent": 55,
+    "AvailableMiB": 7041
+  },
+  {
+    "Time": "2026-10-21T17:55:40.4212929+08:00",
+    "HeadroomGiB": 19.29,
+    "CommitPercent": 54,
+    "AvailableMiB": 7080
+  },
+  {
+    "Time": "2026-10-21T17:55:45.7166248+08:00",
+    "HeadroomGiB": 19.28,
+    "CommitPercent": 55,
+    "AvailableMiB": 7051
+  },
+  {
+    "Time": "2026-10-21T17:55:51.0130971+08:00",
+    "HeadroomGiB": 19.24,
+    "CommitPercent": 55,
+    "AvailableMiB": 6993
+  }
+]

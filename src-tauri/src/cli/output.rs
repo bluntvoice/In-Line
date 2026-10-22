@@ -11,7 +11,7 @@ pub fn exit_code(envelope: &Envelope) -> i32 {
         .and_then(|e| e["code"].as_str())
         .unwrap_or("internal_error")
     {
-        "invalid_arguments" | "unsupported" => 2,
+        "invalid_arguments" | "unsupported" | "import_invalid" => 2,
         "unauthenticated"
         | "forbidden"
         | "revoked"
@@ -20,11 +20,17 @@ pub fn exit_code(envelope: &Envelope) -> i32 {
         | "sensitive_notice_required" => 3,
         "not_found" => 4,
         "conflict"
+        | "import_conflict"
         | "idempotency_conflict"
         | "business_rule"
         | "possible_duplicate"
         | "needs_disambiguation" => 5,
         "host_unavailable"
+        | "onboarding_unavailable"
+        | "import_expired"
+        | "import_used"
+        | "import_in_doubt"
+        | "import_failed"
         | "security_unavailable"
         | "incompatible"
         | "rate_limited"

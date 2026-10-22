@@ -1,29 +1,29 @@
-//! Read-only CLI credential adapter. GUI issuance/import is a Phase3 feature.
+//! CLI credential adapter. GUI issuance/import uses the same bound profile.
 //! No environment/default-profile fallback and no Codex runtime refresh provider.
 use crate::mcp::{
     contract::{Credentials, McpError},
     platform,
     security::Security,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     io::Read,
     path::{Path, PathBuf},
 };
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Profile {
-    version: u32,
-    purpose: String,
-    name: String,
-    machine: String,
-    sid: String,
-    executable: PathBuf,
-    binary_hash: String,
-    software_version: String,
-    credentials: Credentials,
+pub(super) struct Profile {
+    pub version: u32,
+    pub purpose: String,
+    pub name: String,
+    pub machine: String,
+    pub sid: String,
+    pub executable: PathBuf,
+    pub binary_hash: String,
+    pub software_version: String,
+    pub credentials: Credentials,
 }
 pub(super) fn load_at(root: &Path, name: &str, executable: &Path) -> Result<Credentials, McpError> {
     let invalid = || McpError::new("security_unavailable");

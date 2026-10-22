@@ -1,0 +1,27 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+error[E0624]: method `mcp_basis` is private
+   --> tests\cli_foundation.rs:756:46
+    |
+756 |         let before = serde_json::to_value(db.mcp_basis().unwrap()).unwrap();
+    |                                              ^^^^^^^^^ private method
+    |
+   ::: src\database\mcp_read.rs:138:5
+    |
+138 |     pub(crate) fn mcp_basis(&self) -> Result<DataVersion, McpError> {
+    |     --------------------------------------------------------------- private method defined here
+
+error[E0624]: method `mcp_basis` is private
+   --> tests\cli_foundation.rs:829:37
+    |
+829 |             serde_json::to_value(db.mcp_basis().unwrap()).unwrap(),
+    |                                     ^^^^^^^^^ private method
+    |
+   ::: src\database\mcp_read.rs:138:5
+    |
+138 |     pub(crate) fn mcp_basis(&self) -> Result<DataVersion, McpError> {
+    |     --------------------------------------------------------------- private method defined here
+
+For more information about this error, try `rustc --explain E0624`.
+error: could not compile `in-line` (test "cli_foundation") due to 2 previous errors
+=== cargo stdout (tests) ===

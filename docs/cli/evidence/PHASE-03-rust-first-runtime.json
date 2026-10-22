@@ -1,0 +1,17 @@
+{
+  "Start": "2026-10-21T17:45:34.5929518+08:00",
+  "End": "2026-10-21T17:47:54.1931199+08:00",
+  "ExitCode": 101,
+  "GuardStopped": false,
+  "TargetDirectory": "D:\\codex-data\\build-targets\\in-line-cli-phase1-test-20261016",
+  "BuildJobs": 1,
+  "TestDebugInfo": 0,
+  "DevDebugInfo": 0,
+  "TestThreads": 1,
+  "TestsFiltered": false,
+  "MinimumHeadroomGiB": 16.9,
+  "MaximumCommitPercent": 60.0,
+  "AbortHeadroomGiB": 4,
+  "AbortCommitPercent": 90,
+  "ConsecutiveSamplesBeforeAbort": 2
+}

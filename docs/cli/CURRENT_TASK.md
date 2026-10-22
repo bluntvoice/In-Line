@@ -1,30 +1,33 @@
-# CLI 当前任务：Phase2实现与自动检查完成，待用户验收
+# CLI 当前任务：Phase3 实现及自动检查完成，待独立验收
 
-2026-10-21用户授权CLI Phase2，并在整机卡顿排查/正常重启后明确“继续inline开发”。当前分支`feat/scheduled-items`，HEAD及同名远端`1dcc1b02253f3bd80ad72a58cf3c3c7fab608aa5`，恢复时fetch后0/0；Phase1已验收并推送，Phase2未提交、未验收。完成后先交用户独立验收，之后才可提交推送，不进入Phase3。
+2026-10-21，用户在 Phase2 报告后指示“进入阶段3”。已记录 Phase2 验收，提交并推送 `97aa8ad831b4f01a4b03a35a7d9d4c30932c33c1`，远端一致，开始前工作区干净。分支 `feat/scheduled-items`；不与 MCP P0–P9 混用。
 
 ## 权威与范围
 
-先读[Phase2报告](PHASE-02-FOUNDATION.md)、[CLI PRD](../prd/cli.md)、[已确认架构](PHASE-00-ARCHITECTURE.md)、[命令草案](COMMANDS-DRAFT.md)。原任务附件路径见报告；压缩后先查这些文件，不与MCP P1/P8混淆。
+压缩后先读本检查点、[CLI PRD](../prd/cli.md)、[已确认架构](PHASE-00-ARCHITECTURE.md)、[命令草案](COMMANDS-DRAFT.md)及原任务附件（路径见 Phase0 报告）。
 
-- 独立`in-line-cli.exe`及`cli/`：--help、--version、离线doctor、显式CLI profile的status、UTF-8 JSON/table、退出码、1MiB/10秒输入边界。
-- 仅lib.rs注册cli；没有更改领域、数据库schema、MCP工具/契约/安全/IPC/通知、依赖、版本或安装器。保留单Rust package，profile绑定用途/独立身份/机器用户/路径/二进制hash，不继承MCP环境变量或Codex Provider。
-- GUI授权包/profile生产签发、client import及业务只读命令留Phase3；事项写入留Phase4。当前阶段不能让用户手工拼Token接入。
+- Phase3：GUI 签发 CLI 独立授权及短期加密包、本机安全导入、显式 profile；事项、队列、日历、基础报表、数据健康与自身诊断的只读命令。
+- 复用受保护 IPC、现有权限/范围/投影/快照服务。长期凭证不进入参数、提示词或聊天；不继承 MCP/Codex 身份；不提供通用工具调用或数据库路径。
+- 写入留 Phase4，完整日报文本及高级自动化留 Phase5。
 
-## 最终验证
+## 验证与停止点
 
-- Rust首轮在系统提交额度耗尽时编译OOM，尚未跑测试；保留`evidence/PHASE-02-rust-first.txt`。用户重启恢复后再明确继续，补齐输入期限与完整权限/范围校验后以同一仓库外target、jobs1、test/dev调试信息0、test-threads1运行完整suite，**191 Rust通过（178库+2sidecar+11集成），零忽略/筛选**。
-- 五项CLI单元、四项真实子进程通过；既有真实host/stdio/导入、领域事务等全部回归通过。计入隔离安全域，不代表生产连接。
-- 资源守卫未触发，提交额度峰值58%、最小余量17.65GiB；总用时约2分38秒。会话70883已结束exit0，不继续等待或重跑。
-- 119项前端/21文件、TS/Vite、fmt通过；后续未改前端输入，不重复无关大范围测试。
-- 新构建的实际MCP sidecar完整16工具schema/注解、匿名拒绝/限流/纯JSON通过。
-- 194份产品输入已冻结并回读；本地CLI独立副本帮助/版本/doctor及缺profile错误均通过。恢复开发前后已安装两exe/授权库/Codex配置摘要一致。未提交或暂存代码。
+只使用隔离授权及合成数据验证真实 CLI 子进程。Rust 使用已有仓库外 target、单编译任务及串行测试；监测提交内存，资源不足停止本次构建，不能关闭用户软件或更改系统设置。
 
-## 本地交付及停止边界
+完成后给出独立 Phase3 报告，等待用户验收后才提交推送和进入 Phase4。不创建安装包、不安装、不修改生产授权/数据/配置；实机部署、GUI 操作及当前会话接入留 CLI Phase6。不生成 Actions 包、Tag 或 Release。
 
-本地`release/CLI-Phase2-local-20261021/in-line-cli.exe`，4,160,512字节，SHA256 `4DCA0C80ADC13FFF36E712BE507B6E4A69A0094BF0BAFBDD571113E449D38032`；独立debug控制台，**不是安装包**。构建基线1dcc1b0、dirty、exactCommit=null，不使用未来提交SHA。完整证据见报告及evidence/PHASE-02-*。
+## 历史证据
 
-不新建NSIS包、不安装、不改生产授权/业务数据、不启动另一个服务冒充本聊天MCP验证、不生成Actions包/Tag/Release。安装/原生GUI/真实部署留CLI Phase6，MCP P8当前会话接入待验状态独立保留。按原用户任务门禁，下一步仅等待CLI Phase2验收及提交推送授权；不得自动进入Phase3。
+Phase2 已通过 191 项 Rust、119 项前端、TS/Vite、fmt、实际 16 工具契约及匿名协议验证，详见 [Phase2 报告](PHASE-02-FOUNDATION.md)及 evidence/PHASE-02-*。保留首轮系统提交内存耗尽记录。Phase2 本地 debug 二进制与冻结证据保留原构建身份，不覆盖或重标。
 
-## 最新用户指示
 
-用户在Phase2报告后指示“进入阶段3”。按阶段顺序，先记录Phase2通过并提交推送，再开展Phase3；当前检查点在Phase3开始时更新。该后续指示替代本文此前的等待验收停止点，保留历史记录及实机Phase6边界。
+## 最终结果与恢复入口
+
+先读 [Phase3 报告](PHASE-03-READONLY.md)。199 项完整 Rust、121 项前端、TS/Vite、fmt、实际 16 工具契约和匿名 stdio 通过。完整测试会话 7472 已结束 exit0，无运行任务；不要重复等待。资源守卫未触发，提交额度峰值58%、最小余量17.77GiB。
+
+198 份冻结输入及四份已安装程序/授权/配置摘要已回读一致；本地 debug CLI 在 release/CLI-Phase3-local-20261021，非安装包。未安装、未改生产授权/数据、未创建 Actions/Tag/Release、未验证本聊天 MCP。当前变更均未暂存、未提交推送。按原任务要求，先等用户独立验收 Phase3；通过后才提交推送，不能自动进入 Phase4。
+
+
+## 最新用户指示（2026-10-22）
+
+用户回复“先推送，进入阶段4”，授权阶段3提交推送后进入阶段4，替代上述等待验收停止点。先完成本次Git提交及远端核对，随后更新阶段4检查点；实机仍留阶段6。

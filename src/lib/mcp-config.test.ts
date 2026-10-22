@@ -1,10 +1,23 @@
 import {describe,expect,it,vi} from "vitest";
 import {createElement} from "react";
 import {renderToStaticMarkup} from "react-dom/server";
-import {ClientChoice} from "../components/McpSecuritySetting";
+import {ClientChoice,ClientPermissions} from "../components/McpSecuritySetting";
 import {canPrepare,defaultPermissions,parseScope,prepareAndCopy,receiptExpired} from "./mcp-onboarding";
 import type {McpReceipt} from "./mcp-onboarding";
 describe("MCP safe onboarding",()=>{
+  it("offers separately authorized CLI clients without claiming a verified MCP session",()=>{
+    const cli={id:"codex-cli",label:"Codex（CLI，独立授权）",available:false,authorizationAvailable:true,status:"只读接入，导入后单独验证"};
+    const absent={id:"powershell-cli",label:"PowerShell（CLI，独立授权）",available:false,authorizationAvailable:false,status:"未安装 CLI 程序"};
+    expect(canPrepare(cli,false)).toBe(true);expect(canPrepare(absent,false)).toBe(false);
+    const html=renderToStaticMarkup(createElement(ClientChoice,{presets:[cli,absent],value:"codex-cli",busy:false,onChange:()=>{}}));
+    expect(html).toContain("独立授权");expect(html).toContain("导入后单独验证");expect(html).not.toContain("Token");
+  });
+  it("disables only CLI writes while allowing independently chosen read permissions",()=>{
+    const render=(readOnly:boolean)=>renderToStaticMarkup(createElement(ClientPermissions,{value:defaultPermissions(),disabled:false,readOnly,onChange:()=>{}}));
+    const cli=render(true),mcp=render(false);
+    expect(cli.match(/disabled=""/g)).toHaveLength(1);expect(cli).toMatch(/disabled=""[^>]*\/>日常写入/);
+    expect(mcp).not.toContain('disabled=""');expect(cli).toContain("完整读取");
+  });
   it("keeps full read and write off and collapses blank scope to unrestricted",()=>{
     expect(defaultPermissions()).toEqual({regularRead:true,fullRead:false,write:false});
     expect(parseScope("  ")).toBeNull();

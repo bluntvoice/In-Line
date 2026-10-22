@@ -1,0 +1,30 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized] target(s) in 28.77s
+     Running tests\cli_foundation.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\cli_foundation-40ee9538d9a0612f.exe)
+error: test failed, to rerun pass `--test cli_foundation`
+=== cargo stdout (tests) ===
+
+running 6 tests
+test cli_import_failure_rolls_back_and_conflicts_never_overwrite_profiles ... ok
+test cli_import_real_process_and_scoped_read_pagination_match_host_and_gui ... FAILED
+test console_utf8_bom_paths_single_envelope_offline_and_strict_arguments ... ok
+test explicit_cli_profile_uses_existing_authenticated_ipc_and_preserves_permissions ... ok
+test piped_input_without_eof_returns_bounded_error_instead_of_hanging ... ok
+test profiles_reject_foreign_binding_tampering_and_mcp_identity_without_fallback ... ok
+
+failures:
+
+---- cli_import_real_process_and_scoped_read_pagination_match_host_and_gui stdout ----
+
+thread 'cli_import_real_process_and_scoped_read_pagination_match_host_and_gui' (22340) panicked at tests\cli_foundation.rs:204:9:
+assertion `left == right` failed: ["task", "ticket", "2", "--profile", "cli-bd7208fb6bbc6b06f120a0a12c5f50fa", "--format", "json"]: {"apiVersion":1,"data":null,"error":{"code":"resource_limit","diagnosticAvailability":"local_cli_or_host_if_reached","errorId":"0423fb60d7e30223f74d259abdfe88b002c31be6f4491178a880daa5289aef90","message":"查询资源超过本机安全上限，请缩小范围或结束旧查询","retryAfterSeconds":null,"retryable":false},"requestId":"0423fb60d7e30223f74d259abdfe88b002c31be6f4491178a880daa5289aef90","status":"error"}
+  left: 6
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    cli_import_real_process_and_scoped_read_pagination_match_host_and_gui
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.76s

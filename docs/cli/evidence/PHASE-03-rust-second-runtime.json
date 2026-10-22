@@ -1,0 +1,22 @@
+{
+  "Start": "2026-10-21T17:48:53.9490943+08:00",
+  "End": "2026-10-21T17:49:40.8477747+08:00",
+  "ExitCode": 101,
+  "GuardStopped": false,
+  "TargetDirectory": "D:\\codex-data\\build-targets\\in-line-cli-phase1-test-20261016",
+  "BuildJobs": 1,
+  "TestDebugInfo": 0,
+  "DevDebugInfo": 0,
+  "TestThreads": 1,
+  "TestsFiltered": true,
+  "MinimumHeadroomGiB": 17.88,
+  "MaximumCommitPercent": 58.0,
+  "AbortHeadroomGiB": 4,
+  "AbortCommitPercent": 90,
+  "ConsecutiveSamplesBeforeAbort": 2,
+  "RecorderCorrection": {
+    "originalTestsFiltered": false,
+    "actualScope": "--test cli_foundation only",
+    "explanation": "This targeted run preceded the addition of argument/suite recording; the original false was a recorder omission, not a full-suite result."
+  }
+}

@@ -16,6 +16,313 @@ use std::{
 };
 use tokio::io::AsyncWriteExt;
 
+fn task(title: &str, dept: &str) -> in_line_lib::models::TaskInput {
+    serde_json::from_value(json!({"title":title,"department":dept,"departments":[dept],"contact":"private-contact","contacts":["private-contact"],"taskType":"T","details":"private-details","internalNotes":"private-notes","status":"pending","priority":"normal","workload":"standard","isUrgent":false,"urgentRequester":"","urgentReason":""})).unwrap()
+}
+fn host(f: &Fixture, database: Arc<Database>) {
+    let security = f.security.clone();
+    in_line_lib::mcp::ipc::start(
+        security.clone(),
+        Arc::new(move |c, tool, args| {
+            in_line_lib::mcp::service::execute(&security, &database, c, tool, args)
+        }),
+    )
+    .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cli_import_real_process_and_scoped_read_pagination_match_host_and_gui() {
+    let f = Fixture::new();
+    f.security
+        .update_client(
+            &f.credentials.client_id,
+            Default::default(),
+            in_line_lib::mcp::scope::Scope {
+                departments: Some(vec!["A".into()]),
+                task_types: None,
+            },
+        )
+        .unwrap();
+    let db = Arc::new(Database::open_at(f.root.join("synthetic.db")).unwrap());
+    let first = db.save_task(task("第一项", "A")).unwrap();
+    let second = db.save_task(task("第二项", "A")).unwrap();
+    let outside = db.save_task(task("范围外", "B")).unwrap();
+    db.record_work_event(in_line_lib::models::WorkEventInput {
+        task_id: first.id,
+        result_status: "processed".into(),
+        handled_at: "2026-08-08T10:00:00+08:00".into(),
+        note: "private-work-note".into(),
+        sync_status: true,
+    })
+    .unwrap();
+    host(&f, db.clone());
+    let (package, profile) = f.package(None, None);
+    let (code, v) = f
+        .run(
+            &[
+                "client",
+                "import",
+                "--package",
+                &package,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 0, "{v}");
+    assert_eq!(v["data"]["profileName"], profile);
+    assert_eq!(v["data"]["cliConnectionVerified"], true);
+    assert_eq!(v["data"]["currentMcpSessionVerified"], false);
+    let (code, v) = f
+        .run(
+            &[
+                "client",
+                "import",
+                "--package",
+                &package,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 6, "{v}");
+    assert_eq!(v["error"]["code"], "import_used");
+    let (code, v) = f
+        .run(
+            &[
+                "task",
+                "list",
+                "--profile",
+                &profile,
+                "--limit",
+                "1",
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 0, "{v}");
+    assert_eq!(v["data"]["total"], 2);
+    assert!(!v.to_string().contains("private-"));
+    assert!(!v.to_string().contains("范围外"));
+    let cursor = v["data"]["nextCursor"].as_str().unwrap();
+    // Each run is a fresh process; the host retains the shared immutable snapshot.
+    let (code, next) = f
+        .run(
+            &[
+                "task",
+                "list",
+                "--profile",
+                &profile,
+                "--limit",
+                "1",
+                "--cursor",
+                cursor,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 0, "{next}");
+    assert_eq!(
+        v["data"]["meta"]["snapshotId"],
+        next["data"]["meta"]["snapshotId"]
+    );
+    assert_ne!(v["data"]["items"][0]["id"], next["data"]["items"][0]["id"]);
+    let (code, all) = f
+        .run(
+            &[
+                "task",
+                "list",
+                "--profile",
+                &profile,
+                "--limit",
+                "1",
+                "--all",
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 0, "{all}");
+    assert_eq!(all["data"]["pagination"]["complete"], true);
+    assert_eq!(all["data"]["pagination"]["itemsReturned"], 2);
+    for id in [outside.id, 999999] {
+        let (code, v) = f
+            .run(
+                &[
+                    "task",
+                    "get",
+                    &id.to_string(),
+                    "--profile",
+                    &profile,
+                    "--format",
+                    "json",
+                ],
+                None,
+            )
+            .await;
+        assert_eq!(code, 4, "{v}");
+        assert_eq!(v["error"]["code"], "not_found");
+    }
+    let (code, v) = f
+        .run(
+            &[
+                "task",
+                "get",
+                &second.id.to_string(),
+                "--projection",
+                "id,contacts",
+                "--profile",
+                &profile,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v["error"]["code"], "forbidden");
+    let (code, v) = f
+        .run(
+            &[
+                "task",
+                "list",
+                "--profile",
+                &profile,
+                "--limit",
+                "1",
+                "--input",
+                "-",
+                "--format",
+                "json",
+            ],
+            Some(br#"{"limit":1}"#),
+        )
+        .await;
+    assert_eq!(code, 2, "{v}");
+    f.security.revoke(&f.credentials.client_id).unwrap();
+    let (code, v) = f
+        .run(
+            &["task", "list", "--profile", &profile, "--format", "json"],
+            None,
+        )
+        .await;
+    assert_eq!(code, 3, "{v}");
+    assert_eq!(v["error"]["code"], "revoked");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cli_import_failure_rolls_back_and_conflicts_never_overwrite_profiles() {
+    let f = Fixture::new();
+    // A verified IPC peer returning a mismatched contract must fail and roll back.
+    in_line_lib::mcp::ipc::start(
+        f.security.clone(),
+        Arc::new(move |_, _, _| Ok(json!({"clientId":"wrong"}))),
+    )
+    .unwrap();
+    let (package, profile) = f.package(None, None);
+    let (code, v) = f
+        .run(
+            &[
+                "client",
+                "import",
+                "--package",
+                &package,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 6, "{v}");
+    assert_eq!(v["error"]["code"], "incompatible");
+    assert!(!f
+        .security_root()
+        .join("cli-profiles")
+        .join(format!("{profile}.dpapi"))
+        .exists());
+    let result: Value = serde_json::from_slice(
+        &std::fs::read(
+            f.security_root()
+                .join("cli-onboarding")
+                .join(&package)
+                .join("result.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(result["rolledBack"], true);
+    let (package, profile) = f.package(None, None);
+    let mut p = f.profile();
+    p["name"] = json!(profile);
+    f.save(&profile, &p);
+    let path = f
+        .security_root()
+        .join("cli-profiles")
+        .join(format!("{profile}.dpapi"));
+    let before = std::fs::read(&path).unwrap();
+    let (code, v) = f
+        .run(
+            &[
+                "client",
+                "import",
+                "--package",
+                &package,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 5, "{v}");
+    assert_eq!(v["error"]["code"], "import_conflict");
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    let (package, _) = f.package(Some(&before), Some(chrono::Utc::now().timestamp()));
+    let (code, v) = f
+        .run(
+            &[
+                "client",
+                "import",
+                "--package",
+                &package,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 6, "{v}");
+    assert_eq!(v["error"]["code"], "import_expired");
+    assert_eq!(std::fs::read(&path).unwrap(), before);
+    let (package, _) = f.package(Some(&before), None);
+    let (code, v) = f
+        .run(
+            &[
+                "client",
+                "import",
+                "--package",
+                &package,
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 6, "{v}");
+    assert_eq!(v["error"]["code"], "incompatible");
+    assert_eq!(
+        std::fs::read(&path).unwrap(),
+        before,
+        "failed rotation restores exact previous encrypted profile"
+    );
+}
+
 struct Fixture {
     root: PathBuf,
     exe: PathBuf,
@@ -23,6 +330,42 @@ struct Fixture {
     credentials: Credentials,
 }
 impl Fixture {
+    fn package(&self, previous: Option<&[u8]>, expires: Option<i64>) -> (String, String) {
+        self.security
+            .change(|store| {
+                store
+                    .clients
+                    .iter_mut()
+                    .find(|c| c.id == self.credentials.client_id)
+                    .unwrap()
+                    .name = "Codex CLI".into();
+                Ok(())
+            })
+            .unwrap();
+        let id = platform::random_secret().unwrap();
+        let name = format!("cli-{}", &self.credentials.client_id[..32]);
+        let mut profile = self.profile();
+        profile["name"] = json!(name);
+        let now = chrono::Utc::now().timestamp();
+        let ticket = json!({"version":1,"purpose":"cli","packageId":id,"selectedClient":"codex-cli","issuedAt":expires.map_or(now, |t|t-600),"expiresAt":expires.unwrap_or(now+600),"previousHash":previous.map(|v|format!("{:x}",Sha256::digest(v))),"profile":profile});
+        let home = self.security_root().join("cli-onboarding");
+        let dir = home.join(&id);
+        for p in [&home, &dir] {
+            std::fs::create_dir_all(p).unwrap();
+            platform::Descriptor::new(true).unwrap().apply(p).unwrap();
+        }
+        let path = dir.join("ticket.dpapi");
+        std::fs::write(
+            &path,
+            platform::seal(&serde_json::to_vec(&ticket).unwrap(), false).unwrap(),
+        )
+        .unwrap();
+        platform::Descriptor::new(false)
+            .unwrap()
+            .apply(&path)
+            .unwrap();
+        (id, name)
+    }
     fn new() -> Self {
         let root = std::env::temp_dir().join(format!(
             "inline-cli-中文 空格-{}",
@@ -380,4 +723,173 @@ async fn profiles_reject_foreign_binding_tampering_and_mcp_identity_without_fall
         std::fs::read(&auth).unwrap(),
         b"invalid-store-kept-unchanged"
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cli_read_command_families_preserve_readonly_scope_statistics_and_projection() {
+    for family in 0..3 {
+        let f = Fixture::new();
+        f.security
+            .update_client(
+                &f.credentials.client_id,
+                Default::default(),
+                in_line_lib::mcp::scope::Scope {
+                    departments: Some(vec!["A".into()]),
+                    task_types: None,
+                },
+            )
+            .unwrap();
+        f.save("chosen", &f.profile());
+        let profile = String::from("chosen");
+        let db = Arc::new(Database::open_at(f.root.join("synthetic.db")).unwrap());
+        let first = db.save_task(task("第一项", "A")).unwrap();
+        let second = db.save_task(task("第二项", "A")).unwrap();
+        db.save_task(task("范围外", "B")).unwrap();
+        db.record_work_event(in_line_lib::models::WorkEventInput {
+            task_id: first.id,
+            result_status: "processed".into(),
+            handled_at: "2026-08-08T10:00:00+08:00".into(),
+            note: "private-work-note".into(),
+            sync_status: true,
+        })
+        .unwrap();
+        let before = business_view(&db);
+        host(&f, db.clone());
+        let first_id = first.id.to_string();
+        let second_id = second.id.to_string();
+        if family < 2 {
+            let commands = if family == 0 {
+                vec![
+                    vec!["task", "search", "第二"],
+                    vec!["task", "ticket", &second_id],
+                    vec!["task", "history", &first_id],
+                    vec!["task", "children", &first_id],
+                ]
+            } else {
+                vec![
+                    vec!["queue", "list"],
+                    vec!["queue", "future"],
+                    vec!["queue", "history", &first_id],
+                    vec!["data", "health"],
+                ]
+            };
+            for mut args in commands {
+                args.extend(["--profile", &profile, "--format", "json"]);
+                let (code, v) = f.run(&args, None).await;
+                assert_eq!(code, 0, "{args:?}: {v}");
+                assert!(!v.to_string().contains("private-"));
+                assert!(!v.to_string().contains("范围外"));
+            }
+        } else {
+            for cmd in [
+                vec!["stats", "summary"],
+                vec!["report", "daily"],
+                vec!["report", "weekly"],
+                vec!["report", "monthly"],
+                vec!["report", "items"],
+                vec!["calendar", "list"],
+            ] {
+                let summary = cmd == vec!["stats", "summary"];
+                let mut args = cmd;
+                args.extend([
+                    "--from",
+                    "2026-08-08",
+                    "--to",
+                    "2026-08-08",
+                    "--timezone-offset-minutes",
+                    "480",
+                    "--profile",
+                    &profile,
+                    "--format",
+                    "json",
+                ]);
+                let (code, v) = f.run(&args, None).await;
+                assert_eq!(code, 0, "{args:?}: {v}");
+                assert!(!v.to_string().contains("private-"));
+                if summary {
+                    let native = db
+                        .statistics_scoped(
+                            "2026-08-08T00:00:00+08:00".into(),
+                            "2026-08-09T00:00:00+08:00".into(),
+                            480,
+                            in_line_lib::mcp::scope::Scope {
+                                departments: Some(vec!["A".into()]),
+                                task_types: None,
+                            },
+                        )
+                        .unwrap();
+                    assert_eq!(
+                        v["data"]["statistics"],
+                        serde_json::to_value(native).unwrap()
+                    );
+                }
+            }
+        }
+        assert_eq!(
+            business_view(&db),
+            before,
+            "read-only commands must not change business basis"
+        );
+    }
+}
+
+fn business_view(db: &Database) -> Value {
+    json!({"tasks":(1..=3).map(|id|db.get_task(id).unwrap()).collect::<Vec<_>>(),"events":(1..=3).map(|id|db.list_work_events(id).unwrap()).collect::<Vec<_>>()})
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn cli_full_read_requires_both_global_and_independent_client_permission() {
+    use in_line_lib::mcp::security::Permissions;
+    let f = Fixture::new();
+    f.save("chosen", &f.profile());
+    let db = Arc::new(Database::open_at(f.root.join("synthetic.db")).unwrap());
+    let row = db.save_task(task("敏感字段测试", "A")).unwrap();
+    host(&f, db);
+    let id = row.id.to_string();
+    let args = [
+        "task",
+        "get",
+        &id,
+        "--projection",
+        "id,contacts,details",
+        "--profile",
+        "chosen",
+        "--format",
+        "json",
+    ];
+    let full = Permissions {
+        regular_read: true,
+        full_read: true,
+        write: false,
+    };
+    f.security.set_groups(full.clone()).unwrap();
+    let (code, v) = f.run(&args, None).await;
+    assert_eq!(code, 3, "{v}");
+    assert!(!v.to_string().contains("private-"));
+    f.security
+        .update_client(&f.credentials.client_id, full, Default::default())
+        .unwrap();
+    let (code, v) = f.run(&args, None).await;
+    assert_eq!(code, 0, "{v}");
+    assert!(v.to_string().contains("private-contact"));
+    f.security.set_groups(Default::default()).unwrap();
+    let (code, v) = f.run(&args, None).await;
+    assert_eq!(code, 3, "{v}");
+    assert!(!v.to_string().contains("private-"));
+    let (code, v) = f
+        .run(
+            &[
+                "diagnostic",
+                "get",
+                "unknown",
+                "--profile",
+                "chosen",
+                "--format",
+                "json",
+            ],
+            None,
+        )
+        .await;
+    assert_eq!(code, 4, "{v}");
+    assert_eq!(v["error"]["code"], "not_found");
 }

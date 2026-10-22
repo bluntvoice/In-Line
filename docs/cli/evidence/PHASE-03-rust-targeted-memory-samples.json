@@ -1,0 +1,32 @@
+[
+  {
+    "Time": "2026-10-21T17:52:22.5355511+08:00",
+    "HeadroomGiB": 19.29,
+    "CommitPercent": 54,
+    "AvailableMiB": 7167
+  },
+  {
+    "Time": "2026-10-21T17:52:27.8418907+08:00",
+    "HeadroomGiB": 19.27,
+    "CommitPercent": 55,
+    "AvailableMiB": 7144
+  },
+  {
+    "Time": "2026-10-21T17:52:33.1463166+08:00",
+    "HeadroomGiB": 19.28,
+    "CommitPercent": 54,
+    "AvailableMiB": 7157
+  },
+  {
+    "Time": "2026-10-21T17:52:38.4473440+08:00",
+    "HeadroomGiB": 19.3,
+    "CommitPercent": 54,
+    "AvailableMiB": 7162
+  },
+  {
+    "Time": "2026-10-21T17:52:43.7442596+08:00",
+    "HeadroomGiB": 19.29,
+    "CommitPercent": 54,
+    "AvailableMiB": 7156
+  }
+]

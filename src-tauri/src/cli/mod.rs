@@ -1,8 +1,12 @@
 //! CLI adapter only. No database, GUI automation, shell or MCP subprocess.
+#[cfg(windows)]
+pub(crate) mod authorization;
+mod json_input;
 mod output;
 mod parse;
 #[cfg(windows)]
 mod profile;
+mod read;
 
 use crate::mcp::{build_identity, contract::*};
 use serde_json::{json, Value};
@@ -17,8 +21,8 @@ pub use output::exit_code;
 use parse::{Command, Options};
 
 const MAX_INPUT: u64 = 1024 * 1024;
-const HELP: &str = "In Line CLI（Windows，Phase2基础设施）
-用法：in-line-cli [--help | --version | doctor | status] [选项]
+const HELP: &str = "In Line CLI（Windows，Phase3只读）
+用法：in-line-cli <命令> [选项]
   --help                 显示帮助；不启动主程序
   --version              显示版本和构建身份；不启动主程序
   doctor                 离线检查同目录程序及配置是否存在；不读取凭证或业务库
@@ -26,8 +30,24 @@ const HELP: &str = "In Line CLI（Windows，Phase2基础设施）
   --format table|json    默认table；json的stdout恰好一个UTF-8 Envelope
   --no-color             禁止终端颜色（目前所有输出均无颜色）
   --profile <name>       已授权CLI身份；不回退到MCP环境变量或其他profile
-  --input <file|->       仅status接受空JSON对象{}；-读取管道；上限1MiB/10秒，支持UTF-8 BOM
-Phase3将实现GUI授权包导入和只读业务命令；当前不提供授权、事项查询或写入。
+  capabilities / client status   验证显式profile自身身份、权限和受保护IPC
+  client import --package <id>   导入GUI签发的一次性CLI授权包；不接受Token
+  task list / get <id> / search <text> / ticket <id> / children <id> / history <id>
+  queue list / future / history <id>
+  calendar list / stats summary / report daily|weekly|monthly|items --from YYYY-MM-DD --to YYYY-MM-DD
+  data health / diagnostic get <error-id>
+  --input <file|->       对应既有只读请求JSON；-读取管道；上限1MiB/10秒，支持UTF-8 BOM
+  --limit 1..100 / --cursor <值> / --snapshot <值> / --all
+  --all                 同一快照逐页；上限100页/10000条/16MiB；不返回部分成功
+  --projection <逗号分隔字段> / --ids <逗号分隔ID> / --text <文字>
+  --statuses / --departments / --task-types / --priorities / --workloads / --permanent-numbers <逗号分隔值>
+  --urgent / --scheduled / --active-queue <true|false>；--include-trash
+  --parent-task-id / --structure / --archive / --planned-from / --planned-to
+  --created-from / --created-to / --deadline-from / --deadline-to / --handled-from / --handled-to
+  --timezone-offset-minutes <分钟>；history另支持--kinds及--include-voided
+同一字段不得同时在命令参数和JSON指定；状态、字段、日期口径由主程序校验。
+日报/周报/月报当前均需显式起止日期，返回原结构化摘要；完整文本留后续阶段。
+不提供写入、授权增权、任意工具调用或SQL。导入/CLI验证不代表当前聊天MCP已连接。
 首版通过完整路径调用，不自动修改PATH。长期凭证不得放入参数或聊天。";
 
 fn arguments_error() -> McpError {
@@ -36,7 +56,7 @@ fn arguments_error() -> McpError {
     e
 }
 
-fn read_input(path: &str) -> Result<(), McpError> {
+fn read_input(path: &str) -> Result<Value, McpError> {
     if path == "-" && std::io::stdin().is_terminal() {
         return Err(arguments_error());
     }
@@ -74,7 +94,7 @@ fn read_input_bytes(path: &str) -> Result<Vec<u8>, McpError> {
         .map_err(|_| arguments_error())?;
     Ok(bytes)
 }
-fn validate_input(bytes: &[u8]) -> Result<(), McpError> {
+fn validate_input(bytes: &[u8]) -> Result<Value, McpError> {
     if bytes.len() as u64 > MAX_INPUT {
         return Err(arguments_error());
     }
@@ -83,8 +103,7 @@ fn validate_input(bytes: &[u8]) -> Result<(), McpError> {
     if !text.trim_start().starts_with('{') {
         return Err(arguments_error());
     }
-    let _: CapabilityArgs = serde_json::from_str(text).map_err(|_| arguments_error())?;
-    Ok(())
+    json_input::parse(text)
 }
 
 fn doctor_at(executable: &Path, root: Option<&Path>, name: Option<&str>) -> Value {
@@ -122,6 +141,55 @@ async fn status(options: &Options, id: String) -> Result<Value, McpError> {
     validate_status(data, &credentials.client_id)
 }
 
+#[cfg(windows)]
+async fn query(
+    options: &Options,
+    mut request: read::Request,
+    id: String,
+) -> Result<Value, McpError> {
+    let name = options
+        .profile
+        .as_deref()
+        .ok_or_else(|| McpError::new("unauthenticated"))?;
+    let root = crate::mcp::platform::root()?;
+    let executable = std::env::current_exe().map_err(|_| McpError::new("host_unavailable"))?;
+    let credentials = profile::load_at(&root, name, &executable)?;
+    // Confirm the host contract before projecting any business data.
+    let capabilities = crate::mcp::ipc::call_at_with_id(
+        root.clone(),
+        credentials.clone(),
+        "get_capabilities",
+        json!({}),
+        id.clone(),
+    )
+    .await?;
+    validate_status(capabilities, &credentials.client_id)?;
+    let mut pages = read::Pages::new();
+    loop {
+        let data = crate::mcp::ipc::call_at_with_id(
+            root.clone(),
+            credentials.clone(),
+            request.tool,
+            request.args.clone(),
+            id.clone(),
+        )
+        .await?;
+        if request.exact && data["items"].as_array().is_some_and(Vec::is_empty) {
+            return Err(McpError::new("not_found"));
+        }
+        if !options.all || !request.paginated {
+            return Ok(data);
+        }
+        let next = pages.push(data)?;
+        match next {
+            Some(cursor) => {
+                request.args["cursor"] = json!(cursor);
+            }
+            None => return Ok(pages.finish()),
+        }
+    }
+}
+
 #[cfg(any(windows, test))]
 fn validate_status(data: Value, client: &str) -> Result<Value, McpError> {
     let permissions_valid = data.get("permissions").is_some_and(|permissions| {
@@ -151,13 +219,16 @@ fn validate_status(data: Value, client: &str) -> Result<Value, McpError> {
 }
 
 async fn execute(options: &Options, id: String) -> Result<Value, McpError> {
-    if let Some(input) = &options.input {
-        read_input(input)?;
-    }
-    match options.command {
+    let input = options
+        .input
+        .as_deref()
+        .map(read_input)
+        .transpose()?
+        .unwrap_or_else(|| json!({}));
+    match &options.command {
         Command::Help => Ok(json!({"help":HELP})),
         Command::Version => {
-            Ok(json!({"name":"in-line-cli","build":build_identity::current(),"cliPhase":2}))
+            Ok(json!({"name":"in-line-cli","build":build_identity::current(),"cliPhase":3}))
         }
         Command::Doctor => {
             let exe = std::env::current_exe().map_err(|_| McpError::new("host_unavailable"))?;
@@ -170,6 +241,7 @@ async fn execute(options: &Options, id: String) -> Result<Value, McpError> {
             }
         }
         Command::Status => {
+            let _: CapabilityArgs = serde_json::from_value(input).map_err(|_| arguments_error())?;
             #[cfg(windows)]
             {
                 status(options, id).await
@@ -177,6 +249,29 @@ async fn execute(options: &Options, id: String) -> Result<Value, McpError> {
             #[cfg(not(windows))]
             {
                 let _ = id;
+                Err(McpError::new("unsupported"))
+            }
+        }
+        Command::Import => {
+            #[cfg(windows)]
+            {
+                authorization::import(options.package.as_deref().ok_or_else(arguments_error)?, id)
+                    .await
+            }
+            #[cfg(not(windows))]
+            {
+                Err(McpError::new("unsupported"))
+            }
+        }
+        Command::Read(command) => {
+            let request = read::build(command, options, input)?;
+            #[cfg(windows)]
+            {
+                query(options, request, id).await
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = request;
                 Err(McpError::new("unsupported"))
             }
         }
@@ -223,8 +318,9 @@ mod tests {
         for bad in [
             b"[]".as_slice(),
             b"null",
-            b"{\"token\":\"secret\"}",
             b"{}{}",
+            b"{\"limit\":1,\"limit\":2}",
+            b"{\"filters\":{\"text\":\"a\",\"text\":\"b\"}}",
             b"\xff",
             b"\xef\xbb\xbf\xef\xbb\xbf{}",
         ] {
