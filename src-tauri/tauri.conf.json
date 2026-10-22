@@ -7,6 +7,7 @@
     "beforeDevCommand": "npm.cmd exec vite -- --host 127.0.0.1",
     "devUrl": "http://127.0.0.1:1420",
     "beforeBuildCommand": "npm.cmd run build:bundle",
+    "beforeBundleCommand": "node scripts/prepare-mcp-sidecar.mjs --stage-only",
     "frontendDist": "../dist"
   },
   "app": {
@@ -73,7 +74,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "externalBin": ["binaries/in-line-mcp"],
+    "externalBin": ["binaries/in-line-mcp", "binaries/in-line-cli"],
     "resources": {
       "resources/WebView2Loader.dll": "WebView2Loader.dll"
     },

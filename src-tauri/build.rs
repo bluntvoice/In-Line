@@ -6,12 +6,16 @@ fn main() {
     } else {
         ""
     };
-    let sidecar = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("binaries")
-        .join(format!("in-line-mcp-{target}{extension}"));
-    if !sidecar.exists() {
-        std::fs::create_dir_all(sidecar.parent().unwrap()).expect("无法创建 sidecar 目录");
-        std::fs::File::create(&sidecar).expect("无法创建 sidecar 构建占位文件");
+    for name in ["in-line-mcp", "in-line-cli"] {
+        let companion = std::path::PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("binaries")
+            .join(format!("{name}-{target}{extension}"));
+        if !companion.exists() {
+            std::fs::create_dir_all(companion.parent().unwrap()).expect("无法创建伴随程序目录");
+            // Only to let cargo tests compile before bundle preparation. The
+            // bundler preparation rejects empty or invalid PE companions.
+            std::fs::File::create(&companion).expect("无法创建伴随程序构建占位文件");
+        }
     }
     tauri_build::build();
 }

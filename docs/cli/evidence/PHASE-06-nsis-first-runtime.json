@@ -1,0 +1,19 @@
+{
+  "Start": "2026-10-22T14:27:27.7070813+08:00",
+  "End": "2026-10-22T14:38:10.2964814+08:00",
+  "ExitCode": 0,
+  "GuardStopped": false,
+  "TargetDirectory": "D:\\codex-data\\projects\\inline\\In-Line\\src-tauri\\target",
+  "BuildJobs": 1,
+  "TestDebugInfo": 0,
+  "DevDebugInfo": 0,
+  "TestThreads": 1,
+  "Command": "npm.cmd run dist",
+  "InstallerExecuted": false,
+  "LocalInstallation": false,
+  "MinimumHeadroomGiB": 13.88,
+  "MaximumCommitPercent": 67.0,
+  "AbortHeadroomGiB": 4,
+  "AbortCommitPercent": 90,
+  "ConsecutiveSamplesBeforeAbort": 2
+}

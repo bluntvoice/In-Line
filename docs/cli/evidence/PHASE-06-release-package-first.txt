@@ -1,0 +1,9 @@
+file:///D:/codex-data/projects/inline/In-Line/scripts/verify-cli-package.mjs:43
+      if(!staged.equals(bytes))throw new Error(`Staged companion differs: ${name}`);
+                                     ^
+
+Error: Staged companion differs: in-line-mcp
+    at verifyDirectory (file:///D:/codex-data/projects/inline/In-Line/scripts/verify-cli-package.mjs:43:38)
+    at async file:///D:/codex-data/projects/inline/In-Line/scripts/verify-cli-package.mjs:66:16
+
+Node.js v24.19.0

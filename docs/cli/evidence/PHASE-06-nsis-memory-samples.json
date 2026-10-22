@@ -1,0 +1,14 @@
+[
+  {
+    "Time": "2026-10-22T14:51:24.8063325+08:00",
+    "HeadroomGiB": 16.63,
+    "CommitPercent": 61,
+    "AvailableMiB": 4573
+  },
+  {
+    "Time": "2026-10-22T14:51:30.1225349+08:00",
+    "HeadroomGiB": 16.81,
+    "CommitPercent": 60,
+    "AvailableMiB": 4723
+  }
+]

@@ -108,6 +108,16 @@ jobs:
           node docs/mcp/verify-release-stdio.mjs src-tauri/binaries/in-line-mcp-x86_64-pc-windows-msvc.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Verify CLI companions and actual NSIS payload
+        shell: pwsh
+        run: |
+          node scripts/verify-cli-package.mjs src-tauri/target/release --expected-commit $env:GITHUB_SHA --companions src-tauri/binaries --target x86_64-pc-windows-msvc --output release/package-build.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $installers = @(Get-ChildItem -Path 'src-tauri/target/release/bundle/nsis/*.exe' -File)
+          if ($installers.Count -ne 1) { throw 'Expected one release installer' }
+          ./scripts/verify-installer-package.ps1 -InstallerPath $installers[0].FullName -BinaryDirectory src-tauri/target/release -ExpectedCommit $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Prepare updater-compatible release asset
         id: asset
         shell: pwsh

@@ -1,0 +1,11 @@
+=== cargo stderr (compile/status) ===
+     Running beforeBundleCommand `node scripts/prepare-mcp-sidecar.mjs --stage-only`
+        Info Patching D:\codex-data\projects\inline\In-Line\src-tauri\target\release\in-line.exe with bundle type information: nsis
+        Info Target: x64
+     Running makensis to produce D:\codex-data\projects\inline\In-Line\src-tauri\target\release\bundle\nsis\In Line_0.5.0_x64-setup.exe
+    Finished 1 bundle at:
+        D:\codex-data\projects\inline\In-Line\src-tauri\target\release\bundle\nsis\In Line_0.5.0_x64-setup.exe
+
+=== cargo stdout (tests) ===
+Bundled companion ready: D:\codex-data\projects\inline\In-Line\src-tauri\binaries\in-line-mcp-x86_64-pc-windows-msvc.exe
+Bundled companion ready: D:\codex-data\projects\inline\In-Line\src-tauri\binaries\in-line-cli-x86_64-pc-windows-msvc.exe

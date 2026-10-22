@@ -1,0 +1,22 @@
+[
+  {
+    "name": "in-line-mcp",
+    "sourceBytes": 2367488,
+    "stagedBytes": 2367488,
+    "sourceSha256": "AE15966BA6BB380602117A94EF6BCF146239B91DE53369CE297E7E4C48EEB421",
+    "stagedSha256": "F6822609329CB2023DB2C6128F5DA40DBC1F9BAEEA680A1C6D60A0626154D379",
+    "sourceCoffTime": 1792651633,
+    "stagedCoffTime": 1792651440,
+    "differingByteCount": 24
+  },
+  {
+    "name": "in-line-cli",
+    "sourceBytes": 1046016,
+    "stagedBytes": 1046016,
+    "sourceSha256": "2E05068DCFC03438291A3A3D8572764C8F40B05CBC217989CC97FAA021DDC2F1",
+    "stagedSha256": "1CDE81E27CC1BB414A1196A267628F8A10247B65C69679791C2901EC6B2637DC",
+    "sourceCoffTime": 1792651658,
+    "stagedCoffTime": 1792651465,
+    "differingByteCount": 24
+  }
+]

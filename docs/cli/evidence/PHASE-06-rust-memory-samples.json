@@ -1,0 +1,182 @@
+[
+  {
+    "Time": "2026-10-22T14:23:17.1725209+08:00",
+    "HeadroomGiB": 16.74,
+    "CommitPercent": 60,
+    "AvailableMiB": 4315
+  },
+  {
+    "Time": "2026-10-22T14:23:22.4984751+08:00",
+    "HeadroomGiB": 16.52,
+    "CommitPercent": 61,
+    "AvailableMiB": 4931
+  },
+  {
+    "Time": "2026-10-22T14:23:27.7953374+08:00",
+    "HeadroomGiB": 16.43,
+    "CommitPercent": 61,
+    "AvailableMiB": 7303
+  },
+  {
+    "Time": "2026-10-22T14:23:33.1172615+08:00",
+    "HeadroomGiB": 17.12,
+    "CommitPercent": 60,
+    "AvailableMiB": 7788
+  },
+  {
+    "Time": "2026-10-22T14:23:38.4438391+08:00",
+    "HeadroomGiB": 17.19,
+    "CommitPercent": 59,
+    "AvailableMiB": 7961
+  },
+  {
+    "Time": "2026-10-22T14:23:43.7399767+08:00",
+    "HeadroomGiB": 17.14,
+    "CommitPercent": 59,
+    "AvailableMiB": 7628
+  },
+  {
+    "Time": "2026-10-22T14:23:49.0613248+08:00",
+    "HeadroomGiB": 16.71,
+    "CommitPercent": 61,
+    "AvailableMiB": 7994
+  },
+  {
+    "Time": "2026-10-22T14:23:54.3722511+08:00",
+    "HeadroomGiB": 16.64,
+    "CommitPercent": 61,
+    "AvailableMiB": 7547
+  },
+  {
+    "Time": "2026-10-22T14:23:59.6786367+08:00",
+    "HeadroomGiB": 17.48,
+    "CommitPercent": 59,
+    "AvailableMiB": 7607
+  },
+  {
+    "Time": "2026-10-22T14:24:04.9728163+08:00",
+    "HeadroomGiB": 16.71,
+    "CommitPercent": 60,
+    "AvailableMiB": 6750
+  },
+  {
+    "Time": "2026-10-22T14:24:10.2646894+08:00",
+    "HeadroomGiB": 16.41,
+    "CommitPercent": 61,
+    "AvailableMiB": 7028
+  },
+  {
+    "Time": "2026-10-22T14:24:15.5594124+08:00",
+    "HeadroomGiB": 16.27,
+    "CommitPercent": 62,
+    "AvailableMiB": 6753
+  },
+  {
+    "Time": "2026-10-22T14:24:20.8614509+08:00",
+    "HeadroomGiB": 17.69,
+    "CommitPercent": 58,
+    "AvailableMiB": 7413
+  },
+  {
+    "Time": "2026-10-22T14:24:26.1652940+08:00",
+    "HeadroomGiB": 17.73,
+    "CommitPercent": 58,
+    "AvailableMiB": 7456
+  },
+  {
+    "Time": "2026-10-22T14:24:31.4594583+08:00",
+    "HeadroomGiB": 17.73,
+    "CommitPercent": 58,
+    "AvailableMiB": 7469
+  },
+  {
+    "Time": "2026-10-22T14:24:36.7824586+08:00",
+    "HeadroomGiB": 17.34,
+    "CommitPercent": 59,
+    "AvailableMiB": 7170
+  },
+  {
+    "Time": "2026-10-22T14:24:42.0723574+08:00",
+    "HeadroomGiB": 17.14,
+    "CommitPercent": 59,
+    "AvailableMiB": 6909
+  },
+  {
+    "Time": "2026-10-22T14:24:47.3759930+08:00",
+    "HeadroomGiB": 17.05,
+    "CommitPercent": 60,
+    "AvailableMiB": 6853
+  },
+  {
+    "Time": "2026-10-22T14:24:52.6761174+08:00",
+    "HeadroomGiB": 17.62,
+    "CommitPercent": 58,
+    "AvailableMiB": 7316
+  },
+  {
+    "Time": "2026-10-22T14:24:57.9709137+08:00",
+    "HeadroomGiB": 17.69,
+    "CommitPercent": 58,
+    "AvailableMiB": 7240
+  },
+  {
+    "Time": "2026-10-22T14:25:03.2760691+08:00",
+    "HeadroomGiB": 17.69,
+    "CommitPercent": 58,
+    "AvailableMiB": 7208
+  },
+  {
+    "Time": "2026-10-22T14:25:08.5777438+08:00",
+    "HeadroomGiB": 17.67,
+    "CommitPercent": 58,
+    "AvailableMiB": 7185
+  },
+  {
+    "Time": "2026-10-22T14:25:13.8734823+08:00",
+    "HeadroomGiB": 17.71,
+    "CommitPercent": 58,
+    "AvailableMiB": 7233
+  },
+  {
+    "Time": "2026-10-22T14:25:19.1768541+08:00",
+    "HeadroomGiB": 17.71,
+    "CommitPercent": 58,
+    "AvailableMiB": 7237
+  },
+  {
+    "Time": "2026-10-22T14:25:24.4661053+08:00",
+    "HeadroomGiB": 17.71,
+    "CommitPercent": 58,
+    "AvailableMiB": 7229
+  },
+  {
+    "Time": "2026-10-22T14:25:29.7621055+08:00",
+    "HeadroomGiB": 17.72,
+    "CommitPercent": 58,
+    "AvailableMiB": 7232
+  },
+  {
+    "Time": "2026-10-22T14:25:35.0625314+08:00",
+    "HeadroomGiB": 17.71,
+    "CommitPercent": 58,
+    "AvailableMiB": 7221
+  },
+  {
+    "Time": "2026-10-22T14:25:40.3588065+08:00",
+    "HeadroomGiB": 17.69,
+    "CommitPercent": 58,
+    "AvailableMiB": 7195
+  },
+  {
+    "Time": "2026-10-22T14:25:45.6590482+08:00",
+    "HeadroomGiB": 17.7,
+    "CommitPercent": 58,
+    "AvailableMiB": 7206
+  },
+  {
+    "Time": "2026-10-22T14:25:50.9491207+08:00",
+    "HeadroomGiB": 17.12,
+    "CommitPercent": 60,
+    "AvailableMiB": 7057
+  }
+]

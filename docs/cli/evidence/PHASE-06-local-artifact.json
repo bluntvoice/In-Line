@@ -1,0 +1,34 @@
+{
+  "phase": "CLI Phase6",
+  "artifactType": "local_development_NSIS_not_installed",
+  "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\CLI-Phase6-local-20261022\\In-Line_0.5.0-dev-phase6_x64-setup.exe",
+  "bytes": 4315931,
+  "sha256": "E7A926EF2C6F3C8D4474C8530FA067137629D04F4081BB604E0027A038E5BD2E",
+  "build": {
+    "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "sourceInputs": 216,
+  "sourceManifestSha256": "FA40B9E4A97AA7D5093E1057EB17E4F160C6923C800A41B82F7374F21B285AD7",
+  "postSuiteChanges": [
+    "scripts/prepare-mcp-sidecar.mjs",
+    "scripts/verify-cli-package.mjs",
+    "src-tauri/tauri.conf.json",
+    "tests/cli-package.test.ts"
+  ],
+  "postSuiteVerification": "Node syntax, final pre-bundle staging executed by actual tauri bundle, three binary identities and exact staged hashes passed",
+  "installerCompiled": true,
+  "binaryDirectoryAndStagedHashVerified": true,
+  "actualInstallerPayloadExtractionVerifiedLocally": false,
+  "localExtractionPendingReason": "7-Zip unavailable locally; actual NSIS extraction gate configured in development Action",
+  "installerExecuted": false,
+  "installed": false,
+  "currentChatMcpVerified": false,
+  "tagOrReleaseCreated": false,
+  "sourceReadbackMatched": true
+}

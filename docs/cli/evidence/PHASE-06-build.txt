@@ -1,0 +1,13 @@
+
+> in-line@0.5.0 build
+> tsc -p tsconfig.renderer.json --noEmit && vite build
+
+vite v7.3.6 building client environment for production...
+transforming...
+✓ 1659 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.56 kB │ gzip:   0.37 kB
+dist/assets/index-EU3sBYOj.css  110.45 kB │ gzip:  19.53 kB
+dist/assets/index-Br8AX32Y.js   471.68 kB │ gzip: 144.88 kB
+✓ built in 4.78s

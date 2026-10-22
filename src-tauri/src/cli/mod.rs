@@ -224,6 +224,7 @@ fn validate_status(data: Value, client: &str) -> Result<Value, McpError> {
         || data["schemaVersion"] != crate::database::DATABASE_SCHEMA_VERSION
         || data["tools"] != json!(TOOLS)
         || data["connectionVerified"] != true
+        || !build_identity::compatible(&data["build"])
         || !permissions_valid
         || !scope_valid
         || data["authorizationRevision"].as_u64().is_none()
@@ -437,7 +438,7 @@ mod tests {
     }
     #[test]
     fn authenticated_status_requires_same_client_contract_and_actual_confirmation() {
-        let data = json!({"clientId":"only-client","softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":crate::database::DATABASE_SCHEMA_VERSION,"tools":TOOLS,"connectionVerified":true,"permissions":{"regularRead":true,"fullRead":false,"write":false},"scope":{"departments":null,"taskTypes":null},"authorizationRevision":1});
+        let data = json!({"clientId":"only-client","softwareVersion":env!("CARGO_PKG_VERSION"),"mcpVersion":API_VERSION,"schemaVersion":crate::database::DATABASE_SCHEMA_VERSION,"tools":TOOLS,"build":build_identity::current(),"connectionVerified":true,"permissions":{"regularRead":true,"fullRead":false,"write":false},"scope":{"departments":null,"taskTypes":null},"authorizationRevision":1});
         assert_eq!(
             validate_status(data.clone(), "only-client").unwrap()["transport"],
             "local_ipc"
@@ -446,6 +447,7 @@ mod tests {
         for (field, value) in [
             ("connectionVerified", json!(false)),
             ("tools", json!([])),
+            ("build", json!({})),
             ("schemaVersion", json!(0)),
             ("softwareVersion", json!("old")),
             ("mcpVersion", json!(0)),

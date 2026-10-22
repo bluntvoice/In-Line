@@ -1,0 +1,61 @@
+{
+  "offline": true,
+  "build": {
+    "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "records": [
+    {
+      "name": "in-line",
+      "bytes": 30040064,
+      "sha256": "1069f1f4214afa8ea2678adecb430bc4ac9b36bb029fb3ff31bd9fd16b69f33d",
+      "build": {
+        "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      }
+    },
+    {
+      "name": "in-line-mcp",
+      "bytes": 12808704,
+      "sha256": "9893dca8d5fb2e4497ab3979aa897f73e7285dcd8297b1b8812a6de8e1e0ef49",
+      "build": {
+        "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      }
+    },
+    {
+      "name": "in-line-cli",
+      "bytes": 5886976,
+      "sha256": "6b8e9abc8aadc75701cb67351e46b0a97ad1dae4040d3e9c622f5caf8ac68b30",
+      "build": {
+        "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "cliPhase": 5
+    }
+  ],
+  "companionsMatched": false,
+  "pathModified": false,
+  "installed": false,
+  "currentMcpSessionVerified": false
+}

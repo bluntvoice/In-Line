@@ -1,0 +1,7 @@
+
+> in-line@0.5.0 build
+> tsc -p tsconfig.renderer.json --noEmit && vite build
+
+tests/cli-package.test.ts(2,30): error TS7016: Could not find a declaration file for module '../scripts/verify-cli-package.mjs'. 'D:/codex-data/projects/inline/In-Line/scripts/verify-cli-package.mjs' implicitly has an 'any' type.
+tests/cli-package.test.ts(14,42): error TS2538: Type 'null' cannot be used as an index type.
+tests/cli-package.test.ts(19,49): error TS2322: Type 'null' is not assignable to type 'string'.

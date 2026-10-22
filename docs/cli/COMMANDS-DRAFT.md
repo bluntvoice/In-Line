@@ -165,3 +165,8 @@ Phase0–2 已分别验收及提交推送。Phase3 的 GUI 独立 CLI 授权、�
 高级入口不支持all：changes用原cursor显式续取，jobs result用原jobId/nextOffset显式分页。jobs启动及取消、命名条件保存删除、偏好patch、产物创建均须execute；预演不带execute且仍须write。产物仅返回引用，receipt get --kind artifact只读当前客户端账本元数据。原表历史“待开发”记录按本阶段进度解释，不表示CLI已安装。见[Phase5报告](PHASE-05-AUTOMATION.md)。
 
 用户已独立确认阶段5通过（含季度趋势修复），授权提交推送后进入阶段6；实际阶段以CURRENT_TASK和阶段报告为准。
+
+
+## Phase6交付准备（2026-10-22）
+
+阶段5已验收并推送4194f2b。业务能力phase仍为5；阶段6不扩充业务命令或MCP工具，增加GUI/sidecar显式离线build-info及三程序安装/身份/实际包内文件CI核验，不改PATH。见[用户指南](USER-GUIDE.md)、[Agent指南](AGENT-GUIDE.md)、[交付报告](PHASE-06-DELIVERY.md)。实机安装另安排，开发Action测试包按阶段6确认提交后的已授权流程生成。

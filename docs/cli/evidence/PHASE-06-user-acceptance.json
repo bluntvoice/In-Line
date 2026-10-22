@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-22",
+  "phase": "CLI Phase6",
+  "source": "direct user question reply",
+  "answer": "A：确认阶段6开发与本地检查，提交推送并立即运行已授权Action生成测试安装包；实机验收另安排（推荐）",
+  "developmentAndLocalChecksAccepted": true,
+  "commitAndPushAuthorized": true,
+  "developmentWorkflowAuthorized": ".github/workflows/dev-build.yml",
+  "nativeInstallationAcceptance": "separately scheduled",
+  "tagOrReleaseAuthorized": false,
+  "currentSessionMcpVerified": false,
+  "remoteBuildResult": "record separately after execution; this record is authorization only"
+}

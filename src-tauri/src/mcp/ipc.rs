@@ -211,9 +211,43 @@ pub async fn serve(
                     .lock()
                     .map_err(|_| McpError::new("security_unavailable"))?
                     .revision;
+                let peer_security = security.clone();
                 let result = tokio::task::spawn_blocking(move || {
                     let _work_permit = _permit;
                     super::observation::with_request(context_id, || {
+                        // Authenticate first; mixed or legacy-unidentified peers must
+                        // be rejected before dispatching even a write request.
+                        let authorization = peer_security
+                            .store
+                            .lock()
+                            .map_err(|_| McpError::new("security_unavailable"))?
+                            .authorize(&request.credentials);
+                        if let Err(error) = authorization {
+                            peer_security
+                                .limits
+                                .lock()
+                                .map_err(|_| McpError::new("security_unavailable"))?
+                                .check(
+                                    super::security::Limiter::key(&request.credentials, false),
+                                    false,
+                                    std::time::Instant::now(),
+                                )?;
+                            return Err(error);
+                        }
+                        if !super::build_identity::compatible(
+                            request.peer_build.as_ref().unwrap_or(&Value::Null),
+                        ) {
+                            peer_security
+                                .limits
+                                .lock()
+                                .map_err(|_| McpError::new("security_unavailable"))?
+                                .check(
+                                    super::security::Limiter::key(&request.credentials, true),
+                                    true,
+                                    std::time::Instant::now(),
+                                )?;
+                            return Err(McpError::new("incompatible"));
+                        }
                         dispatch(&request.credentials, &request.tool, request.args)
                     })
                 })

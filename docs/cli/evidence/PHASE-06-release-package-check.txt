@@ -1,0 +1,1 @@
+PASS: three offline package identities/version files and staged companions match; no store/IPC/PATH/installation operations.
