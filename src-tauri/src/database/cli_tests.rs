@@ -185,6 +185,7 @@ fn receipt_lookup_is_scoped_ledger_read_only_and_missing_foreign_keys_do_not_exe
     assert_eq!(written["verificationStatus"], "verification_failed");
     let before = rows(&db);
     let args = || ReceiptArgs {
+        kind: None,
         idempotency_key: "original".into(),
     };
     let receipt = db.cli_receipt("cli", &auth, args()).unwrap();
@@ -200,6 +201,7 @@ fn receipt_lookup_is_scoped_ledger_read_only_and_missing_foreign_keys_do_not_exe
             "cli",
             &auth,
             ReceiptArgs {
+                kind: None,
                 idempotency_key: "never-written".into()
             }
         )

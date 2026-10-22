@@ -1,0 +1,46 @@
+{
+  "phase": "CLI Phase5",
+  "date": "2026-10-22",
+  "status": "implemented_and_isolated_checks_passed_pending_user_acceptance",
+  "phase4CommitPushed": "87280c9a09dd8a0d6900b375be943f93fb0c8784",
+  "phase5CommittedOrPushed": false,
+  "rustPassed": 217,
+  "rustLibraryPassed": 188,
+  "rustSidecarPassed": 2,
+  "rustIntegrationPassed": 27,
+  "realCliIntegrationPassed": 20,
+  "newPhase5IntegrationPassed": 6,
+  "rustIgnored": 0,
+  "rustFiltered": 0,
+  "frontendPassed": 125,
+  "frontendFiles": 21,
+  "typeScriptVite": true,
+  "cargoFmt": true,
+  "mcpToolContract": 16,
+  "sourceInputs": 205,
+  "sourceReadbackMatched": true,
+  "olderLocalArtifactsProtected": [
+    {
+      "phase": "CLI Phase4",
+      "sha256": "7C9CD90A1683B24AEED542B3F3B97A588A5B3EC1BF6B15F117BA0282F136BC61",
+      "unchanged": true
+    },
+    {
+      "phase": "CLI Phase3",
+      "sha256": "C5BFE2B9768BE61DCDD3D5B07D0459100CC22BCAA5EAFF69EC5EAD261ACE2B63",
+      "unchanged": true
+    },
+    {
+      "phase": "CLI Phase2",
+      "sha256": "4DCA0C80ADC13FFF36E712BE507B6E4A69A0094BF0BAFBDD571113E449D38032",
+      "unchanged": true
+    }
+  ],
+  "installedProgramAuthConfigProtected": true,
+  "productionDataUsed": false,
+  "nativeInstalledGuiAccepted": false,
+  "currentChatMcpVerified": false,
+  "installerOrActionsGenerated": false,
+  "tagOrReleaseCreated": false,
+  "nativeAcceptanceDeferredTo": "CLI Phase6"
+}

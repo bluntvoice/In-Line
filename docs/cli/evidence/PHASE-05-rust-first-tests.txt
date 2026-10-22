@@ -1,0 +1,52 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+error[E0624]: method `mcp_basis` is private
+   --> tests\cli\phase5.rs:76:20
+    |
+ 76 |     let basis = db.mcp_basis().unwrap();
+    |                    ^^^^^^^^^ private method
+    |
+   ::: src\database\mcp_read.rs:138:5
+    |
+138 |     pub(crate) fn mcp_basis(&self) -> Result<DataVersion, McpError> {
+    |     --------------------------------------------------------------- private method defined here
+
+error[E0624]: method `mcp_basis` is private
+   --> tests\cli\phase5.rs:81:19
+    |
+ 81 |     assert_eq!(db.mcp_basis().unwrap(), basis);
+    |                   ^^^^^^^^^ private method
+    |
+   ::: src\database\mcp_read.rs:138:5
+    |
+138 |     pub(crate) fn mcp_basis(&self) -> Result<DataVersion, McpError> {
+    |     --------------------------------------------------------------- private method defined here
+
+error[E0599]: no method named `update_task_status` found for struct `std::sync::Arc<in_line_lib::database::Database>` in the current scope
+   --> tests\cli\phase5.rs:183:8
+    |
+183 |     db.update_task_status(t.id, "processing".into()).unwrap();
+    |        ^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `set_status` with a similar name
+    |
+183 -     db.update_task_status(t.id, "processing".into()).unwrap();
+183 +     db.set_status(t.id, "processing".into()).unwrap();
+    |
+
+error[E0599]: no method named `update_task_status` found for struct `std::sync::Arc<in_line_lib::database::Database>` in the current scope
+   --> tests\cli\phase5.rs:437:19
+    |
+437 |                 d.update_task_status(t.id, "processing".into()).unwrap();
+    |                   ^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `set_status` with a similar name
+    |
+437 -                 d.update_task_status(t.id, "processing".into()).unwrap();
+437 +                 d.set_status(t.id, "processing".into()).unwrap();
+    |
+
+Some errors have detailed explanations: E0599, E0624.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `in-line` (test "cli_foundation") due to 4 previous errors
+=== cargo stdout (tests) ===

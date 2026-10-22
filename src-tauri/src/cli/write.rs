@@ -13,14 +13,14 @@ pub(super) struct Request {
     pub key: String,
     pub create_title: Option<String>,
 }
-fn put(map: &mut Map<String, Value>, key: &str, value: Value) -> Result<(), McpError> {
+pub(super) fn put(map: &mut Map<String, Value>, key: &str, value: Value) -> Result<(), McpError> {
     if map.contains_key(key) {
         return Err(arguments_error());
     }
     map.insert(key.into(), value);
     Ok(())
 }
-fn nested(
+pub(super) fn nested(
     map: &mut Map<String, Value>,
     object: &str,
     key: &str,
@@ -33,7 +33,7 @@ fn nested(
         .ok_or_else(arguments_error)?;
     put(m, key, value)
 }
-fn typed<T: DeserializeOwned + Serialize>(value: Value) -> Result<Value, McpError> {
+pub(super) fn typed<T: DeserializeOwned + Serialize>(value: Value) -> Result<Value, McpError> {
     let result = serde_json::to_value(
         serde_json::from_value::<T>(value.clone()).map_err(|_| arguments_error())?,
     )

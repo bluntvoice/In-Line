@@ -104,6 +104,7 @@ impl Database {
     ) -> Result<(bool, i64), McpError> {
         let guard = self.connection.lock().map_err(|_| err("internal_error"))?;
         let conn = guard.as_ref().ok_or_else(|| err("host_unavailable"))?;
+
         let task = get_task_on(conn, id).map_err(|_| err("not_found"))?;
         if !allowed(&task, auth) || task.deleted_at.is_some() {
             return Err(err("not_found"));
@@ -127,6 +128,19 @@ impl Database {
         }
         let guard = self.connection.lock().map_err(|_| err("internal_error"))?;
         let conn = guard.as_ref().ok_or_else(|| err("host_unavailable"))?;
+        if let Some(kind) = args.kind.as_deref() {
+            if kind != "artifact" {
+                return Err(err("invalid_arguments"));
+            }
+            let (status,raw):(String,Option<String>)=conn.query_row("SELECT status,result_json FROM mcp_artifact_jobs WHERE client_id=? AND request_key=?",params![client,args.idempotency_key],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(sql)?.ok_or_else(||err("not_found"))?;
+            let value = raw
+                .map(|s| serde_json::from_str::<Json>(&s).map_err(|_| err("internal_error")))
+                .transpose()?;
+            // Metadata only. Never open, create, repair or read back the artifact file.
+            return Ok(
+                json!({"idempotencyKey":args.idempotency_key,"readOnly":true,"kind":"artifact","ledgerStatus":status,"currentStateVerification":"not_reexecuted","receipt":value,"artifactContentsReturned":false}),
+            );
+        }
         let (task,audit_id,raw):(Option<i64>,Option<i64>,String)=conn.query_row("SELECT task_id,audit_id,result_json FROM mcp_receipts WHERE client_id=? AND request_key=?",params![client,args.idempotency_key],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional().map_err(sql)?.ok_or_else(||err("not_found"))?;
         if let Some(id) = task {
             if !allowed(&get_task_on(conn, id).map_err(|_| err("not_found"))?, auth) {

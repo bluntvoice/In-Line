@@ -27,6 +27,12 @@ export function statisticsWeekdayLabel(value: string) {
   return WEEKDAY_LABELS[date.getDay()];
 }
 
+export function statisticsTrendLabel(periodStart:string,granularity:"day"|"week",range:{start:string;end:string}){
+  if(granularity==="day")return {primary:statisticsWeekdayLabel(periodStart),secondary:periodStart.slice(5),title:`${periodStart}（${statisticsWeekdayLabel(periodStart)}）`};
+  const bucket=statisticsTrendRange(periodStart,granularity,range);
+  return {primary:bucket.start.slice(5),secondary:`至 ${bucket.end.slice(5)}`,title:`${bucket.start} 至 ${bucket.end}`};
+}
+
 export function statisticsPresetRange(
   preset: Exclude<StatisticsPreset, "custom">,
   weekStartsOn: WeekStart,

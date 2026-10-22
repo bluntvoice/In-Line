@@ -1,0 +1,14 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized] target(s) in 37.51s
+     Running tests\cli_foundation.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\cli_foundation-40ee9538d9a0612f.exe)
+=== cargo stdout (tests) ===
+
+running 5 tests
+test phase5::phase5_batch_ambiguous_committed_response_preserves_key_and_only_reads_receipt ... ok
+test phase5::phase5_batch_basis_race_rejects_changed_preview_without_retry ... ok
+test phase5::phase5_batch_forces_preview_no_number_consumption_atomic_conflict_and_local_approval ... ok
+test phase5::phase5_daily_full_read_same_snapshot_paging_and_raw_text_are_complete ... ok
+test phase5::phase5_saved_queries_preferences_incremental_inspection_and_jobs_use_original_services ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 12.08s

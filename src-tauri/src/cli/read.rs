@@ -344,6 +344,7 @@ fn private_read(
             "--cursor" if candidates => ("cursor", json!(value)),
             "--snapshot" if candidates => ("snapshot", json!(value)),
             "--idempotency-key" if !candidates => ("idempotencyKey", json!(value)),
+            "--kind" if !candidates => ("kind", json!(value)),
             _ => return Err(arguments_error()),
         };
         insert(&mut args, key, value)?;

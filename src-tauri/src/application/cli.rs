@@ -8,16 +8,18 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
-pub(crate) const ROUTES: [&str; 4] = [
+pub(crate) const ROUTES: [&str; 5] = [
     "cli_get_receipt",
     "cli_parent_candidates",
     "cli_complete_task",
     "cli_create_subtask",
+    "cli_report",
 ];
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct ReceiptArgs {
     pub idempotency_key: String,
+    pub kind: Option<String>,
 }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -39,7 +41,7 @@ pub(crate) struct CompleteArgs {
     pub reason: String,
 }
 pub(crate) fn capabilities() -> Value {
-    json!({"version":1,"phase":4,"privateRoutes":ROUTES,"writeTools":["mutate_task","request_undo","cli_complete_task","cli_create_subtask"],"receiptLookupReadOnly":true})
+    json!({"version":1,"phase":5,"privateRoutes":ROUTES,"writeTools":["mutate_task","request_undo","cli_complete_task","cli_create_subtask"],"receiptLookupReadOnly":true})
 }
 pub(crate) fn write_route(tool: &str) -> bool {
     matches!(tool, "cli_complete_task" | "cli_create_subtask")
@@ -89,6 +91,20 @@ pub(crate) struct ChildArgs {
 }
 fn yes() -> bool {
     true
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ReportArgs {
+    pub period: String,
+    pub date: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
+    pub filters: Option<crate::mcp::query_types::QueryFilters>,
+    pub snapshot: Option<String>,
+    pub timezone_offset_minutes: Option<i32>,
+    #[serde(default)]
+    pub text: bool,
 }
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

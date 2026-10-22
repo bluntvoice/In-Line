@@ -332,17 +332,22 @@ pub async fn call_at_with_id(
             .collect::<String>()
         )
     };
-    let write_request = matches!(
-        tool,
-        "mutate_task"
-            | "request_undo"
-            | "batch_mutate"
-            | "manage_business_data"
-            | "manage_preferences"
-            | "manage_saved_query"
-            | "cli_complete_task"
-            | "cli_create_subtask"
-    );
+    let write_request = (tool == "manage_jobs"
+        && matches!(
+            args["action"].as_str(),
+            Some("start" | "cancelWaiter" | "cancelJob")
+        ))
+        || matches!(
+            tool,
+            "mutate_task"
+                | "request_undo"
+                | "batch_mutate"
+                | "manage_business_data"
+                | "manage_preferences"
+                | "manage_saved_query"
+                | "cli_complete_task"
+                | "cli_create_subtask"
+        );
     let sent = std::sync::atomic::AtomicBool::new(false);
     let result = tokio::time::timeout(DEADLINE, async {
         let mut spawned = false;

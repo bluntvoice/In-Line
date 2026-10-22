@@ -98,6 +98,19 @@ pub fn execute(
         if crate::application::cli::write_route(tool) && !auth.permissions.write {
             return Err(McpError::new("forbidden"));
         }
+        if tool == "cli_report" {
+            let mut queries = security
+                .queries
+                .lock()
+                .map_err(|_| McpError::new("security_unavailable"))?;
+            return query::cli_report(
+                &mut queries,
+                db,
+                &credentials.client_id,
+                &auth,
+                serde_json::from_value(args).map_err(|_| McpError::new("invalid_arguments"))?,
+            );
+        }
         if tool == "cli_parent_candidates" {
             let mut queries = security
                 .queries

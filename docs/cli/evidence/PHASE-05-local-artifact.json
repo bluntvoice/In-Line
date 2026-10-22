@@ -1,0 +1,86 @@
+{
+  "phase": "CLI Phase5",
+  "artifactType": "local_debug_console_not_installer",
+  "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\CLI-Phase5-local-20261022\\in-line-cli.exe",
+  "bytes": 5885952,
+  "sha256": "F36B31798C4E14D053D92BB4AE6E3D9B780EE7D86708985138C8C2FFAF69E9FC",
+  "build": {
+    "baselineCommit": "87280c9a09dd8a0d6900b375be943f93fb0c8784",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "sourceInputs": 205,
+  "frozenSourceManifestSha256": "6A3C8799BB8257D379A72264A07A206CA2DDF61EE905C58BF3AE18BC18338740",
+  "sourceReadbackMatched": true,
+  "checks": [
+    {
+      "arguments": [
+        "--version",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "arguments": [
+        "--help",
+        "--format",
+        "json"
+      ],
+      "exitCode": 0,
+      "status": "ok"
+    },
+    {
+      "arguments": [
+        "batch",
+        "execute",
+        "--format",
+        "json"
+      ],
+      "exitCode": 2,
+      "status": "error"
+    },
+    {
+      "arguments": [
+        "jobs",
+        "start",
+        "--format",
+        "json"
+      ],
+      "exitCode": 2,
+      "status": "error"
+    },
+    {
+      "arguments": [
+        "report",
+        "daily",
+        "--render",
+        "text",
+        "--format",
+        "json"
+      ],
+      "exitCode": 2,
+      "status": "error"
+    },
+    {
+      "arguments": [
+        "receipt",
+        "get",
+        "--kind",
+        "artifact",
+        "--idempotency-key",
+        "local-readback",
+        "--format",
+        "json"
+      ],
+      "exitCode": 3,
+      "status": "error"
+    }
+  ],
+  "nativeInstalled": false
+}

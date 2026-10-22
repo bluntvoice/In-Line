@@ -81,6 +81,166 @@ pub struct QueryState {
     root: PathBuf,
     snapshots: HashMap<String, Snapshot>,
 }
+
+/// CLI-only presentation of the existing report on one scoped immutable image.
+pub(crate) fn cli_report(
+    state: &mut QueryState,
+    db: &Database,
+    client: &str,
+    auth: &Authorization,
+    args: crate::application::cli::ReportArgs,
+) -> Result<Value, McpError> {
+    use chrono::{Datelike, Duration as Days};
+    if !matches!(args.period.as_str(), "daily" | "weekly" | "monthly")
+        || args.text && args.period != "daily"
+        || args.date.is_some() && (args.start_date.is_some() || args.end_date.is_some())
+    {
+        return Err(invalid());
+    }
+    if args.text && !auth.permissions.full_read {
+        return Err(McpError::new("forbidden"));
+    }
+    let tz = args
+        .timezone_offset_minutes
+        .unwrap_or_else(|| Local::now().offset().local_minus_utc() / 60);
+    let zone = FixedOffset::east_opt(tz.checked_mul(60).ok_or_else(invalid)?)
+        .filter(|_| (-840..=840).contains(&tz))
+        .ok_or_else(invalid)?;
+    let parse = |s: &str| {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d")
+            .ok()
+            .filter(|d| d.format("%Y-%m-%d").to_string() == s)
+            .ok_or_else(invalid)
+    };
+    let (start, end) = match (args.start_date.as_deref(), args.end_date.as_deref()) {
+        (Some(a), Some(b)) => (parse(a)?, parse(b)?),
+        (None, None) => {
+            let anchor = args
+                .date
+                .as_deref()
+                .map(parse)
+                .transpose()?
+                .unwrap_or_else(|| Utc::now().with_timezone(&zone).date_naive());
+            let start = match args.period.as_str() {
+                "weekly" => {
+                    let sunday = db
+                        .settings()
+                        .map_err(|_| McpError::new("internal_error"))?
+                        .get("week_start_day")
+                        .is_some_and(|s| s == "sunday");
+                    let days = if sunday {
+                        anchor.weekday().num_days_from_sunday()
+                    } else {
+                        anchor.weekday().num_days_from_monday()
+                    };
+                    anchor
+                        .checked_sub_signed(Days::days(days as i64))
+                        .ok_or_else(invalid)?
+                }
+                "monthly" => anchor.with_day(1).ok_or_else(invalid)?,
+                _ => anchor,
+            };
+            (start, anchor)
+        }
+        _ => return Err(invalid()),
+    };
+    if args.text && start != end {
+        return Err(invalid());
+    }
+    let mut report_args = ReportItemsArgs {
+        start_date: start.to_string(),
+        end_date: end.to_string(),
+        limit: Some(100),
+        offset: None,
+        filters: args.filters,
+        snapshot: args.snapshot,
+        cursor: None,
+        timezone_offset_minutes: Some(tz),
+    };
+    let summary = report(state, db, client, auth, report_args.clone(), true)?;
+    if !args.text {
+        return Ok(summary);
+    }
+    let id = summary["meta"]["snapshotId"]
+        .as_str()
+        .ok_or_else(invalid)?
+        .to_owned();
+    report_args.snapshot = Some(id.clone());
+    let tasks = state
+        .snapshots
+        .get(&id)
+        .ok_or_else(|| McpError::new("snapshot_expired"))?
+        .db
+        .mcp_tasks()?
+        .into_iter()
+        .map(|t| (t.id, t))
+        .collect::<HashMap<_, _>>();
+    let mut rows = Vec::new();
+    let mut count = 0;
+    for page_number in 0..100 {
+        let page = report(state, db, client, auth, report_args.clone(), false)?;
+
+        let items = page["page"]["items"].as_array().ok_or_else(invalid)?;
+        count += items.len();
+        if count > 10000 {
+            return Err(McpError::new("resource_limit"));
+        }
+        for item in items {
+            let result = item["workEvents"]
+                .as_array()
+                .and_then(|events| events.last())
+                .and_then(|e| e["resultStatus"].as_str())
+                .ok_or_else(invalid)?;
+            if !matches!(result, "processed" | "completed") {
+                continue;
+            }
+            let t = tasks
+                .get(&item["taskId"].as_i64().ok_or_else(invalid)?)
+                .ok_or_else(invalid)?;
+            rows.push(json!({"taskId":t.id,"taskType":t.task_type,"title":t.title,"departments":t.departments,"contacts":t.contacts,"resultStatus":result}));
+        }
+        report_args.cursor = page["nextCursor"].as_str().map(str::to_owned);
+        if report_args.cursor.is_none() {
+            break;
+        }
+        if page_number == 99 {
+            return Err(McpError::new("resource_limit"));
+        }
+    }
+    rows.sort_by_key(|r| {
+        (
+            r["taskType"].to_string(),
+            r["title"].to_string(),
+            r["taskId"].as_i64(),
+        )
+    });
+    let clean = |s: &str| s.replace(['\r', '\n', '\t'], " ");
+    let mut text=format!("{start} 今日计划完成事项\n口径：指定日实际办理回顾；每事项按当日最后有效办理结果归类，仅列已处理/已完成；非未来计划。\n");
+    for row in &rows {
+        let list = |key: &str| {
+            row[key]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| clean(v.as_str().unwrap()))
+                .collect::<Vec<_>>()
+                .join("/")
+        };
+        text += &format!(
+            "{}-{}-{}-{}\n",
+            clean(row["taskType"].as_str().unwrap()),
+            clean(row["title"].as_str().unwrap()),
+            list("departments"),
+            list("contacts")
+        );
+        if text.len() > 16 * 1024 * 1024 {
+            return Err(McpError::new("resource_limit"));
+        }
+    }
+    bounded(
+        json!({"startDate":start.to_string(),"endDate":end.to_string(),"timezoneOffsetMinutes":tz,"text":text,"items":rows,"meta":summary["meta"],"complete":true,"definition":summary["definition"],"coverage":summary["coverage"]}),
+    )
+}
 impl QueryState {
     pub(super) fn dependencies(&self, id: &str) -> Result<Vec<i64>, McpError> {
         self.snapshots

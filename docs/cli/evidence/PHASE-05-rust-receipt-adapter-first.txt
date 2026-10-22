@@ -1,0 +1,97 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+error[E0425]: cannot find value `args` in this scope
+   --> src\database\cli.rs:107:29
+    |
+107 |         if let Some(kind) = args.kind.as_deref() {
+    |                             ^^^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> src\cli\authorization_tests.rs:8:1
+    |
+  8 | fn args(client: &str) -> PrepareArgs {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::cli::authorization::tests::args`: not accessible
+    |
+   ::: src\mcp\jobs_tests.rs:42:1
+    |
+ 42 | fn args(v: Value) -> JobsArgs {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::mcp::jobs::tests::args`: not accessible
+help: consider importing this function
+    |
+  2 + use std::env::args;
+    |
+
+error[E0425]: cannot find value `client` in this scope
+   --> src\database\cli.rs:111:164
+    |
+111 | ...obs WHERE client_id=? AND request_key=?",params![client,args.idempotency_key],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(s...
+    |                                                     ^^^^^^ not found in this scope
+
+error[E0425]: cannot find value `args` in this scope
+   --> src\database\cli.rs:111:171
+    |
+111 | ...ERE client_id=? AND request_key=?",params![client,args.idempotency_key],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(sql)?.o...
+    |                                                      ^^^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> src\cli\authorization_tests.rs:8:1
+    |
+  8 | fn args(client: &str) -> PrepareArgs {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::cli::authorization::tests::args`: not accessible
+    |
+   ::: src\mcp\jobs_tests.rs:42:1
+    |
+ 42 | fn args(v: Value) -> JobsArgs {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::mcp::jobs::tests::args`: not accessible
+help: consider importing this function
+    |
+  2 + use std::env::args;
+    |
+
+error[E0425]: cannot find value `args` in this scope
+   --> src\database\cli.rs:117:41
+    |
+117 | ...   json!({"idempotencyKey":args.idempotency_key,"readOnly":true,"kind":"artifact","ledgerStatus":status,"currentStateVerificatio...
+    |                               ^^^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> src\cli\authorization_tests.rs:8:1
+    |
+  8 | fn args(client: &str) -> PrepareArgs {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::cli::authorization::tests::args`: not accessible
+    |
+   ::: src\mcp\jobs_tests.rs:42:1
+    |
+ 42 | fn args(v: Value) -> JobsArgs {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::mcp::jobs::tests::args`: not accessible
+help: consider importing this function
+    |
+  2 + use std::env::args;
+    |
+
+error[E0308]: mismatched types
+   --> src\database\cli.rs:117:17
+    |
+116 | ...eturn Ok(
+    |          -- arguments to this enum variant are incorrect
+117 | ...   json!({"idempotencyKey":args.idempotency_key,"readOnly":true,"kind":"artifact","ledgerStatus":status,"currentStateVerification":"not_reexecuted","receipt":value,"artifactContentsReturned":false}),
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `(bool, i64)`, found `Value`
+    |
+    = note: expected tuple `(bool, i64)`
+                found enum `serde_json::Value`
+help: the type constructed contains `serde_json::Value` due to the type of the argument passed
+   --> src\database\cli.rs:116:20
+    |
+116 |               return Ok(
+    |  ____________________^
+117 | |                 json!({"idempotencyKey":args.idempotency_key,"readOnly":true,"kind":"artifact","ledgerStatus":status,"currentStateVerification":"not_reexecuted","receipt":value,"artifactContentsReturned":false}),
+    | |                 --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- this argument influences the type of `Ok`
+118 | |             );
+    | |_____________^
+note: tuple variant defined here
+   --> /rustc/8bab26f4f68e0e26f0bb7960be334d5b520ea452/library\core\src\result.rs:561:4
+
+Some errors have detailed explanations: E0308, E0425.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `in-line` (lib test) due to 5 previous errors
+=== cargo stdout (tests) ===

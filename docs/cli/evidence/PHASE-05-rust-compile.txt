@@ -1,0 +1,14 @@
+=== cargo stderr (compile/status) ===
+   Compiling in-line v0.5.0 (D:\codex-data\projects\inline\In-Line\src-tauri)
+    Finished `test` profile [unoptimized] target(s) in 1m 41s
+  Executable unittests src\lib.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\in_line_lib-6fe8989771e774e1.exe)
+  Executable unittests src\main.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\in_line-e6662e894cd7c7d2.exe)
+  Executable unittests src\bin\in-line-cli.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\in_line_cli-9d9842efb6eaae74.exe)
+  Executable unittests src\bin\in-line-mcp.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\in_line_mcp-f1225382a19a7ef0.exe)
+  Executable tests\cli_foundation.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\cli_foundation-40ee9538d9a0612f.exe)
+  Executable tests\mcp_host.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\mcp_host-c825e203ef915813.exe)
+  Executable tests\mcp_onboarding.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\mcp_onboarding-a7fc057d250f0a62.exe)
+  Executable tests\mcp_queries.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\mcp_queries-a80d15c814039181.exe)
+  Executable tests\mcp_security.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\mcp_security-fa833cd9ffee16b1.exe)
+  Executable tests\mcp_stdio.rs (D:\codex-data\build-targets\in-line-cli-phase1-test-20261016\debug\deps\mcp_stdio-1408c6663c1f6bbc.exe)
+=== cargo stdout (tests) ===

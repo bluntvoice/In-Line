@@ -8,6 +8,30 @@ pub(super) enum Command {
     Import,
     Read(ReadCommand),
     Write(WriteCommand),
+    Advanced(AdvancedCommand),
+}
+#[derive(Clone)]
+pub(super) enum AdvancedCommand {
+    Report(String),
+    Trace,
+    Compare,
+    Query(String),
+    Batch(bool),
+    Changes,
+    Jobs(String),
+    Cache,
+    Data(String),
+    Preferences(bool),
+}
+impl AdvancedCommand {
+    pub fn requires_execute(&self) -> bool {
+        matches!(self, Self::Query(a) if a == "save" || a == "delete")
+            || matches!(
+                self,
+                Self::Batch(true) | Self::Data(_) | Self::Preferences(true)
+            )
+            || matches!(self, Self::Jobs(a) if a == "start" || a == "cancel" || a == "cancel-waiter")
+    }
 }
 #[derive(Clone)]
 pub(super) enum ReadCommand {
@@ -60,6 +84,7 @@ pub(super) struct Options {
     pub all: bool,
     pub execute: bool,
     pub package: Option<String>,
+    pub text: bool,
 }
 pub(super) fn requests_json(args: &[OsString]) -> bool {
     args.windows(2)
@@ -119,6 +144,9 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
                     | "--inherit-deadline"
                     | "--confirm-historical-impact"
                     | "--sync-status"
+                    | "--explicit-intent"
+                    | "--explicit-requery"
+                    | "--allow-latest-after-invalidation"
             );
             let value = if boolean {
                 "true".into()
@@ -154,9 +182,27 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
         ["queue", "future"] => Command::Read(ReadCommand::Future),
         ["queue", "history", id] => Command::Read(ReadCommand::QueueHistory(positive_id(id)?)),
         ["calendar", "list"] => Command::Read(ReadCommand::Calendar),
-        ["stats", "summary"] | ["report", "daily" | "weekly" | "monthly"] => {
-            Command::Read(ReadCommand::Summary)
+        ["stats", "summary"] => Command::Read(ReadCommand::Summary),
+        ["report", period @ ("daily" | "weekly" | "monthly")] => {
+            Command::Advanced(AdvancedCommand::Report((*period).into()))
         }
+        ["stats", "trace"] => Command::Advanced(AdvancedCommand::Trace),
+        ["stats", "compare"] => Command::Advanced(AdvancedCommand::Compare),
+        ["query", action @ ("list" | "get" | "save" | "delete")] => {
+            Command::Advanced(AdvancedCommand::Query((*action).into()))
+        }
+        ["batch", "preview"] => Command::Advanced(AdvancedCommand::Batch(false)),
+        ["batch", "execute"] => Command::Advanced(AdvancedCommand::Batch(true)),
+        ["changes", "list"] => Command::Advanced(AdvancedCommand::Changes),
+        ["jobs", action @ ("start" | "list" | "get" | "result" | "cancel-waiter" | "cancel")] => {
+            Command::Advanced(AdvancedCommand::Jobs((*action).into()))
+        }
+        ["data", "cache"] => Command::Advanced(AdvancedCommand::Cache),
+        ["data", action @ ("backup" | "export")] => {
+            Command::Advanced(AdvancedCommand::Data((*action).into()))
+        }
+        ["preferences", "get"] => Command::Advanced(AdvancedCommand::Preferences(false)),
+        ["preferences", "patch"] => Command::Advanced(AdvancedCommand::Preferences(true)),
         ["report", "items"] => Command::Read(ReadCommand::ReportItems),
         ["data", "health"] => Command::Read(ReadCommand::Health),
         ["diagnostic", "get", id] => Command::Read(ReadCommand::Diagnostic((*id).into())),
@@ -208,12 +254,23 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
         ["undo", "request"] => Command::Write(WriteCommand::Undo),
         _ => return Err(()),
     };
-    if flags
-        .remove("--format")
-        .is_some_and(|f| !matches!(f.as_str(), "table" | "json"))
+    let format = flags.remove("--format");
+    if format
+        .as_deref()
+        .is_some_and(|f| !matches!(f, "table" | "json"))
     {
         return Err(());
     }
+    let text = match flags.remove("--render").as_deref() {
+        None => false,
+        Some("text")
+            if format.as_deref() != Some("json")
+                && matches!(&command, Command::Advanced(AdvancedCommand::Report(p)) if p == "daily") =>
+        {
+            true
+        }
+        _ => return Err(()),
+    };
     flags.remove("--no-color");
     let profile = flags.remove("--profile");
     if profile.as_deref().is_some_and(|p| !valid_profile(p)) {
@@ -228,7 +285,9 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
     }
     let all = flags.remove("--all").is_some();
     let execute = flags.remove("--execute").is_some();
-    if matches!(command, Command::Write(_)) != execute || (execute && all) {
+    let requires_execute = matches!(command, Command::Write(_))
+        || matches!(&command, Command::Advanced(c) if c.requires_execute());
+    if requires_execute != execute || (execute && all) {
         return Err(());
     }
     let package = flags.remove("--package");
@@ -237,7 +296,7 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
     }
     if !matches!(
         command,
-        Command::Status | Command::Read(_) | Command::Write(_)
+        Command::Status | Command::Read(_) | Command::Write(_) | Command::Advanced(_)
     ) && input.is_some()
     {
         return Err(());
@@ -254,7 +313,11 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
     } else if package.is_some() {
         return Err(());
     }
-    if !matches!(command, Command::Read(_) | Command::Write(_)) && (!flags.is_empty() || all) {
+    if !matches!(
+        command,
+        Command::Read(_) | Command::Write(_) | Command::Advanced(_)
+    ) && (!flags.is_empty() || all)
+    {
         return Err(());
     }
     Ok(Options {
@@ -265,6 +328,7 @@ pub(super) fn parse(args: Vec<OsString>) -> Result<Options, ()> {
         all,
         execute,
         package,
+        text,
     })
 }
 fn positive_id(s: &str) -> Result<i64, ()> {

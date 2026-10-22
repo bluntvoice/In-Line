@@ -1,0 +1,25 @@
+{
+  "Start": "2026-10-22T13:55:27.9292868+08:00",
+  "End": "2026-10-22T13:57:59.5189635+08:00",
+  "ExitCode": 0,
+  "GuardStopped": false,
+  "TargetDirectory": "D:\\codex-data\\build-targets\\in-line-cli-phase1-test-20261016",
+  "BuildJobs": 1,
+  "TestDebugInfo": 0,
+  "DevDebugInfo": 0,
+  "TestThreads": 1,
+  "CargoArguments": [
+    "test",
+    "--locked",
+    "--manifest-path",
+    "src-tauri/Cargo.toml",
+    "--",
+    "--test-threads=1"
+  ],
+  "TestsFiltered": false,
+  "MinimumHeadroomGiB": 15.56,
+  "MaximumCommitPercent": 63.0,
+  "AbortHeadroomGiB": 4,
+  "AbortCommitPercent": 90,
+  "ConsecutiveSamplesBeforeAbort": 2
+}

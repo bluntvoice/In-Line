@@ -4,9 +4,45 @@ use std::io::Write;
 pub fn exit_code(envelope: &Envelope) -> i32 {
     if envelope.status == "ok" && envelope.error.is_none() && envelope.data.is_some() {
         let data = envelope.data.as_ref().unwrap();
+        if data["commitStatus"] == "dry_run" {
+            return if data.get("cliReceipt").is_none() {
+                0
+            } else {
+                9
+            };
+        }
+        if data["commitStatus"] == "needs_user_approval" || data["submissionOnly"] == true {
+            return 8;
+        }
+        let state = data
+            .get("job")
+            .unwrap_or(data)
+            .get("state")
+            .and_then(serde_json::Value::as_str);
+        if data["waiting"] != false {
+            if let Some(state) = state {
+                match state {
+                    "queued" | "running" | "paused" | "recovering" | "cancelling"
+                    | "publishing" => return 8,
+                    "failed" => return 6,
+                    "completed" | "cancelled" => {}
+                    _ => return 9,
+                }
+            }
+        }
         if let Some(receipt) = data.get("cliReceipt") {
             if receipt["kind"] == "undo_request" && data["submissionOnly"] == true {
                 return 8;
+            }
+            if receipt["kind"] == "artifact" {
+                return if data["commitStatus"] == "artifact_created"
+                    && data["verificationStatus"] == "verified_after_commit"
+                    && data["artifactName"].as_str().is_some_and(|s| !s.is_empty())
+                {
+                    0
+                } else {
+                    9
+                };
             }
             return if matches!(
                 data["commitStatus"].as_str(),
@@ -100,7 +136,11 @@ pub(super) fn emit(envelope: &Envelope, json_output: bool) -> i32 {
             "{}",
             serde_json::to_string(envelope).unwrap_or_default()
         )
-    } else if let Some(text) = envelope.data.as_ref().and_then(|d| d["help"].as_str()) {
+    } else if let Some(text) = envelope
+        .data
+        .as_ref()
+        .and_then(|d| d["help"].as_str().or_else(|| d["cliText"].as_str()))
+    {
         writeln!(stdout, "{text}")
     } else if let Some(data) = envelope.data.as_ref().and_then(|d| d.as_object()) {
         writeln!(stdout, "字段\t值").and_then(|_| {
@@ -178,5 +218,39 @@ mod tests {
         let mut malformed = Envelope::result("test".into(), Ok(serde_json::json!({})));
         malformed.status = "unknown".into();
         assert_eq!(exit_code(&malformed), 7);
+    }
+    #[test]
+    fn phase5_preview_approval_artifacts_and_background_states_are_distinct() {
+        for (data, expected) in [
+            (
+                serde_json::json!({"commitStatus":"dry_run","verificationStatus":"verified_after_commit"}),
+                0,
+            ),
+            (
+                serde_json::json!({"commitStatus":"needs_user_approval","verificationStatus":"verified_after_commit","cliReceipt":{"kind":"mutation"}}),
+                8,
+            ),
+            (serde_json::json!({"job":{"state":"running"}}), 8),
+            (serde_json::json!({"state":"failed"}), 6),
+            (serde_json::json!({"job":{"state":"unknown"}}), 9),
+            (
+                serde_json::json!({"job":{"state":"running"},"waiting":false}),
+                0,
+            ),
+            (
+                serde_json::json!({"commitStatus":"artifact_created","verificationStatus":"verified_after_commit","artifactName":"export.json","cliReceipt":{"kind":"artifact"}}),
+                0,
+            ),
+            (
+                serde_json::json!({"commitStatus":"artifact_created","verificationStatus":"verification_failed","artifactName":"export.json","cliReceipt":{"kind":"artifact"}}),
+                9,
+            ),
+        ] {
+            assert_eq!(
+                exit_code(&Envelope::result("test".into(), Ok(data.clone()))),
+                expected,
+                "{data}"
+            );
+        }
     }
 }

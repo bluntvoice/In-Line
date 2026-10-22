@@ -1,4 +1,5 @@
 //! CLI adapter only. No database, GUI automation, shell or MCP subprocess.
+mod advanced;
 #[cfg(windows)]
 pub(crate) mod authorization;
 mod json_input;
@@ -22,7 +23,7 @@ pub use output::exit_code;
 use parse::{Command, Options};
 
 const MAX_INPUT: u64 = 1024 * 1024;
-const HELP: &str = "In Line CLI（Windows，Phase4事项管理）
+const HELP: &str = "In Line CLI（Windows，Phase5高级自动化）
 用法：in-line-cli <命令> [选项]
   --help                 显示帮助；不启动主程序
   --version              显示版本和构建身份；不启动主程序
@@ -47,7 +48,13 @@ const HELP: &str = "In Line CLI（Windows，Phase4事项管理）
   --created-from / --created-to / --deadline-from / --deadline-to / --handled-from / --handled-to
   --timezone-offset-minutes <分钟>；history另支持--kinds及--include-voided
 同一字段不得同时在命令参数和JSON指定；状态、字段、日期口径由主程序校验。
-日报/周报/月报当前均需显式起止日期，返回原结构化摘要；完整文本留后续阶段。
+日报/周报/月报可用--date YYYY-MM-DD（默认宿主今天），返回当日/本周至该日/本月至该日的摘要；也可显式--from/--to。
+  report daily --render text 输出四字段实际办理日报，需有效fullRead；与--format json互斥。
+  stats trace/compare、query list/get/save/delete、batch preview/execute、changes list、jobs start/list/get/result/cancel-waiter/cancel、data cache/backup/export、preferences get/patch。
+  复杂参数使用--input，命令已确定的action不得重复。query保存/删除须--explicit-intent；jobs取消须--explicit-user-request。
+  batch execute强制先预演再携带基准执行，仍可能待软件内批准；预演也需独立write权限。
+  改动命名查询、启动/取消作业、偏好patch及备份导出均须--execute；只读/预演不能带--execute。
+  changes每页必须保留相同条件及cursor，先全量同步；jobs结果分页保留原jobId/nextOffset；不自动重试或等待。
 写入命令：task create/update/status set/complete/urgent set|clear/archive/trash/restore/reopen/reschedule；
   task child create/parent set|clear/children reorder；queue enter/move；work process-round/complete-round/record/correct/void；undo request。
   写入必须--execute及显式--profile；--input提供意图、原因、原幂等键、版本或字段基准，禁止自动填版本或猜业务字段。
@@ -55,7 +62,7 @@ const HELP: &str = "In Line CLI（Windows，Phase4事项管理）
   版本：--task-version、--parent-version；业务：--date、--event-id、--audit-id、--requester、--urgent-reason、--handled-at、--result-status、--note。
   父任务完成须明确--include-eligible-subtasks或--parent-only，并提供当前所有子任务taskVersions；普通完成保留原保护。
   归档/软删除可显式--include-completed-subtasks/--include-subtasks；恢复沿用GUI加入今日队列。
-  task parent candidates <id>；receipt get --idempotency-key <原键>仅查当前profile原回执，绝不重做写入。
+  task parent candidates <id>；receipt get --idempotency-key <原键>仅查当前profile原回执；产物用--kind artifact，只查账本元数据、不读产物内容，绝不重做写入。
 不提供授权增权、审批approve、force、任意工具调用或SQL。导入/CLI验证不代表当前聊天MCP已连接。
 首版通过完整路径调用，不自动修改PATH。长期凭证不得放入参数或聊天。";
 
@@ -242,7 +249,7 @@ async fn execute(
     match &options.command {
         Command::Help => Ok(json!({"help":HELP})),
         Command::Version => {
-            Ok(json!({"name":"in-line-cli","build":build_identity::current(),"cliPhase":4}))
+            Ok(json!({"name":"in-line-cli","build":build_identity::current(),"cliPhase":5}))
         }
         Command::Doctor => {
             let exe = std::env::current_exe().map_err(|_| McpError::new("host_unavailable"))?;
@@ -290,6 +297,21 @@ async fn execute(
                 Err(McpError::new("unsupported"))
             }
         }
+        Command::Advanced(command) => {
+            let request = advanced::build(command, options, input)?;
+            if options.execute {
+                *receipt_key = request.key.clone();
+            }
+            #[cfg(windows)]
+            {
+                advanced::dispatch(options, request, id).await
+            }
+            #[cfg(not(windows))]
+            {
+                let _ = request;
+                Err(McpError::new("unsupported"))
+            }
+        }
         Command::Read(command) => {
             let request = read::build(command, options, input)?;
             #[cfg(windows)]
@@ -316,6 +338,18 @@ pub async fn run(args: impl Iterator<Item = OsString>) -> i32 {
         Err(_) => Err(arguments_error()),
     };
     let mut envelope = Envelope::result(id, result);
+    if parsed.as_ref().is_ok_and(|o| o.text) {
+        if let Some(data) = envelope.data.as_mut() {
+            if let Some(text) = data["text"].as_str().map(str::to_owned) {
+                data["cliText"] = json!(text);
+            } else {
+                envelope = Envelope::result(
+                    envelope.request_id.clone(),
+                    Err(McpError::new("result_unknown")),
+                );
+            }
+        }
+    }
     // A failed status/doctor still reports safe local facts, never an authenticated result.
     if envelope.status == "error" {
         if let Ok(options) = &parsed {
@@ -333,7 +367,14 @@ pub async fn run(args: impl Iterator<Item = OsString>) -> i32 {
         }
     }
     if let Some(key) = receipt_key {
-        let kind = if parsed
+        let kind = if parsed.as_ref().is_ok_and(|o| {
+            matches!(
+                o.command,
+                Command::Advanced(parse::AdvancedCommand::Data(_))
+            )
+        }) {
+            "artifact"
+        } else if parsed
             .as_ref()
             .is_ok_and(|o| matches!(o.command, Command::Write(parse::WriteCommand::Undo)))
         {
@@ -341,7 +382,13 @@ pub async fn run(args: impl Iterator<Item = OsString>) -> i32 {
         } else {
             "mutation"
         };
-        let context = json!({"idempotencyKey":key,"kind":kind,"lookup":"receipt get --idempotency-key <original> --profile <same>","neverBlindlyReplay":true});
+        let lookup = if kind == "artifact" {
+            "receipt get --kind artifact --idempotency-key <original> --profile <same>"
+        } else {
+            "receipt get --idempotency-key <original> --profile <same>"
+        };
+        let context =
+            json!({"idempotencyKey":key,"kind":kind,"lookup":lookup,"neverBlindlyReplay":true});
         if let Some(data) = envelope.data.as_mut().and_then(Value::as_object_mut) {
             data.insert("cliReceipt".into(), context.clone());
         }

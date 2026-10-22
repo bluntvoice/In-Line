@@ -322,12 +322,39 @@ try {
     await page.locator(".sidebar nav button").filter({hasText:"统计中心"}).click();
     await page.getByRole("button",{name:"上一季度",exact:true}).click();
     await page.getByText("按自然周去重 · 点击数量查看明细",{exact:true}).waitFor();
+    const weeklyColumn=page.locator(".trend-column").first();
+    const weeklyTitle=await weeklyColumn.getAttribute("title");
+    assert.match(weeklyTitle,/^\d{4}-\d{2}-\d{2} 至 \d{4}-\d{2}-\d{2}：3 项$/);
+    assert.doesNotMatch(await weeklyColumn.innerText(),/周[一二三四五六日]/);
+    const [labelStart,labelEnd]=weeklyTitle.split("：")[0].split(" 至 ");
+    assert.equal(await weeklyColumn.locator("small>span").innerText(),labelStart.slice(5));
+    assert.equal(await weeklyColumn.locator("small>time").innerText(),`至 ${labelEnd.slice(5)}`);
+    assert.equal(await weeklyColumn.locator("small>time").getAttribute("dateTime"),labelEnd);
+    const exportedLabels=await page.evaluate(async()=>{
+      const {api}=await import("/src/api.ts");
+      const {renderStatisticsChartsPng}=await import("/src/lib/statistics-export.ts");
+      const query=window.__inlineCalls.filter(call=>call[0]==="statistics").at(-2);
+      const data=await api.getStatistics(query[1],query[2]);
+      const localDate=value=>{const d=new Date(value);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+      const range={start:localDate(query[1]),end:localDate(new Date(new Date(query[2]).getTime()-86400000))};
+      const original=CanvasRenderingContext2D.prototype.fillText,texts=[];
+      CanvasRenderingContext2D.prototype.fillText=function(text,...args){texts.push(text);return original.call(this,text,...args)};
+      try{const png=await renderStatisticsChartsPng(["trend"],"隔离趋势回归",{data,comparisonData:data,range,comparisonRange:range,comparisonLabel:"测试",taskTypeMode:"list"});return {texts,bytes:png.length};}
+      finally{CanvasRenderingContext2D.prototype.fillText=original;}
+    });
+    assert.ok(exportedLabels.bytes>1000);
+    assert.ok(exportedLabels.texts.includes(labelStart.slice(5)));
+    assert.ok(exportedLabels.texts.includes(`至 ${labelEnd.slice(5)}`));
+    assert.ok(exportedLabels.texts.every(text=>!/^周[一二三四五六日]$/.test(text)));
     await page.locator(".trend-column .trend-total").first().click();
     await page.locator(".details-card tbody tr").last().waitFor();
     await page.getByRole("button",{name:"复制明细",exact:true}).click();
     assert.equal(await page.evaluate(()=>window.__inlineClipboard),copied);
     const weeklyCall=(await page.evaluate(()=>window.__inlineCalls)).filter(c=>c[0]==="trend").at(-1);
     assert.ok(new Date(weeklyCall[2])-new Date(weeklyCall[1])<=7*86400000);
+    const asLocalDate=value=>{const d=new Date(value);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+    assert.equal(asLocalDate(weeklyCall[1]),labelStart);
+    assert.equal(asLocalDate(new Date(new Date(weeklyCall[2]).getTime()-86400000)),labelEnd);
     assert.match(await page.locator(".details-card h2").innerText(),/至.*全部办理事项/);
     console.log("PASS trend: total/bar/zero/type details, close/navigation, day/week clipped ranges, copy including later waiting/sort/newlines/failure/empty");
   }

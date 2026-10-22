@@ -4,7 +4,7 @@ use in_line_lib::mcp::security::{Permissions, Scope};
 use rmcp::{model::CallToolRequestParams, transport::TokioChildProcess, ServiceExt};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-async fn mcp_client(
+pub(super) async fn mcp_client(
     f: &Fixture,
     c: &Credentials,
 ) -> rmcp::service::RunningService<rmcp::RoleClient, ()> {
@@ -187,7 +187,7 @@ async fn parent_candidates_over_one_hundred_are_scoped_snapshot_pages_not_trunca
         assert!(!value.to_string().contains("hidden candidate"));
     }
 }
-fn business_snapshot(path: &Path) -> Value {
+pub(super) fn business_snapshot(path: &Path) -> Value {
     let c = rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
         .unwrap();
     let mut result = serde_json::Map::new();
