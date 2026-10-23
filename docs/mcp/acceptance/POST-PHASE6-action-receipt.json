@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-23",
+  "builtCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+  "runId": 39914041747,
+  "runUrl": "https://github.com/bluntvoice/In-Line/actions/runs/39914041747",
+  "artifactId": 12483998522,
+  "artifactName": "In-Line-dev-windows-x64-8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+  "artifactExpiresAt": "2026-11-06T07:02:36Z",
+  "archiveSha256": "92131D01EE84E5F3FAFF14899E0EC2B3FDC17182F1660DF8714D2C31C2676ABD",
+  "installerPath": "D:\\codex-data\\projects\\inline\\In-Line\\release\\Post-Phase6-Action-8784d51-20261023\\In-Line_0.5.0-dev-8784d51_x64-setup.exe",
+  "installerBytes": 4332399,
+  "installerSha256": "163088A5E65CB4ADE2BA4C0BCB9BC8954B9659CD7DFD0BF1FED41506A89447AE",
+  "actualNsisExtractionVerified": true,
+  "threeBuildIdentitiesMatch": true,
+  "exactStagedCompanionsMatch": true,
+  "downloadDigestVerified": true,
+  "installerExecuted": false,
+  "installed": false,
+  "nativeAcceptance": "pending separate test window",
+  "currentChatMcpVerified": false,
+  "tagOrReleaseCreated": false
+}

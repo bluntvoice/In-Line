@@ -1,0 +1,62 @@
+{
+  "offline": true,
+  "build": {
+    "baselineCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+    "commitVerification": "clean_checkout_readback",
+    "databaseSchemaVersion": 14,
+    "exactCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": false
+  },
+  "records": [
+    {
+      "name": "in-line",
+      "bytes": 8815104,
+      "sha256": "a203b67275f0bbbff64df68ff5ef456ff38fa7dc68d3ad1448a23bad47e80499",
+      "build": {
+        "baselineCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+        "commitVerification": "clean_checkout_readback",
+        "databaseSchemaVersion": 14,
+        "exactCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": false
+      }
+    },
+    {
+      "name": "in-line-mcp",
+      "bytes": 2366976,
+      "sha256": "24267135ee481f1dcf4425cb2493a569459e0b9132b9f1645000cdb1e45addca",
+      "build": {
+        "baselineCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+        "commitVerification": "clean_checkout_readback",
+        "databaseSchemaVersion": 14,
+        "exactCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": false
+      }
+    },
+    {
+      "name": "in-line-cli",
+      "bytes": 1052672,
+      "sha256": "a73479d4fd27ed41c5cefdbbd6242e4ef6d308e361a26f2fdb57860fb1c7d6bb",
+      "build": {
+        "baselineCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+        "commitVerification": "clean_checkout_readback",
+        "databaseSchemaVersion": 14,
+        "exactCommit": "8784d51c4f6b1d977250a8fcac20e1b70c98607f",
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": false
+      },
+      "cliPhase": 5
+    }
+  ],
+  "companionsMatched": false,
+  "nsisPayloadMatched": false,
+  "pathModified": false,
+  "installed": false,
+  "currentMcpSessionVerified": false
+}

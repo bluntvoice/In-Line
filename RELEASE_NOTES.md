@@ -1,6 +1,6 @@
 # v0.5.0 开发构建说明（未正式发布）
 
-最新本地修改（未发布）：统一 MCP / CLI 接入弹窗、安装中文控件高度、字体字号恢复，以及授权磁盘回读与缺失授权明确错误。隔离检查与实机验收分别记录，见[修复记录](docs/mcp/acceptance/POST-PHASE6-ONBOARDING-AND-UPGRADE.md)。
+最新开发修改（测试包已生成，未正式发布）：统一 MCP / CLI 接入弹窗、安装中文控件高度、字体字号恢复，以及授权磁盘回读与缺失授权明确错误。[开发 Action 测试包](docs/mcp/acceptance/POST-PHASE6-ACTION-DELIVERY.md)已下载核验；隔离检查与实机验收分别记录，见[修复记录](docs/mcp/acceptance/POST-PHASE6-ONBOARDING-AND-UPGRADE.md)。
 
 CLI Phase5已验收并提交推送4194f2b（含季度趋势修复）。Phase6已完成三程序打包、离线身份、混版拒绝及CI解包门禁的开发与本地检查，实际NSIS解包门禁待Action执行；详见[阶段6报告](docs/cli/PHASE-06-DELIVERY.md)。测试包按用户要求在阶段6确认提交后运行开发Action生成，保留为Artifact；本机安装另安排。
 
