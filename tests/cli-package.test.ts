@@ -44,6 +44,17 @@ describe("three executable package gate",()=>{
       expect(()=>assertNsisPayload(source,changed,"in-line")).toThrow();
     }
   });
+  it("rejects mismatching extracted bytes before executing a metadata probe",async()=>{
+    const root=await mkdtemp(join(tmpdir(),"inline-package-payload-"));
+    try{
+      const source=Buffer.alloc(2048);source.write("MZ");source.write("offline-build-info",32);source.write("__TAURI_BUNDLE_TYPE_VAR_UNK",64);
+      const payload=Buffer.from(source);payload.write("__TAURI_BUNDLE_TYPE_VAR_NSS",64);payload[3]=1;
+      const sourceDirectory=join(root,"source");
+      const {mkdir}=await import("node:fs/promises");await mkdir(sourceDirectory);
+      await writeFile(join(sourceDirectory,"in-line.exe"),source);await writeFile(join(root,"in-line.exe"),payload);
+      await expect(verifyDirectory(root,{nsisSource:sourceDirectory})).rejects.toThrow("Installer payload differs from expected NSIS binary");
+    }finally{await rm(root,{recursive:true,force:true});}
+  });
   it("refuses missing or ambiguous GUI markers and unknown binaries",()=>{
     for(const source of [Buffer.from("missing"),Buffer.from("__TAURI_BUNDLE_TYPE_VAR_UNK__TAURI_BUNDLE_TYPE_VAR_UNK")]){
       expect(()=>assertNsisPayload(source,source,"in-line")).toThrow();

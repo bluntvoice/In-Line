@@ -43,6 +43,9 @@ export async function verifyDirectory(directory,{expectedCommit,companions,targe
     // An older GUI may ignore unknown flags and open its normal data store.
     // Refuse it before execution; every new offline probe embeds this marker.
     if(name!=="in-line-cli" && !bytes.includes(Buffer.from("offline-build-info","utf8")))throw new Error(`Offline metadata probe unsupported; legacy binary not launched: ${name}`);
+    // Verify extracted bytes before executing even an offline metadata probe.
+    const source=nsisSource?await readFile(join(resolve(nsisSource),`${name}.exe`)):null;
+    if(source)assertNsisPayload(source,bytes,name);
     const args=name==="in-line-cli"?["--version","--format","json"]:["--build-info"];
     const {stdout,stderr}=await promisify(execFile)(path,args,{env,windowsHide:true,timeout:10000,maxBuffer:2*1024*1024,encoding:"utf8"});
     const result=JSON.parse(stdout);
@@ -51,9 +54,7 @@ export async function verifyDirectory(directory,{expectedCommit,companions,targe
     if(name==="in-line-cli")record.cliPhase=result.data.cliPhase;
     else if(result.data.offline!==true)throw new Error(`Offline flag missing: ${name}`);
     records.push(record);
-    if(nsisSource){
-      const source=await readFile(join(resolve(nsisSource),`${name}.exe`));
-      assertNsisPayload(source,bytes,name);
+    if(source){
       record.sourceSha256=createHash("sha256").update(source).digest("hex");
       record.sourceTransformation=name==="in-line"?"tauri_nsis_bundle_type_marker":"none";
     }
