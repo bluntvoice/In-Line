@@ -991,7 +991,6 @@ fn apply_ui_scale(app: &tauri::AppHandle, value: &str) -> Result<(), String> {
         return Ok(());
     }
     let old_factor = *previous;
-    *previous = factor;
     // Small fixed-size windows need enough space for their scaled controls.
     if let Some(window) = app.get_webview_window("floating") {
         let height = window
@@ -1015,12 +1014,28 @@ fn apply_ui_scale(app: &tauri::AppHandle, value: &str) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-fn get_ui_scale(app: tauri::AppHandle, db: State<Database>) -> Result<String, String> {
+fn get_ui_scale(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    db: State<Database>,
+) -> Result<String, String> {
     let value = db
         .settings()?
         .remove("ui_scale")
         .unwrap_or_else(|| "100".into());
     apply_ui_scale(&app, &value)?;
+    // Every WebView needs its own zoom, even when another window already
+    // applied this factor while this one was still initializing.
+    window
+        .set_zoom(
+            value
+                .parse::<f64>()
+                .ok()
+                .filter(|value| [100., 110., 120., 130., 140., 150.].contains(value))
+                .unwrap_or(100.)
+                / 100.,
+        )
+        .map_err(|_| "无法恢复当前窗口的界面大小，请重试")?;
     Ok(value)
 }
 #[tauri::command]

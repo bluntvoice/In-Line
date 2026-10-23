@@ -10,9 +10,10 @@ export const useUIFont=()=>useContext(FontContext);
 export default function UIFontProvider({children}:{children:ReactNode}){
   const [state,setState]=useState({selection:DEFAULT_UI_FONT_SELECTION,unavailable:false});
   useEffect(()=>{
-    let active=true,request=0;
-    const refresh=async()=>{
+    let active=true,request=0,timer:ReturnType<typeof setTimeout>|undefined;
+    const refresh=async(attempt=0)=>{
       const id=++request;
+      clearTimeout(timer);
       try{
         const selection=await api.getUIFontSelection();
         if(selection.effective===RECOMMENDED_UI_FONT_FAMILY)await loadRecommendedFont();
@@ -20,13 +21,18 @@ export default function UIFontProvider({children}:{children:ReactNode}){
         applyUIFont(selection);setState({selection,unavailable:false});
       }catch{
         if(!active||id!==request)return;
-        applyUIFont(DEFAULT_UI_FONT_SELECTION);setState({selection:DEFAULT_UI_FONT_SELECTION,unavailable:true});
+        // A temporary startup/read failure must not erase an already loaded
+        // font or write a default selection back over the saved preference.
+        setState(current=>({...current,unavailable:true}));
+        const delay=[150,500,1500][attempt];
+        if(delay!==undefined)timer=setTimeout(()=>{if(active&&id===request)void refresh(attempt+1);},delay);
       }
     };
     void refresh();
     // Same native broadcast already used for settings and backup restoration, in every route.
     const dispose=api.onDataChanged(()=>void refresh());
-    return()=>{active=false;dispose();};
+    const focus=()=>void refresh();window.addEventListener("focus",focus);
+    return()=>{active=false;clearTimeout(timer);dispose();window.removeEventListener("focus",focus);};
   },[]);
   return <FontContext.Provider value={state}>{children}</FontContext.Provider>;
 }

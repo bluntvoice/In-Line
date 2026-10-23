@@ -4851,6 +4851,9 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         let db = Database::open_at(root.join("inline.db")).unwrap();
         let parent = db.save_task(sample("v8升级前父任务")).unwrap();
+        db.set_setting("ui_font_family".into(), "in-line:sarasa-ui-sc".into())
+            .unwrap();
+        db.set_setting("ui_scale".into(), "130".into()).unwrap();
         let child = db
             .create_subtask(subtask_sample(parent.id, "v8子任务"))
             .unwrap();
@@ -4859,6 +4862,11 @@ mod tests {
         drop(db);
         let db = Database::open_root(root.clone()).unwrap();
         assert_eq!(db.with_conn(Database::schema_version).unwrap(), 14);
+        assert_eq!(
+            db.settings().unwrap().get("ui_font_family").unwrap(),
+            "in-line:sarasa-ui-sc"
+        );
+        assert_eq!(db.settings().unwrap().get("ui_scale").unwrap(), "130");
         let after = db.get_task(child.id).unwrap();
         assert_eq!(after.parent_task_id, Some(parent.id));
         assert_eq!(after.permanent_number, child.permanent_number);
@@ -4885,6 +4893,11 @@ mod tests {
         drop(db);
         let db = Database::open_root(root.clone()).unwrap();
         assert!(db.get_task(future.id).unwrap().is_scheduled);
+        assert_eq!(
+            db.settings().unwrap().get("ui_font_family").unwrap(),
+            "in-line:sarasa-ui-sc"
+        );
+        assert_eq!(db.settings().unwrap().get("ui_scale").unwrap(), "130");
         assert_eq!(db.list_work_events(child.id).unwrap().len(), 1);
         assert_eq!(
             db.list_backups()
