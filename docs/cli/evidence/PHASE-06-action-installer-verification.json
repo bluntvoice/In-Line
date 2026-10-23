@@ -1,0 +1,8 @@
+{
+  "Installer": "In Line_0.5.0_x64-setup.exe",
+  "Sha256": "ABA3ED844AA79CD0685729AFFB0060A2B714C0189A0688A4E536E676B94477E8",
+  "ExpectedCommit": "f39cdb5c3e72d49d99cec9e4d7f070642cfafac8",
+  "PayloadMatched": true,
+  "InstallerExecuted": false,
+  "Installed": false
+}

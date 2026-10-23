@@ -1,6 +1,6 @@
 # CLI Phase6：回归与交付准备
 
-日期：2026-10-22。状态：**开发与本地检查已获用户独立确认，执行提交推送与开发Action；实机安装与整体人工验收另安排。**
+更新：2026-10-23。状态：**开发与本地检查已获用户独立确认，代码已推送，开发Action及安装包独立下载核验通过；实机安装与整体人工验收另安排。**
 
 ## 1. 授权及基线
 
@@ -80,3 +80,19 @@ IPC在认证后、派发业务前检查peer build，与宿主的软件/API/schem
 当前版本仍为0.5.0开发构建，正式版记录保持v0.4.0。不创建SemVer预发布Tag、不修改正式Release/Latest/更新通道。阶段6确认提交后按所提交精确SHA运行开发Action，构建结束提供run链接、Artifact/安装包及SHA；不能把workflow已触发当作产物已生成。
 
 本地构建是dirty源码，exactCommit=null；保留元数据，不重新标为阶段6未来提交。阶段6开发与本地检查已独立确认；整体实机验收和安装仍待后续测试窗口，未完成部分保持待验收。原final-checks保留检查时历史状态；实际远端run、构建SHA、Artifact及解包结果另行记录，不能把旧本地包当作Action产物。
+
+## 6. 最终Action交付（2026-10-23）
+
+构建提交：`f39cdb5c3e72d49d99cec9e4d7f070642cfafac8`，分支`feat/scheduled-items`。阶段6开发提交e0c2087、换行修复9327d66、NSIS校验修复09f6144及探针顺序修复f39cdb5均已推送；后续交付记录只改文档，不改变此安装包的构建身份。
+
+- [CI 39885248586](https://github.com/bluntvoice/In-Line/actions/runs/39885248586)：success。
+- [开发Action 39885271373](https://github.com/bluntvoice/In-Line/actions/runs/39885271373)：success，完整测试、NSIS编译、16工具完整契约/匿名认证、三程序同一干净提交、暂存伴随文件及实际NSIS解包检查全部通过，Artifact已上传。
+- 最终测试：219项Rust、133项前端/22文件，0失败；TypeScript/Vite、fmt通过。新增包门禁测试由4项增至8项。
+- [Artifact 12472598944](https://github.com/bluntvoice/In-Line/actions/runs/39885271373/artifacts/12472598944)，名称`In-Line-dev-windows-x64-f39cdb5c3e72d49d99cec9e4d7f070642cfafac8`，至2026-11-06 09:58:26（北京时间）过期。包含NSIS及三份包校验报告。
+- 安装包4,326,442字节；SHA256 `ABA3ED844AA79CD0685729AFFB0060A2B714C0189A0688A4E536E676B94477E8`。
+- 已下载Artifact并核对归档SHA256 `3BE2378A599EF95A7EA3B4086FE1B4ED15F046C998E9A2232B505E3E03E2987C`，与GitHub digest一致。再次本地解出下载包中的三exe，逐一核对payload报告SHA，并运行显式离线探针，均为上述精确干净提交。
+- 本地交付：`release/CLI-Phase6-Action-20261023/In-Line_0.5.0-dev-f39cdb5_x64-setup.exe`，同目录`SHA256SUMS.txt`、三份云端报告、独立回读报告及delivery-receipt.json。这是Action产物，区别于10月22日的dirty本地包。
+
+持久证据：`evidence/PHASE-06-action-delivery.json`、`PHASE-06-action-final-summary.txt`、`PHASE-06-action-package-build.json`、`PHASE-06-action-installer-payload.json`、`PHASE-06-action-installer-verification.json`及`PHASE-06-action-independent-readback.json`。早期失败记录及本地dirty身份均原样保留。
+
+**未执行安装器、未升级本机程序、未操作生产业务数据，未创建Tag或Release。当前聊天MCP认证及原生GUI/旧数据/权限/回退等实机验收仍待另行测试窗口；不因Action成功自动标记通过。**

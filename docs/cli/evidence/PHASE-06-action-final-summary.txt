@@ -1,0 +1,22 @@
+2026-10-23T01:41:27.0413567Z  Test Files  22 passed (22)
+2026-10-23T01:41:27.0420462Z       Tests  133 passed (133)
+2026-10-23T01:47:22.3001831Z test result: ok. 189 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.44s
+2026-10-23T01:47:22.3255485Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-23T01:47:22.3406708Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-23T01:47:22.3573786Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-23T01:47:54.0692733Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.70s
+2026-10-23T01:47:58.0477355Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.95s
+2026-10-23T01:48:00.1498434Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.07s
+2026-10-23T01:48:01.5466031Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s
+2026-10-23T01:48:01.9342980Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+2026-10-23T01:48:02.5700032Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+2026-10-23T01:48:04.0790849Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+2026-10-23T01:58:22.0330988Z PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.
+2026-10-23T01:58:22.1581926Z PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.
+2026-10-23T01:58:22.2972338Z PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.
+2026-10-23T01:58:22.4151862Z PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.
+2026-10-23T01:58:23.0719575Z PASS: three offline package identities/version files and staged companions match; no store/IPC/PATH/installation operations.
+2026-10-23T01:58:24.1509851Z PASS: three offline package identities/version files and exact expected NSIS payload match; no store/IPC/PATH/installation operations.
+2026-10-23T01:58:24.5431109Z PASS: actual NSIS payload contains three matching binaries; installer not executed. SHA256 ABA3ED844AA79CD0685729AFFB0060A2B714C0189A0688A4E536E676B94477E8
+2026-10-23T01:58:27.9313191Z Artifact In-Line-dev-windows-x64-f39cdb5c3e72d49d99cec9e4d7f070642cfafac8 has been successfully uploaded! Final size is 4309424 bytes. Artifact ID is 12472598944
+2026-10-23T01:58:27.9320777Z Artifact download URL: https://github.com/bluntvoice/In-Line/actions/runs/39885271373/artifacts/12472598944
