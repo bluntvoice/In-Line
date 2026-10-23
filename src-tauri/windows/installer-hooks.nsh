@@ -1,3 +1,18 @@
+; Match the Windows Chinese UI font and give Tauri's 8u maintenance radios
+; enough height for full glyphs. Keep all original styles and other controls.
+SetFont "Microsoft YaHei UI" 9
+!include nsDialogs.nsh
+!define InLineNativeCreateRadioButton "${NSD_CreateRadioButton}"
+!undef NSD_CreateRadioButton
+!define NSD_CreateRadioButton "!insertmacro InLineCreateRadioButton"
+!macro InLineCreateRadioButton X Y WIDTH HEIGHT TEXT
+  !if "${HEIGHT}" == "8u"
+    ${InLineNativeCreateRadioButton} ${X} ${Y} ${WIDTH} 14u "${TEXT}"
+  !else
+    ${InLineNativeCreateRadioButton} ${X} ${Y} ${WIDTH} ${HEIGHT} "${TEXT}"
+  !endif
+!macroend
+
 ; Codex 等客户端可能仍在运行 stdio MCP，Windows 会锁定旧的伴随程序。
 ; 安装和卸载写文件前仅结束 In Line MCP，不关闭 Codex 或其他客户端。
 !macro StopInLineMcp
