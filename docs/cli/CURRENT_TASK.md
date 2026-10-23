@@ -1,6 +1,6 @@
-# CLI 当前任务：Phase6开发与本地检查已确认，提交推送并立即运行开发Action
+# CLI 当前任务：Phase6已提交，修复Action换行误报后重新构建
 
-2026-10-22。阶段5含季度趋势修复已验收并推送4194f2bc4571220587b01cc4aef35cfe3d8c984d，远端一致。用户已授权进入阶段6，并要求阶段6完成后通过Action生成测试安装包；实机安装另安排。
+2026-10-23。阶段6已按用户独立确认提交推送e0c20871bad92f3af4aa012bd76ffd35f63d223e，远端核对一致，开发Action已于10月22日触发。CI通过；开发Action测试/NSIS编译/MCP门禁通过，但干净提交检查失败、Artifact未上传。实机安装另安排。
 
 ## 权威与恢复
 
@@ -17,6 +17,6 @@
 
 ## 待执行及未验证
 
-本地无7-Zip，实际NSIS payload解包未执行，已接入Action；远端Action尚未触发。当前通过编译、release三exe/暂存及版本检查，不能说解包门禁或实机通过。真实安装/旧库保留/GUI授权审批/当前聊天MCP均待另行安排。没有Tag/Release或生产数据操作。
+首次开发run 39737746725，CI run 39737737625。已在隔离副本实际复现Tauri 2.11.4初始化把Cargo.toml写成LF；core.autocrlf=true导致git status误报修改且规范化diff为空。新增.gitattributes仅固定该文件LF，重跑相同初始化后状态干净；未放宽dirty/目标提交/hash检查。详情见evidence/PHASE-06-action-first.json。首次run未到实际NSIS解包步骤，不称为包内校验通过。真实安装/旧库保留/GUI授权审批/当前聊天MCP均待另行安排。没有Tag/Release或生产数据操作。
 
-下一步提交推送，再立即运行已授权dev-build.yml（精确远端提交），等待真实成功、获取Artifact与SHA。不要再次要求提交或测试包许可。不要把workflow触发当作成功，也不要把隔离实例当作当前聊天MCP验证。旧final-checks和本地包报告保留构建时状态，不回写为后续提交或Action结果；远端执行证据另记实际构建SHA。
+下一步提交推送换行修复，再立即运行已授权dev-build.yml（精确远端新提交），等待真实成功、获取Artifact与SHA。不要再次要求提交或测试包许可。不要把workflow触发当作成功，也不要把隔离实例当作当前聊天MCP验证。旧final-checks和本地包报告保留构建时状态，不回写为后续提交或Action结果；远端执行证据另记实际构建SHA。

@@ -58,6 +58,8 @@ IPC在认证后、派发业务前检查peer build，与宿主的软件/API/schem
 
 ## 4. 本机测试窗口清单（未执行）
 
+2026-10-23远端跟进：阶段6已提交推送e0c20871bad92f3af4aa012bd76ffd35f63d223e；CI run 39737737625通过。开发run 39737746725的完整测试、NSIS编译和MCP门禁通过，但目标干净提交检查失败，解包未执行、Artifact未上传。隔离副本实际复现Tauri初始化将Cargo.toml写为LF，core.autocrlf=true下git status误报修改；新增.gitattributes仅固定该文件LF后，同一初始化保持干净。保持原严格身份/hash检查，修复提交后重新运行开发构建。证据见evidence/PHASE-06-action-first.json。
+
 | 项目 | 验收方式 | 当前状态 |
 | --- | --- | --- |
 | 安装/升级与回退 | 保存并退出In-Line/CLI，在独立确认窗口备份原程序及数据；按包内SHA核对三exe，保留原路径与回退材料 | 待安排 |

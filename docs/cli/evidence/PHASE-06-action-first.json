@@ -1,0 +1,31 @@
+{
+  "recordedDate": "2026-10-23",
+  "builtCommit": "e0c20871bad92f3af4aa012bd76ffd35f63d223e",
+  "ci": { "runId": 39737737625, "conclusion": "success" },
+  "development": {
+    "runId": 39737746725,
+    "url": "https://github.com/bluntvoice/In-Line/actions/runs/39737746725",
+    "jobId": 119687343697,
+    "tests": "success",
+    "nsisCompilation": "success",
+    "mcpContractsAndAnonymousAuthorization": "success",
+    "packageIdentity": "failure: Package is not the requested clean commit",
+    "actualNsisPayloadExtraction": "not reached",
+    "artifactUpload": "skipped"
+  },
+  "isolatedReproduction": {
+    "tauriCliVersion": "2.11.4",
+    "source": "git archive of built commit, isolated temporary repository under ignored release directory",
+    "beforeFix": "Tauri build initialization rewrites Cargo.toml with LF; Git core.autocrlf=true reports M src-tauri/Cargo.toml while normalized diff is empty",
+    "fix": ".gitattributes: src-tauri/Cargo.toml text eol=lf",
+    "afterFix": "same actual Tauri build initialization leaves git status --porcelain empty",
+    "compilerWasInvoked": false,
+    "expectedRunnerExit": 1,
+    "runner": "intentionally missing build runner, to stop after actual Tauri manifest initialization",
+    "productSourcesOrBuildIdentityGateRelaxed": false
+  },
+  "installationPerformed": false,
+  "productionDataUsed": false,
+  "currentChatMcpVerified": false,
+  "next": "commit and push LF fix, rerun dev workflow for new exact SHA; wait for payload verification and Artifact"
+}
