@@ -1,0 +1,68 @@
+{
+  "offline": true,
+  "build": {
+    "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "records": [
+    {
+      "name": "in-line",
+      "bytes": 8843776,
+      "sha256": "4e02e844f63752042fd5916f747ab0233715e71d0f6f20ed3742c9ce529b0ff9",
+      "build": {
+        "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "sourceSha256": "aae678cb9000e47bfeabfa31244dfebb2bc23e8c0484f8ae298aab75afd91390",
+      "sourceTransformation": "tauri_nsis_bundle_type_marker"
+    },
+    {
+      "name": "in-line-mcp",
+      "bytes": 2367488,
+      "sha256": "ae15966ba6bb380602117a94ef6bcf146239b91de53369ce297e7e4c48eeb421",
+      "build": {
+        "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "sourceSha256": "ae15966ba6bb380602117a94ef6bcf146239b91de53369ce297e7e4c48eeb421",
+      "sourceTransformation": "none"
+    },
+    {
+      "name": "in-line-cli",
+      "bytes": 1046016,
+      "sha256": "2e05068dcfc03438291a3a3d8572764c8f40b05cbc217989cc97faa021ddc2f1",
+      "build": {
+        "baselineCommit": "4194f2bc4571220587b01cc4aef35cfe3d8c984d",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "cliPhase": 5,
+      "sourceSha256": "2e05068dcfc03438291a3a3d8572764c8f40b05cbc217989cc97faa021ddc2f1",
+      "sourceTransformation": "none"
+    }
+  ],
+  "companionsMatched": false,
+  "nsisPayloadMatched": true,
+  "pathModified": false,
+  "installed": false,
+  "currentMcpSessionVerified": false
+}

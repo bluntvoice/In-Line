@@ -20,7 +20,21 @@ export function assertBuildSet(records,expectedCommit){
   return identity;
 }
 
-export async function verifyDirectory(directory,{expectedCommit,companions,target,output}={}){
+// Tauri 2.11.4 patches this one marker before NSIS, then restores the source
+// executable. Reconstruct the exact expected payload; never mask byte ranges.
+export function assertNsisPayload(source,payload,name){
+  if(!["in-line","in-line-mcp","in-line-cli"].includes(name))throw new Error("Unknown package binary");
+  const expected=Buffer.from(source);
+  if(name==="in-line"){
+    const from=Buffer.from("__TAURI_BUNDLE_TYPE_VAR_UNK"),to=Buffer.from("__TAURI_BUNDLE_TYPE_VAR_NSS");
+    const offset=expected.indexOf(from);
+    if(offset<0 || expected.indexOf(from,offset+1)!==-1)throw new Error("Expected one Tauri bundle type marker");
+    to.copy(expected,offset);
+  }
+  if(!expected.equals(payload))throw new Error(`Installer payload differs from expected NSIS binary: ${name}`);
+}
+
+export async function verifyDirectory(directory,{expectedCommit,companions,target,nsisSource,output}={}){
   const env=Object.fromEntries(Object.entries(process.env).filter(([key])=>!/^IN_LINE_MCP_/i.test(key)));
   const records=[];
   for(const name of ["in-line","in-line-mcp","in-line-cli"]){
@@ -37,6 +51,12 @@ export async function verifyDirectory(directory,{expectedCommit,companions,targe
     if(name==="in-line-cli")record.cliPhase=result.data.cliPhase;
     else if(result.data.offline!==true)throw new Error(`Offline flag missing: ${name}`);
     records.push(record);
+    if(nsisSource){
+      const source=await readFile(join(resolve(nsisSource),`${name}.exe`));
+      assertNsisPayload(source,bytes,name);
+      record.sourceSha256=createHash("sha256").update(source).digest("hex");
+      record.sourceTransformation=name==="in-line"?"tauri_nsis_bundle_type_marker":"none";
+    }
     if(companions && name!=="in-line"){
       if(!target)throw new Error("Companion target required");
       const staged=await readFile(join(resolve(companions),`${name}-${target}.exe`));
@@ -53,7 +73,7 @@ export async function verifyDirectory(directory,{expectedCommit,companions,targe
   const lockVersion=/\[\[package\]\]\s*\r?\nname = "in-line"\s*\r?\nversion = "([^"]+)"/.exec(cargoLock)?.[1];
   if([packageJson.version,lock.version,lock.packages?.[""]?.version,config.version,cargoVersion,lockVersion].some(v=>v!==build.softwareVersion))throw new Error("Version files differ from binaries");
   if(!["binaries/in-line-mcp","binaries/in-line-cli"].every(s=>config.bundle.externalBin.includes(s)))throw new Error("Missing packaged companion configuration");
-  const report={offline:true,build,records,companionsMatched:!!companions,pathModified:false,installed:false,currentMcpSessionVerified:false};
+  const report={offline:true,build,records,companionsMatched:!!companions,nsisPayloadMatched:!!nsisSource,pathModified:false,installed:false,currentMcpSessionVerified:false};
   if(output){await mkdir(dirname(resolve(output)),{recursive:true});await writeFile(output,JSON.stringify(report,null,2)+"\n");}
   return report;
 }
@@ -62,7 +82,7 @@ if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).
   const args=process.argv.slice(2),directory=args.shift();if(!directory)throw new Error("Binary directory required");
   const options={};
   while(args.length){const key=args.shift(),value=args.shift();if(!value || options[key])throw new Error("Invalid or duplicate verifier option");options[key]=value;}
-  if(Object.keys(options).some(key=>!["--expected-commit","--companions","--target","--output"].includes(key)))throw new Error("Unknown verifier option");
-  const report=await verifyDirectory(directory,{expectedCommit:options["--expected-commit"],companions:options["--companions"],target:options["--target"],output:options["--output"]});
-  console.log(`PASS: three offline package identities/version files${report.companionsMatched?" and staged companions":""} match; no store/IPC/PATH/installation operations.`);
+  if(Object.keys(options).some(key=>!["--expected-commit","--companions","--target","--nsis-source","--output"].includes(key)))throw new Error("Unknown verifier option");
+  const report=await verifyDirectory(directory,{expectedCommit:options["--expected-commit"],companions:options["--companions"],target:options["--target"],nsisSource:options["--nsis-source"],output:options["--output"]});
+  console.log(`PASS: three offline package identities/version files${report.companionsMatched?" and staged companions":""}${report.nsisPayloadMatched?" and exact expected NSIS payload":""} match; no store/IPC/PATH/installation operations.`);
 }

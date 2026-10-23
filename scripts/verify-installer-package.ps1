@@ -17,11 +17,12 @@ New-Item -ItemType Directory -Path $inspection | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'NSIS payload extraction failed' }
 foreach ($name in @('in-line.exe','in-line-mcp.exe','in-line-cli.exe')) {
     $payload = Join-Path $inspection $name
-    $source = Join-Path $binaryRoot $name
     if (!(Test-Path -LiteralPath $payload -PathType Leaf)) { throw "Installer missing $name" }
-    if ((Get-FileHash -LiteralPath $payload -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash) { throw "Installer payload differs from verified binary: $name" }
 }
-$verify = @(Join-Path $PSScriptRoot 'verify-cli-package.mjs') + @($inspection,'--output',(Join-Path $repository 'release/installer-payload.json'))
+# Tauri patches the GUI bundle marker for NSIS and restores its source file.
+# The Node verifier reconstructs that exact payload and compares every byte;
+# companions allow no transformation. Original and payload hashes are recorded.
+$verify = @(Join-Path $PSScriptRoot 'verify-cli-package.mjs') + @($inspection,'--nsis-source',$binaryRoot,'--output',(Join-Path $repository 'release/installer-payload.json'))
 if ($ExpectedCommit) { $verify += @('--expected-commit',$ExpectedCommit) }
 & node @verify
 if ($LASTEXITCODE -ne 0) { throw 'Extracted payload identity validation failed' }

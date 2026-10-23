@@ -1,0 +1,24 @@
+
+7-Zip 26.04 (x64) : Copyright (c) 1999-2026 Igor Pavlov : 2026-10-05
+
+Scanning the drive for archives:
+1 file, 4315931 bytes (4215 KiB)
+
+Extracting archive: D:\codex-data\projects\inline\In-Line\release\CLI-Phase6-local-20261022\In-Line_0.5.0-dev-phase6_x64-setup.exe
+--
+Path = D:\codex-data\projects\inline\In-Line\release\CLI-Phase6-local-20261022\In-Line_0.5.0-dev-phase6_x64-setup.exe
+Type = Nsis
+Physical Size = 4315931
+Method = LZMA:23
+Solid = +
+Headers Size = 71154
+Embedded Stub Size = 52224
+SubType = NSIS-3 Unicode
+
+Everything is Ok
+
+Files: 3
+Size:       12257280
+Compressed: 4315931
+PASS: three offline package identities/version files and exact expected NSIS payload match; no store/IPC/PATH/installation operations.
+PASS: actual NSIS payload contains three matching binaries; installer not executed. SHA256 E7A926EF2C6F3C8D4474C8530FA067137629D04F4081BB604E0027A038E5BD2E

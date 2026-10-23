@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {assertBuildSet,verifyDirectory,type PackageRecord} from "../scripts/verify-cli-package.mjs";
+import {assertBuildSet,assertNsisPayload,verifyDirectory,type PackageRecord} from "../scripts/verify-cli-package.mjs";
 import {mkdtemp,writeFile,rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
@@ -31,5 +31,31 @@ describe("three executable package gate",()=>{
       await writeFile(join(root,"in-line.exe"),bytes);
       await expect(verifyDirectory(root)).rejects.toThrow("legacy binary not launched");
     }finally{await rm(root,{recursive:true,force:true});}
+  });
+  it("checks the exact NSIS GUI transformation without changing the source",()=>{
+    const source=Buffer.from("MZ-prefix-__TAURI_BUNDLE_TYPE_VAR_UNK-suffix");
+    const payload=Buffer.from("MZ-prefix-__TAURI_BUNDLE_TYPE_VAR_NSS-suffix");
+    const saved=Buffer.from(source);
+    expect(()=>assertNsisPayload(source,payload,"in-line")).not.toThrow();
+    expect(source.equals(saved)).toBe(true);
+    expect(()=>assertNsisPayload(source,source,"in-line")).toThrow();
+    for(const offset of [0,source.length-1]){
+      const changed=Buffer.from(payload);changed[offset]^=1;
+      expect(()=>assertNsisPayload(source,changed,"in-line")).toThrow();
+    }
+  });
+  it("refuses missing or ambiguous GUI markers and unknown binaries",()=>{
+    for(const source of [Buffer.from("missing"),Buffer.from("__TAURI_BUNDLE_TYPE_VAR_UNK__TAURI_BUNDLE_TYPE_VAR_UNK")]){
+      expect(()=>assertNsisPayload(source,source,"in-line")).toThrow();
+    }
+    expect(()=>assertNsisPayload(Buffer.alloc(8),Buffer.alloc(8),"other")).toThrow();
+  });
+  it("requires exact companion bytes including timestamps and all metadata",()=>{
+    const source=Buffer.from("MZ-companion-__TAURI_BUNDLE_TYPE_VAR_UNK");
+    for(const name of ["in-line-mcp","in-line-cli"]){
+      expect(()=>assertNsisPayload(source,Buffer.from(source),name)).not.toThrow();
+      const changed=Buffer.from(source);changed[3]^=1;
+      expect(()=>assertNsisPayload(source,changed,name)).toThrow();
+    }
   });
 });

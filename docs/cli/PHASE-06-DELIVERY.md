@@ -60,6 +60,10 @@ IPC在认证后、派发业务前检查peer build，与宿主的软件/API/schem
 
 2026-10-23远端跟进：阶段6已提交推送e0c20871bad92f3af4aa012bd76ffd35f63d223e；CI run 39737737625通过。开发run 39737746725的完整测试、NSIS编译和MCP门禁通过，但目标干净提交检查失败，解包未执行、Artifact未上传。隔离副本实际复现Tauri初始化将Cargo.toml写为LF，core.autocrlf=true下git status误报修改；新增.gitattributes仅固定该文件LF后，同一初始化保持干净。保持原严格身份/hash检查，修复提交后重新运行开发构建。证据见evidence/PHASE-06-action-first.json。
 
+第二次跟进：换行修复9327d66的CI 39882628623通过，开发run 39882659422的完整测试、NSIS编译、干净提交/暂存核验通过。实际解出三exe后GUI比较失败：Tauri会临时把GUI中唯一`__TAURI_BUNDLE_TYPE_VAR_UNK`写为`__TAURI_BUNDLE_TYPE_VAR_NSS`后入包，再还原release源文件，故两者hash本来不同。[固定版本源码](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle.rs)与本地实际包复现一致。现在从源字节重建唯一固定变换后的预期完整文件再严格比较；不忽略任意字节区间，两个伴随程序仍完全相同，报告分别保留source/payload SHA。新增3项回归覆盖额外篡改、缺失/重复标记、伴随程序变化；本地包测试7项、TS/Vite和脚本语法通过。
+
+10月23日已从官方7-Zip 26.04 MSI只提取解包工具到ignored release，核对官方asset SHA256；未安装工具、未执行MSI或In-Line安装器。对此前保留的本地NSIS执行真实解包与新严格预期字节/离线身份校验，结果通过，见evidence/PHASE-06-local-nsis-payload-check.txt及PHASE-06-local-nsis-payload.json。该旧包仍为4194f2b+dirty，不能改标为新提交。原10月22日“未本地解包”记录保留其历史状态。远端Artifact仍须修复提交后通过新Action才能交付。
+
 | 项目 | 验收方式 | 当前状态 |
 | --- | --- | --- |
 | 安装/升级与回退 | 保存并退出In-Line/CLI，在独立确认窗口备份原程序及数据；按包内SHA核对三exe，保留原路径与回退材料 | 待安排 |

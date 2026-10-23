@@ -1,4 +1,4 @@
-# CLI 当前任务：Phase6已提交，修复Action换行误报后重新构建
+# CLI 当前任务：修复NSIS主程序类型标记校验，重新运行开发Action
 
 2026-10-23。阶段6已按用户独立确认提交推送e0c20871bad92f3af4aa012bd76ffd35f63d223e，远端核对一致，开发Action已于10月22日触发。CI通过；开发Action测试/NSIS编译/MCP门禁通过，但干净提交检查失败、Artifact未上传。实机安装另安排。
 
@@ -18,5 +18,7 @@
 ## 待执行及未验证
 
 首次开发run 39737746725，CI run 39737737625。已在隔离副本实际复现Tauri 2.11.4初始化把Cargo.toml写成LF；core.autocrlf=true导致git status误报修改且规范化diff为空。新增.gitattributes仅固定该文件LF，重跑相同初始化后状态干净；未放宽dirty/目标提交/hash检查。详情见evidence/PHASE-06-action-first.json。首次run未到实际NSIS解包步骤，不称为包内校验通过。真实安装/旧库保留/GUI授权审批/当前聊天MCP均待另行安排。没有Tag/Release或生产数据操作。
+
+9327d66414eca29b1430d48c4b9e07f50de6a5cd已推送，CI 39882628623通过；开发run 39882659422测试/NSIS编译/干净提交及暂存身份通过，实际解出三exe后GUI字节比较失败。定位Tauri会把GUI中唯一UNK bundle marker改为NSS再入包，结束后还原源exe。校验器现从源文件按同一固定变换重建完整预期字节再严格比较；其他字节及两个伴随程序均不能变，source/payload SHA分别记录。新增3项回归测试后包测试共7项通过、TS/Vite及脚本语法通过。10月23日从官方7-Zip MSI仅提取工具到ignored release（未安装、未执行MSI），官方asset digest核对；实际本地旧NSIS解包和修复后校验已通过，仍保留4194f2b+dirty身份。旧“本地未解包”记录是10月22日历史状态，不覆盖。准备提交此次校验修复并对新SHA重新构建。
 
 下一步提交推送换行修复，再立即运行已授权dev-build.yml（精确远端新提交），等待真实成功、获取Artifact与SHA。不要再次要求提交或测试包许可。不要把workflow触发当作成功，也不要把隔离实例当作当前聊天MCP验证。旧final-checks和本地包报告保留构建时状态，不回写为后续提交或Action结果；远端执行证据另记实际构建SHA。
