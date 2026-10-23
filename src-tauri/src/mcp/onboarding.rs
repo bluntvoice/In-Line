@@ -264,6 +264,9 @@ pub fn prepare_at(
     args: PrepareArgs,
     now: i64,
 ) -> Result<Receipt, McpError> {
+    if security.private_root() != root {
+        return Err(McpError::new("security_unavailable"));
+    }
     if args.client != "codex" {
         return Err(McpError::new("onboarding_unavailable"));
     }
@@ -302,6 +305,9 @@ pub fn rotate_at(
     id: &str,
     now: i64,
 ) -> Result<Receipt, McpError> {
+    if security.private_root() != root {
+        return Err(McpError::new("security_unavailable"));
+    }
     if !security
         .view()?
         .clients
@@ -431,6 +437,28 @@ pub(crate) mod tests {
         }
     }
     #[test]
+    fn mismatched_security_root_is_rejected_before_grant_or_ticket() {
+        let f = Fixture::new();
+        let wrong = f.root.join("wrong-security");
+        let result = prepare_at(
+            &f.security,
+            &wrong,
+            &f.command,
+            PrepareArgs {
+                client: "codex".into(),
+                permissions: Permissions::default(),
+                scope: Scope::default(),
+            },
+            1000,
+        );
+        assert_eq!(result.err().unwrap().code, "security_unavailable");
+        assert!(Security::read_at(&f.security_root())
+            .unwrap()
+            .clients
+            .is_empty());
+        assert!(!wrong.exists());
+    }
+    #[test]
     fn receipt_has_no_long_credential_and_ticket_is_encrypted_private_and_bound() {
         let f = Fixture::new();
         let receipt = f.prepare();
@@ -442,6 +470,12 @@ pub(crate) mod tests {
         assert!(receipt.prompt.contains("--import-client"));
         assert!(receipt.prompt.contains("currentSessionVerified"));
         assert_eq!(receipt.expires_at, 1600);
+        let persisted = Security::read_at(&f.security_root()).unwrap();
+        let auth = persisted.authorize(&ticket.credentials).unwrap();
+        assert!(auth.permissions.regular_read);
+        assert!(persisted.clients.iter().any(
+            |client| client.id == receipt.client_id && client.kind.as_deref() == Some("codex")
+        ));
         assert!(f
             .security
             .view()

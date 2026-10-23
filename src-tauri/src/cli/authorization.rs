@@ -236,6 +236,9 @@ pub(crate) fn prepare_at(
     args: PrepareArgs,
     now: i64,
 ) -> Result<Receipt, McpError> {
+    if security.private_root() != root {
+        return Err(McpError::new("security_unavailable"));
+    }
     if !is_cli(&args.client) {
         return Err(McpError::new("onboarding_unavailable"));
     }
@@ -278,6 +281,9 @@ pub(crate) fn rotate_at(
     id: &str,
     now: i64,
 ) -> Result<Receipt, McpError> {
+    if security.private_root() != root {
+        return Err(McpError::new("security_unavailable"));
+    }
     let view = security.view()?;
     let client = view
         .clients

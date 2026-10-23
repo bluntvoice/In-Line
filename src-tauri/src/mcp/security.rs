@@ -240,8 +240,10 @@ impl Security {
             .store
             .lock()
             .map_err(|_| McpError::new("security_unavailable"))?;
-        if stored.revision != live.revision {
-            return Err(McpError::new("authorization_changed"));
+        if serde_json::to_vec(&stored).map_err(|_| McpError::new("security_unavailable"))?
+            != serde_json::to_vec(&*live).map_err(|_| McpError::new("security_unavailable"))?
+        {
+            return Err(McpError::new("authorization_storage_mismatch"));
         }
         Ok(())
     }
@@ -314,6 +316,14 @@ impl Security {
                 .map_err(|_| McpError::new("security_unavailable"))?;
             drop(file);
             platform::atomic_replace(&temp, &self.path)?;
+            // Never return an authorization/receipt until its complete store is
+            // independently readable from the file used by client importers.
+            let persisted = Self::read_at(self.private_root())?;
+            if serde_json::to_vec(&persisted).map_err(|_| McpError::new("security_unavailable"))?
+                != serde_json::to_vec(store).map_err(|_| McpError::new("security_unavailable"))?
+            {
+                return Err(McpError::new("security_unavailable"));
+            }
             Ok(())
         })();
         if result.is_err() {
@@ -329,6 +339,13 @@ impl Security {
             .store
             .lock()
             .map_err(|_| McpError::new("security_unavailable"))?;
+        // Never replace newer/replaced disk grants with a stale GUI snapshot.
+        let persisted = Self::read_at(self.private_root())?;
+        if serde_json::to_vec(&persisted).map_err(|_| McpError::new("security_unavailable"))?
+            != serde_json::to_vec(&*guard).map_err(|_| McpError::new("security_unavailable"))?
+        {
+            return Err(McpError::new("authorization_storage_mismatch"));
+        }
         let mut candidate = guard.clone();
         let result = mutate(&mut candidate)?;
         candidate.revision = candidate
@@ -340,6 +357,7 @@ impl Security {
         Ok(result)
     }
     pub fn view(&self) -> Result<SecurityView, McpError> {
+        self.verify_private_store()?;
         Ok(self
             .store
             .lock()
@@ -645,6 +663,39 @@ mod tests {
         );
         assert!(Security::read_at(&root).is_err());
         let _ = creds;
+    }
+    #[test]
+    fn view_rejects_disk_memory_divergence_even_at_same_revision() {
+        let root = root();
+        let security = Security::open_at(root.clone()).unwrap();
+        let saved = std::fs::read(root.join("authorization.dpapi")).unwrap();
+        security.grant(grant()).unwrap();
+        // Simulate a stale file being restored while the GUI still has a client.
+        std::fs::write(root.join("authorization.dpapi"), &saved).unwrap();
+        assert_eq!(
+            security.view().err().unwrap().code,
+            "authorization_storage_mismatch"
+        );
+        assert_eq!(
+            security.pause(true).err().unwrap().code,
+            "authorization_storage_mismatch"
+        );
+        assert_eq!(
+            std::fs::read(root.join("authorization.dpapi")).unwrap(),
+            saved
+        );
+        let mut old = Security::read_at(&root).unwrap();
+        old.revision = security.store.lock().unwrap().revision;
+        std::fs::write(
+            root.join("authorization.dpapi"),
+            platform::seal(&serde_json::to_vec(&old).unwrap(), false).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            security.view().err().unwrap().code,
+            "authorization_storage_mismatch"
+        );
+        assert_eq!(Security::read_at(&root).unwrap().clients.len(), 0);
     }
     #[test]
     fn persistence_failure_does_not_claim_revocation_or_change_memory() {

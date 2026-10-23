@@ -192,7 +192,7 @@ fn authorize(root: &Path, ticket: &Ticket) -> Result<Authorization, McpError> {
     if !store.clients.iter().any(|client| {
         client.id == ticket.credentials.client_id && client.kind.as_deref() == Some("codex")
     }) {
-        return Err(McpError::new("import_invalid"));
+        return Err(McpError::new("import_authorization_missing"));
     }
     store.authorize(&ticket.credentials)
 }
@@ -548,6 +548,36 @@ mod tests {
         )
         .unwrap();
         assert_eq!(backup.original.unwrap().into_bytes(), original);
+    }
+    #[tokio::test]
+    async fn missing_persisted_grant_does_not_consume_ticket_or_touch_configuration() {
+        let f = Fixture::new();
+        let r = f.prepare();
+        let (_, dir) = onboarding::load_ticket(&f.security_root(), &r.package_id, 1000).unwrap();
+        f.security
+            .change(|store| {
+                store.clients.clear();
+                Ok(())
+            })
+            .unwrap();
+        let path = f.home.join("config.toml");
+        let original = b"# preserved\nmodel='keep'\n";
+        onboarding::write_private(&path, original).unwrap();
+        let error = import_at(&f.security_root(), &f.home, &r.package_id, 1000)
+            .await
+            .err()
+            .unwrap();
+        assert_eq!(error.code, "import_authorization_missing");
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+        assert!(dir.join("ticket.dpapi").exists());
+        for name in ["attempt.lock", "result.json", "config-backup.dpapi"] {
+            assert!(!dir.join(name).exists());
+        }
+        assert!(!f.home.join(".in-line-import.lock").exists());
+        assert!(Security::read_at(&f.security_root())
+            .unwrap()
+            .clients
+            .is_empty());
     }
     #[tokio::test]
     async fn revoked_rotated_and_paused_credentials_do_not_write_configuration() {

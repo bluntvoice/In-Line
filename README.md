@@ -9,6 +9,8 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 ## v0.5.0 开发构建
 
+最新本地调整：MCP / CLI 改为点击“连接 AI”后在弹窗选择客户端、权限和范围，再授权并复制提示词；修复安装维护页中文截断及字体字号启动恢复。授权落盘异常的已知证据、备份规则和待实机验证项见[修复记录](docs/mcp/acceptance/POST-PHASE6-ONBOARDING-AND-UPGRADE.md)。当前会话连接未验证通过，本次调整尚未发布。
+
 CLI Phase5（含季度趋势日期修复）已验收并推送4194f2b；Phase6补齐GUI/MCP/CLI三程序打包、离线构建身份、混版拒绝和CI包内容校验。开发与自动检查状态见[阶段6报告](docs/cli/PHASE-06-DELIVERY.md)，操作见[用户指南](docs/cli/USER-GUIDE.md)、[Agent指南](docs/cli/AGENT-GUIDE.md)。测试安装包待阶段6确认提交后由开发Action生成；实机安装另安排。
 
 - 修复季度工作量趋势标签重复显示“周一”：周视图显示实际起止日期，首尾周裁至所选范围；图表导出同步，日视图和统计口径保持不变。

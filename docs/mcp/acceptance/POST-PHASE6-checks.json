@@ -1,0 +1,127 @@
+{
+  "date": "2026-10-23",
+  "branch": "feat/scheduled-items",
+  "baselineCommit": "7c61d761b4f6861acae261341b774b6838eccfcd",
+  "uncommittedLocalBuild": true,
+  "rust": {
+    "failed": 0,
+    "filtered": 0,
+    "passed": 223
+  },
+  "frontend": {
+    "failed": 0,
+    "files": 22,
+    "passed": 133
+  },
+  "ui": {
+    "passed": true,
+    "productionDataTouched": false,
+    "checks": [
+      "startup preference retry",
+      "preserve loaded font and scale on transient failure",
+      "focus recovery",
+      "stale response rejected",
+      "real verified Sarasa weights and font-load failure retry",
+      "unmount cancels retries",
+      "dialog defaults and unavailable clients",
+      "explicit global/resume/sensitive confirmations",
+      "CLI independent scope",
+      "clipboard retry without duplicate grant",
+      "receipt retained on reopen",
+      "narrow layout"
+    ]
+  },
+  "toolContract": {
+    "tools": 16,
+    "completeSchemasAndAnnotationsMatched": true
+  },
+  "installer": {
+    "Installer": "In Line_0.5.0_x64-setup.exe",
+    "Sha256": "DAD7A3542B9D130B65FAF02EA7F23AB5D63F1CC77D018417F3A0E1740EF66CFC",
+    "ExpectedCommit": "",
+    "PayloadMatched": true,
+    "InstallerExecuted": false,
+    "Installed": false
+  },
+  "buildIdentity": {
+    "baselineCommit": "7c61d761b4f6861acae261341b774b6838eccfcd",
+    "commitVerification": "unverified_local_source",
+    "databaseSchemaVersion": 14,
+    "exactCommit": null,
+    "mcpVersion": 1,
+    "softwareVersion": "0.5.0",
+    "sourceDirty": true
+  },
+  "payload": [
+    {
+      "name": "in-line",
+      "bytes": 8856576,
+      "sha256": "f3fe5af9ef3908c51fe72e0916729def652975c163595ce76fc9f50f039c5cf6",
+      "build": {
+        "baselineCommit": "7c61d761b4f6861acae261341b774b6838eccfcd",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "sourceSha256": "a92fe3179d9920bf0e5718d4c70a699e6954291afc20040f8c8c3b6c5e52b0b2",
+      "sourceTransformation": "tauri_nsis_bundle_type_marker"
+    },
+    {
+      "name": "in-line-mcp",
+      "bytes": 2368512,
+      "sha256": "dd934e7f483d60a97e812406f1dfd2228f6e12fc491f1a0697c3615214e8faa0",
+      "build": {
+        "baselineCommit": "7c61d761b4f6861acae261341b774b6838eccfcd",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "sourceSha256": "dd934e7f483d60a97e812406f1dfd2228f6e12fc491f1a0697c3615214e8faa0",
+      "sourceTransformation": "none"
+    },
+    {
+      "name": "in-line-cli",
+      "bytes": 1046016,
+      "sha256": "da333f9f00ea3b4359772ec10cb3998ebaa2d87f44d00b5e17868380acc44ffc",
+      "build": {
+        "baselineCommit": "7c61d761b4f6861acae261341b774b6838eccfcd",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "cliPhase": 5,
+      "sourceSha256": "da333f9f00ea3b4359772ec10cb3998ebaa2d87f44d00b5e17868380acc44ffc",
+      "sourceTransformation": "none"
+    }
+  ],
+  "memoryGuard": {
+    "rust": {
+      "ExitCode": 0,
+      "GuardStopped": false,
+      "MinimumHeadroomGiB": 13.09,
+      "MaximumCommitPercent": 69.0
+    },
+    "nsis": {
+      "ExitCode": 0,
+      "GuardStopped": false,
+      "MinimumHeadroomGiB": 12.83,
+      "MaximumCommitPercent": 70.0
+    }
+  },
+  "nativeAcceptance": {
+    "installed": false,
+    "actionDispatched": false,
+    "currentMcpSessionVerified": false,
+    "tagCreated": false,
+    "authorizationRootCauseResolved": false
+  }
+}

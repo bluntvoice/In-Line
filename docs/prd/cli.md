@@ -1,5 +1,7 @@
 # In-Line CLI 与共享应用服务实施约束
 
+2026-10-23 接入体验补充：CLI 与 MCP 使用统一“连接 AI”弹窗选择客户端、权限和范围；无需用户预先展开分散设置。CLI 继续独立授权、独立验证；全局权限及暂停影响必须在窗口内明确确认。提示词不含长期凭证，复制失败保留同一回执并重试复制。开发修改不等同于当前会话验证通过，见[修复记录](../mcp/acceptance/POST-PHASE6-ONBOARDING-AND-UPGRADE.md)。
+
 2026-10-16，用户确认CLI Phase0方案，D1–D4全部选A；随后指示“继续”，进入CLI Phase1。权威调查、映射和阶段验收标准见[已确认架构](../cli/PHASE-00-ARCHITECTURE.md)，完整命令设计见[命令草案](../cli/COMMANDS-DRAFT.md)。
 
 - 保留单Rust package，增量提取共享应用服务；独立`in-line-cli.exe`通过现有受保护本机IPC调用主程序，不直接写数据库、不通过MCP子进程转发业务。

@@ -13,6 +13,20 @@ fn args(client: &str) -> PrepareArgs {
     }
 }
 #[test]
+fn gui_rejects_cli_ticket_root_different_from_authorization_store() {
+    let f = Fixture::new();
+    let wrong = f.root.join("different-security");
+    let error = prepare_at(&f.security, &wrong, &exe(&f), args("codex-cli"), 1000)
+        .err()
+        .unwrap();
+    assert_eq!(error.code, "security_unavailable");
+    assert!(Security::read_at(&f.security_root())
+        .unwrap()
+        .clients
+        .is_empty());
+    assert!(!wrong.exists());
+}
+#[test]
 fn gui_issues_distinct_cli_profiles_without_credentials_in_prompt_or_mcp_reuse() {
     let f = Fixture::new();
     let exe = exe(&f);

@@ -1,5 +1,7 @@
 # In Line CLI 使用指南
 
+最新本地开发界面：在软件设置点击“AI 接入（MCP / CLI）→ 连接 AI”，弹窗内选择 Codex（CLI）或 PowerShell（CLI）、必要权限及可选范围，再授权复制提示词。需要开启的全局权限或解除暂停会在同一窗口明确确认，无需先到分散设置操作。MCP 与 CLI 独立授权和验证；尚未安装本轮修改，见[修复记录](../mcp/acceptance/POST-PHASE6-ONBOARDING-AND-UPGRADE.md)。
+
 适用：v0.5.0开发构建。CLI与MCP分别授权；以下命令示例需安装包含CLI的新测试包后使用。开发包、安装成功、真实连接和人工验收分别记录。
 
 ## 1. 安装及首次接入
