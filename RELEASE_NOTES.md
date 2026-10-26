@@ -1,5 +1,7 @@
 # v0.5.0 开发构建说明（未正式发布）
 
+本轮开发 Artifact 的构建状态、Windows 短文件名别名补丁及下载信息见[Action 交付记录](docs/mcp/acceptance/MSIX-STORAGE-ACTION-DELIVERY.md)。不创建 Tag/Release，不将构建成功等同于安装、迁移或当前会话接入验收。
+
 2026-10-26 已开发跨环境安全存储兼容修复：统一到用户 Profile 下的私有目录，拒绝读取重定向副本；旧存储通过软件内明确确认后迁移，原文件、授权及撤销/暂停状态保留，不自动合并。开发验证与未完成的实机门禁见[交付报告](docs/mcp/acceptance/MSIX-STORAGE-COMPATIBILITY.md)。本机迁移和安装尚未执行，当前会话认证未通过；现场证据见[根因报告](docs/mcp/acceptance/AUTHORIZATION-STORAGE-MSIX-ROOT-CAUSE.md)。
 
 新增只读授权存储诊断，便于排查界面有授权而导入器缺失的差异；输出本机路径及脱敏摘要，明确区分诊断与配置/当前会话验证。诊断版本于 2026-10-26 获授权安装；后续新授权对照确认软件已保存三条记录，Codex 却读取私有旧副本。下文较早的 Action 测试包不含该诊断及兼容修复，详见[诊断记录](docs/mcp/acceptance/AUTHORIZATION-STORAGE-DIAGNOSTIC.md)。

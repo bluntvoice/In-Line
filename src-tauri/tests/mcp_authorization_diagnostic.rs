@@ -181,3 +181,48 @@ fn appdata_canary_guard_agrees_with_the_actual_physical_file() {
         .starts_with("inline-location-test-"));
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn windows_short_path_alias_is_not_mistaken_for_a_redirected_store() {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::Storage::FileSystem::GetShortPathNameW;
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let root = dirs::home_dir().unwrap().join(format!(
+        ".in-line-storage-alias-test-{}",
+        platform::random_secret().unwrap()
+    ));
+    let cleanup = Cleanup(root.clone());
+    let security = Security::open_at(root.clone()).unwrap();
+    let mut buffer = vec![0u16; 32768];
+    let length = unsafe {
+        GetShortPathNameW(
+            platform::wide(root.as_os_str()).as_ptr(),
+            buffer.as_mut_ptr(),
+            buffer.len() as u32,
+        )
+    };
+    assert!(length > 0 && (length as usize) < buffer.len());
+    let alias = std::path::PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length as usize]));
+    let original = root.join("authorization.dpapi");
+    let through_alias = alias.join("authorization.dpapi");
+    assert_eq!(
+        platform::file_location(&original).unwrap().1,
+        platform::file_location(&through_alias).unwrap().1
+    );
+    println!("synthetic_short_path_alias_exercised={}", alias != root);
+    platform::require_unredirected(&through_alias).unwrap();
+    Security::read_at(&alias).unwrap();
+    let output = run(&alias, None);
+    assert!(output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["data"]["storage"]["redirected"], false);
+    assert_eq!(report["data"]["disk"]["clientCount"], 0);
+    assert_eq!(report["data"]["configurationVerified"], false);
+    assert_eq!(report["data"]["currentSessionVerified"], false);
+    drop((security, cleanup));
+}

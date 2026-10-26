@@ -376,9 +376,11 @@ mod tests {
             Path::new(r"\\?\UNC\SERVER\users\FILE")
         ));
         assert!(!platform::same_location_name(
-            Path::new(r"C:\Users\KB\AppData\Local\in-line-mcp-security\authorization.dpapi"),
             Path::new(
-                r"\\?\C:\Users\KB\AppData\Local\Packages\OpenAI.Codex_test\LocalCache\Local\in-line-mcp-security\authorization.dpapi"
+                r"C:\synthetic-profile\AppData\Local\in-line-mcp-security\authorization.dpapi"
+            ),
+            Path::new(
+                r"\\?\C:\synthetic-profile\AppData\Local\Packages\OpenAI.Codex_test\LocalCache\Local\in-line-mcp-security\authorization.dpapi"
             )
         ));
         let source = profile.join("AppData/native");

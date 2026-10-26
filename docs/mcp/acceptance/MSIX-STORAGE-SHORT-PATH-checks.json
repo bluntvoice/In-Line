@@ -1,0 +1,65 @@
+{
+  "Date": "2026-10-26",
+  "Status": "local_short_path_fix_passed_cloud_rebuild_pending",
+  "PriorCodeCommit": "685a8d872a084f112bec5fe8f323e01e856d3138",
+  "FirstCiRun": 40287775269,
+  "FirstBuildRun": 40287792461,
+  "FirstBuildResult": "failure",
+  "FirstLibPassed": 126,
+  "FirstLibFailed": 75,
+  "FirstFailureCode": "storage_redirected",
+  "RegressionBeforeFix": {
+    "ActualShortAliasExercised": true,
+    "SamePhysicalFileIdentity": true,
+    "Tests": 1,
+    "Failed": 1
+  },
+  "RustAfterFix": {
+    "Runtime": {
+      "Start": "2026-10-26T15:55:40.4133681+08:00",
+      "End": "2026-10-26T15:58:26.3714942+08:00",
+      "ExitCode": 0,
+      "GuardStopped": false,
+      "TargetDirectory": "D:\\codex-data\\build-targets\\in-line-cli-phase1-test-20261016",
+      "BuildJobs": 1,
+      "TestDebugInfo": 0,
+      "DevDebugInfo": 0,
+      "TestThreads": 1,
+      "CargoArguments": [
+        "test",
+        "--locked",
+        "--manifest-path",
+        "src-tauri/Cargo.toml",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "TestsFiltered": false,
+      "MinimumHeadroomGiB": 12.11,
+      "MaximumCommitPercent": 71.0,
+      "AbortHeadroomGiB": 4,
+      "AbortCommitPercent": 90,
+      "ConsecutiveSamplesBeforeAbort": 2
+    },
+    "Passed": 236,
+    "Failed": 0
+  },
+  "DebugContract": {
+    "Tools": 16,
+    "Passed": true
+  },
+  "LogicalNameMetadataProbe": {
+    "MetadataOnly": true,
+    "RequestedLogicalFile": "C:\\Users\\KB\\AppData\\Local\\in-line-mcp-security\\authorization.dpapi",
+    "ExpandedLogicalFile": "\\\\?\\C:\\Users\\KB\\AppData\\Local\\in-line-mcp-security\\authorization.dpapi",
+    "PreviouslyObservedPhysicalFile": "\\\\?\\C:\\Users\\KB\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\in-line-mcp-security\\authorization.dpapi",
+    "PhysicalTargetStillDifferent": true,
+    "CredentialBytesRead": false,
+    "ProductionFilesWritten": false
+  },
+  "ProductionInstallExecuted": false,
+  "ProductionMigrationExecuted": false,
+  "OldImportReplayed": false,
+  "ConfigurationVerified": false,
+  "CurrentSessionVerified": false
+}

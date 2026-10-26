@@ -58,9 +58,10 @@ mod win {
             UNPROTECTED_DACL_SECURITY_INFORMATION,
         },
         Storage::FileSystem::{
-            CreateFileW, GetFileInformationByHandle, GetFinalPathNameByHandleW, MoveFileExW,
-            BY_HANDLE_FILE_INFORMATION, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
-            FILE_SHARE_WRITE, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, OPEN_EXISTING,
+            CreateFileW, GetFileInformationByHandle, GetFinalPathNameByHandleW, GetLongPathNameW,
+            MoveFileExW, BY_HANDLE_FILE_INFORMATION, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE,
+            FILE_SHARE_READ, FILE_SHARE_WRITE, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+            OPEN_EXISTING,
         },
         System::{
             Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ},
@@ -124,7 +125,26 @@ mod win {
                 text.strip_prefix(r"\\?\").unwrap_or(&text).to_owned()
             }
         };
-        normalize(a) == normalize(b)
+        if normalize(a) == normalize(b) {
+            return true;
+        }
+        // Windows TEMP and user directories may use an 8.3 alias. Expand the
+        // logical name, rather than resolving a handle (which would hide MSIX
+        // redirection by returning the private target for both paths).
+        let expand = |path: &Path| -> Option<PathBuf> {
+            use std::os::windows::ffi::OsStringExt;
+            let name = path_wide(path).ok()?;
+            let mut buffer = vec![0u16; 32768];
+            let length = unsafe {
+                GetLongPathNameW(name.as_ptr(), buffer.as_mut_ptr(), buffer.len() as u32)
+            } as usize;
+            (length > 0 && length < buffer.len())
+                .then(|| PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length])))
+        };
+        let expanded_a = expand(a);
+        let expanded_b = expand(b);
+        normalize(expanded_a.as_deref().unwrap_or(a))
+            == normalize(expanded_b.as_deref().unwrap_or(b))
     }
     pub fn require_unredirected(path: &Path) -> Result<(), McpError> {
         if !same_location_name(path, &file_location(path)?.0) {
