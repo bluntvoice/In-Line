@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-26",
+  "installerExitCode": 0,
+  "installed": true,
+  "installedBinaries": [
+    {
+      "name": "in-line",
+      "sha256": "25137f3c3fe340fcbd5452c4991f9dd8c367e0109070fe99b58e861c27bc79b8",
+      "matches": true
+    },
+    {
+      "name": "in-line-mcp",
+      "sha256": "b1a45fe6b602467500e3e489880af618f8cb5e8ba44a2f3536ec68161cb3f0e8",
+      "matches": true
+    },
+    {
+      "name": "in-line-cli",
+      "sha256": "7255fa63dc87dad2a71c9905a866b401ba2c3a3bda6ebe49a4396fd4ae7c1e18",
+      "matches": true
+    }
+  ],
+  "rollbackDirectory": "D:\\codex-data\\private-test-backups\\in-line-auth-diagnostic-20261023-1618\\program",
+  "tableCount": 23,
+  "tasks": 339,
+  "schemaVersion": 14,
+  "quickCheck": "ok",
+  "tableCountsPreserved": true,
+  "uiSettingsPreserved": true,
+  "uiSettings": {
+    "ui_font_family": "in-line:sarasa-ui-sc",
+    "ui_scale": "110"
+  },
+  "authorizationMetadataPreserved": true,
+  "nativeGuiDiagnosticCollected": true,
+  "newAuthorizationCreated": false,
+  "oldImportReexecuted": false,
+  "onboardingPackageRead": false,
+  "clientConfigurationRead": false,
+  "configurationVerified": false,
+  "currentSessionVerified": false,
+  "mountedToolResult": "Transport closed",
+  "gitCommitOrPush": false
+}

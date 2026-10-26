@@ -9,6 +9,10 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 ## v0.5.0 开发构建
 
+2026-10-26 接入存储兼容修复已开发：GUI/MCP/CLI 统一使用用户 Profile 下 `.in-line/mcp-security`，检测并拒绝 AppData 隔离副本；旧版存储须在软件内明确确认后迁移，保留原文件和现有授权，不自动合并。隔离验证及本地包见[交付报告](docs/mcp/acceptance/MSIX-STORAGE-COMPATIBILITY.md)。本机迁移、安装和当前会话认证仍待独立验证；[根因报告](docs/mcp/acceptance/AUTHORIZATION-STORAGE-MSIX-ROOT-CAUSE.md)保留现场证据。
+
+新增授权存储脱敏诊断：在高级管理对照 GUI 与导入器的存储位置、授权版本和客户端匹配摘要；不重试导入，不代表连接验证通过。诊断版本于 2026-10-26 获授权安装并采集双端报告，新授权后确认软件已保存、Codex 命中私有旧副本；下文较早的 Action 测试包不含该诊断及兼容修复，见[诊断记录](docs/mcp/acceptance/AUTHORIZATION-STORAGE-DIAGNOSTIC.md)。
+
 最新开发改动：MCP / CLI 改为点击“连接 AI”后在弹窗选择客户端、权限和范围，再授权并复制提示词；修复安装维护页中文截断及字体字号启动恢复。授权落盘异常的已知证据、备份规则和待实机验证项见[修复记录](docs/mcp/acceptance/POST-PHASE6-ONBOARDING-AND-UPGRADE.md)。[开发 Action 测试包已生成](docs/mcp/acceptance/POST-PHASE6-ACTION-DELIVERY.md)，供实机验收；当前会话连接未验证通过，尚未正式发布。
 
 CLI Phase5（含季度趋势日期修复）已验收并推送4194f2b；Phase6补齐GUI/MCP/CLI三程序打包、离线构建身份、混版拒绝和CI包内容校验。开发与自动检查状态见[阶段6报告](docs/cli/PHASE-06-DELIVERY.md)，操作见[用户指南](docs/cli/USER-GUIDE.md)、[Agent指南](docs/cli/AGENT-GUIDE.md)。测试安装包待阶段6确认提交后由开发Action生成；实机安装另安排。

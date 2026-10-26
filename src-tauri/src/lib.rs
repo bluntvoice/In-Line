@@ -687,6 +687,47 @@ fn mcp_security_state(
     Ok(view)
 }
 #[tauri::command]
+fn mcp_storage_state(window: tauri::WebviewWindow) -> Result<mcp::storage::StorageState, String> {
+    mcp_local(&window)?;
+    mcp::storage::state().map_err(mcp_error)
+}
+#[tauri::command]
+async fn mcp_migrate_storage(
+    window: tauri::WebviewWindow,
+    app: tauri::AppHandle,
+    expected_file_identity: String,
+    confirmed: bool,
+) -> Result<mcp::storage::MigrationReceipt, String> {
+    mcp_local(&window)?;
+    if app.try_state::<McpSecurity>().is_some() {
+        return Err(mcp_error(mcp::contract::McpError::new(
+            "storage_migration_conflict",
+        )));
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        mcp::storage::migrate(&expected_file_identity, confirmed)
+    })
+    .await
+    .map_err(|_| "迁移检查异常，未确认完成，请保留现场".to_string())?
+    .map_err(mcp_error)?;
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        app.restart();
+    });
+    Ok(result)
+}
+#[tauri::command]
+async fn mcp_authorization_diagnostic(
+    window: tauri::WebviewWindow,
+    security: State<'_, McpSecurity>,
+    id: Option<String>,
+) -> Result<mcp::authorization_diagnostic::Comparison, String> {
+    mcp_local(&window)?;
+    mcp::authorization_diagnostic::collect(&security, &mcp_executable()?, id.as_deref())
+        .await
+        .map_err(mcp_error)
+}
+#[tauri::command]
 fn mcp_jobs_state(
     window: tauri::WebviewWindow,
     security: State<McpSecurity>,
@@ -1562,6 +1603,9 @@ pub fn run() {
             open_backup_directory,
             mcp_connection_guide,
             mcp_security_state,
+            mcp_storage_state,
+            mcp_migrate_storage,
+            mcp_authorization_diagnostic,
             mcp_acknowledge_sensitive_notice,
             mcp_fault_state,
             mcp_fault_action,

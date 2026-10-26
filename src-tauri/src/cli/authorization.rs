@@ -392,6 +392,7 @@ fn install(path: &Path, bytes: &[u8], original: &Option<Vec<u8>>) -> Result<(), 
 }
 pub(super) async fn import(id: &str, request_id: String) -> Result<Value, McpError> {
     let root = platform::root()?;
+    crate::mcp::storage::require_client_ready(&root)?;
     let exe = std::env::current_exe().map_err(|_| McpError::new("host_unavailable"))?;
     import_at(&root, id, &exe, request_id).await
 }

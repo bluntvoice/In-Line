@@ -180,7 +180,9 @@ pub struct Security {
 }
 impl Security {
     pub fn open() -> Result<Self, McpError> {
-        Self::open_at(platform::root()?)
+        let root = platform::root()?;
+        super::storage::require_host_ready(&root, platform::legacy_root()?.as_deref())?;
+        Self::open_at(root)
     }
     pub fn open_at(root: PathBuf) -> Result<Self, McpError> {
         platform::check_path(&root)?;
@@ -230,6 +232,28 @@ impl Security {
     pub(crate) fn private_root(&self) -> &Path {
         self.path.parent().unwrap_or(&self.path)
     }
+    /// Local diagnostics may inspect public views, never the credential store itself.
+    pub(crate) fn diagnostic_views(
+        &self,
+    ) -> Result<(SecurityView, Result<SecurityView, McpError>, Option<bool>), McpError> {
+        let live = self
+            .store
+            .lock()
+            .map_err(|_| McpError::new("security_unavailable"))?;
+        let disk = Self::read_at(self.private_root());
+        let matches = match &disk {
+            Ok(disk) => Some(
+                serde_json::to_vec(&*live).map_err(|_| McpError::new("security_unavailable"))?
+                    == serde_json::to_vec(disk)
+                        .map_err(|_| McpError::new("security_unavailable"))?,
+            ),
+            Err(_) => None,
+        };
+        Ok((live.view(), disk.map(|store| store.view()), matches))
+    }
+    pub(crate) fn read_view_at(root: &Path) -> Result<SecurityView, McpError> {
+        Self::read_at(root).map(|store| store.view())
+    }
     pub fn verify_private_store(&self) -> Result<(), McpError> {
         let stored = Self::read_at(
             self.path
@@ -268,6 +292,7 @@ impl Security {
     pub fn read_at(root: &Path) -> Result<Store, McpError> {
         let path = root.join("authorization.dpapi");
         platform::check_path(&path)?;
+        platform::require_unredirected(&path)?;
         platform::Descriptor::new(true)?.verify(root)?;
         platform::Descriptor::new(false)?.verify(&path)?;
         if std::fs::metadata(&path)

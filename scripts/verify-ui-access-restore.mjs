@@ -15,10 +15,12 @@ const t=window.__test;
 const state={paused:true,groups:{regularRead:false,fullRead:false,write:false},revision:1,sensitiveNoticeAcknowledged:false,clients:[],onboardingClients:[{id:'codex',label:'Codex（MCP）',available:false,authorizationAvailable:true,status:'自动接入验证中'},{id:'codex-cli',label:'Codex（CLI）',available:false,authorizationAvailable:true,status:'独立授权'},{id:'powershell-cli',label:'PowerShell（CLI）',available:false,authorizationAvailable:false,status:'未安装'}]};
 t.state=state;t.emit=()=>callbacks.forEach(cb=>cb());
 const api={
+ mcpStorageState:async()=>({ready:true}),
  getUIFontSelection:async()=>{t.calls.push('fontRead');if(t.fontFailures-->0)throw Error('startup font unavailable');const value={requested:t.font,effective:t.font,missing:false};if(t.holdFont){t.holdFont=false;return new Promise(resolve=>t.releaseFont=()=>resolve(value));}return value;},
  getUIScale:async()=>{t.calls.push('scaleRead');if(t.scaleFailures-->0)throw Error('startup zoom unavailable');return t.scale;},
  setSetting:async(key,value)=>{t.calls.push(['settingWrite',key,value]);if(key==='ui_scale')t.scale=value;},onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb);},
- mcpSecurityState:async()=>structuredClone(state),
+ mcpSecurityState:async()=>{if(t.securityReadFailure)throw Error('isolated authorization storage mismatch');return structuredClone(state);},
+ mcpAuthorizationDiagnostic:async id=>{t.calls.push(['diagnose',id]);if(t.diagnosticFailure)throw Error('isolated diagnostic unavailable');return {diagnosticOnly:true,configurationVerified:false,currentSessionVerified:false,gui:{selectedClientFingerprint:'fixture-fingerprint'},importer:null,importerErrorCode:'incompatible',sameStorageFile:null,sameRevision:null,sameSelectedClient:null,sameBuild:null};},
  mcpSetGroups:async p=>{t.calls.push(['groups',p]);state.groups=p;},mcpSetPaused:async v=>{t.calls.push(['pause',v]);state.paused=v;},mcpAcknowledgeSensitiveNotice:async()=>{t.calls.push('notice');state.sensitiveNoticeAcknowledged=true;},
  mcpPrepareOnboarding:async args=>{t.grantCount++;t.calls.push(['grant',args]);await new Promise(r=>setTimeout(r,80));const receipt={packageId:'fixture-package',clientId:'fixture-client',expiresAt:Math.floor(Date.now()/1000)+600,prompt:'本地安全导入指令（隔离测试，无凭证）'};state.clients.push({id:receipt.clientId,name:args.client,kind:args.client==='codex'?'codex':'cli',permissions:args.permissions,scope:args.scope,revoked:false});return receipt;},
  copyText:async text=>{t.calls.push(['copy',text]);if(t.copyFailures-->0)throw Error('clipboard unavailable');},
@@ -57,9 +59,25 @@ try{
  assert.equal(await dialog.getByLabel('客户端',{exact:true}).isDisabled(),true);assert.equal(await dialog.getByLabel('接入提示词',{exact:true}).inputValue(),'本地安全导入指令（隔离测试，无凭证）');
  await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});await page.getByRole('button',{name:'连接 AI',exact:true}).click();await dialog.waitFor();assert.equal(await dialog.getByLabel('客户端',{exact:true}).inputValue(),'codex-cli');assert.equal(await page.evaluate(()=>__test.grantCount),1);
  await mkdir('release/ui',{recursive:true});await page.setViewportSize({width:560,height:800});await page.screenshot({path:'release/ui/connect-dialog-isolated.png'});assert.ok(await dialog.evaluate(e=>e.scrollWidth<=e.clientWidth+1));
- await page.keyboard.press('Escape');await page.getByRole('button',{name:'save scale',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#scale').textContent==='150|false');
+ await page.keyboard.press('Escape');
+ await page.getByText('已授权客户端与高级管理',{exact:true}).click();
+ const writesBefore=await page.evaluate(()=>__test.calls.filter(c=>Array.isArray(c)&&['grant','groups','pause'].includes(c[0])).length);
+ await page.getByRole('button',{name:'接入诊断',exact:true}).click();
+ const diagnostic=JSON.parse(await page.getByLabel('脱敏诊断结果',{exact:true}).inputValue());
+ assert.equal(diagnostic.configurationVerified,false);assert.equal(diagnostic.currentSessionVerified,false);
+ assert.deepEqual(await page.evaluate(()=>__test.calls.filter(c=>Array.isArray(c)&&c[0]==='diagnose')), [['diagnose','fixture-client']]);
+ await page.getByRole('button',{name:'复制脱敏诊断',exact:true}).click();
+ assert.equal(await page.evaluate(()=>__test.calls.filter(c=>Array.isArray(c)&&['grant','groups','pause'].includes(c[0])).length),writesBefore);
+ await page.evaluate(()=>__test.diagnosticFailure=true);await page.getByRole('button',{name:'检查授权存储',exact:true}).click();
+ await page.getByRole('alert').filter({hasText:'isolated diagnostic unavailable'}).waitFor();assert.equal(await page.getByLabel('脱敏诊断结果',{exact:true}).count(),0);
+ await page.evaluate(()=>{__test.securityReadFailure=true;__test.diagnosticFailure=false;});await page.getByRole('button',{name:'连接 AI',exact:true}).click();
+ await dialog.getByRole('alert').filter({hasText:'isolated authorization storage mismatch'}).waitFor();await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'检查授权存储',exact:true}).click();await page.getByRole('region',{name:'授权存储脱敏诊断',exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>__test.grantCount),1);
+ await page.screenshot({path:'release/ui/authorization-diagnostic-isolated.png'});
+ await page.getByRole('button',{name:'save scale',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#scale').textContent==='150|false');
  await page.evaluate(()=>{__test.fontFailures=100;__test.scaleFailures=100;__test.emit();});await page.waitForTimeout(30);await page.evaluate(()=>window.__unmount());const reads=await page.evaluate(()=>__test.calls.filter(c=>typeof c==='string'&&c.endsWith('Read')).length);await page.waitForTimeout(500);assert.equal(await page.evaluate(()=>__test.calls.filter(c=>typeof c==='string'&&c.endsWith('Read')).length),reads);
- assert.deepEqual(errors,[]);const result={passed:true,productionDataTouched:false,checks:['startup preference retry','preserve loaded font and scale on transient failure','focus recovery','stale response rejected','real verified Sarasa weights and font-load failure retry','unmount cancels retries','dialog defaults and unavailable clients','explicit global/resume/sensitive confirmations','CLI independent scope','clipboard retry without duplicate grant','receipt retained on reopen','narrow layout']};await writeFile('release/Post-Phase6-ui-check.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
+ assert.deepEqual(errors,[]);const result={passed:true,productionDataTouched:false,checks:['startup preference retry','preserve loaded font and scale on transient failure','focus recovery','stale response rejected','real verified Sarasa weights and font-load failure retry','unmount cancels retries','dialog defaults and unavailable clients','explicit global/resume/sensitive confirmations','CLI independent scope','clipboard retry without duplicate grant','receipt retained on reopen','read-only selected-client diagnostic and copy','diagnostic failure clears stale results','narrow layout']};await writeFile('release/Post-Phase6-ui-check.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }finally{await browser.close();await server.close();}
 
 

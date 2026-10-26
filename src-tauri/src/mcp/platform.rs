@@ -12,9 +12,24 @@ pub fn root() -> Result<PathBuf, McpError> {
     if let Some(path) = std::env::var_os("IN_LINE_MCP_TEST_SECURITY_ROOT") {
         return Ok(path.into());
     }
-    Ok(dirs::data_local_dir()
-        .ok_or_else(|| McpError::new("security_unavailable"))?
-        .join("in-line-mcp-security"))
+    shared_root_at(&dirs::home_dir().ok_or_else(|| McpError::new("security_unavailable"))?)
+}
+pub(crate) fn shared_root_at(profile: &Path) -> Result<PathBuf, McpError> {
+    if !profile.is_absolute() {
+        return Err(McpError::new("security_unavailable"));
+    }
+    Ok(profile.join(".in-line").join("mcp-security"))
+}
+pub(crate) fn legacy_root() -> Result<Option<PathBuf>, McpError> {
+    #[cfg(debug_assertions)]
+    if std::env::var_os("IN_LINE_MCP_TEST_SECURITY_ROOT").is_some() {
+        return Ok(None);
+    }
+    Ok(Some(
+        dirs::data_local_dir()
+            .ok_or_else(|| McpError::new("security_unavailable"))?
+            .join("in-line-mcp-security"),
+    ))
 }
 #[cfg(windows)]
 pub use win::*;
@@ -42,7 +57,11 @@ mod win {
             SECURITY_ATTRIBUTES, SE_DACL_PROTECTED, TOKEN_GROUPS, TOKEN_QUERY, TOKEN_USER,
             UNPROTECTED_DACL_SECURITY_INFORMATION,
         },
-        Storage::FileSystem::{MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH},
+        Storage::FileSystem::{
+            CreateFileW, GetFileInformationByHandle, GetFinalPathNameByHandleW, MoveFileExW,
+            BY_HANDLE_FILE_INFORMATION, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
+            FILE_SHARE_WRITE, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, OPEN_EXISTING,
+        },
         System::{
             Registry::{RegGetValueW, HKEY_LOCAL_MACHINE, RRF_RT_REG_SZ},
             SystemServices::SE_GROUP_LOGON_ID,
@@ -55,8 +74,87 @@ mod win {
     fn unavailable() -> McpError {
         McpError::new("security_unavailable")
     }
+    /// Query only metadata, including the actual target hidden by MSIX path overlays.
+    pub fn file_location(path: &Path) -> Result<(PathBuf, String), McpError> {
+        check_path(path)?;
+        let name = path_wide(path)?;
+        unsafe {
+            let handle = CreateFileW(
+                name.as_ptr(),
+                FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                null(),
+                OPEN_EXISTING,
+                0,
+                null_mut(),
+            );
+            if handle == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+                return Err(unavailable());
+            }
+            let result = (|| {
+                let mut buffer = vec![0u16; 32768];
+                let length =
+                    GetFinalPathNameByHandleW(handle, buffer.as_mut_ptr(), buffer.len() as u32, 0);
+                let mut info: BY_HANDLE_FILE_INFORMATION = std::mem::zeroed();
+                if length == 0
+                    || length as usize >= buffer.len()
+                    || GetFileInformationByHandle(handle, &mut info) == 0
+                {
+                    return Err(unavailable());
+                }
+                use std::os::windows::ffi::OsStringExt;
+                Ok((
+                    PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length as usize])),
+                    format!(
+                        "{:08x}:{:08x}{:08x}",
+                        info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow
+                    ),
+                ))
+            })();
+            CloseHandle(handle);
+            result
+        }
+    }
+    pub fn same_location_name(a: &Path, b: &Path) -> bool {
+        let normalize = |p: &Path| {
+            let text = p.to_string_lossy().replace('/', "\\").to_lowercase();
+            if let Some(unc) = text.strip_prefix(r"\\?\unc\") {
+                format!(r"\\{unc}")
+            } else {
+                text.strip_prefix(r"\\?\").unwrap_or(&text).to_owned()
+            }
+        };
+        normalize(a) == normalize(b)
+    }
+    pub fn require_unredirected(path: &Path) -> Result<(), McpError> {
+        if !same_location_name(path, &file_location(path)?.0) {
+            return Err(McpError::new("storage_redirected"));
+        }
+        Ok(())
+    }
     pub fn wide(value: &std::ffi::OsStr) -> Vec<u16> {
         value.encode_wide().chain(Some(0)).collect()
+    }
+    // ACL and metadata APIs need extended names even when Rust file I/O already
+    // supports long paths. A migration staging path can exceed MAX_PATH.
+    fn path_wide(path: &Path) -> Result<Vec<u16>, McpError> {
+        use std::ffi::OsString;
+        let absolute = std::path::absolute(path).map_err(|_| unavailable())?;
+        let text = absolute.as_os_str();
+        let mut name = OsString::new();
+        let units: Vec<u16> = text.encode_wide().collect();
+        if units.starts_with(&[92, 92, 63, 92]) {
+            return Ok(wide(text));
+        }
+        if units.starts_with(&[92, 92]) {
+            use std::os::windows::ffi::OsStringExt;
+            name.push(r"\\?\UNC\");
+            name.push(OsString::from_wide(&units[2..]));
+        } else {
+            name.push(r"\\?\");
+            name.push(text);
+        }
+        Ok(wide(&name))
     }
     pub fn user_sid() -> Result<String, McpError> {
         unsafe {
@@ -233,7 +331,7 @@ mod win {
     impl Descriptor {
         pub fn capture(path: &Path) -> Result<Self, McpError> {
             check_path(path)?;
-            let path = wide(path.as_os_str());
+            let path = path_wide(path)?;
             unsafe {
                 let mut size = 0;
                 GetFileSecurityW(
@@ -340,7 +438,7 @@ mod win {
             }
         }
         pub fn apply(&self, path: &Path) -> Result<(), McpError> {
-            let path = wide(path.as_os_str());
+            let path = path_wide(path)?;
             if unsafe {
                 SetFileSecurityW(
                     path.as_ptr(),
@@ -361,7 +459,7 @@ mod win {
     }
     impl Descriptor {
         pub fn verify(&self, path: &Path) -> Result<(), McpError> {
-            let path = wide(path.as_os_str());
+            let path = path_wide(path)?;
             unsafe {
                 let mut size = 0;
                 GetFileSecurityW(
@@ -530,8 +628,8 @@ mod win {
         Ok(result)
     }
     pub fn atomic_replace(from: &Path, to: &Path) -> Result<(), McpError> {
-        let a = wide(from.as_os_str());
-        let b = wide(to.as_os_str());
+        let a = path_wide(from)?;
+        let b = path_wide(to)?;
         if unsafe {
             MoveFileExW(
                 a.as_ptr(),

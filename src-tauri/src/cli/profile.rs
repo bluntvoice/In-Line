@@ -26,6 +26,7 @@ pub(super) struct Profile {
     pub credentials: Credentials,
 }
 pub(super) fn load_at(root: &Path, name: &str, executable: &Path) -> Result<Credentials, McpError> {
+    crate::mcp::storage::require_client_ready(root)?;
     let invalid = || McpError::new("security_unavailable");
     if !super::parse::valid_profile(name) {
         return Err(McpError::new("invalid_arguments"));

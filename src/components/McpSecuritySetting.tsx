@@ -2,13 +2,14 @@ import {useEffect,useRef,useState,type ReactNode} from "react";
 import {Plug} from "lucide-react";
 import {api} from "../api";
 import ConnectionDialog from "./ConnectionDialog";
+import McpStorageGate from "./McpStorageGate";
 import McpFaultSetting from "./McpFaultSetting";
 import McpAuditSetting from "./McpAuditSetting";
 import McpBatchSetting from "./McpBatchSetting";
 import McpJobsSetting from "./McpJobsSetting";
 import McpCacheSetting from "./McpCacheSetting";
 import {canPrepare,defaultPermissions,parseScope,prepareAndCopy,receiptExpired} from "../lib/mcp-onboarding";
-import type {McpClient,McpClientPreset,McpPermissions,McpReceipt,McpSecurityState} from "../lib/mcp-onboarding";
+import type {McpAuthorizationDiagnostic,McpClient,McpClientPreset,McpPermissions,McpReceipt,McpSecurityState} from "../lib/mcp-onboarding";
 
 const labels:[keyof McpPermissions,string][]=[["regularRead","常规读取"],["fullRead","完整读取"],["write","日常写入"]];
 export function ClientChoice({presets,value,busy,onChange}:{presets:McpClientPreset[];value:string;busy:boolean;onChange:(id:string)=>void}){
@@ -18,12 +19,16 @@ export function ClientPermissions({value,disabled,readOnly,onChange}:{value:McpP
   return <div className="mcp-security-controls">{labels.map(([key,label])=><label key={key}><input type="checkbox" checked={value[key]} disabled={disabled||(readOnly&&key==="write")} onChange={e=>onChange({...value,[key]:e.target.checked})}/>{label}</label>)}</div>;
 }
 const presetId=(value:McpClient)=>value.kind==="cli"?(value.name==="Codex CLI"?"codex-cli":"powershell-cli"):"codex";
-export default function McpSecuritySetting({notify,guide}:{notify:(text:string)=>void;guide?:ReactNode}){
+type SettingProps={notify:(text:string)=>void;guide?:ReactNode};
+export default function McpSecuritySetting(props:SettingProps){return <McpStorageGate><McpSecurityControls {...props}/></McpStorageGate>;}
+function McpSecurityControls({notify,guide}:SettingProps){
   const [state,setState]=useState<McpSecurityState|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
   const [open,setOpen]=useState(false),[resume,setResume]=useState(false),[enableGlobal,setEnableGlobal]=useState(false),[acknowledged,setAcknowledged]=useState(false);
   const [client,setClient]=useState("codex"),[permissions,setPermissions]=useState(defaultPermissions),[departments,setDepartments]=useState(""),[types,setTypes]=useState("");
   const [editing,setEditing]=useState<McpClient|null>(null),[receipt,setReceipt]=useState<McpReceipt|null>(null),[now,setNow]=useState(Date.now());
   const busyRef=useRef(false);
+  const [diagnostic,setDiagnostic]=useState<McpAuthorizationDiagnostic|null>(null);
+  const diagnose=async(id:string|null)=>{if(busyRef.current)return;busyRef.current=true;setBusy(true);setError("");setDiagnostic(null);try{setDiagnostic(await api.mcpAuthorizationDiagnostic(id));}catch(e){setError(String(e));}finally{busyRef.current=false;setBusy(false);}};
   const [risk,setRisk]=useState(false);const pendingRisk=useRef<(()=>Promise<unknown>)|null>(null);
   const reload=async()=>{try{setState(await api.mcpSecurityState());}catch(e){setState(null);throw e;}};
   useEffect(()=>{let active=true;void api.mcpSecurityState().then(value=>{if(active)setState(value);}).catch(e=>{if(active)setError(String(e));});return()=>{active=false;};},[]);
@@ -63,12 +68,15 @@ export default function McpSecuritySetting({notify,guide}:{notify:(text:string)=
   const confirmMissing=(blocked.length>0&&!enableGlobal)||(Boolean(state?.paused)&&!resume)||(needsNotice&&!acknowledged);
   return <><div className="setting-row"><div><strong>AI 接入（MCP / CLI）</strong><span>在接入窗口选择客户端和权限，再复制提示词交给 AI</span></div><button className="button secondary" disabled={busy} onClick={()=>{setError("");setState(null);setOpen(true);void reload().catch(e=>{setState(null);setError(String(e));});}}><Plug size={16}/>连接 AI</button></div>
   <details className="mcp-security-setting"><summary>已授权客户端与高级管理</summary>
+    <p>接入失败时，可对照当前窗口与导入器看到的授权存储。诊断不执行接入，不代表连接验证通过。</p>
+    <button className="button secondary" disabled={busy} onClick={()=>void diagnose(null)}>检查授权存储</button>
+    {diagnostic&&<div className="mcp-issued" role="region" aria-label="授权存储脱敏诊断"><p>仅含存储位置、文件标识、授权版本和客户端匹配摘要；包含本机路径。配置与当前会话连接均未由此诊断验证。</p><textarea readOnly aria-label="脱敏诊断结果" value={JSON.stringify(diagnostic,null,2)}/><button className="button secondary" disabled={busy} onClick={()=>void api.copyText(JSON.stringify(diagnostic,null,2)).then(()=>notify("脱敏诊断已复制，包含本机路径")).catch(e=>setError(String(e)))}>复制脱敏诊断</button></div>}
     {risk&&<div role="dialog" aria-label="敏感权限首次提示" className="mcp-issued"><strong>完整读取及写入权限</strong><p>完整读取会向所选 AI 客户端开放授权范围内的办理说明等内容；写入会实际修改事项和统计。请只授权可信客户端并确认范围。历史撤销须在软件内批准。</p><div className="mcp-security-controls"><button className="button secondary" disabled={busy} onClick={()=>void act(async()=>{await api.mcpAcknowledgeSensitiveNotice();setRisk(false);const f=pendingRisk.current;pendingRisk.current=null;await f?.();})}>了解并继续</button><button className="button secondary" disabled={busy} onClick={()=>{pendingRisk.current=null;setRisk(false);}}>取消</button></div></div>}
     {!open&&error&&<p role="alert" className="mcp-security-error">{error}</p>}
     {state&&<fieldset className="mcp-permission-fields" disabled={busy||risk}>
       <div className="mcp-security-controls"><label><input type="checkbox" checked={state.paused} onChange={e=>void act(()=>api.mcpSetPaused(e.target.checked))}/>暂停全部外部接入</label>{labels.map(([key,label])=><label key={key}><input type="checkbox" checked={state.groups[key]} onChange={e=>{const next={...state.groups,[key]:e.target.checked};sensitive(next,()=>api.mcpSetGroups(next));}}/>{label}</label>)}</div>
       <p>每个客户端独立授权，有效权限同时受全局开关限制。CLI 连接与聊天中的 MCP 连接分别验证。</p>
-      <ul className="mcp-client-list">{state.clients.map(value=><li key={value.id}><div><strong>{value.name}</strong><small>{value.revoked?"已撤销":"已授权 · 连接仍需验证"}{value.scope.departments?" · 部门："+(value.scope.departments.join("、")||"无"):""}{value.scope.taskTypes?" · 类型："+(value.scope.taskTypes.join("、")||"无"):""}</small></div>{!value.revoked&&<div><button className="button secondary" onClick={()=>edit(value)}>权限</button><button className="button secondary" disabled={!canPrepare(state.onboardingClients.find(p=>p.id===presetId(value)),busy)} onClick={()=>void act(async()=>{const next=await api.mcpRotateOnboarding(value.id);reset();remember(next);setClient(presetId(value));setPermissions({...value.permissions});setDepartments(value.scope.departments?.join("，")??"");setTypes(value.scope.taskTypes?.join("，")??"");setOpen(true);await copy(next);})}>轮换并接入</button><button className="button secondary danger" onClick={()=>void act(()=>api.mcpRevokeClient(value.id))}>撤销</button></div>}</li>)}</ul>
+      <ul className="mcp-client-list">{state.clients.map(value=><li key={value.id}><div><strong>{value.name}</strong><small>{value.revoked?"已撤销":"已授权 · 连接仍需验证"}{value.scope.departments?" · 部门："+(value.scope.departments.join("、")||"无"):""}{value.scope.taskTypes?" · 类型："+(value.scope.taskTypes.join("、")||"无"):""}</small></div><div><button className="button secondary" onClick={()=>void diagnose(value.id)}>接入诊断</button>{!value.revoked&&<><button className="button secondary" onClick={()=>edit(value)}>权限</button><button className="button secondary" disabled={!canPrepare(state.onboardingClients.find(p=>p.id===presetId(value)),busy)} onClick={()=>void act(async()=>{const next=await api.mcpRotateOnboarding(value.id);reset();remember(next);setClient(presetId(value));setPermissions({...value.permissions});setDepartments(value.scope.departments?.join("，")??"");setTypes(value.scope.taskTypes?.join("，")??"");setOpen(true);await copy(next);})}>轮换并接入</button><button className="button secondary danger" onClick={()=>void act(()=>api.mcpRevokeClient(value.id))}>撤销</button></>}</div></li>)}</ul>
     </fieldset>}
     {guide}
   </details>

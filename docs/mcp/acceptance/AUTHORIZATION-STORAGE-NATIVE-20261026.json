@@ -1,0 +1,82 @@
+{
+  "diagnosticOnly": true,
+  "configurationVerified": false,
+  "currentSessionVerified": false,
+  "gui": {
+    "diagnosticOnly": true,
+    "configurationVerified": false,
+    "currentSessionVerified": false,
+    "processId": 36284,
+    "executable": "D:\\Application\\In Line\\in-line.exe",
+    "build": {
+      "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    },
+    "selectedClientFingerprint": null,
+    "storage": {
+      "root": "C:\\Users\\KB\\AppData\\Local\\in-line-mcp-security",
+      "resolvedRoot": "\\\\?\\C:\\Users\\KB\\AppData\\Local\\in-line-mcp-security",
+      "authorizationFileExists": true,
+      "fileIdentity": "be7d6092:001b000000046df5",
+      "fileBytes": 518,
+      "modifiedUnixMs": 1791594962576
+    },
+    "storageStableDuringRead": true,
+    "memory": {
+      "revision": 3,
+      "clientCount": 0,
+      "selectedClient": null
+    },
+    "disk": {
+      "revision": 3,
+      "clientCount": 0,
+      "selectedClient": null
+    },
+    "memoryMatchesDisk": true,
+    "diskErrorCode": null
+  },
+  "importer": {
+    "diagnosticOnly": true,
+    "configurationVerified": false,
+    "currentSessionVerified": false,
+    "processId": 34048,
+    "executable": "D:\\Application\\In Line\\in-line-mcp.exe",
+    "build": {
+      "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    },
+    "selectedClientFingerprint": null,
+    "storage": {
+      "root": "C:\\Users\\KB\\AppData\\Local\\in-line-mcp-security",
+      "resolvedRoot": "\\\\?\\C:\\Users\\KB\\AppData\\Local\\in-line-mcp-security",
+      "authorizationFileExists": true,
+      "fileIdentity": "be7d6092:001b000000046df5",
+      "fileBytes": 518,
+      "modifiedUnixMs": 1791594962576
+    },
+    "storageStableDuringRead": true,
+    "memory": null,
+    "disk": {
+      "revision": 3,
+      "clientCount": 0,
+      "selectedClient": null
+    },
+    "memoryMatchesDisk": null,
+    "diskErrorCode": null
+  },
+  "importerErrorCode": null,
+  "sameStorageFile": true,
+  "sameRevision": true,
+  "sameSelectedClient": null,
+  "sameBuild": true
+}

@@ -124,7 +124,9 @@ impl Provider {
         }
     }
     pub fn resolve(&self) -> Result<(Credentials, bool), McpError> {
-        self.resolve_at(&platform::root()?)
+        let root = platform::root()?;
+        super::storage::require_client_ready(&root)?;
+        self.resolve_at(&root)
     }
     fn resolve_at(&self, root: &Path) -> Result<(Credentials, bool), McpError> {
         let mut current = self.credentials.lock().map_err(|_| unavailable())?;

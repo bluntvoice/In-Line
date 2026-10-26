@@ -1,3 +1,5 @@
+#[cfg(windows)]
+pub mod authorization_diagnostic;
 pub mod basis;
 pub mod build_identity;
 #[cfg(windows)]
@@ -41,4 +43,6 @@ pub mod scope;
 pub mod security;
 #[cfg(windows)]
 pub mod service;
+#[cfg(windows)]
+pub mod storage;
 pub mod write_types;

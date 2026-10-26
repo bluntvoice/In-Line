@@ -297,24 +297,37 @@ async fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !args.is_empty() {
         #[cfg(windows)]
-        let result = if args.len() == 2 && args[0] == "--import-client" {
-            let run = async {
-                in_line_lib::mcp::onboarding::require_authorization_available("codex")?;
-                let root = in_line_lib::mcp::platform::root()?;
-                let home = in_line_lib::mcp::codex_import::codex_home()?;
-                let report = in_line_lib::mcp::codex_import::import_at(
-                    &root,
-                    &home,
-                    &args[1],
-                    chrono::Utc::now().timestamp(),
-                )
-                .await?;
-                serde_json::to_value(report).map_err(|_| McpError::new("import_failed"))
+        let result =
+            if (args.len() == 1 || args.len() == 2) && args[0] == "--diagnose-authorization" {
+                let run = || {
+                    let root = in_line_lib::mcp::platform::root()?;
+                    let report = in_line_lib::mcp::authorization_diagnostic::snapshot(
+                        &root,
+                        None,
+                        args.get(1).map(String::as_str),
+                    )?;
+                    serde_json::to_value(report).map_err(|_| McpError::new("security_unavailable"))
+                };
+                run()
+            } else if args.len() == 2 && args[0] == "--import-client" {
+                let run = async {
+                    in_line_lib::mcp::onboarding::require_authorization_available("codex")?;
+                    let root = in_line_lib::mcp::platform::root()?;
+                    in_line_lib::mcp::storage::require_import_ready(&root)?;
+                    let home = in_line_lib::mcp::codex_import::codex_home()?;
+                    let report = in_line_lib::mcp::codex_import::import_at(
+                        &root,
+                        &home,
+                        &args[1],
+                        chrono::Utc::now().timestamp(),
+                    )
+                    .await?;
+                    serde_json::to_value(report).map_err(|_| McpError::new("import_failed"))
+                };
+                run.await
+            } else {
+                Err(McpError::new("import_invalid"))
             };
-            run.await
-        } else {
-            Err(McpError::new("import_invalid"))
-        };
         #[cfg(not(windows))]
         let result: Result<Value, McpError> = Err(McpError::new("unsupported"));
         let failed = result.is_err();

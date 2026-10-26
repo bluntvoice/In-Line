@@ -1,5 +1,9 @@
 # v0.5.0 开发构建说明（未正式发布）
 
+2026-10-26 已开发跨环境安全存储兼容修复：统一到用户 Profile 下的私有目录，拒绝读取重定向副本；旧存储通过软件内明确确认后迁移，原文件、授权及撤销/暂停状态保留，不自动合并。开发验证与未完成的实机门禁见[交付报告](docs/mcp/acceptance/MSIX-STORAGE-COMPATIBILITY.md)。本机迁移和安装尚未执行，当前会话认证未通过；现场证据见[根因报告](docs/mcp/acceptance/AUTHORIZATION-STORAGE-MSIX-ROOT-CAUSE.md)。
+
+新增只读授权存储诊断，便于排查界面有授权而导入器缺失的差异；输出本机路径及脱敏摘要，明确区分诊断与配置/当前会话验证。诊断版本于 2026-10-26 获授权安装；后续新授权对照确认软件已保存三条记录，Codex 却读取私有旧副本。下文较早的 Action 测试包不含该诊断及兼容修复，详见[诊断记录](docs/mcp/acceptance/AUTHORIZATION-STORAGE-DIAGNOSTIC.md)。
+
 最新开发修改（测试包已生成，未正式发布）：统一 MCP / CLI 接入弹窗、安装中文控件高度、字体字号恢复，以及授权磁盘回读与缺失授权明确错误。[开发 Action 测试包](docs/mcp/acceptance/POST-PHASE6-ACTION-DELIVERY.md)已下载核验；隔离检查与实机验收分别记录，见[修复记录](docs/mcp/acceptance/POST-PHASE6-ONBOARDING-AND-UPGRADE.md)。
 
 CLI Phase5已验收并提交推送4194f2b（含季度趋势修复）。Phase6已完成三程序打包、离线身份、混版拒绝及CI解包门禁的开发与本地检查，实际NSIS解包门禁待Action执行；详见[阶段6报告](docs/cli/PHASE-06-DELIVERY.md)。测试包按用户要求在阶段6确认提交后运行开发Action生成，保留为Artifact；本机安装另安排。

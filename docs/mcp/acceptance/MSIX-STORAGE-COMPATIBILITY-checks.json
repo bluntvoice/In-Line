@@ -1,0 +1,362 @@
+{
+  "Date": "2026-10-26",
+  "Status": "development_and_isolation_complete_native_gates_pending",
+  "Authorization": "Develop compatibility fix and isolated verification only; preserve old files and authorizations; native installation and migration require separate confirmation",
+  "Branch": "feat/scheduled-items",
+  "BaselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+  "SourceDirty": true,
+  "ExactCommitVerified": false,
+  "Rust": {
+    "Failed": 0,
+    "Passed": 235,
+    "Command": "cargo test --locked --manifest-path src-tauri/Cargo.toml -- --test-threads=1 --nocapture",
+    "Runtime": {
+      "Start": "2026-10-26T14:56:59.1173623+08:00",
+      "End": "2026-10-26T14:59:55.6086953+08:00",
+      "ExitCode": 0,
+      "GuardStopped": false,
+      "TargetDirectory": "D:\\codex-data\\build-targets\\in-line-cli-phase1-test-20261016",
+      "BuildJobs": 1,
+      "TestDebugInfo": 0,
+      "DevDebugInfo": 0,
+      "TestThreads": 1,
+      "CargoArguments": [
+        "test",
+        "--locked",
+        "--manifest-path",
+        "src-tauri/Cargo.toml",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "TestsFiltered": false,
+      "MinimumHeadroomGiB": 11.99,
+      "MaximumCommitPercent": 72.0,
+      "AbortHeadroomGiB": 4,
+      "AbortCommitPercent": 90,
+      "ConsecutiveSamplesBeforeAbort": 2
+    }
+  },
+  "Frontend": {
+    "MigrationUI": {
+      "passed": true,
+      "productionDataTouched": false,
+      "nativeMigrationExecuted": false,
+      "checks": [
+        "explicit consent before migration",
+        "connection controls gated while pending",
+        "source-change failure clears confirmation without retry",
+        "successful receipt remains separate from session verification",
+        "redirected legacy source cannot migrate",
+        "ready shared root ignores legacy shadow"
+      ]
+    },
+    "StartupAuthorizationAndDiagnosticUI": {
+      "passed": true,
+      "productionDataTouched": false,
+      "checks": [
+        "startup preference retry",
+        "preserve loaded font and scale on transient failure",
+        "focus recovery",
+        "stale response rejected",
+        "real verified Sarasa weights and font-load failure retry",
+        "unmount cancels retries",
+        "dialog defaults and unavailable clients",
+        "explicit global/resume/sensitive confirmations",
+        "CLI independent scope",
+        "clipboard retry without duplicate grant",
+        "receipt retained on reopen",
+        "read-only selected-client diagnostic and copy",
+        "diagnostic failure clears stale results",
+        "narrow layout"
+      ]
+    },
+    "Passed": 133,
+    "BuildPassed": true
+  },
+  "FormatCheckPassed": true,
+  "GitDiffCheckPassed": true,
+  "DebugMcpContract": {
+    "ToolCount": 16,
+    "Passed": true
+  },
+  "ProfileCanaryActualSidecar": {
+    "Redirected": false,
+    "ProductionRootUsed": false,
+    "Passed": true,
+    "SamePhysicalFile": true,
+    "SyntheticDirectoryRemoved": true
+  },
+  "AppDataSyntheticCanary": {
+    "Redirected": false,
+    "Passed": true,
+    "Note": "Fresh synthetic AppData file did not recreate the existing shadow; the real legacy file was probed with metadata-only access."
+  },
+  "LegacyMetadataProbe": {
+    "MetadataOnly": true,
+    "NormalPhysicalFile": "\\\\?\\C:\\Users\\KB\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\in-line-mcp-security\\authorization.dpapi",
+    "ExtendedPhysicalFile": "\\\\?\\C:\\Users\\KB\\AppData\\Local\\Packages\\OpenAI.Codex_2p2nqsd0c76g0\\LocalCache\\Local\\in-line-mcp-security\\authorization.dpapi",
+    "SamePhysicalTarget": true,
+    "CredentialBytesRead": false,
+    "ProductionFilesWritten": false
+  },
+  "SourceFiles": [
+    {
+      "Path": "scripts/verify-msix-storage-ui.mjs",
+      "SHA256": "16AE8C1CBEFAD37CB7E322F7451A783FE8241D7E073D65B06E0CD111C909836F"
+    },
+    {
+      "Path": "scripts/verify-ui-access-restore.mjs",
+      "SHA256": "F932BD6C51B552D23B7015C8327C0DB98BC7998ED8F795CAE48E5195681FBFDB"
+    },
+    {
+      "Path": "src-tauri/src/bin/in-line-mcp.rs",
+      "SHA256": "DD323BBC8402E985D3B6C5663E1E970EB669B61C106675337447DBD4EDD13FD5"
+    },
+    {
+      "Path": "src-tauri/src/cli/authorization.rs",
+      "SHA256": "6B5815FEC5F94CF00243AD89ACC18FA8E6EF135B8396FCF2B47991A898A2CC6B"
+    },
+    {
+      "Path": "src-tauri/src/cli/profile.rs",
+      "SHA256": "9EE59C3A3231BAAE23D7B20CD52A04A915AD55DE7773986355255916992DF012"
+    },
+    {
+      "Path": "src-tauri/src/lib.rs",
+      "SHA256": "1DAA73768D85B65A1929C7C39F4F8D329E4AB8DD61EC70DFC8CFC34FEBA8F102"
+    },
+    {
+      "Path": "src-tauri/src/mcp/authorization_diagnostic.rs",
+      "SHA256": "B9ED36B41578EE8C87E7CB36D907D8A3E5CC0713EAD05AB35A45B72A4E2D94AE"
+    },
+    {
+      "Path": "src-tauri/src/mcp/contract.rs",
+      "SHA256": "ADE1796E0A04B0E75B470B9C8A1E6F50D75C9E9A6CE58A0C7764C26DB7458F89"
+    },
+    {
+      "Path": "src-tauri/src/mcp/mod.rs",
+      "SHA256": "0655D966A920AF63551E340A80F70ED4F1FA291B9127AE690C0A121E27E91585"
+    },
+    {
+      "Path": "src-tauri/src/mcp/platform.rs",
+      "SHA256": "203CF2B9C58659EDFE5E8CD3A07D05DE86DD4B95784E3576A7B5B0CF642DC9AD"
+    },
+    {
+      "Path": "src-tauri/src/mcp/runtime_credentials.rs",
+      "SHA256": "E592CFF1ADF92CC15464919F270642C02F931AEC72B55B1388193224621EF60F"
+    },
+    {
+      "Path": "src-tauri/src/mcp/security.rs",
+      "SHA256": "9433D2B36A6C0D4E92EA627CAAA07482BF5A97C3C2E1DB52C67F4089215F55A2"
+    },
+    {
+      "Path": "src-tauri/src/mcp/storage.rs",
+      "SHA256": "E768E643B958BE94047367B84ABA8941F3E24A9E712CF7B6D6E895A6E9DFC9AB"
+    },
+    {
+      "Path": "src-tauri/tests/mcp_authorization_diagnostic.rs",
+      "SHA256": "35AB8B918D229BD5A0F872AF73CCABF175B9647012E4142219D8DF274C2E7F42"
+    },
+    {
+      "Path": "src/api.ts",
+      "SHA256": "81B81DDB4D28CA8B75B894C632467A879CF431424DC9BCBF91A3302FFEE7D470"
+    },
+    {
+      "Path": "src/components/McpSecuritySetting.tsx",
+      "SHA256": "68CBB3F1B12BF3E0BB32A4F120212DD4E2F248E45FC4E03166C97619E25AE5C2"
+    },
+    {
+      "Path": "src/components/McpStorageGate.tsx",
+      "SHA256": "F0C7BE8EA4AACEEF05EF7B16E2DA169DAA6E49F8DDA770F2537B4407BD00B667"
+    },
+    {
+      "Path": "src/lib/mcp-onboarding.ts",
+      "SHA256": "72F8B630761D87A42CC5FA6860263A9F3AF491813D05539D0BBFBCDB118C9FE5"
+    }
+  ],
+  "Production": {
+    "OldFilesDeletedOrMerged": false,
+    "SharedStoreCreated": false,
+    "ConfigurationOpenedOrWritten": false,
+    "InstallerExecuted": false,
+    "ExistingAuthorizationsModified": false,
+    "OldImportReplayed": false,
+    "AuthorizationMigrationExecuted": false
+  },
+  "Verification": {
+    "MountedCallRepeatedDuringDevelopment": false,
+    "LatestMountedResult": "unauthenticated",
+    "ConfigurationVerified": false,
+    "CurrentSessionVerified": false
+  },
+  "Git": {
+    "Pushed": false,
+    "TagOrReleaseCreated": false,
+    "ActionDispatched": false,
+    "Committed": false
+  },
+  "Package": {
+    "BuildPassed": true,
+    "BuildRuntime": {
+      "Start": "2026-10-26T15:00:49.1984917+08:00",
+      "End": "2026-10-26T15:11:45.9302768+08:00",
+      "ExitCode": 0,
+      "GuardStopped": false,
+      "TargetDirectory": "D:\\codex-data\\projects\\inline\\In-Line\\src-tauri\\target",
+      "BuildJobs": 1,
+      "TestDebugInfo": 0,
+      "DevDebugInfo": 0,
+      "TestThreads": 1,
+      "Command": "npm.cmd run dist",
+      "InstallerExecuted": false,
+      "LocalInstallation": false,
+      "MinimumHeadroomGiB": 10.05,
+      "MaximumCommitPercent": 76.0,
+      "AbortHeadroomGiB": 4,
+      "AbortCommitPercent": 90,
+      "ConsecutiveSamplesBeforeAbort": 2
+    },
+    "Installer": {
+      "Path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\MSIX-Storage-local-20261026\\In-Line_0.5.0-msix-storage-local_x64-setup.exe",
+      "Bytes": 4372870,
+      "SHA256": "0FE80DE7BFC3EF90027CAF7A4B065B7D7EB5F3D8395F88A79C71D06FDB423304",
+      "InstallerExecuted": false
+    },
+    "SourceIdentityAndStaging": {
+      "offline": true,
+      "build": {
+        "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "records": [
+        {
+          "name": "in-line",
+          "bytes": 8979456,
+          "sha256": "d84b22feaf4c26f03186aa024f3d00abc45475231011cc70f7d5f213c524e722",
+          "build": {
+            "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          }
+        },
+        {
+          "name": "in-line-mcp",
+          "bytes": 2386432,
+          "sha256": "49e581cbf360e3f9e60992a5fbad8e2564b09480339b727bf4333d1fc79c9862",
+          "build": {
+            "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          }
+        },
+        {
+          "name": "in-line-cli",
+          "bytes": 1057792,
+          "sha256": "8b7b50ae9d993c7780ff4d3ea55dffb118cd6817be2614e3f647308b8c914141",
+          "build": {
+            "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          },
+          "cliPhase": 5
+        }
+      ],
+      "companionsMatched": true,
+      "nsisPayloadMatched": false,
+      "pathModified": false,
+      "installed": false,
+      "currentMcpSessionVerified": false
+    },
+    "ExtractedPayload": {
+      "offline": true,
+      "build": {
+        "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "records": [
+        {
+          "name": "in-line",
+          "bytes": 8979456,
+          "sha256": "aaeef4ce58cac8566911e70d1c4988f9e79d5b1f601e8dd67d289304fe6dd5ab",
+          "build": {
+            "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          },
+          "sourceSha256": "d84b22feaf4c26f03186aa024f3d00abc45475231011cc70f7d5f213c524e722",
+          "sourceTransformation": "tauri_nsis_bundle_type_marker"
+        },
+        {
+          "name": "in-line-mcp",
+          "bytes": 2386432,
+          "sha256": "49e581cbf360e3f9e60992a5fbad8e2564b09480339b727bf4333d1fc79c9862",
+          "build": {
+            "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          },
+          "sourceSha256": "49e581cbf360e3f9e60992a5fbad8e2564b09480339b727bf4333d1fc79c9862",
+          "sourceTransformation": "none"
+        },
+        {
+          "name": "in-line-cli",
+          "bytes": 1057792,
+          "sha256": "8b7b50ae9d993c7780ff4d3ea55dffb118cd6817be2614e3f647308b8c914141",
+          "build": {
+            "baselineCommit": "80db9e7c9f6ec8375f9d09eb18e0ef4e31d186e6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          },
+          "cliPhase": 5,
+          "sourceSha256": "8b7b50ae9d993c7780ff4d3ea55dffb118cd6817be2614e3f647308b8c914141",
+          "sourceTransformation": "none"
+        }
+      ],
+      "companionsMatched": false,
+      "nsisPayloadMatched": true,
+      "pathModified": false,
+      "installed": false,
+      "currentMcpSessionVerified": false
+    },
+    "ExtractedMcpContractPassed": true,
+    "ToolCount": 16,
+    "ReleaseRootReadOnlyProbePassed": true,
+    "ReleaseRoot": "C:\\Users\\KB\\.in-line\\mcp-security",
+    "ProductionRootCreated": false,
+    "NativeInstallExecuted": false
+  }
+}
