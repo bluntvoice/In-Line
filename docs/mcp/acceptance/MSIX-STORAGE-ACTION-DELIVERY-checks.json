@@ -1,0 +1,127 @@
+{
+  "Date": "2026-10-26",
+  "Status": "action_artifact_delivered_native_acceptance_pending",
+  "CodeCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+  "Branch": "feat/scheduled-items",
+  "Ci": {
+    "RustPassed": 236,
+    "Id": 40289206194,
+    "Conclusion": "success",
+    "McpContractAndAnonymousRejectionPassed": true,
+    "FrontendPassed": 133,
+    "OfflineIdentitiesPassed": true
+  },
+  "Action": {
+    "ExactNsisPayloadMatched": true,
+    "StagedCompanionsMatched": true,
+    "Id": 40289214226,
+    "ArtifactUploaded": true,
+    "Conclusion": "success",
+    "BothSidecarsContractAndAnonymousRejectionPassed": true,
+    "NsisBuildPassed": true
+  },
+  "Artifact": {
+    "ExpiresUtc": "2026-11-09T08:10:53Z",
+    "Name": "In-Line-dev-windows-x64-3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+    "Id": 12636460880,
+    "ZipSHA256": "2B018B0BF067CBA12368B7FD2A790B6FB597DC313CA7C3B63E08BDF587877874",
+    "GitHubDigestMatched": true,
+    "Url": "https://github.com/bluntvoice/In-Line/actions/runs/40289214226/artifacts/12636460880",
+    "ZipBytes": 4361007
+  },
+  "Installer": {
+    "Path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\MSIX-Storage-Action-3b21c02-20261026\\In-Line_0.5.0-dev-3b21c02_x64-setup.exe",
+    "Bytes": 4378500,
+    "SHA256": "A521758C13664076C393C326BAA8ECBBAEFBAA3CE090CDE6187C77C8CDA98777",
+    "ZipDigestMatched": true,
+    "InstallerExecuted": false
+  },
+  "IndependentDownloadReadback": {
+    "passed": true,
+    "commit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+    "installerBytes": 4378500,
+    "installerSha256": "a521758c13664076c393c326baa8ecbbaefbaa3ce090cde6187c77c8cda98777",
+    "threeBinariesMatched": true,
+    "sourceDirty": false,
+    "installerExecuted": false,
+    "installed": false,
+    "productionMigrationExecuted": false,
+    "currentSessionVerified": false
+  },
+  "PayloadReadback": {
+    "offline": true,
+    "build": {
+      "baselineCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+      "commitVerification": "clean_checkout_readback",
+      "databaseSchemaVersion": 14,
+      "exactCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": false
+    },
+    "records": [
+      {
+        "name": "in-line",
+        "bytes": 8935936,
+        "sha256": "1249985716f2c6b710392df6539cb681b1901d61f1ed0bfb28f95a2289f24be0",
+        "build": {
+          "baselineCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+          "commitVerification": "clean_checkout_readback",
+          "databaseSchemaVersion": 14,
+          "exactCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": false
+        }
+      },
+      {
+        "name": "in-line-mcp",
+        "bytes": 2385920,
+        "sha256": "83ecfcdf332bc33783a3b5333b6d1d5de7e2d7568e9667bcd422d44d98675d09",
+        "build": {
+          "baselineCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+          "commitVerification": "clean_checkout_readback",
+          "databaseSchemaVersion": 14,
+          "exactCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": false
+        }
+      },
+      {
+        "name": "in-line-cli",
+        "bytes": 1064960,
+        "sha256": "a6d90c03f9c9b01aa47edd7a9f8d13f617efbfd768363b80d51005a3f0c0525a",
+        "build": {
+          "baselineCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+          "commitVerification": "clean_checkout_readback",
+          "databaseSchemaVersion": 14,
+          "exactCommit": "3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456",
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": false
+        },
+        "cliPhase": 5
+      }
+    ],
+    "companionsMatched": false,
+    "nsisPayloadMatched": false,
+    "pathModified": false,
+    "installed": false,
+    "currentMcpSessionVerified": false
+  },
+  "IndependentExtractedMcpContractPassed": true,
+  "PriorFailedRuns": [
+    40287775269,
+    40287792461
+  ],
+  "TagCreated": false,
+  "ReleaseCreated": false,
+  "NativeInstallExecuted": false,
+  "ProductionMigrationExecuted": false,
+  "ProductionAuthorizationsModified": false,
+  "ClientConfigurationModified": false,
+  "OldImportReplayed": false,
+  "ConfigurationVerified": false,
+  "CurrentSessionVerified": false
+}

@@ -20,4 +20,14 @@
 
 ## 最终构建与下载
 
-补丁检查和新的 Action 构建结果完成后追加于此；本段未完成前不能视为已交付安装包。
+- 构建提交：[3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456](https://github.com/bluntvoice/In-Line/commit/3b21c02d6cfb4b367ddbe9cf09cc376bba0e0456)，已推送 `feat/scheduled-items`。
+- [CI 40289206194](https://github.com/bluntvoice/In-Line/actions/runs/40289206194)：成功，236 项 Rust、133 项前端、格式、三程序离线身份及 MCP 契约/匿名拒绝检查通过。
+- [开发 Action 40289214226](https://github.com/bluntvoice/In-Line/actions/runs/40289214226)：成功，测试、NSIS、两份 sidecar 契约/匿名拒绝、三程序及安装包解包、上传均通过。
+- [Artifact 12636460880](https://github.com/bluntvoice/In-Line/actions/runs/40289214226/artifacts/12636460880)，保留至 2026-11-09 16:10:53（北京时间）。
+- 本地安装包：`release/MSIX-Storage-Action-3b21c02-20261026/In-Line_0.5.0-dev-3b21c02_x64-setup.exe`，4,378,500 字节。
+- 安装器 SHA-256：`A521758C13664076C393C326BAA8ECBBAEFBAA3CE090CDE6187C77C8CDA98777`。
+- Artifact ZIP SHA-256：`2B018B0BF067CBA12368B7FD2A790B6FB597DC313CA7C3B63E08BDF587877874`，与 GitHub digest 一致。
+
+本地文件名增加开发提交标识，字节与 Action 安装器相同，内部软件版本仍为开发中的 0.5.0。独立下载后核对安装器摘要；仅解出三程序并运行离线元数据和工具契约检查，三程序均为 API 1/schema 14、exactCommit=`3b21c02...`、sourceDirty=false。对照云端的源文件/载荷记录逐项核对，主程序仅包含已验证的 Tauri NSIS marker 转换，两个 companion 完全一致。[交付核验 JSON](MSIX-STORAGE-ACTION-DELIVERY-checks.json)保留最终事实。
+
+未创建 Tag 或 GitHub Release，未执行本机安装、真实授权迁移、再次授权或旧导入重放。配置与当前 AI 会话连接仍未验证成功；后续实机窗口另行确认。不得把当前包生成及离线核验视为迁移、安装或接入验收通过。

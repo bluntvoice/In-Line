@@ -11,7 +11,7 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 2026-10-26 接入存储兼容修复已开发：GUI/MCP/CLI 统一使用用户 Profile 下 `.in-line/mcp-security`，检测并拒绝 AppData 隔离副本；旧版存储须在软件内明确确认后迁移，保留原文件和现有授权，不自动合并。隔离验证及本地包见[交付报告](docs/mcp/acceptance/MSIX-STORAGE-COMPATIBILITY.md)。本机迁移、安装和当前会话认证仍待独立验证；[根因报告](docs/mcp/acceptance/AUTHORIZATION-STORAGE-MSIX-ROOT-CAUSE.md)保留现场证据。
 
-本轮提交推送及开发安装包构建见[Action 交付记录](docs/mcp/acceptance/MSIX-STORAGE-ACTION-DELIVERY.md)。首轮云端检查发现 Windows 短文件名别名误判，已补充兼容处理和真实别名回归；以该记录最终成功的确定提交及安装包摘要为准。
+本轮开发安装包已由 Action 成功生成并下载核验，构建提交为 `3b21c02`，下载与摘要见[Action 交付记录](docs/mcp/acceptance/MSIX-STORAGE-ACTION-DELIVERY.md)。首轮云端检查发现的 Windows 短文件名别名误判已修复，236 项 Rust、133 项前端及包检查通过；未创建 Tag/Release，安装、真实授权迁移和当前会话接入仍待实机验证。
 
 新增授权存储脱敏诊断：在高级管理对照 GUI 与导入器的存储位置、授权版本和客户端匹配摘要；不重试导入，不代表连接验证通过。诊断版本于 2026-10-26 获授权安装并采集双端报告，新授权后确认软件已保存、Codex 命中私有旧副本；下文较早的 Action 测试包不含该诊断及兼容修复，见[诊断记录](docs/mcp/acceptance/AUTHORIZATION-STORAGE-DIAGNOSTIC.md)。
 

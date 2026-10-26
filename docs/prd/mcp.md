@@ -6,6 +6,8 @@
 
 实现、隔离检查、本地包及实机边界见[交付报告](../mcp/acceptance/MSIX-STORAGE-COMPATIBILITY.md)。不重放旧导入，不自动授权，不把迁移回执视为配置或会话验证通过。
 
+本轮最终开发 Action 交付见[记录](../mcp/acceptance/MSIX-STORAGE-ACTION-DELIVERY.md)，构建提交 `3b21c02` 已通过 236 项 Rust、133 项前端及包检查。路径比较补齐 Windows 8.3 别名：展开逻辑长名称后比较物理位置，保留真实隔离副本的拒绝；实际 sidecar 别名回归通过。本机安装与迁移尚未执行，当前会话验证门禁保持。
+
 ## 2026-10-23 授权存储脱敏诊断（历史开发及诊断记录）
 
 2026-10-26 后续根因已确认：Codex 侧同路径读取实际命中其私有 LocalCache 的旧授权文件（revision 3/0 条），软件侧已保存 revision 10/3 条；物理文件 ID 及反查路径不同。更正此前“未保存”的推断，后续需处理跨环境共享安全存储及覆盖检测，开发方案见[根因报告](../mcp/acceptance/AUTHORIZATION-STORAGE-MSIX-ROOT-CAUSE.md)。未自动迁移或删除现有文件，配置与当前会话尚未验证通过。
