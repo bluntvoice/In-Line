@@ -1,5 +1,18 @@
 import {describe,expect,it} from "vitest";
-import {canPrepare} from "./mcp-onboarding";
+import {canPrepare,initialMcpIdentity,reusableMcpClients,type McpClient} from "./mcp-onboarding";
+
+describe("existing MCP identity selection",()=>{
+  const client=(id:string,kind="codex",revoked=false):McpClient=>({id,name:id,kind,revoked,permissions:{regularRead:true,fullRead:false,write:false},scope:{departments:["A"],taskTypes:["T"]}});
+  it("reuses a sole active Codex identity without choosing CLI or revoked identities",()=>{
+    const clients=[client("active"),client("revoked","codex",true),client("cli","cli")];
+    expect(reusableMcpClients(clients).map(c=>c.id)).toEqual(["active"]);
+    expect(initialMcpIdentity(clients)).toBe("active");
+  });
+  it("requires disambiguation when more than one active identity exists",()=>{
+    expect(initialMcpIdentity([client("A"),client("B")])).toBe("");
+    expect(initialMcpIdentity([client("revoked","codex",true)])).toBe("new");
+  });
+});
 
 describe("first client authorization",()=>{
   it("allows a supported authorization adapter before current-session verification",()=>{

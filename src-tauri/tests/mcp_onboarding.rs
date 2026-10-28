@@ -114,6 +114,25 @@ async fn existing_stdio_connection_refreshes_authorized_identity_without_restart
         true
     );
     assert_eq!(
+        active["data"]["credentialResolution"],
+        json!({"source":"runtimeBinding","changed":true})
+    );
+    assert_eq!(active["data"]["verificationScope"], "thisToolCall");
+    let repeated = client
+        .call_tool(request())
+        .await
+        .unwrap()
+        .structured_content
+        .unwrap();
+    assert_eq!(
+        repeated["data"]["credentialResolution"],
+        json!({"source":"runtimeBinding","changed":false})
+    );
+    assert_eq!(
+        repeated["data"]["compatibility"]["sessionCredentialsRefreshed"],
+        true
+    );
+    assert_eq!(
         active["data"]["permissions"],
         json!({"regularRead":true,"fullRead":false,"write":false})
     );
@@ -297,6 +316,58 @@ async fn actual_importer_config_and_sidecar_verify_identity_intersection_scope_w
         std::fs::read_to_string(home.join("config.toml")).unwrap()
     );
     assert!(!String::from_utf8_lossy(&replay.stdout).contains(token));
+    // New short-lived handoffs reuse the same identity and exact config bytes.
+    // They are distinct synthetic tickets, never replayed production commands.
+    let auth_before = std::fs::read(security_root.join("authorization.dpapi")).unwrap();
+    let file_before = platform::file_location(&home.join("config.toml"))
+        .unwrap()
+        .1;
+    for _ in 0..2 {
+        let reused = onboarding::reuse_at(
+            &security,
+            &security_root,
+            std::path::Path::new(env!("CARGO_BIN_EXE_in-line-mcp")),
+            &home,
+            &receipt.client_id,
+            chrono::Utc::now().timestamp(),
+        )
+        .unwrap();
+        let mut cmd = tokio::process::Command::new(env!("CARGO_BIN_EXE_in-line-mcp"));
+        cmd.args(["--import-client", &reused.package_id])
+            .env("IN_LINE_MCP_TEST_SECURITY_ROOT", &security_root)
+            .env("IN_LINE_MCP_TEST_CODEX_HOME", &home)
+            .env(
+                "IN_LINE_MCP_TEST_HOST_EXE",
+                std::env::current_exe().unwrap(),
+            )
+            .creation_flags(0x08000000);
+        let output = cmd.output().await.unwrap();
+        assert!(output.status.success(), "synthetic reuse import failed");
+        assert!(output.stderr.is_empty());
+        assert!(!String::from_utf8_lossy(&output.stdout).contains(token));
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result["data"]["configurationChanged"], false);
+        assert_eq!(result["data"]["configurationVerified"], true);
+        assert_eq!(result["data"]["currentSessionVerified"], false);
+        assert_eq!(result["data"]["clientId"], receipt.client_id);
+        assert_eq!(result["data"]["scope"], data["scope"]);
+        assert_eq!(result["data"]["permissions"], data["permissions"]);
+    }
+    assert_eq!(security.view().unwrap().clients.len(), 1);
+    assert_eq!(
+        std::fs::read(security_root.join("authorization.dpapi")).unwrap(),
+        auth_before
+    );
+    assert_eq!(
+        platform::file_location(&home.join("config.toml"))
+            .unwrap()
+            .1,
+        file_before
+    );
+    assert_eq!(
+        std::fs::read_to_string(home.join("config.toml")).unwrap(),
+        config
+    );
     let credentials = Credentials {
         client_id: receipt.client_id,
         token: token.into(),

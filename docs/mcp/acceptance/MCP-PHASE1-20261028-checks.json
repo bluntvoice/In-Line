@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "phase": "Phase 1",
+  "date": "2026-10-28",
+  "timezone": "Asia/Shanghai",
+  "status": "awaiting_user_acceptance",
+  "report": "../../MCP_PHASE1_ACCEPTANCE.md",
+  "git": {
+    "branch": "feat/scheduled-items",
+    "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+    "committed": false,
+    "pushed": false
+  },
+  "decisions": {
+    "D2_A": "Reuse the explicitly selected authorized Codex identity and its valid credentials; no automatic grant, rotation, permission, scope, or pause changes.",
+    "D3_A": "Retain existing private config env and DPAPI storage; no credential architecture migration, resident service, or intermediary."
+  },
+  "compatibility": {
+    "toolCount": 16,
+    "apiVersion": 1,
+    "namesInputSchemasAndAnnotationsUnchanged": true,
+    "contractBaselineRegenerated": false,
+    "additiveFields": [
+      "credentialResolution.source",
+      "credentialResolution.changed",
+      "verificationScope",
+      "configurationChanged"
+    ],
+    "legacyAliasesRetained": [
+      "sessionCredentialsRefreshed",
+      "currentSessionAutoImportVerified"
+    ],
+    "legacyAliasesAreSessionProof": false,
+    "authorizationStoreSchemaChanged": false,
+    "businessDatabaseSchemaChanged": false
+  },
+  "tests": {
+    "frontend": {
+      "passed": 135,
+      "files": 22,
+      "log": "frontend-full.txt"
+    },
+    "frontendBuild": {
+      "passed": true,
+      "log": "frontend-build-final.txt"
+    },
+    "rustFull": {
+      "passed": 247,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "log": "rust-final.txt",
+      "sequence": "After ACL fix, before final timeout validation boundary adjustment."
+    },
+    "finalTimeoutBoundaryRegression": {
+      "passed": 96,
+      "mcpLibrary": {
+        "passed": 94,
+        "filtered": 118,
+        "log": "rust-schema-final.txt"
+      },
+      "actualStdioOnboarding": {
+        "passed": 2,
+        "filtered": 0,
+        "log": "onboarding-schema-final.txt"
+      },
+      "fullSuiteRepeatedAfterFinalAdjustment": false
+    },
+    "formatting": {
+      "passed": true,
+      "log": "fmt-check.txt"
+    },
+    "gitDiffCheck": {
+      "passed": true
+    },
+    "browserAccessRestore": {
+      "passed": true,
+      "syntheticApi": true,
+      "log": "ui-access.txt"
+    },
+    "browserReuse": {
+      "passed": true,
+      "flows": 12,
+      "layoutCases": 6,
+      "syntheticApi": true,
+      "results": "ui-check.json"
+    },
+    "browserOriginalLayout": {
+      "passed": true,
+      "cases": 126,
+      "minimumActionGapCssPx": 10,
+      "syntheticApi": true,
+      "results": "layout-check.json"
+    },
+    "releaseToolContract": {
+      "passed": true,
+      "toolCount": 16,
+      "fullInputSchemas": true,
+      "allAnnotations": true,
+      "log": "contract.txt"
+    },
+    "releaseAnonymousStdio": {
+      "passed": true,
+      "toolCalls": 16,
+      "repeatCalls": 3,
+      "rateLimitFromAttempt": 6,
+      "jsonStdoutOnly": true,
+      "noBusinessData": true,
+      "log": "anonymous-stdio.txt"
+    },
+    "offlinePackageIdentity": {
+      "passed": true,
+      "threePrograms": true,
+      "companionsMatched": true,
+      "results": "package-build.json"
+    },
+    "nsisPayload": {
+      "passed": true,
+      "installerExecuted": false,
+      "results": "nsis-payload.json",
+      "records": [
+        {
+          "name": "in-line",
+          "bytes": 9106432,
+          "sha256": "616a3cfc4cdfe6b17e0bb8c4bc74f553ffd77dcaa303cee89befe2f03e3c4815",
+          "sourceTransformation": "tauri_nsis_bundle_type_marker"
+        },
+        {
+          "name": "in-line-mcp",
+          "bytes": 2442240,
+          "sha256": "755fef9db956099a70cdad0f587f2ab8c7d6aa0eb583243f0fec639460654b12",
+          "sourceTransformation": "none"
+        },
+        {
+          "name": "in-line-cli",
+          "bytes": 1059328,
+          "sha256": "a9db51e403365a8be142dd4f1864a0a024ec4b1abbcd2d81eb3063dedef10f35",
+          "sourceTransformation": "none"
+        }
+      ]
+    },
+    "nativeGui": {
+      "executed": false
+    },
+    "newBuildCurrentCodexSession": {
+      "executed": false
+    },
+    "allBusinessToolsAcceptance": {
+      "completed": false,
+      "deferredTo": "Phase 3"
+    }
+  },
+  "package": {
+    "path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\MCP-Phase1-20261028\\In-Line_0.5.0-mcp-phase1-local_x64-setup.exe",
+    "bytes": 4421954,
+    "sha256": "04EFDF7C6EFD3A27AEC76CB03C88F3AD57AC247A4166ED11D3F0242B910483F9",
+    "payloadMatched": true,
+    "installerExecuted": false,
+    "installed": false,
+    "build": {
+      "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    },
+    "started": "2026-10-28T12:40:24.9305989+08:00",
+    "ended": "2026-10-28T12:52:48.4813691+08:00",
+    "exitCode": 0,
+    "minimumFreeGiB": 3.68,
+    "maximumCommitPercent": 80,
+    "guardStopped": false,
+    "sourceFreeze": {
+      "files": 818,
+      "changed": [],
+      "manifest": "source-freeze-final.json"
+    },
+    "formalInstalledBinaries": [
+      {
+        "name": "in-line",
+        "unchanged": true
+      },
+      {
+        "name": "in-line-mcp",
+        "unchanged": true
+      },
+      {
+        "name": "in-line-cli",
+        "unchanged": true
+      }
+    ]
+  },
+  "currentMountedMcp": {
+    "observedUtc": "2026-10-28 04:28:20 UTC",
+    "status": "ok",
+    "errorCode": null,
+    "requestId": "b7be483e14f45c2e33a9006ce4bb8ccd5906d816a96dd22d851cccea37c2eab9",
+    "identityMatchesPhase0": true,
+    "authorizationRevision": 20,
+    "permissions": {
+      "fullRead": true,
+      "regularRead": true,
+      "write": true
+    },
+    "scope": {
+      "departments": null,
+      "taskTypes": null
+    },
+    "tools": [
+      "get_capabilities",
+      "get_report_summary",
+      "list_report_items",
+      "query_tasks",
+      "query_task_history",
+      "query_work_calendar",
+      "manage_saved_query",
+      "mutate_task",
+      "manage_preferences",
+      "request_undo",
+      "batch_mutate",
+      "manage_business_data",
+      "query_changes",
+      "manage_jobs",
+      "inspect_data",
+      "get_diagnostic"
+    ],
+    "build": {
+      "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    },
+    "sidecarBuild": {
+      "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    },
+    "connectionVerified": true,
+    "phase1FieldsPresent": false,
+    "meaning": "installed pre-Phase1 build only; does not validate new artifacts"
+  },
+  "protection": {
+    "baselineFiles": 817,
+    "finalFiles": 820,
+    "modifiedExistingFiles": 18,
+    "addedFiles": 3,
+    "deletedFiles": 0,
+    "preexistingUnrelatedChangesPreserved": true,
+    "securityRsInstallerWorkflowsDependenciesVersionsUnchanged": true,
+    "formalEnvironmentUpgraded": false,
+    "codexRestarted": false,
+    "formalClientProcessesTerminated": false,
+    "realWorkItemsModified": false,
+    "realClientAuthorizationModified": false,
+    "realCodexConfigurationModified": false,
+    "secretsIncluded": false,
+    "originalOneTimeImportReplayed": false
+  },
+  "files": {
+    "changedExisting": [
+      {
+        "path": "CHANGELOG.md",
+        "hash": "5D80FDBEAD874459C1A4C45E9B1ACC052B5A204B6C77D9C9CBFB79A52999B496"
+      },
+      {
+        "path": "docs/mcp/client-onboarding-proposal.md",
+        "hash": "E99EBCDA364DDDD965FFEA9B1A71084DBF6E9BDA9A0D5E6178F98F2DEDDCA02B"
+      },
+      {
+        "path": "docs/mcp/connection-guide.md",
+        "hash": "AF34AA9415FB3F92006FAF227749671FA9DC721A81E1484E3395ACAE9E5BC115"
+      },
+      {
+        "path": "docs/prd/mcp.md",
+        "hash": "922F9190FDBF10274663451E54E884A803B29D342097CCCD5CFE1F178FD60A2A"
+      },
+      {
+        "path": "README.md",
+        "hash": "6DACC71678595A32C362A848A34CADAD6FAB350218D964601779347C2D13DBFC"
+      },
+      {
+        "path": "RELEASE_NOTES.md",
+        "hash": "A25A75553671FD0795C64EA12E8705876D55D51C78671ED3612DF07C3254702F"
+      },
+      {
+        "path": "scripts/verify-mcp-button-spacing.mjs",
+        "hash": "9F5BC595537DC69CB598F26F40FC1D3EDD459CF723F399E432AFC490A7BF5F6F"
+      },
+      {
+        "path": "src-tauri/src/bin/in-line-mcp.rs",
+        "hash": "39AA86D60B451DF645DADEA0AB812A4986E927C5704AE0F68F5833D211ADA1CC"
+      },
+      {
+        "path": "src-tauri/src/lib.rs",
+        "hash": "6A14FB929095FCDA0400EA45F978DF48336CA39B9BF7BF245E2B0640C4083D5E"
+      },
+      {
+        "path": "src-tauri/src/mcp/codex_import.rs",
+        "hash": "834F1D2BE2706E6291FC9B9640CF8C0AA35DB06633931FB23CC15324F38C2A91"
+      },
+      {
+        "path": "src-tauri/src/mcp/contract.rs",
+        "hash": "1B557101A147E01963AF6CF5A94544847388DD1DC3FBFB4FCA1882122173586E"
+      },
+      {
+        "path": "src-tauri/src/mcp/onboarding.rs",
+        "hash": "3997B6252DF18A5F3450EA112A08EED928B066450DF12BD20E8F258B1F1A4508"
+      },
+      {
+        "path": "src-tauri/src/mcp/runtime_credentials.rs",
+        "hash": "22AB07D4703AE9755AA0F28BD733E142526A7F100CD657FF3347D7D67EE1AFF6"
+      },
+      {
+        "path": "src-tauri/tests/mcp_onboarding.rs",
+        "hash": "BB123C871FA63A6E1CECD3925BC489D8E3B75D16D94DD5483A357D3545410BDD"
+      },
+      {
+        "path": "src/api.ts",
+        "hash": "77F6DC0155A7242C9A55DDAC052F7AD3C21F95EAC0EA300F25A4F0B61E81E90E"
+      },
+      {
+        "path": "src/components/McpSecuritySetting.tsx",
+        "hash": "261084441C08F87FB25BBF1D3228BF656B0112EE684F3ABED47A150714A6A685"
+      },
+      {
+        "path": "src/lib/mcp-onboarding.test.ts",
+        "hash": "A1874B41DA758A53A7F2B3C1DED4E284E2E50CC825F60982FE384510AD9530AB"
+      },
+      {
+        "path": "src/lib/mcp-onboarding.ts",
+        "hash": "94DC3B8F591D57E529CAE1F19AF150C842DEAA4831EDD74658E9FB297149A722"
+      }
+    ],
+    "added": [
+      {
+        "path": "docs/MCP_PHASE1_ACCEPTANCE.md",
+        "hash": "3E7873852481AB0665B340853AF70E72E726CDDE9EF1880EB5DE48572E21CE45"
+      },
+      {
+        "path": "scripts/verify-mcp-phase1-ui.mjs",
+        "hash": "AD22D273A1A5B7BA851357BF729B90841F27A50841774787A545C22B2B56EB9D"
+      }
+    ],
+    "additionalManifest": "docs/mcp/acceptance/MCP-PHASE1-20261028-checks.json",
+    "hashScope": "Final working files excluding this manifest; existing changes are relative to Phase 1 start, not Git HEAD."
+  },
+  "evidenceDirectory": "release/MCP-Phase1-20261028",
+  "rollback": {
+    "scope": "Only Phase 1 delta; preserve preexisting changes. Do not reset/restore/clean the whole tree.",
+    "beforeSnapshots": "release/MCP-Phase1-20261028/before/",
+    "formalDataMigration": false,
+    "importFailure": "Existing conditional config byte and ACL rollback retained; never overwrite concurrent third-party edits or resurrect revoked authorization."
+  },
+  "deferred": {
+    "automaticHostConnectionRecovery": {
+      "resolved": false,
+      "phase": "Phase 2",
+      "priority": "Investigate official supported host reload/recovery entry points first."
+    },
+    "installerProcessTermination": {
+      "changed": false,
+      "phase": "Phase 2"
+    },
+    "clientDeletion": {
+      "implemented": false,
+      "phase": "Phase 4"
+    }
+  },
+  "nextGate": "Stop for user Phase 1 acceptance. No commit, push, installation, or Phase 2 execution."
+}

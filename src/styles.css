@@ -353,9 +353,10 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 .mcp-security-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:8px 0}
 .mcp-security-controls label{display:flex;align-items:center;gap:5px}
 .mcp-client-list{list-style:none;padding:0;margin:8px 0}
-.mcp-client-list li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e4eaf2}
+.mcp-client-list li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #e4eaf2}
+.mcp-client-list li>div:first-child{flex:1 1 220px;min-width:0;overflow-wrap:anywhere}
 .mcp-client-list small{display:block;font-size:12px;color:#607086;overflow-wrap:anywhere}
-.mcp-client-list li>div:last-child{display:flex;gap:6px}
+.mcp-client-list li>.mcp-button-actions{flex:0 1 auto;min-width:0}
 .mcp-grant-form{display:flex;flex-wrap:wrap;align-items:end;gap:8px;margin:8px 0}
 .mcp-grant-form label{display:grid;gap:4px;flex:1 1 180px}
 .mcp-grant-form input,.mcp-grant-form select{width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px;border:1px solid #ccd7e8;border-radius:6px}
@@ -371,3 +372,17 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 .mcp-connect-confirm{display:flex;align-items:flex-start;gap:7px;margin:12px 0;font-size:13px;line-height:1.6}
 .mcp-connect-confirm input{flex:none;margin-top:4px}
 .mcp-connect-dialog .mcp-issued textarea{display:block;resize:vertical;min-height:160px;padding:9px;border:1px solid #cfd8e5;border-radius:7px;overflow-wrap:anywhere;white-space:pre-wrap}
+.mcp-button-actions{display:flex!important;flex-wrap:wrap;align-items:center;gap:10px}
+.mcp-security-setting .button,.mcp-connect-dialog .button,.mcp-content-dialog .button,.mcp-storage-gate .button,.mcp-connection-row>.button{height:auto;min-height:36px;max-width:100%;padding:7px 12px;white-space:normal;overflow-wrap:anywhere;flex-shrink:0}
+.mcp-security-setting .button svg,.mcp-connect-dialog .button svg,.mcp-content-dialog .button svg,.mcp-connection-row>.button svg{flex-shrink:0}
+.mcp-security-controls>label{max-width:100%;min-width:0;flex-wrap:wrap}
+.mcp-security-controls input:not([type=checkbox]),.mcp-security-controls select{min-width:0;max-width:100%}
+.mcp-grant-form label{min-width:0;max-width:100%}
+.mcp-connection-row{flex-wrap:wrap;gap:10px}
+.mcp-connection-row>div:first-child{flex:1 1 220px}
+.mcp-storage-gate>div{width:100%;overflow-wrap:anywhere}
+.mcp-connect-dialog>.modal-header,.mcp-content-dialog>header{gap:10px}
+.mcp-connect-dialog>.modal-header h2,.mcp-content-dialog>header>div{min-width:0;overflow-wrap:anywhere}
+.mcp-connect-dialog>.modal-header>.icon-button,.mcp-content-dialog>header>.icon-button{flex-shrink:0}
+.mcp-content-dialog>footer{flex-wrap:wrap;gap:10px}
+@media(max-width:600px){.mcp-client-list li>div{flex-basis:100%}.mcp-content-help>div{grid-template-columns:1fr;gap:3px}}

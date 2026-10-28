@@ -1,0 +1,274 @@
+{
+  "Date": "2026-10-26",
+  "Status": "development_isolation_and_local_package_complete_native_gates_pending",
+  "Branch": "feat/scheduled-items",
+  "BaselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+  "SourceDirty": true,
+  "ExactCommitVerified": false,
+  "ApprovalPolicy": {
+    "DefaultInserted": false,
+    "RealPolicyValueRead": false,
+    "Schema": "https://learn.chatgpt.com/docs/config-schema.json",
+    "SupportedStrings": [
+      "auto",
+      "prompt",
+      "writes",
+      "approve"
+    ],
+    "OriginalPolicyKeyAndItemPreserved": true
+  },
+  "Rust": {
+    "NewRegressionTests": 3,
+    "RegressionReproducedBeforePatch": true,
+    "Failed": 0,
+    "Runtime": {
+      "Start": "2026-10-26T16:51:42.3430144+08:00",
+      "End": "2026-10-26T16:54:29.3263105+08:00",
+      "ExitCode": 0,
+      "GuardStopped": false,
+      "TargetDirectory": "D:\\codex-data\\build-targets\\in-line-cli-phase1-test-20261016",
+      "BuildJobs": 1,
+      "TestDebugInfo": 0,
+      "DevDebugInfo": 0,
+      "TestThreads": 1,
+      "CargoArguments": [
+        "test",
+        "--locked",
+        "--manifest-path",
+        "src-tauri/Cargo.toml",
+        "--",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "TestsFiltered": false,
+      "MinimumHeadroomGiB": 11.99,
+      "MaximumCommitPercent": 72.0,
+      "AbortHeadroomGiB": 4,
+      "AbortCommitPercent": 90,
+      "ConsecutiveSamplesBeforeAbort": 2
+    },
+    "Passed": 239.0
+  },
+  "Frontend": {
+    "Files": 22,
+    "Failed": 0,
+    "Tests": 133,
+    "TypeScriptAndViteBuildPassed": true,
+    "Log": "release/Import-Spacing-frontend-tests.txt",
+    "ButtonBehaviorAttributeReadbackPassed": true
+  },
+  "Layout": {
+    "Widths": [
+      1280,
+      980,
+      560
+    ],
+    "Scenarios": 126,
+    "MinimumActionGapCssPx": 10.0,
+    "Method": "effective CSS viewport and DPR equivalent to native WebView zoom; not desktop acceptance",
+    "ZoomPercent": [
+      100,
+      110,
+      150
+    ],
+    "OverlapOrOverflowFailures": 0,
+    "LogSHA256": "EDCB78F1CBD15F83155EE4841FDE319553E771CD9B48562281B82BF817DD79B6",
+    "Passed": true,
+    "Font": "hash-verified Sarasa UI SC 400/600/700",
+    "TextPercent": [
+      100,
+      150
+    ],
+    "BaselineFailsForSixPixelGap": true,
+    "Log": "release/Import-Spacing-ui-check.json"
+  },
+  "ExistingBrowserBehavior": {
+    "PassedWhenRunSerially": true,
+    "Access": {
+      "passed": true,
+      "productionDataTouched": false,
+      "checks": [
+        "startup preference retry",
+        "preserve loaded font and scale on transient failure",
+        "focus recovery",
+        "stale response rejected",
+        "real verified Sarasa weights and font-load failure retry",
+        "unmount cancels retries",
+        "dialog defaults and unavailable clients",
+        "explicit global/resume/sensitive confirmations",
+        "CLI independent scope",
+        "clipboard retry without duplicate grant",
+        "receipt retained on reopen",
+        "read-only selected-client diagnostic and copy",
+        "diagnostic failure clears stale results",
+        "narrow layout"
+      ]
+    },
+    "Storage": {
+      "passed": true,
+      "productionDataTouched": false,
+      "nativeMigrationExecuted": false,
+      "checks": [
+        "explicit consent before migration",
+        "connection controls gated while pending",
+        "source-change failure clears confirmation without retry",
+        "successful receipt remains separate from session verification",
+        "redirected legacy source cannot migrate",
+        "ready shared root ignores legacy shadow"
+      ]
+    },
+    "InitialParallelAttemptPortConflict": true
+  },
+  "SourceFiles": [
+    {
+      "Path": "src-tauri/src/mcp/codex_import.rs",
+      "SHA256": "11294B33C5219B5AF35A93286C799D629A0F6A94B4FA4E83D0A9BB28487188DE"
+    },
+    {
+      "Path": "src/components/McpSecuritySetting.tsx",
+      "SHA256": "E779DA09D71B48569E72C4166F725AE321935E86C5E2F44BFF0B6753D9385AA8"
+    },
+    {
+      "Path": "src/components/McpStorageGate.tsx",
+      "SHA256": "1323C8CA065AF7895716DBAF54140DD54B0486AB8D13EBC0C3FB30581C65D183"
+    },
+    {
+      "Path": "src/components/SettingsPanel.tsx",
+      "SHA256": "F7EC9BEFC32C6AF6D11835CEAB54512EC6D9A8F0C0E6E9BB6EAB324554FDEEE0"
+    },
+    {
+      "Path": "src/styles.css",
+      "SHA256": "0980F22C83DA5AD508C60C1C4818021B8703FADE854ACDCA46E6BCA98C55B9D4"
+    },
+    {
+      "Path": "scripts/verify-mcp-button-spacing.mjs",
+      "SHA256": "08EC76A07DB99FAE89A1FE97DFDA56EBC9808255D103927364677F038165D1BC"
+    }
+  ],
+  "Package": {
+    "ExtractedPayload": {
+      "offline": true,
+      "build": {
+        "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+        "commitVerification": "unverified_local_source",
+        "databaseSchemaVersion": 14,
+        "exactCommit": null,
+        "mcpVersion": 1,
+        "softwareVersion": "0.5.0",
+        "sourceDirty": true
+      },
+      "records": [
+        {
+          "name": "in-line",
+          "bytes": 8979968,
+          "sha256": "857e151eb1fb25c73ddce6204659e706aae0247aecdbfcfa49d611324a93d143",
+          "build": {
+            "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          },
+          "sourceSha256": "c97e2e30687533577ac6c246f9309ea8569b4fa7984f3dc69e769a1030616b00",
+          "sourceTransformation": "tauri_nsis_bundle_type_marker"
+        },
+        {
+          "name": "in-line-mcp",
+          "bytes": 2394112,
+          "sha256": "7820147887debd205bad104a5bb59b2a0f9907220d7eb838272dac2359b4a47b",
+          "build": {
+            "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          },
+          "sourceSha256": "7820147887debd205bad104a5bb59b2a0f9907220d7eb838272dac2359b4a47b",
+          "sourceTransformation": "none"
+        },
+        {
+          "name": "in-line-cli",
+          "bytes": 1058816,
+          "sha256": "c4c399bd83a9144a4f8a9f97489259fc09996ce1e81ce249604be344f3230c8f",
+          "build": {
+            "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+            "commitVerification": "unverified_local_source",
+            "databaseSchemaVersion": 14,
+            "exactCommit": null,
+            "mcpVersion": 1,
+            "softwareVersion": "0.5.0",
+            "sourceDirty": true
+          },
+          "cliPhase": 5,
+          "sourceSha256": "c4c399bd83a9144a4f8a9f97489259fc09996ce1e81ce249604be344f3230c8f",
+          "sourceTransformation": "none"
+        }
+      ],
+      "companionsMatched": true,
+      "nsisPayloadMatched": true,
+      "pathModified": false,
+      "installed": false,
+      "currentMcpSessionVerified": false
+    },
+    "BuildPassed": true,
+    "Runtime": {
+      "Start": "2026-10-26T16:57:05.423529+08:00",
+      "End": "2026-10-26T17:08:02.7022697+08:00",
+      "ExitCode": 0,
+      "GuardStopped": false,
+      "TargetDirectory": "D:\\codex-data\\projects\\inline\\In-Line\\src-tauri\\target",
+      "BuildJobs": 1,
+      "TestDebugInfo": 0,
+      "DevDebugInfo": 0,
+      "TestThreads": 1,
+      "Command": "npm.cmd run dist",
+      "InstallerExecuted": false,
+      "LocalInstallation": false,
+      "MinimumHeadroomGiB": 9.97,
+      "MaximumCommitPercent": 76.0,
+      "AbortHeadroomGiB": 4,
+      "AbortCommitPercent": 90,
+      "ConsecutiveSamplesBeforeAbort": 2
+    },
+    "Installer": {
+      "SHA256": "DAC2D052E8A8E98E12D25FE31844C0372F2C8396A030B727A695527A103AF331",
+      "Path": "D:\\codex-data\\projects\\inline\\In-Line\\release\\Import-Spacing-local-20261026\\In-Line_0.5.0-import-spacing-local_x64-setup.exe",
+      "InstallerExecuted": false,
+      "Bytes": 4375322
+    },
+    "ToolContract": {
+      "Tools": 16,
+      "Purpose": "isolated unauthenticated contract listing only; not current-session validation",
+      "Passed": true,
+      "Log": "release/Import-Spacing-contract.txt"
+    }
+  },
+  "Production": {
+    "PauseChanged": false,
+    "ConfigurationRead": false,
+    "InstallationExecuted": false,
+    "CredentialOrOldTicketRead": false,
+    "OldImportReplayed": false,
+    "ConfigurationWritten": false,
+    "MigrationExecuted": false,
+    "AuthorizationChanged": false
+  },
+  "Verification": {
+    "MountedResult": "unauthenticated",
+    "UpgradeDatabaseAndPreferencesAcceptance": false,
+    "CurrentSessionVerified": false,
+    "ConfigurationVerified": false,
+    "MountedToolCalled": true,
+    "NativeWebViewAcceptance": false
+  },
+  "Git": {
+    "ActionDispatched": false,
+    "Committed": false,
+    "TagOrReleaseCreated": false,
+    "Pushed": false
+  }
+}

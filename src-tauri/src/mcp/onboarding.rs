@@ -298,6 +298,67 @@ fn discard_failed(root: &Path, id: Option<&str>) {
         }
     }
 }
+/// Reissue a short-lived handoff for an explicitly selected existing identity.
+/// No grant, rotation, permission change or security-store write occurs here.
+pub fn reuse_at(
+    security: &Security,
+    root: &Path,
+    command: &Path,
+    home: &Path,
+    id: &str,
+    now: i64,
+) -> Result<Receipt, McpError> {
+    if security.private_root() != root {
+        return Err(McpError::new("security_unavailable"));
+    }
+    validate_command(command)?;
+    let before = security.view()?;
+    let client = before
+        .clients
+        .iter()
+        .find(|c| c.id == id && c.kind.as_deref() == Some("codex"))
+        .ok_or_else(|| McpError::new("onboarding_unavailable"))?;
+    if client.revoked {
+        return Err(McpError::new("revoked"));
+    }
+    if before.paused {
+        return Err(McpError::new("paused"));
+    }
+    let credentials = super::codex_import::existing_credentials(home, command, id)?;
+    let store = Security::read_at(root)?;
+    if store.revision != before.revision {
+        return Err(McpError::new("authorization_changed"));
+    }
+    // A stale/rotated token must never silently cause a new grant or rotation.
+    store.authorize(&credentials).map_err(|e| {
+        if e.code == "unauthenticated" {
+            McpError::new("onboarding_credentials_unavailable")
+        } else {
+            e
+        }
+    })?;
+    let receipt = issue(
+        root,
+        command,
+        Issued {
+            client_id: credentials.client_id,
+            token: credentials.token,
+        },
+        now,
+    )?;
+    let checked = security.view().and_then(|state| {
+        if state.revision == before.revision {
+            Ok(())
+        } else {
+            Err(McpError::new("authorization_changed"))
+        }
+    });
+    if let Err(error) = checked {
+        discard_failed(root, Some(&receipt.package_id));
+        return Err(error);
+    }
+    Ok(receipt)
+}
 pub fn rotate_at(
     security: &Security,
     root: &Path,
@@ -370,6 +431,166 @@ pub(crate) fn load_ticket(root: &Path, id: &str, now: i64) -> Result<(Ticket, Pa
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    fn configured_identity(f: &Fixture) -> (Receipt, Credentials) {
+        let r = f.prepare();
+        let (ticket, _) = load_ticket(&f.security_root(), &r.package_id, 1000).unwrap();
+        let content = format!("# synthetic private config\n[mcp_servers.in_line]\ncommand = {}\n[ mcp_servers.in_line.env ]\nIN_LINE_MCP_CLIENT_ID = '{}'\nIN_LINE_MCP_TOKEN = '{}'\n", toml_edit::value(f.command.to_str().unwrap()), ticket.credentials.client_id, ticket.credentials.token);
+        write_private(&f.home.join("config.toml"), content.as_bytes()).unwrap();
+        (r, ticket.credentials)
+    }
+    #[test]
+    fn reuse_reissues_for_same_identity_without_changing_store_token_scope_or_config() {
+        let f = Fixture::new();
+        let (original, credentials) = configured_identity(&f);
+        f.security
+            .update_client(
+                &original.client_id,
+                Permissions {
+                    regular_read: true,
+                    full_read: true,
+                    write: false,
+                },
+                Scope {
+                    departments: Some(vec!["A".into()]),
+                    task_types: Some(vec!["T".into()]),
+                },
+            )
+            .unwrap();
+        let auth_bytes = std::fs::read(f.security_root().join("authorization.dpapi")).unwrap();
+        let config_bytes = std::fs::read(f.home.join("config.toml")).unwrap();
+        let revision = f.security.view().unwrap().revision;
+        for now in [1001, 1002, 1700] {
+            let receipt = reuse_at(
+                &f.security,
+                &f.security_root(),
+                &f.command,
+                &f.home,
+                &original.client_id,
+                now,
+            )
+            .unwrap();
+            assert_eq!(receipt.client_id, original.client_id);
+            assert_ne!(receipt.package_id, original.package_id);
+            let (ticket, _) = load_ticket(&f.security_root(), &receipt.package_id, now).unwrap();
+            assert!(super::super::security::constant_equal(
+                &ticket.credentials.token,
+                &credentials.token
+            ));
+            assert!(!receipt.prompt.contains(&credentials.token));
+        }
+        assert_eq!(f.security.view().unwrap().revision, revision);
+        assert_eq!(f.security.view().unwrap().clients.len(), 1);
+        assert_eq!(
+            std::fs::read(f.security_root().join("authorization.dpapi")).unwrap(),
+            auth_bytes
+        );
+        assert_eq!(
+            std::fs::read(f.home.join("config.toml")).unwrap(),
+            config_bytes
+        );
+        let auth = Security::read_at(&f.security_root())
+            .unwrap()
+            .authorize(&credentials)
+            .unwrap();
+        assert_eq!(auth.scope.departments, Some(vec!["A".into()]));
+    }
+    #[test]
+    fn reuse_never_falls_back_to_grant_or_rotation_for_missing_mismatched_or_stale_credentials() {
+        let f = Fixture::new();
+        let original = f.prepare();
+        let before = std::fs::read(f.security_root().join("authorization.dpapi")).unwrap();
+        assert_eq!(
+            reuse_at(
+                &f.security,
+                &f.security_root(),
+                &f.command,
+                &f.home,
+                &original.client_id,
+                1001
+            )
+            .err()
+            .unwrap()
+            .code,
+            "onboarding_credentials_unavailable"
+        );
+        assert_eq!(
+            std::fs::read(f.security_root().join("authorization.dpapi")).unwrap(),
+            before
+        );
+        let g = Fixture::new();
+        let (selected, credentials) = configured_identity(&g);
+        let other = g.prepare();
+        assert_eq!(
+            reuse_at(
+                &g.security,
+                &g.security_root(),
+                &g.command,
+                &g.home,
+                &other.client_id,
+                1001
+            )
+            .err()
+            .unwrap()
+            .code,
+            "onboarding_credentials_unavailable"
+        );
+        g.security.rotate(&selected.client_id).unwrap();
+        let rotated_bytes = std::fs::read(g.security_root().join("authorization.dpapi")).unwrap();
+        assert_eq!(
+            reuse_at(
+                &g.security,
+                &g.security_root(),
+                &g.command,
+                &g.home,
+                &selected.client_id,
+                1001
+            )
+            .err()
+            .unwrap()
+            .code,
+            "onboarding_credentials_unavailable"
+        );
+        assert_eq!(
+            std::fs::read(g.security_root().join("authorization.dpapi")).unwrap(),
+            rotated_bytes
+        );
+        assert!(Security::read_at(&g.security_root())
+            .unwrap()
+            .credential_owner(&credentials)
+            .is_none());
+        g.security.pause(true).unwrap();
+        assert_eq!(
+            reuse_at(
+                &g.security,
+                &g.security_root(),
+                &g.command,
+                &g.home,
+                &selected.client_id,
+                1001
+            )
+            .err()
+            .unwrap()
+            .code,
+            "paused"
+        );
+        g.security.pause(false).unwrap();
+        g.security.revoke(&selected.client_id).unwrap();
+        assert_eq!(
+            reuse_at(
+                &g.security,
+                &g.security_root(),
+                &g.command,
+                &g.home,
+                &selected.client_id,
+                1001
+            )
+            .err()
+            .unwrap()
+            .code,
+            "revoked"
+        );
+        assert_eq!(g.security.view().unwrap().clients.len(), 2);
+    }
     pub struct Fixture {
         pub root: PathBuf,
         pub security: Security,

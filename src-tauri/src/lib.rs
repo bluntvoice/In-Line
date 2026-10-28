@@ -829,6 +829,24 @@ fn mcp_prepare_onboarding(
     .map_err(mcp_error)
 }
 #[tauri::command]
+fn mcp_reuse_onboarding(
+    window: tauri::WebviewWindow,
+    security: State<McpSecurity>,
+    id: String,
+) -> Result<mcp::onboarding::Receipt, String> {
+    mcp_local(&window)?;
+    mcp::onboarding::require_authorization_available("codex").map_err(mcp_error)?;
+    mcp::onboarding::reuse_at(
+        &security,
+        &mcp::platform::root().map_err(mcp_error)?,
+        &mcp_executable()?,
+        &mcp::codex_import::codex_home().map_err(mcp_error)?,
+        &id,
+        chrono::Utc::now().timestamp(),
+    )
+    .map_err(mcp_error)
+}
+#[tauri::command]
 fn mcp_rotate_onboarding(
     window: tauri::WebviewWindow,
     security: State<McpSecurity>,
@@ -1619,6 +1637,7 @@ pub fn run() {
             mcp_cancel_job,
             mcp_cleanup_jobs,
             mcp_prepare_onboarding,
+            mcp_reuse_onboarding,
             mcp_rotate_onboarding,
             mcp_revoke_client,
             mcp_update_client,

@@ -71,6 +71,7 @@ impl McpError {
               "storage_migration_required" => "旧版 MCP 安全存储需要由 In Line 软件内确认迁移；未创建空授权、未回退读取旧副本，请先完成软件内迁移",
               "storage_migration_conflict" => "安全存储目标已存在、来源已变化或含未知状态，未覆盖或合并；请保留两边文件并重新核对迁移状态",
             "onboarding_unavailable" => "当前客户端自动接入仍在验证，入口暂未开放",
+            "onboarding_credentials_unavailable" => "无法安全复用所选客户端的有效凭证；可由用户明确选择同一客户端“轮换并接入”（旧凭证立即失效）。未新建授权、未自动轮换或更改权限",
             "import_expired" => "接入提示词已过期，请回到软件重新发起接入",
             "import_used" => "本次接入已执行，不能重复使用；请查看已有结果",
             "import_in_doubt" => "接入曾中断，配置结果尚待核验；未自动重试或修改授权",

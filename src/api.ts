@@ -101,6 +101,7 @@ export const api={
   mcpCleanupJobs:()=>invoke<{summariesRemoved:number;temporaryResultsCleared:number}>("mcp_cleanup_jobs"),
   mcpPrepareOnboarding:(args:{client:string;permissions:import("./lib/mcp-onboarding").McpPermissions;scope:import("./lib/mcp-onboarding").McpScope})=>invoke<import("./lib/mcp-onboarding").McpReceipt>("mcp_prepare_onboarding",{args}),
   mcpRotateOnboarding:(id:string)=>invoke<import("./lib/mcp-onboarding").McpReceipt>("mcp_rotate_onboarding",{id}),
+  mcpReuseOnboarding:(id:string)=>invoke<import("./lib/mcp-onboarding").McpReceipt>("mcp_reuse_onboarding",{id}),
   mcpRevokeClient:(id:string)=>invoke<void>("mcp_revoke_client",{id}),
   mcpUpdateClient:(id:string,permissions:import("./lib/mcp-onboarding").McpPermissions,scope:import("./lib/mcp-onboarding").McpScope)=>invoke<void>("mcp_update_client",{id,permissions,scope}),
   mcpSetGroups:(groups:import("./lib/mcp-onboarding").McpPermissions)=>invoke<void>("mcp_set_groups",{groups}),

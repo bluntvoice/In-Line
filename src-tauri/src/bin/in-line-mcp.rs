@@ -78,17 +78,32 @@ impl InLineMcp {
         let id =
             in_line_lib::mcp::platform::random_secret().unwrap_or_else(|_| "unavailable".into());
         #[cfg(windows)]
-        let (result, refreshed) = match self.credentials.resolve() {
-            Ok((credentials, refreshed)) => (
+        let (result, resolution) = match self.credentials.resolve_with_status() {
+            Ok((credentials, resolution)) => (
                 in_line_lib::mcp::ipc::call_with_id(credentials, tool, args, id.clone()).await,
-                refreshed,
+                resolution,
             ),
-            Err(error) => (Err(error), false),
+            Err(error) => (Err(error), Default::default()),
         };
         #[cfg(not(windows))]
         let result = Err(McpError::new("unsupported"));
         #[cfg(windows)]
-        let result=result.map(|mut v|{if tool=="get_capabilities"{v["sidecarBuild"]=in_line_lib::mcp::build_identity::current();v["compatibility"]=serde_json::json!({"toolSetMatches":v["tools"]==serde_json::json!(TOOLS),"schemaVersionMatches":v["schemaVersion"]==serde_json::json!(in_line_lib::database::DATABASE_SCHEMA_VERSION),"sessionCredentialsRefreshed":refreshed,"currentSessionAutoImportVerified":refreshed});}v});
+        let result = result.map(|mut v| {
+            if tool == "get_capabilities" {
+                v["sidecarBuild"] = in_line_lib::mcp::build_identity::current();
+                v["credentialResolution"] = serde_json::to_value(&resolution).expect("safe resolution");
+                v["verificationScope"] = serde_json::json!("thisToolCall");
+                // Deprecated aliases retain their original binding-applied
+                // meaning for compatibility. Neither verifies a Codex session.
+                v["compatibility"] = serde_json::json!({
+                    "toolSetMatches": v["tools"] == serde_json::json!(TOOLS),
+                    "schemaVersionMatches": v["schemaVersion"] == serde_json::json!(in_line_lib::database::DATABASE_SCHEMA_VERSION),
+                    "sessionCredentialsRefreshed": resolution.runtime_binding_applied,
+                    "currentSessionAutoImportVerified": resolution.runtime_binding_applied
+                });
+            }
+            v
+        });
         let failed = result.is_err();
         let value =
             serde_json::to_value(Envelope::result(id, result)).expect("envelope serializable");

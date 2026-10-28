@@ -1,5 +1,11 @@
 # v0.5.0 开发构建说明（未正式发布）
 
+2026-10-28 Phase 1 开发改动尚未安装、提交或发布：Codex MCP 普通接入修复优先复用已有身份及授权，复制重试/回执过期不自动创建或轮换；配置局部保留安全宿主策略、格式和其他服务器，等价不重写；新增精确状态字段，旧刷新字段兼容保留并弃用。当前会话验证依原对话实调，自动恢复仍未解决；安装器和客户端删除不在本阶段。完整范围、验证结果和剩余风险见[验收报告](docs/MCP_PHASE1_ACCEPTANCE.md)。以下为历史记录。
+
+2026-10-27 用户已授权安装审批策略兼容与按钮间距修复包，三程序与包内载荷一致，数据库主/WAL 及授权元数据保留核对通过；当前挂载会话为 `Transport closed`，未重试接入。见[安装记录](docs/mcp/acceptance/IMPORT-SPACING-NATIVE-INSTALL-20261027.md)。下文未安装状态为此前开发快照。
+
+2026-10-26 后续开发补丁：修复 Codex 导入器拒绝审批策略字段，严格校验并原样保留策略；统一 MCP 按钮动作组间距、换行和窄窗口布局。[本轮验证记录](docs/mcp/acceptance/IMPORT-CONFLICT-AND-BUTTON-SPACING-20261026.md)区分合成配置/浏览器检查、本地包解包与实机验收。本机配置未修改，旧导入未重试，未安装或发布；当前挂载会话返回 `unauthenticated`。
+
 本轮开发 Artifact 已成功生成并下载核验，构建提交 `3b21c02`，包含 Windows 短文件名别名补丁；下载及摘要见[Action 交付记录](docs/mcp/acceptance/MSIX-STORAGE-ACTION-DELIVERY.md)。未创建 Tag/Release，不将构建成功等同于安装、迁移或当前会话接入验收。
 
 2026-10-26 已开发跨环境安全存储兼容修复：统一到用户 Profile 下的私有目录，拒绝读取重定向副本；旧存储通过软件内明确确认后迁移，原文件、授权及撤销/暂停状态保留，不自动合并。开发验证与未完成的实机门禁见[交付报告](docs/mcp/acceptance/MSIX-STORAGE-COMPATIBILITY.md)。本机迁移和安装尚未执行，当前会话认证未通过；现场证据见[根因报告](docs/mcp/acceptance/AUTHORIZATION-STORAGE-MSIX-ROOT-CAUSE.md)。

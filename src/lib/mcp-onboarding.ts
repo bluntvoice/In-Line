@@ -12,6 +12,9 @@ export const defaultPermissions=():McpPermissions=>({regularRead:true,fullRead:f
 export const parseScope=(value:string):string[]|null=>value.trim()?Array.from(new Set(value.split(/[,，\n]/).map(x=>x.trim()).filter(Boolean))):null;
 export const receiptExpired=(receipt:McpReceipt,now=Date.now()):boolean=>now>=receipt.expiresAt*1000;
 export const canPrepare=(preset:McpClientPreset|undefined,busy:boolean):boolean=>Boolean(preset?.authorizationAvailable??preset?.available)&&!busy;
+export const reusableMcpClients=(clients:McpClient[]):McpClient[]=>clients.filter(c=>c.kind==="codex"&&!c.revoked);
+// A single identity may be suggested; several identities always need a choice.
+export const initialMcpIdentity=(clients:McpClient[]):string=>{const active=reusableMcpClients(clients);return active.length===1?active[0].id:active.length===0?"new":"";};
 // Store the receipt before touching the clipboard: a failed copy must reuse this grant.
 export async function prepareAndCopy(prepare:()=>Promise<McpReceipt>,remember:(receipt:McpReceipt)=>void,copy:(text:string)=>Promise<void>):Promise<void>{
   const receipt=await prepare();remember(receipt);await copy(receipt.prompt);

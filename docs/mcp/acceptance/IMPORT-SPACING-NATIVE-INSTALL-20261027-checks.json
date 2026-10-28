@@ -1,0 +1,151 @@
+{
+  "Date": "2026-10-27",
+  "InstallerExitCode": 0,
+  "Start": "2026-10-27T16:16:01.4796072+08:00",
+  "End": "2026-10-27T16:16:05.5824267+08:00",
+  "InstallerSHA256": "DAC2D052E8A8E98E12D25FE31844C0372F2C8396A030B727A695527A103AF331",
+  "InstallDirectory": "D:\\Application\\In Line",
+  "RollbackPrograms": "D:\\codex-data\\projects\\inline\\In-Line\\release\\Import-Spacing-install-20261027-161601\\old-programs",
+  "Binaries": [
+    {
+      "Name": "in-line",
+      "SHA256": "857E151EB1FB25C73DDCE6204659E706AAE0247AECDBFCFA49D611324A93D143",
+      "MatchesPayload": true
+    },
+    {
+      "Name": "in-line-mcp",
+      "SHA256": "7820147887DEBD205BAD104A5BB59B2A0F9907220D7EB838272DAC2359B4A47B",
+      "MatchesPayload": true
+    },
+    {
+      "Name": "in-line-cli",
+      "SHA256": "C4C399BD83A9144A4F8A9F97489259FC09996CE1E81CE249604BE344F3230C8F",
+      "MatchesPayload": true
+    }
+  ],
+  "DatabaseMainAndWalUnchanged": true,
+  "DatabaseFilesBefore": [
+    {
+      "Name": "inline.db",
+      "Bytes": 1421312,
+      "SHA256": "0718A43745F8DF45E8FE9B49E5A2D09E90D144071C769D1A1791418BBCC18814"
+    },
+    {
+      "Name": "inline.db-wal",
+      "Bytes": 4194192,
+      "SHA256": "081FE974B76FD296BA62078580F39B2DDEB77F845B9DDFBD6F6DFB7B0B445FF1"
+    },
+    {
+      "Name": "inline.db-shm",
+      "Bytes": 32768,
+      "SHA256": "636B327C4E5B4681EB4D48B0E5F02D85B54D023F727F75C1C195DDC83EB9A58E"
+    }
+  ],
+  "DatabaseFilesAfter": [
+    {
+      "Name": "inline.db",
+      "Bytes": 1421312,
+      "SHA256": "0718A43745F8DF45E8FE9B49E5A2D09E90D144071C769D1A1791418BBCC18814"
+    },
+    {
+      "Name": "inline.db-wal",
+      "Bytes": 4194192,
+      "SHA256": "081FE974B76FD296BA62078580F39B2DDEB77F845B9DDFBD6F6DFB7B0B445FF1"
+    },
+    {
+      "Name": "inline.db-shm",
+      "Bytes": 32768,
+      "SHA256": "636B327C4E5B4681EB4D48B0E5F02D85B54D023F727F75C1C195DDC83EB9A58E"
+    }
+  ],
+  "AuthorizationMetadataUnchanged": true,
+  "AuthorizationMetadataBefore": {
+    "Exists": true,
+    "Bytes": 2102,
+    "LastWriteTimeUtc": "2026-10-27T08:02:47.4996204Z",
+    "CreationTimeUtc": "2026-10-27T08:02:47.4986215Z"
+  },
+  "AuthorizationMetadataAfter": {
+    "Exists": true,
+    "Bytes": 2102,
+    "LastWriteTimeUtc": "2026-10-27T08:02:47.4996204Z",
+    "CreationTimeUtc": "2026-10-27T08:02:47.4986215Z"
+  },
+  "AuthorizationContentRead": false,
+  "CodexConfigurationReadOrWritten": false,
+  "TicketOrExistingBackupRead": false,
+  "ImportReplayed": false,
+  "CurrentSessionVerified": false,
+  "NativeUiAccepted": false,
+  "GuiRelaunched": true,
+  "EvidenceDirectory": "D:\\codex-data\\projects\\inline\\In-Line\\release\\Import-Spacing-install-20261027-161601",
+  "ConfigurationVerified": false,
+  "CurrentSessionResult": "Transport closed",
+  "MainWindowObserved": true,
+  "FirstPreflightStoppedBeforeInstaller": true,
+  "InstallerExecutionCount": 1,
+  "DatabaseHashScope": "Observed Roaming/in-line main and WAL files; read-only digests, no database contents exported or copied",
+  "AuthorizationVerificationScope": "File metadata only; credential content not opened or hashed",
+  "InstalledOfflineIdentity": {
+    "offline": true,
+    "build": {
+      "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    },
+    "records": [
+      {
+        "name": "in-line",
+        "bytes": 8979968,
+        "sha256": "857e151eb1fb25c73ddce6204659e706aae0247aecdbfcfa49d611324a93d143",
+        "build": {
+          "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+          "commitVerification": "unverified_local_source",
+          "databaseSchemaVersion": 14,
+          "exactCommit": null,
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": true
+        }
+      },
+      {
+        "name": "in-line-mcp",
+        "bytes": 2394112,
+        "sha256": "7820147887debd205bad104a5bb59b2a0f9907220d7eb838272dac2359b4a47b",
+        "build": {
+          "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+          "commitVerification": "unverified_local_source",
+          "databaseSchemaVersion": 14,
+          "exactCommit": null,
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": true
+        }
+      },
+      {
+        "name": "in-line-cli",
+        "bytes": 1058816,
+        "sha256": "c4c399bd83a9144a4f8a9f97489259fc09996ce1e81ce249604be344f3230c8f",
+        "build": {
+          "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+          "commitVerification": "unverified_local_source",
+          "databaseSchemaVersion": 14,
+          "exactCommit": null,
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": true
+        },
+        "cliPhase": 5
+      }
+    ],
+    "companionsMatched": false,
+    "nsisPayloadMatched": false,
+    "pathModified": false,
+    "installed": false,
+    "currentMcpSessionVerified": false
+  }
+}

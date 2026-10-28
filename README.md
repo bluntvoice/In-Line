@@ -9,6 +9,12 @@ In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合
 
 ## v0.5.0 开发构建
 
+2026-10-28 Phase 1（未安装、待验收）：Codex MCP 支持选择并复用已有授权身份，普通重签不新建/轮换或更改权限范围；配置采用局部合并，保留安全的宿主策略和其他服务器，等价时不重写。状态区分凭证实际变化、配置验证和原对话真实调用；旧刷新标志保留兼容并弃用。自动恢复仍待 Phase 2，不把能力查询成功当作恢复机制完成。见[本阶段验收报告](docs/MCP_PHASE1_ACCEPTANCE.md)。以下是历史快照；10 月 27 日断连后来已在 Phase 0 复核恢复，不代表当前仍断连。
+
+2026-10-27 已获授权安装下述导入兼容与按钮间距修复包，三程序及数据文件保留核对通过；当前挂载会话为 `Transport closed`，接入仍未验证成功。见[本机安装记录](docs/mcp/acceptance/IMPORT-SPACING-NATIVE-INSTALL-20261027.md)。
+
+2026-10-26 后续兼容补丁：Codex 导入器严格校验并原样保留 `default_tools_approval_mode`，不改审批策略；MCP 设置与接入弹窗的按钮增加间距、换行和窄窗口适配。开发验证、本地包核验与实机门禁见[本轮记录](docs/mcp/acceptance/IMPORT-CONFLICT-AND-BUTTON-SPACING-20261026.md)。未改本机 Codex 配置，未重试旧接入；当前会话实测为 `unauthenticated`，尚未认证通过。
+
 2026-10-26 接入存储兼容修复已开发：GUI/MCP/CLI 统一使用用户 Profile 下 `.in-line/mcp-security`，检测并拒绝 AppData 隔离副本；旧版存储须在软件内明确确认后迁移，保留原文件和现有授权，不自动合并。隔离验证及本地包见[交付报告](docs/mcp/acceptance/MSIX-STORAGE-COMPATIBILITY.md)。本机迁移、安装和当前会话认证仍待独立验证；[根因报告](docs/mcp/acceptance/AUTHORIZATION-STORAGE-MSIX-ROOT-CAUSE.md)保留现场证据。
 
 本轮开发安装包已由 Action 成功生成并下载核验，构建提交为 `3b21c02`，下载与摘要见[Action 交付记录](docs/mcp/acceptance/MSIX-STORAGE-ACTION-DELIVERY.md)。首轮云端检查发现的 Windows 短文件名别名误判已修复，236 项 Rust、133 项前端及包检查通过；未创建 Tag/Release，安装、真实授权迁移和当前会话接入仍待实机验证。

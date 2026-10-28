@@ -112,6 +112,23 @@ fn read(dir: &Path, target: &Target) -> Result<Option<Binding>, McpError> {
     Ok(Some(binding))
 }
 
+#[derive(Clone, Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Resolution {
+    pub source: &'static str,
+    pub changed: bool,
+    #[serde(skip)]
+    pub runtime_binding_applied: bool,
+}
+impl Resolution {
+    fn retained() -> Self {
+        Self {
+            source: "currentCredentials",
+            changed: false,
+            runtime_binding_applied: false,
+        }
+    }
+}
 pub struct Provider {
     credentials: Mutex<Credentials>,
     target: Option<Target>,
@@ -124,27 +141,36 @@ impl Provider {
         }
     }
     pub fn resolve(&self) -> Result<(Credentials, bool), McpError> {
+        self.resolve_with_status()
+            .map(|(c, status)| (c, status.runtime_binding_applied))
+    }
+    pub fn resolve_with_status(&self) -> Result<(Credentials, Resolution), McpError> {
         let root = platform::root()?;
         super::storage::require_client_ready(&root)?;
-        self.resolve_at(&root)
+        self.resolve_at_with_status(&root)
     }
+    #[cfg(test)]
     fn resolve_at(&self, root: &Path) -> Result<(Credentials, bool), McpError> {
+        self.resolve_at_with_status(root)
+            .map(|(c, status)| (c, status.runtime_binding_applied))
+    }
+    fn resolve_at_with_status(&self, root: &Path) -> Result<(Credentials, Resolution), McpError> {
         let mut current = self.credentials.lock().map_err(|_| unavailable())?;
         let empty = current.client_id.is_empty() && current.token.is_empty();
         // A partially configured identity never acquires a different identity.
         if !empty
             && (!onboarding::valid_id(&current.client_id) || !onboarding::valid_id(&current.token))
         {
-            return Ok((current.clone(), false));
+            return Ok((current.clone(), Resolution::retained()));
         }
         let Some(target) = &self.target else {
-            return Ok((current.clone(), false));
+            return Ok((current.clone(), Resolution::retained()));
         };
         let Some(dir) = directory(root, false)? else {
-            return Ok((current.clone(), false));
+            return Ok((current.clone(), Resolution::retained()));
         };
         let Some(binding) = read(&dir, target)? else {
-            return Ok((current.clone(), false));
+            return Ok((current.clone(), Resolution::retained()));
         };
         let related = if empty {
             binding.predecessor_client_id.is_none()
@@ -153,7 +179,7 @@ impl Provider {
                 || binding.predecessor_client_id.as_ref() == Some(&current.client_id)
         };
         if !related {
-            return Ok((current.clone(), false));
+            return Ok((current.clone(), Resolution::retained()));
         }
         // A fresh environment after an explicit rotation must not be replaced
         // by a stale handoff. Revoked/paused identities still reach IPC so its
@@ -162,12 +188,21 @@ impl Provider {
             .credential_owner(&binding.credentials)
             .is_none()
         {
-            return Ok((current.clone(), false));
+            return Ok((current.clone(), Resolution::retained()));
         }
+        let changed = current.client_id != binding.credentials.client_id
+            || !super::security::constant_equal(&current.token, &binding.credentials.token);
         *current = binding.credentials;
         // IPC independently validates the current authorization, revocation,
         // pause, scope and revision on every call, including after this refresh.
-        Ok((current.clone(), true))
+        Ok((
+            current.clone(),
+            Resolution {
+                source: "runtimeBinding",
+                changed,
+                runtime_binding_applied: true,
+            },
+        ))
     }
 }
 
@@ -262,6 +297,41 @@ fn write_binding(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn resolution_distinguishes_binding_application_from_actual_credential_change() {
+        let f = onboarding::tests::Fixture::new();
+        let r = f.prepare();
+        let (ticket, _) = onboarding::load_ticket(&f.security_root(), &r.package_id, 1000).unwrap();
+        let target = context(&f);
+        let provider = Provider {
+            credentials: Mutex::new(blank()),
+            target: Some(target.clone()),
+        };
+        let (_, initial) = provider.resolve_at_with_status(&f.security_root()).unwrap();
+        assert_eq!(initial.source, "currentCredentials");
+        assert!(!initial.changed && !initial.runtime_binding_applied);
+        write_binding(&f.security_root(), &target, &ticket, None).unwrap();
+        let (_, first) = provider.resolve_at_with_status(&f.security_root()).unwrap();
+        assert_eq!(first.source, "runtimeBinding");
+        assert!(first.changed && first.runtime_binding_applied);
+        let (_, repeated) = provider.resolve_at_with_status(&f.security_root()).unwrap();
+        assert!(!repeated.changed && repeated.runtime_binding_applied);
+        let mut rotated_ticket = ticket;
+        let rotated = f
+            .security
+            .rotate(&rotated_ticket.credentials.client_id)
+            .unwrap();
+        rotated_ticket.credentials = Credentials {
+            client_id: rotated.client_id,
+            token: rotated.token,
+        };
+        write_binding(&f.security_root(), &target, &rotated_ticket, None).unwrap();
+        let (_, changed) = provider.resolve_at_with_status(&f.security_root()).unwrap();
+        assert!(changed.changed && changed.runtime_binding_applied);
+        let safe = serde_json::to_string(&changed).unwrap();
+        assert!(!safe.contains("token") && !safe.contains("clientId"));
+        assert_eq!(safe, r#"{"source":"runtimeBinding","changed":true}"#);
+    }
     fn context(f: &onboarding::tests::Fixture) -> Target {
         Target {
             host: process(std::process::id()).unwrap().0,
