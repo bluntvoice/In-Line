@@ -17,7 +17,8 @@ $candidate = Join-Path $package 'candidate.exe'
 $baseline = Join-Path $package 'baseline-0.4.0.exe'
 $names = @('in-line.exe','in-line-mcp.exe','in-line-cli.exe','WebView2Loader.dll','uninstall.exe')
 $arp = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\In Line'
-$vendor = 'Software\bluntvoice\In Line'
+# Observed Publisher of the unchanged reviewed NSIS package is "github".
+$vendor = 'Software\github\In Line'
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 $checks = [Collections.Generic.List[object]]::new()
 $operations = [Collections.Generic.List[object]]::new()
@@ -32,7 +33,13 @@ function Check([bool]$condition,[string]$name,[bool]$fatal=$false) {
     $checks.Add([ordered]@{name=$name;passed=$condition})
     if (!$condition -and $fatal) { throw $name }
 }
-function Hash([string]$path) { if (Test-Path -LiteralPath $path -PathType Leaf) { return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }; return $null }
+function Hash([string]$path) {
+    if(Test-Path -LiteralPath $path -PathType Leaf) {
+        try { return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() }
+        catch { return $null } # Snapshot records existence separately; unreadable bytes never equal a known digest.
+    }
+    return $null
+}
 function ProgramState {
     $map=[ordered]@{}
     foreach($name in $names) { $path=Join-Path $install $name; $map[$name]=@{exists=(Test-Path -LiteralPath $path -PathType Leaf);sha256=(Hash $path)} }
@@ -51,7 +58,11 @@ function RegistryState {
     }
     return $map
 }
-function ShortcutPaths { return @((Join-Path ([Environment]::GetFolderPath('Desktop')) 'In Line.lnk'),(Join-Path ([Environment]::GetFolderPath('Programs')) 'In Line.lnk'),(Join-Path ([Environment]::GetFolderPath('Programs')) 'In Line/In Line.lnk')) }
+function ShortcutPaths {
+    $desktop=[Environment]::GetFolderPath([Environment+SpecialFolder]::DesktopDirectory,[Environment+SpecialFolderOption]::Create)
+    $programs=[Environment]::GetFolderPath([Environment+SpecialFolder]::Programs,[Environment+SpecialFolderOption]::Create)
+    return @((Join-Path $desktop 'In Line.lnk'),(Join-Path $programs 'In Line.lnk'),(Join-Path $programs 'In Line/In Line.lnk'))
+}
 function ShortcutState {
     $map=[ordered]@{}; $shell=New-Object -ComObject WScript.Shell
     foreach($path in (ShortcutPaths)) {
@@ -91,6 +102,8 @@ public static class NativeNsisLabThreads {
  [DllImport("kernel32.dll")] static extern uint SuspendThread(IntPtr h);
  [DllImport("kernel32.dll")] static extern uint ResumeThread(IntPtr h);
  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+ [DllImport("kernel32.dll",SetLastError=true)] static extern bool GetExitCodeProcess(IntPtr h,out uint code);
+ public static uint ReadExitCode(IntPtr handle) { uint code; if(!GetExitCodeProcess(handle,out code)) throw new InvalidOperationException("Cannot read held test process exit code"); return code; }
  public static IntPtr[] Pause(int id) { var handles=new List<IntPtr>(); foreach(ProcessThread t in Process.GetProcessById(id).Threads) { var h=OpenThread(2,false,(uint)t.Id); if(h!=IntPtr.Zero) { if(SuspendThread(h)!=uint.MaxValue) handles.Add(h); else CloseHandle(h); } } return handles.ToArray(); }
  public static void Resume(IntPtr[] handles) { foreach(var h in handles) { ResumeThread(h);CloseHandle(h); } }
 }
@@ -122,7 +135,7 @@ function Run-NSIS([string]$exe,[string]$label,[bool]$uninstalling=$false,[string
                     if(!@($descendants | Where-Object pid -EQ $child.ProcessId).Count) {
                         $body=Get-Process -Id $child.ProcessId -ErrorAction SilentlyContinue
                         if($body -and $body.StartTime.ToUniversalTime().Ticks -ge $item.started) {
-                            $descendants.Add(@{pid=$body.Id;parent=$item.pid;path=$child.ExecutablePath;created=$body.StartTime.ToUniversalTime().Ticks;process=$body})
+                            $descendants.Add(@{pid=$body.Id;parent=$item.pid;path=$child.ExecutablePath;created=$body.StartTime.ToUniversalTime().Ticks;process=$body;exitHandle=$body.SafeHandle})
                             $owned.Add(@{process=$body;pid=$body.Id;started=$body.StartTime.ToUniversalTime().Ticks;path=$child.ExecutablePath;tag='copied-native-uninstaller'})
                         }
                     }
@@ -159,7 +172,7 @@ function Run-NSIS([string]$exe,[string]$label,[bool]$uninstalling=$false,[string
         }
         if(!$process.HasExited -or @($descendants | Where-Object { !$_.process.HasExited }).Count) { $operation.timedOut=$true;Stop-Owned $item;foreach($body in $descendants) { $entry=@{process=$body.process;pid=$body.pid;started=$body.created;path=$body.path};Stop-Owned $entry } }
         $process.WaitForExit();$operation.rootExitCode=$process.ExitCode;$operation.exitCode=$process.ExitCode
-        foreach($body in $descendants) { $body.process.WaitForExit();$body.exitCode=$body.process.ExitCode;$body.Remove('process');$operation.exitCode=$body.exitCode }
+        foreach($body in $descendants) { $body.process.WaitForExit();$body.exitCode=[NativeNsisLabThreads]::ReadExitCode($body.exitHandle.DangerousGetHandle());$body.exitCodeSource='GetExitCodeProcess-held-handle';$body.Remove('process');$body.Remove('exitHandle');$operation.exitCode=$body.exitCode }
         $operation.copiedUninstallerObserved=($descendants.Count -gt 0)
         if($helperProcess -and $helperProcess.HasExited) { $operation.helperExitCode=$helperProcess.ExitCode }
         $item.stdout.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $out $operation.stdoutFile) -Encoding utf8
@@ -167,7 +180,7 @@ function Run-NSIS([string]$exe,[string]$label,[bool]$uninstalling=$false,[string
     } finally {
         if($pause.Count) { [NativeNsisLabThreads]::Resume($pause) }
         if($tempAcl) { Restore-Access $tempAcl }
-        foreach($body in $descendants) { if($body.ContainsKey('process')) { $body.Remove('process') } }
+        foreach($body in $descendants) { $body.Remove('process');$body.Remove('exitHandle') }
     }
     return $operation
 }
@@ -220,6 +233,7 @@ function Probe-Programs {
         $gui.process.Refresh();$window=$gui.process.MainWindowHandle
         if($window -ne [IntPtr]::Zero) { $closeRequested=$gui.process.CloseMainWindow();Start-Sleep -Milliseconds 500;$result.guiStartup.closeRequested=$closeRequested;$result.guiStartup.aliveAfterClose=!$gui.process.HasExited }
         Stop-Owned $gui
+        $result.guiStartup.cleanup='Harness-only identity-verified test process termination; tray exit not exercised'
         & python -c 'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute("create table if not exists nsis_lab_records(id integer primary key,title text)"); c.execute("insert or replace into nsis_lab_records values(1,?)",("NSIS synthetic business record",)); c.commit(); c.close()' $database
         if($LASTEXITCODE -ne 0) { throw 'Actual product database fixture failed' };$dataPaths.Add($database)
         if(Test-Path -LiteralPath $authorization) {
@@ -242,6 +256,8 @@ function Probe-Programs {
     Check ($LASTEXITCODE -eq 0) 'Installed MCP actual initialize/list/anonymous calls'
     & (Join-Path $install 'in-line-cli.exe') doctor --format json > (Join-Path $out 'cli-doctor.json')
     $result.cliDoctorExit=$LASTEXITCODE
+    $doctor=Get-Content -LiteralPath (Join-Path $out 'cli-doctor.json') -Raw | ConvertFrom-Json
+    Check ($doctor.apiVersion -eq 1 -and $doctor.status -in @('ok','error')) 'Installed CLI doctor returns its structured protocol (profile authorization separately scoped)'
 }
 try {
     Check ([IO.Path]::GetFullPath($lab).StartsWith([IO.Path]::GetFullPath($env:RUNNER_TEMP)+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) 'Lab stays under RUNNER_TEMP' $true
@@ -254,11 +270,13 @@ try {
     $result.installerSha256=Hash $candidate;$result.baselineSha256=Hash $baseline
     New-Item -ItemType Directory -Path $install -Force | Out-Null
     Seed-SyntheticData
+    Check ((@((DataState).Values | Where-Object { !$_.Length })).Count -eq 0) 'Synthetic data baseline digests are readable' $true
     $before=Snapshot 'initial'
     if($Scenario -eq 'lifecycle') {
         $null=Install-Candidate 'fresh';$fresh=Snapshot 'fresh'
         Probe-Programs
         $preserved=DataState
+        Check ((@($preserved.Values | Where-Object { !$_.Length })).Count -eq 0) 'Product data preservation baseline is readable' $true
         $null=Install-Candidate 'same-version-repair';$null=Snapshot 'repair'
         Check (Equal $preserved (DataState)) 'Repair preserves synthetic database, preferences, authorization and other MCP config'
         $null=Uninstall-Candidate 'actual-uninstall';$null=Snapshot 'uninstall'
@@ -288,7 +306,14 @@ try {
                 Check (Equal $old.shortcuts $now.shortcuts) "Registry denied attempt $attempt restores shortcuts"
                 Check (Equal $old.data $now.data) "Registry denied attempt $attempt preserves data"
             }
-        } finally { $acl=Get-Acl $regPath;$acl.SetSecurityDescriptorSddlForm($original);Set-Acl $regPath $acl }
+        } finally {
+            # Do not reopen the denied key for ReadWrite/SetValue merely to
+            # restore its DACL. Request only the unchanged WRITE_DAC permission.
+            $restore=[Security.AccessControl.RegistrySecurity]::new()
+            $restore.SetSecurityDescriptorSddlForm($original,[Security.AccessControl.AccessControlSections]::Access)
+            $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($arp,[Microsoft.Win32.RegistryKeyPermissionCheck]::Default,[Security.AccessControl.RegistryRights]::ChangePermissions)
+            try { [Microsoft.Win32.RegistryAclExtensions]::SetAccessControl($key,$restore) } finally { $key.Dispose() }
+        }
         $null=Install-Candidate 'retry-after-restoring-test-key-permissions';$null=Snapshot 'retry'
     } elseif($Scenario -eq 'shortcut-deny') {
         $desktop=(ShortcutPaths)[0];$program=(ShortcutPaths)[1];$shell=New-Object -ComObject WScript.Shell
@@ -299,6 +324,17 @@ try {
             $correct=@($now.shortcuts.Values | Where-Object { $_.target -eq (Join-Path $install 'in-line.exe') })
             Check ($op.exitCode -ne 0 -or $correct.Count -ge 2) "Shortcut creation failure attempt $attempt is not falsely reported as success"
         }
+        # Only links that actually target this installation are uninstall targets.
+        # Preserve the failed-creation snapshots, then seed a separate valid-target
+        # deletion fixture; retaining a foreign target must not be called a defect.
+        foreach($stream in $streams) { $stream.Dispose() };$streams.Clear()
+        foreach($path in (ShortcutPaths)) {
+            if(Test-Path -LiteralPath $path -PathType Leaf) {
+                $link=$shell.CreateShortcut($path);$link.TargetPath=Join-Path $install 'in-line.exe';$link.Save()
+                $streams.Add([IO.File]::Open($path,'Open','Read','Read'))
+            }
+        }
+        $null=Snapshot 'locked-valid-target-shortcut-deletion-fixture'
         if(Test-Path -LiteralPath (Join-Path $install 'uninstall.exe')) {
             $op=Run-NSIS (Join-Path $install 'uninstall.exe') 'shortcut-delete-denied' $true;$now=Snapshot 'shortcut-delete-denied'
             Check ($op.exitCode -ne 0 -or @($now.shortcuts.Values | Where-Object exists).Count -eq 0) 'Shortcut deletion failure is not falsely reported as success'
@@ -310,7 +346,8 @@ try {
             $old=Snapshot 'before-helper-fault';$op=Run-NSIS $candidate $Scenario $false $fault;$now=Snapshot 'after-helper-fault'
             Check $op.faultApplied 'Fault reached the actual NSIS helper/private compiler temp'
             if($Scenario -eq 'ps-hang') {
-                Check (!$op.installerStillWaitingAfter15Seconds) 'Installer handles a suspended helper within the observed 15-second window'
+                $result.hangObservation=@{seconds=15;installerStillWaiting=$op.installerStillWaitingAfter15Seconds;resumedByHarness=$op.resumedByHarness;productTimeoutObserved=(!$op.installerStillWaitingAfter15Seconds)}
+                Check (!$op.installerStillWaitingAfter15Seconds) 'Product independently handled the hung helper in the observed window; harness resume does not verify bounded handling'
                 $result.notCovered+=@('Longer hang bound and enterprise AppLocker/WDAC; harness resumed only its own helper')
             } else {
                 Check ($op.exitCode -ne 0 -and !$op.timedOut) 'Actual NSIS safely rejects helper execution/compilation failure'
@@ -365,3 +402,4 @@ try {
     Write-Output ("Native NSIS $Scenario : passed=$($result.passed), checks=$($checks.Count), findings=$($result.findings.Count). See structured artifact; no credential contents included.")
 }
 if(!$result.passed) { exit 1 }
+exit 0

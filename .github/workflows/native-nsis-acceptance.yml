@@ -13,6 +13,9 @@ on:
         description: Also run the lifecycle control on windows-2022
         type: boolean
         default: true
+      verified_package_run:
+        description: Optional prior successful package job from this workflow; same product SHA required
+        default: ""
 
 permissions:
   contents: read
@@ -56,16 +59,20 @@ jobs:
           ref: ${{ inputs.product_ref }}
           path: product
       - uses: actions/setup-node@v7
+        if: inputs.verified_package_run == ''
         with:
           node-version: "24"
           cache: npm
           cache-dependency-path: product/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
+        if: inputs.verified_package_run == ''
       - uses: Swatinem/rust-cache@v2
+        if: inputs.verified_package_run == ''
         with:
           workspaces: product/src-tauri
           cache-on-failure: true
       - name: Build unchanged product and verify actual payload
+        if: inputs.verified_package_run == ''
         working-directory: product
         shell: pwsh
         env:
@@ -91,6 +98,7 @@ jobs:
           node docs/mcp/verify-release-stdio.mjs src-tauri/target/release/in-line-mcp.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Acquire and verify v0.4.0 baseline
+        if: inputs.verified_package_run == ''
         shell: pwsh
         run: |
           $destination = 'product/release/native-package'
@@ -99,19 +107,46 @@ jobs:
           Copy-Item product/release/installer-payload.json,product/release/installer-verification.json,product/release/package-build.json $destination
           Invoke-WebRequest https://github.com/bluntvoice/In-Line/releases/download/v0.4.0/In.Line_0.4.0_x64-setup.exe -OutFile "$destination/baseline-0.4.0.exe"
           if ((Get-FileHash "$destination/baseline-0.4.0.exe").Hash -ne 'F8E0BF5D1EC4EF1C4759579713AA8CA49BE05624ACD74C50AF49A62B30842F68') { throw 'Baseline digest mismatch' }
+      - name: Reuse only an already verified package for the unchanged product SHA
+        if: inputs.verified_package_run != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_RUN: ${{ inputs.verified_package_run }}
+          PRODUCT_REF: ${{ inputs.product_ref }}
+        run: |
+          if ($env:PACKAGE_RUN -notmatch '^\d+$') { throw 'Numeric package run required' }
+          $run = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:PACKAGE_RUN" | ConvertFrom-Json
+          $jobs = gh api "repos/$env:GITHUB_REPOSITORY/actions/runs/$env:PACKAGE_RUN/jobs" | ConvertFrom-Json
+          if ($run.path -ne '.github/workflows/native-nsis-acceptance.yml' -or $run.event -ne 'workflow_dispatch' -or !@($jobs.jobs | Where-Object { $_.name -eq 'package' -and $_.conclusion -eq 'success' }).Count) { throw 'Prior package build was not verified by this workflow' }
+          $destination = 'product/release/native-package'
+          gh run download $env:PACKAGE_RUN --repo $env:GITHUB_REPOSITORY --name native-nsis-package --dir $destination
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $origin = Get-Content "$destination/provenance.json" -Raw | ConvertFrom-Json
+          $verification = Get-Content "$destination/installer-verification.json" -Raw | ConvertFrom-Json
+          $payload = Get-Content "$destination/installer-payload.json" -Raw | ConvertFrom-Json
+          if ($origin.productCommit -ne $env:PRODUCT_REF -or $verification.ExpectedCommit -ne $env:PRODUCT_REF -or !$verification.PayloadMatched -or $payload.build.exactCommit -ne $env:PRODUCT_REF -or $payload.build.sourceDirty -or (Get-FileHash "$destination/candidate.exe").Hash -ne $verification.Sha256 -or (Get-FileHash "$destination/baseline-0.4.0.exe").Hash -ne 'F8E0BF5D1EC4EF1C4759579713AA8CA49BE05624ACD74C50AF49A62B30842F68') { throw 'Reused source/build/digest verification failed' }
       - id: manifest
         name: Record provenance and fresh-job matrix
         shell: pwsh
         env:
           PRODUCT_REF: ${{ inputs.product_ref }}
           INCLUDE_2022: ${{ inputs.compare_2022 }}
+          PACKAGE_RUN: ${{ inputs.verified_package_run }}
         run: |
           $cases = @('lifecycle','upgrade','file-lock','mcp-lock','uninstaller-lock','file-deny','registry-deny','uninstall-registry-deny','shortcut-deny','ps-exit','ps-compile-deny','ps-hang')
           $matrix = @($cases | ForEach-Object { @{os='windows-2025';scenario=$_} })
           if ($env:INCLUDE_2022 -eq 'true') { $matrix += @{os='windows-2022';scenario='lifecycle'} }
           "matrix=$(@{include=$matrix} | ConvertTo-Json -Depth 4 -Compress)" >> $env:GITHUB_OUTPUT
           "product_sha=$env:PRODUCT_REF" >> $env:GITHUB_OUTPUT
-          @{productCommit=$env:PRODUCT_REF;harnessCommit=$env:GITHUB_SHA;installerSha256=(Get-FileHash product/release/native-package/candidate.exe).Hash;runnerImage=$env:ImageVersion;baselineVersion='0.4.0'} | ConvertTo-Json | Set-Content product/release/native-package/provenance.json
+          $originRun = $env:GITHUB_RUN_ID; $originCommit = $env:GITHUB_SHA; $originImage = $env:ImageVersion
+          if ($env:PACKAGE_RUN) {
+            $origin = Get-Content product/release/native-package/provenance.json -Raw | ConvertFrom-Json
+            $originRun = if ($origin.originBuildRun) { $origin.originBuildRun } else { $env:PACKAGE_RUN }
+            $originCommit = if ($origin.originBuildWorkflowCommit) { $origin.originBuildWorkflowCommit } else { $origin.harnessCommit }
+            $originImage = $origin.runnerImage
+          }
+          @{productCommit=$env:PRODUCT_REF;harnessCommit=$env:GITHUB_SHA;originBuildRun=$originRun;originBuildWorkflowCommit=$originCommit;installerSha256=(Get-FileHash product/release/native-package/candidate.exe).Hash;runnerImage=$originImage;baselineVersion='0.4.0'} | ConvertTo-Json | Set-Content product/release/native-package/provenance.json
       - uses: actions/upload-artifact@v7
         with:
           name: native-nsis-package
