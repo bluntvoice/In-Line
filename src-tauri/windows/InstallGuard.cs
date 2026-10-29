@@ -80,7 +80,8 @@ namespace InLine.Installer {
    Write(target,Path.Combine(folder,e.Name)); Require(Hash(target)==e.Before,"Restored file verification failed.");
    if(restoreAcl) {
     var security=new FileSecurity(); security.SetSecurityDescriptorSddlForm(e.Acl,AccessControlSections.Access); target.SetAccessControl(security);
-    Require(target.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access)==e.Acl,"Restored access descriptor could not be verified.");
+    string restored=target.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access);
+    Require(restored==e.Acl,"Restored access descriptor could not be verified. Expected="+e.Acl+" Actual="+restored);
    }
    var c=Time(e.Created); var a=Time(e.Accessed); var w=Time(e.Written);
    Require(SetFileTime(target.SafeFileHandle,ref c,ref a,ref w),"Cannot restore file timestamps.");
