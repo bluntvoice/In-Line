@@ -297,21 +297,42 @@ try {
         $acl.AddAccessRule([Security.AccessControl.RegistryAccessRule]::new([Security.Principal.SecurityIdentifier]::new($sid),$rights,[Security.AccessControl.AccessControlType]::Deny));Set-Acl $regPath $acl
         try {
             $old=Snapshot 'before-registry-denial'
+            $savedLinks=@{}
+            foreach($path in (ShortcutPaths)) { if(Test-Path -LiteralPath $path -PathType Leaf) { $savedLinks[$path]=[IO.File]::ReadAllBytes($path) } }
+            $result.independentFixtureResets=@()
             for($attempt=1;$attempt -le 2;$attempt++) {
+                if($attempt -eq 2) {
+                    # Keep the first failed result. Restore only known test
+                    # metadata to reproduce from the same independent baseline;
+                    # this is explicitly not a product rollback or a passing fix.
+                    if($Scenario -eq 'registry-deny') {
+                        Check ($vendor -eq 'Software\github\In Line') 'Fixture reset restricted to the exact initially absent product key' $true
+                        [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($vendor,$false)
+                    } else {
+                        foreach($path in $savedLinks.Keys) {
+                            Check (!(Test-Path -LiteralPath $path) -or (Hash $path) -eq $old.shortcuts[$path].sha256) 'Fixture reset refuses an unexpected shortcut replacement' $true
+                            [IO.File]::WriteAllBytes($path,$savedLinks[$path])
+                        }
+                    }
+                    $reset=Snapshot 'external-fixture-reset-for-independent-attempt-2'
+                    Check ((Equal $old.programs $reset.programs) -and (Equal $old.registry $reset.registry) -and (Equal $old.shortcuts $reset.shortcuts)) 'Independent replay fixture matches original baseline' $true
+                    $result.independentFixtureResets+=@(@{forAttempt=2;externalHarnessAction=$true;productRollback=$false;originalFailureRetained=$true})
+                }
+                $attemptBefore=Snapshot "before-registry-denied-$attempt"
                 $op=if($Scenario -eq 'registry-deny') { Run-NSIS $candidate "registry-denied-$attempt" } else { Run-NSIS (Join-Path $install 'uninstall.exe') "uninstall-registry-denied-$attempt" $true }
                 $now=Snapshot "registry-denied-$attempt"
                 Check ($op.exitCode -ne 0 -and !$op.timedOut) "Registry denied attempt $attempt returns failure"
-                Check (Equal $old.programs $now.programs) "Registry denied attempt $attempt restores full program group"
-                Check (Equal $old.registry $now.registry) "Registry denied attempt $attempt restores installation registry"
-                Check (Equal $old.shortcuts $now.shortcuts) "Registry denied attempt $attempt restores shortcuts"
-                Check (Equal $old.data $now.data) "Registry denied attempt $attempt preserves data"
+                Check (Equal $attemptBefore.programs $now.programs) "Registry denied attempt $attempt restores full program group"
+                Check (Equal $attemptBefore.registry $now.registry) "Registry denied attempt $attempt restores installation registry"
+                Check (Equal $attemptBefore.shortcuts $now.shortcuts) "Registry denied attempt $attempt restores shortcuts"
+                Check (Equal $attemptBefore.data $now.data) "Registry denied attempt $attempt preserves data"
             }
         } finally {
             # Do not reopen the denied key for ReadWrite/SetValue merely to
             # restore its DACL. Request only the unchanged WRITE_DAC permission.
             $restore=[Security.AccessControl.RegistrySecurity]::new()
             $restore.SetSecurityDescriptorSddlForm($original,[Security.AccessControl.AccessControlSections]::Access)
-            $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($arp,[Microsoft.Win32.RegistryKeyPermissionCheck]::Default,[Security.AccessControl.RegistryRights]::ChangePermissions)
+            $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($arp,[Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree,[Security.AccessControl.RegistryRights]::ChangePermissions)
             try { [Microsoft.Win32.RegistryAclExtensions]::SetAccessControl($key,$restore) } finally { $key.Dispose() }
         }
         $null=Install-Candidate 'retry-after-restoring-test-key-permissions';$null=Snapshot 'retry'
