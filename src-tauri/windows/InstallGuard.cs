@@ -166,6 +166,10 @@ namespace InLine.Installer {
       var e=journal.Files[i]; string actual=Hash(streams[i]);
       Require((e.After==null&&created[i])||actual==e.After||actual==e.Before,"Target changed since transaction; rollback refused.");
      }
+     // Release new-group allocation before restoring differently sized old files.
+     // All handles and verified backups are retained throughout this operation.
+     mutated=true;
+     foreach(var stream in streams) { stream.SetLength(0); stream.Flush(true); }
     } else {
      Directory.CreateDirectory(folder);
      ownedFolder=true;
@@ -193,9 +197,12 @@ namespace InLine.Installer {
     if(operation=="rollback"&&mutated) { result.Code=2; result.Message+=" Recovery incomplete; retain backups and do not launch this installation."; }
     if(mutated&&prepared) {
      try {
+      foreach(var stream in streams) DeleteOnClose(stream,false);
+      if(operation=="install") foreach(var stream in streams) { stream.SetLength(0); stream.Flush(true); }
       for(int i=0;i<streams.Count;i++) {
-       DeleteOnClose(streams[i],false); var e=journal.Files[i];
-       if(e.Existed) Restore(streams[i],folder,e);
+       var e=journal.Files[i];
+       if(e.Existed&&operation=="uninstall") Require(Hash(streams[i])==e.Before,"Uninstall rollback bytes changed.");
+       else if(e.Existed) Restore(streams[i],folder,e);
        else DeleteOnClose(streams[i],true);
       }
       Clean(folder); result.RolledBack=true;

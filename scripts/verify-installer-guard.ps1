@@ -50,6 +50,10 @@ $f=Fixture 'fresh-failure' $false; $before=Snapshot $f.root
 $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',2); Assert $r.RolledBack $r.Message
 EqualSnapshot $before (Snapshot $f.root); Pass 'failed fresh install leaves no partial programs'
 
+$f=Fixture 'different-file-sizes'; [IO.File]::WriteAllBytes((Join-Path $f.root 'in-line.exe'),(New-Object byte[] 2097152)); [IO.File]::WriteAllBytes((Join-Path $f.payload 'in-line-mcp.exe'),(New-Object byte[] 2097152))
+$before=Snapshot $f.root; $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',3)
+Assert $r.RolledBack $r.Message; EqualSnapshot $before (Snapshot $f.root); Pass 'different old/new file sizes restore as a complete group'
+
 $f=Fixture 'held-file'; $before=Snapshot $f.root
 $held=[IO.File]::Open((Join-Path $f.root 'in-line-cli.exe'),[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
 try { $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',-1); Assert ($r.Code -ne 0) 'Ignored held file'; EqualSnapshot $before (Snapshot $f.root) } finally { $held.Dispose() }
