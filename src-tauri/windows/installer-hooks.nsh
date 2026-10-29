@@ -52,4 +52,5 @@ Var InLineTransactionReady
 !macro NSIS_HOOK_POSTUNINSTALL
   !insertmacro InLineRequireGuard "finalize"
   StrCpy $InLineTransactionReady 0
+  RMDir "$INSTDIR" ; empty directories only; unknown/user files are preserved
 !macroend

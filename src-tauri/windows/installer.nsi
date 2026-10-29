@@ -600,45 +600,83 @@ Section Install
 
   ; Register deep links
   {{#each deep_link_protocols as |protocol| ~}}
+    ClearErrors
     WriteRegStr SHCTX "Software\Classes\\{{protocol}}" "URL Protocol" ""
+    IfErrors inline_install_metadata_failed
+    ClearErrors
     WriteRegStr SHCTX "Software\Classes\\{{protocol}}" "" "URL:${BUNDLEID} protocol"
+    IfErrors inline_install_metadata_failed
+    ClearErrors
     WriteRegStr SHCTX "Software\Classes\\{{protocol}}\DefaultIcon" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\",0"
+    IfErrors inline_install_metadata_failed
+    ClearErrors
     WriteRegStr SHCTX "Software\Classes\\{{protocol}}\shell\open\command" "" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
+    IfErrors inline_install_metadata_failed
   {{/each}}
 
   ; Uninstaller is part of the verified file-group transaction.
 
   ; Save $INSTDIR in registry for future installations
+  ClearErrors
   WriteRegStr SHCTX "${MANUPRODUCTKEY}" "" $INSTDIR
+  IfErrors inline_install_metadata_failed
 
   !if "${INSTALLMODE}" == "both"
     ; Save install mode to be selected by default for the next installation such as updating
     ; or when uninstalling
+    ClearErrors
     WriteRegStr SHCTX "${UNINSTKEY}" $MultiUser.InstallMode 1
+    IfErrors inline_install_metadata_failed
   !endif
 
   ; Save current MAINBINARYNAME for future updates
+  ClearErrors
   WriteRegStr SHCTX "${UNINSTKEY}" "MainBinaryName" "${MAINBINARYNAME}.exe"
+  IfErrors inline_install_metadata_failed
 
   ; Registry information for add/remove programs
+  ClearErrors
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${PRODUCTNAME}"
+  IfErrors inline_install_metadata_failed
+  ClearErrors
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayIcon" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\""
+  IfErrors inline_install_metadata_failed
+  ClearErrors
   WriteRegStr SHCTX "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
+  IfErrors inline_install_metadata_failed
+  ClearErrors
   WriteRegStr SHCTX "${UNINSTKEY}" "Publisher" "${MANUFACTURER}"
+  IfErrors inline_install_metadata_failed
+  ClearErrors
   WriteRegStr SHCTX "${UNINSTKEY}" "InstallLocation" "$\"$INSTDIR$\""
+  IfErrors inline_install_metadata_failed
+  ClearErrors
   WriteRegStr SHCTX "${UNINSTKEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
+  IfErrors inline_install_metadata_failed
+  ClearErrors
   WriteRegDWORD SHCTX "${UNINSTKEY}" "NoModify" "1"
+  IfErrors inline_install_metadata_failed
+  ClearErrors
   WriteRegDWORD SHCTX "${UNINSTKEY}" "NoRepair" "1"
+  IfErrors inline_install_metadata_failed
 
   ${GetSize} "$INSTDIR" "/M=uninstall.exe /S=0K /G=0" $0 $1 $2
   IntOp $0 $0 + ${ESTIMATEDSIZE}
   IntFmt $0 "0x%08X" $0
+  ClearErrors
   WriteRegDWORD SHCTX "${UNINSTKEY}" "EstimatedSize" "$0"
+  IfErrors inline_install_metadata_failed
 
   !if "${HOMEPAGE}" != ""
+    ClearErrors
     WriteRegStr SHCTX "${UNINSTKEY}" "URLInfoAbout" "${HOMEPAGE}"
+    IfErrors inline_install_metadata_failed
+    ClearErrors
     WriteRegStr SHCTX "${UNINSTKEY}" "URLUpdateInfo" "${HOMEPAGE}"
+    IfErrors inline_install_metadata_failed
+    ClearErrors
     WriteRegStr SHCTX "${UNINSTKEY}" "HelpLink" "${HOMEPAGE}"
+    IfErrors inline_install_metadata_failed
   !endif
 
   ; Create start menu shortcut
@@ -652,6 +690,13 @@ Section Install
   ${OrIf} ${Silent}
     Call CreateOrUpdateDesktopShortcut
   ${EndIf}
+
+  Goto inline_install_metadata_ok
+  inline_install_metadata_failed:
+    Call InLineOnAbort
+    SetErrorLevel 1
+    Abort "注册信息写入失败；安装已停止。请核对回滚状态及保留的恢复备份。"
+  inline_install_metadata_ok:
 
   !ifmacrodef NSIS_HOOK_POSTINSTALL
     !insertmacro NSIS_HOOK_POSTINSTALL
@@ -751,7 +796,9 @@ Section Uninstall
   {{#each deep_link_protocols as |protocol| ~}}
     ReadRegStr $R7 SHCTX "Software\Classes\\{{protocol}}\shell\open\command" ""
     ${If} $R7 == "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" $\"%1$\""
+      ClearErrors
       DeleteRegKey SHCTX "Software\Classes\\{{protocol}}"
+      IfErrors inline_uninstall_metadata_failed
     ${EndIf}
   {{/each}}
 
@@ -794,22 +841,29 @@ Section Uninstall
 
   ; Remove registry information for add/remove programs
   !if "${INSTALLMODE}" == "both"
+    ClearErrors
     DeleteRegKey SHCTX "${UNINSTKEY}"
+    IfErrors inline_uninstall_metadata_failed
   !else if "${INSTALLMODE}" == "perMachine"
+    ClearErrors
     DeleteRegKey HKLM "${UNINSTKEY}"
+    IfErrors inline_uninstall_metadata_failed
   !else
+    ClearErrors
     DeleteRegKey HKCU "${UNINSTKEY}"
+    IfErrors inline_uninstall_metadata_failed
   !endif
 
-  ; Removes the Autostart entry for ${PRODUCTNAME} from the HKCU Run key if it exists.
-  ; This ensures the program does not launch automatically after uninstallation if it exists.
-  ; If it doesn't exist, it does nothing.
-  ; We do this when not updating (to preserve the registry value on updates)
-  ${If} $UpdateMode <> 1
-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCTNAME}"
-  ${EndIf}
+  ; Retain the user autostart preference along with the app settings.
 
   ; Never delete user data, authorization, preferences or MCP configuration.
+
+  Goto inline_uninstall_metadata_ok
+  inline_uninstall_metadata_failed:
+    Call un.InLineOnAbort
+    SetErrorLevel 1
+    Abort "卸载注册信息处理失败；已停止并尝试恢复程序，用户数据保留。"
+  inline_uninstall_metadata_ok:
 
   !ifmacrodef NSIS_HOOK_POSTUNINSTALL
     !insertmacro NSIS_HOOK_POSTUNINSTALL

@@ -134,8 +134,10 @@ namespace InLine.Installer {
     root=Root(directory); Directory.CreateDirectory(root); folder=Path.Combine(root,Transaction);
     directoryHandle=CreateFile(root,0x80,3,IntPtr.Zero,3,0x02000000,IntPtr.Zero);
     Require(!directoryHandle.IsInvalid,"Cannot pin installation directory identity.");
-    string lockPath=Path.Combine(root,".in-line-install.lock"); serial=Open(lockPath,!File.Exists(lockPath)); DeleteOnClose(serial,true);
+    string lockPath=Path.Combine(root,".in-line-install.lock"); serial=Open(lockPath,!File.Exists(lockPath));
+    Require(serial.Length==0,"Unrecognized installer lock; retained for inspection."); DeleteOnClose(serial,true);
     if(operation=="finalize") {
+     Require(Directory.Exists(folder),"Missing transaction journal; cannot confirm completion.");
      if(Directory.Exists(folder)) {
       var complete=Load(folder);
       foreach(var e in complete.Files) Require(e.After==null?!File.Exists(Path.Combine(root,e.Name)):HashFile(Path.Combine(root,e.Name))==e.After,"Installed group changed; recovery backups retained.");

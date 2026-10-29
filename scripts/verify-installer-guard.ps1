@@ -73,6 +73,14 @@ $f=Fixture 'incomplete-payload'; $before=Snapshot $f.root
 $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',-1); Assert ($r.Code -ne 0) 'Incomplete payload accepted'
 EqualSnapshot $before (Snapshot $f.root); Pass 'missing payload member fails before target mutation'
 
+$f=Fixture 'missing-finalize-journal'; $before=Snapshot $f.root
+$r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'finalize',-1); Assert ($r.Code -ne 0) 'Claimed completion without journal'
+EqualSnapshot $before (Snapshot $f.root); Pass 'missing completion journal cannot report success'
+
+$f=Fixture 'unknown-lock'; $lockPath=Join-Path $f.root '.in-line-install.lock'; [IO.File]::WriteAllText($lockPath,'retain unknown lock')
+$before=Snapshot $f.root; $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',-1)
+Assert ($r.Code -ne 0) 'Accepted unknown lock'; EqualSnapshot $before (Snapshot $f.root); Pass 'unknown lock contents retained'
+
 $f=Fixture 'post-install-rollback'; $before=Snapshot $f.root
 $rollbackFile=Join-Path $f.root 'in-line-mcp.exe'; $beforeAcl=(Get-Acl -LiteralPath $rollbackFile).Sddl; $beforeTime=[IO.File]::GetLastWriteTimeUtc($rollbackFile).Ticks
 $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',-1); Assert ($r.Code -eq 0) $r.Message
@@ -132,6 +140,10 @@ try {
     Assert (!$target.HasExited -and !$nonTarget.HasExited) 'Guard stopped a process'
     Assert ($target.StartTime.Ticks -eq $targetStart -and $nonTarget.StartTime.Ticks -eq $otherStart) 'Process replaced'
     Pass 'running target blocks; same-name other directory and both process identities unchanged'
+    $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'uninstall',-1); Assert ($r.Code -ne 0) 'Uninstall ignored mapped executable'
+    EqualSnapshot $before (Snapshot $f.root); EqualSnapshot $otherBefore (Snapshot $other.root)
+    Assert (!$target.HasExited -and !$nonTarget.HasExited) 'Uninstall stopped a process'
+    Pass 'uninstall also stops before removing files while a target is running'
     [IO.File]::WriteAllText($targetSignal,'exit'); Assert ($target.WaitForExit(5000)) 'Fixture did not exit'
     $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',-1); Assert ($r.Code -eq 0) $r.Message
     Assert (!$nonTarget.HasExited) 'Exited PID was used to affect unrelated process'
