@@ -64,6 +64,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: product/src-tauri
+          cache-on-failure: true
       - name: Build unchanged product and verify actual payload
         working-directory: product
         shell: pwsh
@@ -71,6 +72,10 @@ jobs:
           PRODUCT_REF: ${{ inputs.product_ref }}
         run: |
           if ((git rev-parse HEAD) -ne $env:PRODUCT_REF) { throw 'Source checkout mismatch' }
+          if (git status --porcelain) { throw 'Product checkout is not clean' }
+          # build.rs checks GITHUB_SHA against the actual product checkout.
+          # This step builds a different, explicitly verified source checkout.
+          $env:GITHUB_SHA = $env:PRODUCT_REF
           npm ci
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run dist

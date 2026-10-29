@@ -36,6 +36,7 @@ function Hash([string]$path) { if (Test-Path -LiteralPath $path -PathType Leaf) 
 function ProgramState {
     $map=[ordered]@{}
     foreach($name in $names) { $path=Join-Path $install $name; $map[$name]=@{exists=(Test-Path -LiteralPath $path -PathType Leaf);sha256=(Hash $path)} }
+    foreach($legacy in @(Get-ChildItem -LiteralPath $install -Filter '*.exe' -File -ErrorAction SilentlyContinue)) { if(!$map.Contains($legacy.Name)) { $map[$legacy.Name]=@{exists=$true;sha256=(Hash $legacy.FullName)} } }
     return $map
 }
 function RegistryState {
@@ -110,14 +111,36 @@ function Run-NSIS([string]$exe,[string]$label,[bool]$uninstalling=$false,[string
     $item=Start-Owned $exe $arguments $label $privateTemp;$process=$item.process
     $operation=[ordered]@{label=$label;pid=$item.pid;createdUtcTicks=$item.started;executable=$item.path;arguments=$arguments;fault=$fault;faultApplied=$false;helper=$null;timedOut=$false;exitCode=$null;stdoutFile="$sequence-stdout.txt";stderrFile="$sequence-stderr.txt";silentNsisDetailLogAvailable=$false}
     $operations.Add($operation);$deadline=[DateTime]::UtcNow.AddSeconds(180);$pause=@();$resumeAt=$null;$tempAcl=$null;$helperProcess=$null
+    $descendants=[Collections.Generic.List[object]]::new();$operation.descendants=$descendants;$nextObservation=[DateTime]::MinValue;$rootExitedAt=$null
     try {
-        while(!$process.HasExited -and [DateTime]::UtcNow -lt $deadline) {
+        while([DateTime]::UtcNow -lt $deadline) {
+            if($uninstalling -and [DateTime]::UtcNow -ge $nextObservation) {
+                # NSIS can copy its uninstaller and let the original stub exit.
+                # Observe and hold the real temporary body's process handle.
+                $observed=@(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($item.pid)" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($privateTemp,[StringComparison]::OrdinalIgnoreCase) })
+                foreach($child in $observed) {
+                    if(!@($descendants | Where-Object pid -EQ $child.ProcessId).Count) {
+                        $body=Get-Process -Id $child.ProcessId -ErrorAction SilentlyContinue
+                        if($body -and $body.StartTime.ToUniversalTime().Ticks -ge $item.started) {
+                            $descendants.Add(@{pid=$body.Id;parent=$item.pid;path=$child.ExecutablePath;created=$body.StartTime.ToUniversalTime().Ticks;process=$body})
+                            $owned.Add(@{process=$body;pid=$body.Id;started=$body.StartTime.ToUniversalTime().Ticks;path=$child.ExecutablePath;tag='copied-native-uninstaller'})
+                        }
+                    }
+                }
+                $nextObservation=[DateTime]::UtcNow.AddMilliseconds(150)
+            }
+            if($process.HasExited) {
+                if(!$uninstalling) { break }
+                if(!$rootExitedAt) { $rootExitedAt=[DateTime]::UtcNow }
+                $active=@($descendants | Where-Object { !$_.process.HasExited })
+                if(!$active.Count -and ($descendants.Count -or ([DateTime]::UtcNow-$rootExitedAt).TotalSeconds -ge 2)) { break }
+            }
             if($fault -eq 'deny-compile-temp' -and !$operation.faultApplied) {
                 $wrapper=@(Get-ChildItem -LiteralPath $privateTemp -Filter install-guard.ps1 -Recurse -File -ErrorAction SilentlyContinue)
                 if($wrapper.Count) { $tempAcl=Deny-Access $privateTemp ([Security.AccessControl.FileSystemRights]::CreateFiles);$operation.faultApplied=$true;$operation.privateTempDenied=$privateTemp }
             }
             if($fault -in @('terminate-helper','suspend-helper','deny-compile-temp') -and !$operation.helper) {
-                $children=@(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($item.pid)" | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine.Contains('install-guard.ps1') -and $_.CommandLine.Contains($install) })
+                $children=@(Get-CimInstance Win32_Process -Filter "ParentProcessId=$($item.pid)" | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -and $_.CommandLine.Contains('install-guard.ps1') -and $_.CommandLine.Contains($install) })
                 if($children.Count -eq 1) {
                     $child=$children[0];$helperProcess=Get-Process -Id $child.ProcessId -ErrorAction SilentlyContinue
                     if($helperProcess -and $helperProcess.StartTime.ToUniversalTime().Ticks -ge $item.started) {
@@ -134,14 +157,17 @@ function Run-NSIS([string]$exe,[string]$label,[bool]$uninstalling=$false,[string
             }
             Start-Sleep -Milliseconds 30
         }
-        if(!$process.HasExited) { $operation.timedOut=$true;Stop-Owned $item }
-        $process.WaitForExit();$operation.exitCode=$process.ExitCode
+        if(!$process.HasExited -or @($descendants | Where-Object { !$_.process.HasExited }).Count) { $operation.timedOut=$true;Stop-Owned $item;foreach($body in $descendants) { $entry=@{process=$body.process;pid=$body.pid;started=$body.created;path=$body.path};Stop-Owned $entry } }
+        $process.WaitForExit();$operation.rootExitCode=$process.ExitCode;$operation.exitCode=$process.ExitCode
+        foreach($body in $descendants) { $body.process.WaitForExit();$body.exitCode=$body.process.ExitCode;$body.Remove('process');$operation.exitCode=$body.exitCode }
+        $operation.copiedUninstallerObserved=($descendants.Count -gt 0)
         if($helperProcess -and $helperProcess.HasExited) { $operation.helperExitCode=$helperProcess.ExitCode }
         $item.stdout.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $out $operation.stdoutFile) -Encoding utf8
         $item.stderr.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $out $operation.stderrFile) -Encoding utf8
     } finally {
         if($pause.Count) { [NativeNsisLabThreads]::Resume($pause) }
         if($tempAcl) { Restore-Access $tempAcl }
+        foreach($body in $descendants) { if($body.ContainsKey('process')) { $body.Remove('process') } }
     }
     return $operation
 }
@@ -166,7 +192,10 @@ function Seed-SyntheticData {
     & python -c 'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute("create table if not exists synthetic_work(id integer primary key,title text)"); c.execute("insert or ignore into synthetic_work values(1,?)",("NSIS synthetic record",)); c.commit(); c.close()' $db
     if($LASTEXITCODE -ne 0) { throw 'Synthetic SQLite creation failed' }
     $dataPaths.Add($db)
-    foreach($name in @('preferences.json','authorization.dpapi','config.toml')) { $path=Join-Path $fixture $name;[IO.File]::WriteAllText($path,'NSIS synthetic preservation fixture');$dataPaths.Add($path) }
+    Add-Type -AssemblyName System.Security.Cryptography.ProtectedData
+    $preferences=Join-Path $fixture 'preferences.json';[IO.File]::WriteAllText($preferences,'{"theme":"synthetic","zoom":1}');$dataPaths.Add($preferences)
+    $authorization=Join-Path $fixture 'authorization.dpapi';[IO.File]::WriteAllBytes($authorization,[Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes('{"syntheticClient":"native-lab","regularRead":true,"write":false}'),$null,[Security.Cryptography.DataProtectionScope]::CurrentUser));$dataPaths.Add($authorization)
+    $fixtureConfig=Join-Path $fixture 'config.toml';[IO.File]::WriteAllText($fixtureConfig,"[mcp_servers.synthetic]`ncommand='synthetic-fixture'`n");$dataPaths.Add($fixtureConfig)
     $config=Join-Path $env:USERPROFILE '.codex/config.toml';New-Item -ItemType Directory -Path (Split-Path $config) -Force | Out-Null
     [IO.File]::WriteAllText($config,"[mcp_servers.synthetic_other]`ncommand = 'synthetic-fixture'`n");$dataPaths.Add($config)
 }
@@ -181,10 +210,13 @@ function Probe-Programs {
     $gui=Start-Owned (Join-Path $install 'in-line.exe') @() 'native-gui-startup'
     $database=Join-Path $env:APPDATA 'in-line/inline.db';$authorization=Join-Path $env:USERPROFILE '.in-line/mcp-security/authorization.dpapi'
     $until=[DateTime]::UtcNow.AddSeconds(25)
-    while(!$gui.process.HasExited -and !(Test-Path -LiteralPath $database) -and [DateTime]::UtcNow -lt $until) { Start-Sleep -Milliseconds 200 }
+    while(!$gui.process.HasExited -and (!(Test-Path -LiteralPath $database) -or !(Test-Path -LiteralPath $authorization)) -and [DateTime]::UtcNow -lt $until) { Start-Sleep -Milliseconds 200 }
     $result.guiStartup=@{processAlive=!$gui.process.HasExited;databaseCreated=(Test-Path -LiteralPath $database);authorizationCreated=(Test-Path -LiteralPath $authorization)}
     if(!$gui.process.HasExited -and (Test-Path -LiteralPath $database)) {
         Check $true 'GUI native process created its database'
+        $beforeGuiInstall=Snapshot 'gui-running-before-install';$guiOp=Run-NSIS $candidate 'gui-running-install';$afterGuiInstall=Snapshot 'gui-running-after-install'
+        Check ($guiOp.exitCode -ne 0 -and !$guiOp.timedOut) 'Actual running GUI blocks native installation'
+        Check (Equal $beforeGuiInstall.programs $afterGuiInstall.programs) 'GUI occupation prevents partial writes'
         $gui.process.Refresh();$window=$gui.process.MainWindowHandle
         if($window -ne [IntPtr]::Zero) { $closeRequested=$gui.process.CloseMainWindow();Start-Sleep -Milliseconds 500;$result.guiStartup.closeRequested=$closeRequested;$result.guiStartup.aliveAfterClose=!$gui.process.HasExited }
         Stop-Owned $gui
