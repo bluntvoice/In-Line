@@ -12,8 +12,10 @@ $inspector = (Get-Command $SevenZip -ErrorAction Stop).Source
 $repository = Split-Path -Parent $PSScriptRoot
 $inspection = Join-Path $repository ('release/installer-inspection-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $inspection | Out-Null
-# Extract only these known filenames; never execute the NSIS installer or its hooks.
-& $inspector e -y "-o$inspection" -- $installer 'in-line.exe' 'in-line-mcp.exe' 'in-line-cli.exe'
+# The guarded NSIS template stages programs under this exact private path.
+# Extract only those entries; never execute the installer or its hooks.
+$payloadEntries = @('in-line.exe','in-line-mcp.exe','in-line-cli.exe') | ForEach-Object { '$PLUGINSDIR\inline-payload\' + $_ }
+& $inspector e -y "-o$inspection" -- $installer @payloadEntries
 if ($LASTEXITCODE -ne 0) { throw 'NSIS payload extraction failed' }
 foreach ($name in @('in-line.exe','in-line-mcp.exe','in-line-cli.exe')) {
     $payload = Join-Path $inspection $name
