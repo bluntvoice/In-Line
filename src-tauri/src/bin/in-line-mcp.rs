@@ -309,6 +309,10 @@ async fn main() {
     if in_line_lib::mcp::build_identity::print_if_requested("in-line-mcp") {
         return;
     }
+    if !in_line_lib::install_gate::ready() {
+        eprintln!("{}", in_line_lib::install_gate::MESSAGE);
+        std::process::exit(78);
+    }
     let args: Vec<String> = std::env::args().skip(1).collect();
     if !args.is_empty() {
         #[cfg(windows)]

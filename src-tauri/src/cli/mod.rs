@@ -241,6 +241,12 @@ async fn execute(
     id: String,
     receipt_key: &mut Option<String>,
 ) -> Result<Value, McpError> {
+    if !matches!(options.command, Command::Help | Command::Version) && !crate::install_gate::ready()
+    {
+        let mut error = McpError::new("incompatible");
+        error.message = crate::install_gate::MESSAGE.into();
+        return Err(error);
+    }
     let input = options
         .input
         .as_deref()
