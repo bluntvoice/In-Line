@@ -561,6 +561,21 @@ SectionEnd
 Section Install
   SetOutPath $INSTDIR
 
+  ; Existing program files require matching registration, including silent mode.
+  ; A fresh directory may replace the registered location without touching it.
+  ${If} ${FileExists} "$INSTDIR\in-line.exe"
+  ${OrIf} ${FileExists} "$INSTDIR\in-line-mcp.exe"
+  ${OrIf} ${FileExists} "$INSTDIR\in-line-cli.exe"
+  ${OrIf} ${FileExists} "$INSTDIR\WebView2Loader.dll"
+  ${OrIf} ${FileExists} "$INSTDIR\uninstall.exe"
+    ReadRegStr $R7 SHCTX "${UNINSTKEY}" "InstallLocation"
+    ${If} $R7 != "$INSTDIR"
+    ${AndIf} $R7 != "$\"$INSTDIR$\""
+      SetErrorLevel 1
+      Abort "现有程序无法与本用户的注册安装目录核对，已停止覆盖；未调用旧卸载器。"
+    ${EndIf}
+  ${EndIf}
+
   !ifmacrodef NSIS_HOOK_PREINSTALL
     !insertmacro NSIS_HOOK_PREINSTALL
   !endif

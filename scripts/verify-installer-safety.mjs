@@ -19,5 +19,7 @@ for(const marker of ['InLineRequireGuard "install"','Function .onInstFailed','Fu
 assert(hooks.includes('InLineRequireGuard "uninstall"'));
 assert(!template.includes('WriteUninstaller "$INSTDIR\\uninstall.exe"'));
 assert(template.includes('WriteUninstaller "$PLUGINSDIR\\inline-payload\\uninstall.exe"'));
+assert(template.includes('Existing program files require matching registration, including silent mode.'));
+assert(template.includes('IfErrors inline_install_metadata_failed')&&template.includes('IfErrors inline_uninstall_metadata_failed'));
 for(const p of ['src-tauri/src/main.rs','src-tauri/src/bin/in-line-mcp.rs','src-tauri/src/cli/mod.rs'])assert(read(p).includes('install_gate::ready()'));
 console.log('PASS: pinned NSIS template, guarded payload allowlist, fail-closed callbacks, data preservation and three launch barriers.');
