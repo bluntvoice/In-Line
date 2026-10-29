@@ -29,6 +29,14 @@ function Snapshot([string]$root) {
 function EqualSnapshot($a, $b) { Assert ($a.Count -eq $b.Count) 'File count changed'; foreach ($name in $a.Keys) { Assert ($a[$name] -eq $b[$name]) ('Changed bytes: ' + $name) } }
 function Pass([string]$name) { $results.Add(@{name=$name;passed=$true}) }
 
+$legacy='D:(A;ID;FA;;;BA)(A;ID;FA;;;SY)(A;ID;0x1200a9;;;BU)'
+Assert ([InLine.Installer.Guard]::AccessEquivalent($legacy,$legacy.Replace('D:','D:AI'))) 'Documented AI conversion rejected'
+Assert (![InLine.Installer.Guard]::AccessEquivalent($legacy.Replace('D:','D:AI'),$legacy)) 'AI downgrade accepted'
+foreach($different in @($legacy.Replace('D:','D:P'),$legacy.Replace('0x1200a9','FA'),$legacy.Replace(';;;BU',';;;WD'),$legacy.Replace(';ID;',';;'),($legacy+'(A;;FA;;;WD)'),'D:(A;ID;FA;;;SY)(A;ID;FA;;;BA)(A;ID;0x1200a9;;;BU)')) {
+    Assert (![InLine.Installer.Guard]::AccessEquivalent($legacy,$different)) 'Changed ACL security policy accepted'
+}
+Pass 'documented legacy AI conversion only; reject changed protection, SID, rights, flags, extra or reordered ACEs'
+
 $f=Fixture 'fresh' $false; $before=Snapshot $f.root
 $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',-1); Assert ($r.Code -eq 0) $r.Message
 foreach ($name in $names) { Assert ((Get-FileHash (Join-Path $f.root $name)).Hash -eq (Get-FileHash (Join-Path $f.payload $name)).Hash) 'Incomplete fresh group' }

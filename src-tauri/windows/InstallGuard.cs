@@ -76,12 +76,26 @@ namespace InLine.Installer {
    target.SetLength(target.Position); target.Flush(true);
   }
   static FileTime Time(long value) { return new FileTime { Low=(uint)value, High=(uint)((ulong)value>>32) }; }
+  public static bool AccessEquivalent(string expected, string actual) {
+   var before=new RawSecurityDescriptor(expected); var after=new RawSecurityDescriptor(actual);
+   // SetSecurityInfo may mark a legacy descriptor as converted to the current
+   // inheritance model (AI). Accept only that documented false -> true bit;
+   // protection, every ACE/SID/access mask, inheritance flag and order stay exact.
+   var converted=before.ControlFlags | ControlFlags.DiscretionaryAclAutoInherited;
+   if(after.ControlFlags!=before.ControlFlags && after.ControlFlags!=converted) return false;
+   if(before.DiscretionaryAcl==null || after.DiscretionaryAcl==null) return before.DiscretionaryAcl==null && after.DiscretionaryAcl==null;
+   if(before.DiscretionaryAcl.BinaryLength!=after.DiscretionaryAcl.BinaryLength) return false;
+   var a=new byte[before.DiscretionaryAcl.BinaryLength]; var b=new byte[after.DiscretionaryAcl.BinaryLength];
+   before.DiscretionaryAcl.GetBinaryForm(a,0); after.DiscretionaryAcl.GetBinaryForm(b,0);
+   for(int i=0;i<a.Length;i++) if(a[i]!=b[i]) return false;
+   return true;
+  }
   static void Restore(FileStream target, string folder, Entry e, bool restoreAcl) {
    Write(target,Path.Combine(folder,e.Name)); Require(Hash(target)==e.Before,"Restored file verification failed.");
    if(restoreAcl) {
     var security=new FileSecurity(); security.SetSecurityDescriptorSddlForm(e.Acl,AccessControlSections.Access); target.SetAccessControl(security);
     string restored=target.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access);
-    Require(restored==e.Acl,"Restored access descriptor could not be verified. Expected="+e.Acl+" Actual="+restored);
+    Require(AccessEquivalent(e.Acl,restored),"Restored access descriptor could not be verified.");
    }
    var c=Time(e.Created); var a=Time(e.Accessed); var w=Time(e.Written);
    Require(SetFileTime(target.SafeFileHandle,ref c,ref a,ref w),"Cannot restore file timestamps.");
