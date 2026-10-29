@@ -1,0 +1,225 @@
+{
+  "phase": "P2-C",
+  "date": "2026-10-29",
+  "timezone": "Asia/Shanghai",
+  "status": "conditional_code_acceptance_formally_committed_native_plan_awaiting_approval",
+  "codeCommit": "8c232c0257e4875c501605ff11b7a41bd0eac840",
+  "validatedSnapshot": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+  "branch": "feat/scheduled-items",
+  "reviewedFilesCommitted": [
+    ".github/workflows/dev-build.yml",
+    "CHANGELOG.md",
+    "README.md",
+    "RELEASE_NOTES.md",
+    "docs/MCP_PHASE2C_ACCEPTANCE.md",
+    "docs/mcp/acceptance/MCP-PHASE2C-20261029-checks.json",
+    "docs/prd/app-update.md",
+    "docs/prd/mcp.md",
+    "scripts/prepare-mcp-sidecar.mjs",
+    "scripts/verify-installer-guard.ps1",
+    "scripts/verify-installer-package.ps1",
+    "scripts/verify-installer-safety.mjs",
+    "src-tauri/src/bin/in-line-mcp.rs",
+    "src-tauri/src/cli/mod.rs",
+    "src-tauri/src/install_gate.rs",
+    "src-tauri/src/lib.rs",
+    "src-tauri/src/main.rs",
+    "src-tauri/tauri.conf.json",
+    "src-tauri/windows/InstallGuard.cs",
+    "src-tauri/windows/README.md",
+    "src-tauri/windows/install-guard.ps1",
+    "src-tauri/windows/installer-hooks.nsh",
+    "src-tauri/windows/installer.nsi"
+  ],
+  "frozenFilesMatchedBeforeCodeCommit": 23,
+  "snapshotFiles": [
+    {
+      "path": ".github/workflows/dev-build.yml",
+      "unchangedSinceSnapshot": true,
+      "sha256": "7baf5dae39e5cdb4e20522bdfc98d80eae87510320475367c9a0ff8dfd5c6689",
+      "snapshotOnlyPushTriggerExcluded": true
+    },
+    {
+      "path": "scripts/prepare-mcp-sidecar.mjs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "ae882c50fc4913281e90df0d682f9bcbfe114963bccda8f80d0a73501690bfb0",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "scripts/verify-installer-package.ps1",
+      "unchangedSinceSnapshot": true,
+      "sha256": "9c83827ad6d28d73f1b1c39638ed6ee793d5fcd25f19172c1c3ba056ebbede58",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "scripts/verify-installer-guard.ps1",
+      "unchangedSinceSnapshot": true,
+      "sha256": "85c637e045e37eddee56d994c68ddeff801933fa60de978d2df367eb417fe567",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "scripts/verify-installer-safety.mjs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "726b98abe4d14d64f073eae82381fd01d022211c51463c8d9ce5d8953ff297de",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/src/bin/in-line-mcp.rs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "1d60e363a97752ea3d357e62c43bb1f5483ed988482b06a6668094b062dbd828",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/src/cli/mod.rs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "96f67313277036cae71e55b0b0d6859ab489c78bd7c7383c235926361224f635",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/src/install_gate.rs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "b9e0f2dc5681e57aa82880c969aa011b2e6c0fa6de3c88c0609d5110faed32b1",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/src/lib.rs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "a432b9cbeb9bf15ff05019cf257c348b59ea3777ae417d602d4af1ebe047e46d",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/src/main.rs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "ed474032d6cef185d7d7a7298195bef3b824b94168b9b7dc1404e65447863228",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/tauri.conf.json",
+      "unchangedSinceSnapshot": true,
+      "sha256": "341b3faab6883cd16213e33d874844b6be572a2a10b1d477f88c41ad59ddb0ca",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/windows/InstallGuard.cs",
+      "unchangedSinceSnapshot": true,
+      "sha256": "08a86d4f1148d1724bcecfd7d3bc0a84915751e2cdb63743132d20f6346c28b2",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/windows/install-guard.ps1",
+      "unchangedSinceSnapshot": true,
+      "sha256": "530c84fd07cc11068247649ba4c91d7dcd860d129c096dfcb7c4d83015145a28",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/windows/installer-hooks.nsh",
+      "unchangedSinceSnapshot": true,
+      "sha256": "7c8809a21c6a69c6b8ad0ca039b0d42da4fc580e623b14ab0ba4a86c30771f08",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/windows/installer.nsi",
+      "unchangedSinceSnapshot": true,
+      "sha256": "0189df57b876a5186051654ad742afbb606210de7f51b5a3d0d596c0c3329267",
+      "snapshotOnlyPushTriggerExcluded": false
+    },
+    {
+      "path": "src-tauri/windows/README.md",
+      "unchangedSinceSnapshot": true,
+      "sha256": "65e576ac607015b3122be6b7e8866b69a55858c23ae901cb838be9650400e3bb",
+      "snapshotOnlyPushTriggerExcluded": false
+    }
+  ],
+  "snapshotExpectedDifference": "Temporary branch-only push trigger omitted in formal workflow",
+  "formalCodeCi": {
+    "runId": 40836466009,
+    "jobId": 123322284769,
+    "sourceCommit": "8c232c0257e4875c501605ff11b7a41bd0eac840",
+    "conclusion": "success",
+    "rustPassed": 248,
+    "rustFailed": 0,
+    "rustIgnored": 0,
+    "summaries": [
+      "2026-10-29T07:37:10.1332413Z  Test Files  22 passed (22)\r",
+      "2026-10-29T07:37:10.1334783Z       Tests  135 passed (135)\r",
+      "2026-10-29T07:39:55.4431176Z test result: ok. 213 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.71s\r",
+      "2026-10-29T07:39:55.4642373Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-29T07:39:55.4795051Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-29T07:39:55.4965505Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-29T07:40:18.8056438Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.29s\r",
+      "2026-10-29T07:40:18.9403021Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s\r",
+      "2026-10-29T07:40:22.8192650Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.84s\r",
+      "2026-10-29T07:40:24.8957832Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.05s\r",
+      "2026-10-29T07:40:26.2069989Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.30s\r",
+      "2026-10-29T07:40:26.5678457Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s\r",
+      "2026-10-29T07:40:27.1184350Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s\r",
+      "2026-10-29T07:40:29.2715407Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+      "2026-10-29T07:40:29.9280232Z PASS: three offline package identities/version files match; no store/IPC/PATH/installation operations.\r",
+      "2026-10-29T07:40:30.5225431Z PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.\r",
+      "2026-10-29T07:40:30.6834032Z PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.\r"
+    ]
+  },
+  "maintenanceReviewOnly": true,
+  "runtimeChangedInThisFollowup": false,
+  "upstream": {
+    "version": "tauri-cli-v2.11.4",
+    "sourceUrl": "https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi",
+    "freshReadMatchesPrior": true,
+    "sha256Lf": "20f4ecc730defb71f1342eaeaec4021df13be3d843abba0effe88ea5835fa079",
+    "customSha256Lf": "0189df57b876a5186051654ad742afbb606210de7f51b5a3d0d596c0c3329267",
+    "diffSha256Lf": "0b62e7d45db27423ba7ae3ad9663d1f83f51a47920e1cd80cdfed2b554029f74",
+    "hunks": 50,
+    "diffReconstructsExactTemplate": true
+  },
+  "maintenanceFindings": {
+    "versionGate": "Bundling path only; ordinary CI does not directly call the guard check",
+    "upstreamContentDriftAutomaticallyDetected": false,
+    "powershellFailure": "Nonzero/unavailable stops; policy and hang behavior still require native testing",
+    "explicitGuardTimeoutConfigured": false,
+    "windowCloseHidesGui": true,
+    "trayQuitAvailable": true,
+    "exitInstructionsNeedImprovement": true,
+    "registryShortcutRollbackAtomic": false,
+    "shortcutErrorsExplicitlyHandledPerOperation": false,
+    "residentServiceAdded": false,
+    "simplification": "No safety validation removed; consistency-check suggestions only"
+  },
+  "nativePlan": {
+    "path": "docs/MCP_PHASE2C_NATIVE_NSIS_TEST_PLAN.md",
+    "cases": 15,
+    "executed": false,
+    "authorized": false,
+    "preferredEnvironment": "Snapshot-capable independent Windows VM with a dedicated account and synthetic data",
+    "sameUserDifferentDirectorySufficient": false,
+    "fileMetadataConsistencyRequired": true,
+    "vmRecoveryNotProductAutomaticRollback": true
+  },
+  "history": {
+    "priorUntrackedFiles": 12,
+    "allPreserved": true,
+    "temporaryBranchRetained": true,
+    "mainChanged": false
+  },
+  "followupDocumentationFiles": [
+    "README.md",
+    "CHANGELOG.md",
+    "RELEASE_NOTES.md",
+    "docs/prd/app-update.md",
+    "docs/prd/mcp.md",
+    "docs/MCP_PHASE2C_MAINTENANCE_REVIEW.md",
+    "docs/MCP_PHASE2C_NATIVE_NSIS_TEST_PLAN.md",
+    "docs/mcp/acceptance/MCP-PHASE2C-TAURI-2.11.4-template.diff",
+    "docs/mcp/acceptance/MCP-PHASE2C-20261029-submission-checks.json"
+  ],
+  "phaseGates": {
+    "nativeLifecycleAccepted": false,
+    "formalInstallationOrUpgradeAuthorized": false,
+    "tagOrReleaseAuthorized": false,
+    "p2BAutomaticRecoveryComplete": false,
+    "p2BDeferred": true,
+    "p2DSeparate": true,
+    "phase3Started": false,
+    "phase2Complete": false
+  },
+  "stopGate": "Wait for user confirmation of the native plan; do not execute any native NSIS install, including isolated installations."
+}

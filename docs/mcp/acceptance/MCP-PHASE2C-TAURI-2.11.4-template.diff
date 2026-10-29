@@ -1,0 +1,391 @@
+--- tauri-cli-v2.11.4/installer.nsi
++++ in-line-p2c/installer.nsi
+@@ -0,0 +1 @@
++; In-Line P2-C: Tauri CLI 2.11.4 template, safety changes documented in windows/README.md.
+@@ -21,0 +23,2 @@
++!define MUI_CUSTOMFUNCTION_ABORT InLineOnAbort
++!define MUI_CUSTOMFUNCTION_UNABORT un.InLineOnAbort
+@@ -260,0 +264,4 @@
++  StrCpy $R1 "使用安全就地安装，保留数据；文件占用或校验失败时停止。不会运行旧卸载器。"
++  StrCpy $R2 "安全安装 / 修复（整组校验，失败回滚）"
++  StrCpy $R3 "取消并保留原安装"
++
+@@ -311,3 +318 @@
+-  ${NSD_GetState} $R2 $R1
+-
+-  ; If migrating from Wix, always uninstall
++  ; Never invoke an older uninstaller: it may still contain name-based kills.
+@@ -315,70 +320,17 @@
+-    Goto reinst_uninstall
+-  ${EndIf}
+-
+-  ; In update mode, always proceeds without uninstalling
+-  ${If} $UpdateMode = 1
+-    Goto reinst_done
+-  ${EndIf}
+-
+-  ; $R0 holds whether same(0)/upgrading(1)/downgrading(-1) version
+-  ; $R1 holds the radio buttons state:
+-  ;   1 => first choice was selected
+-  ;   0 => second choice was selected
+-  ${If} $R0 = 0 ; Same version, proceed
+-    ${If} $R1 = 1              ; User chose to add/reinstall
+-      Goto reinst_done
+-    ${Else}                    ; User chose to uninstall
+-      Goto reinst_uninstall
+-    ${EndIf}
+-  ${ElseIf} $R0 = 1 ; Upgrading
+-    ${If} $R1 = 1              ; User chose to uninstall
+-      Goto reinst_uninstall
+-    ${Else}
+-      Goto reinst_done         ; User chose NOT to uninstall
+-    ${EndIf}
+-  ${ElseIf} $R0 = -1 ; Downgrading
+-    ${If} $R1 = 1              ; User chose to uninstall
+-      Goto reinst_uninstall
+-    ${Else}
+-      Goto reinst_done         ; User chose NOT to uninstall
+-    ${EndIf}
+-  ${EndIf}
+-
+-  reinst_uninstall:
+-    HideWindow
+-    ClearErrors
+-
+-    ${If} $WixMode = 1
+-      ReadRegStr $R1 HKLM "$R6" "UninstallString"
+-      ExecWait '$R1' $0
+-    ${Else}
+-      ReadRegStr $4 SHCTX "${MANUPRODUCTKEY}" ""
+-      ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
+-      ${IfThen} $UpdateMode = 1 ${|} StrCpy $R1 "$R1 /UPDATE" ${|} ; append /UPDATE
+-      ${IfThen} $PassiveMode = 1 ${|} StrCpy $R1 "$R1 /P" ${|} ; append /P
+-      StrCpy $R1 "$R1 _?=$4" ; append uninstall directory
+-      ExecWait '$R1' $0
+-    ${EndIf}
+-
+-    BringToFront
+-
+-    ${IfThen} ${Errors} ${|} StrCpy $0 2 ${|} ; ExecWait failed, set fake exit code
+-
+-    ${If} $0 <> 0
+-    ${OrIf} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
+-      ; User cancelled wix uninstaller? return to select un/reinstall page
+-      ${If} $WixMode = 1
+-      ${AndIf} $0 = 1602
+-        Abort
+-      ${EndIf}
+-
+-      ; User cancelled NSIS uninstaller? return to select un/reinstall page
+-      ${If} $0 = 1
+-        Abort
+-      ${EndIf}
+-
+-      ; Other erros? show generic error message and return to select un/reinstall page
+-      MessageBox MB_ICONEXCLAMATION "$(unableToUninstall)"
+-      Abort
+-    ${EndIf}
+-  reinst_done:
++    IfSilent +2
++    MessageBox MB_ICONSTOP "无法安全迁移旧 MSI 安装。安装已停止；未调用旧卸载器。"
++    SetErrorLevel 1
++    Quit
++  ${EndIf}
++  !if "${ALLOWDOWNGRADES}" == "false"
++    ${If} $R0 = -1
++      SetErrorLevel 1
++      Quit
++    ${EndIf}
++  !endif
++  ${If} $PassiveMode <> 1
++    ${NSD_GetState} $R2 $R1
++    ${If} $R1 <> ${BST_CHECKED}
++      Quit
++    ${EndIf}
++  ${EndIf}
+@@ -429,33 +381,4 @@
+-Function un.ConfirmShow ; Add add a `Delete app data` check box
+-  ; $1 inner dialog HWND
+-  ; $2 window DPI
+-  ; $3 style
+-  ; $4 x
+-  ; $5 y
+-  ; $6 width
+-  ; $7 height
+-  FindWindow $1 "#32770" "" $HWNDPARENT ; Find inner dialog
+-  System::Call "user32::GetDpiForWindow(p r1) i .r2"
+-  ${If} $(^RTL) = 1
+-    StrCpy $3 "${__NSD_CheckBox_EXSTYLE} | ${WS_EX_LAYOUTRTL}"
+-    IntOp $4 50 * $2
+-  ${Else}
+-    StrCpy $3 "${__NSD_CheckBox_EXSTYLE}"
+-    IntOp $4 0 * $2
+-  ${EndIf}
+-  IntOp $5 100 * $2
+-  IntOp $6 400 * $2
+-  IntOp $7 25 * $2
+-  IntOp $4 $4 / 96
+-  IntOp $5 $5 / 96
+-  IntOp $6 $6 / 96
+-  IntOp $7 $7 / 96
+-  System::Call 'user32::CreateWindowEx(i r3, w "${__NSD_CheckBox_CLASS}", w "$(deleteAppData)", i ${__NSD_CheckBox_STYLE}, i r4, i r5, i r6, i r7, p r1, i0, i0, i0) i .s'
+-  Pop $DeleteAppDataCheckbox
+-  SendMessage $HWNDPARENT ${WM_GETFONT} 0 0 $1
+-  SendMessage $DeleteAppDataCheckbox ${WM_SETFONT} $1 1
+-FunctionEnd
+-!define MUI_PAGE_CUSTOMFUNCTION_LEAVE un.ConfirmLeave
+-Function un.ConfirmLeave
+-  SendMessage $DeleteAppDataCheckbox ${BM_GETCHECK} 0 0 $DeleteAppDataCheckboxState
+-FunctionEnd
++Function un.ConfirmShow
++  StrCpy $DeleteAppDataCheckboxState 0
++FunctionEnd
++; P2-C always retains data, authorization, preferences and MCP configuration.
+@@ -640,0 +564,15 @@
++  ; Existing program files require matching registration, including silent mode.
++  ; A fresh directory may replace the registered location without touching it.
++  ${If} ${FileExists} "$INSTDIR\in-line.exe"
++  ${OrIf} ${FileExists} "$INSTDIR\in-line-mcp.exe"
++  ${OrIf} ${FileExists} "$INSTDIR\in-line-cli.exe"
++  ${OrIf} ${FileExists} "$INSTDIR\WebView2Loader.dll"
++  ${OrIf} ${FileExists} "$INSTDIR\uninstall.exe"
++    ReadRegStr $R7 SHCTX "${UNINSTKEY}" "InstallLocation"
++    ${If} $R7 != "$INSTDIR"
++    ${AndIf} $R7 != "$\"$INSTDIR$\""
++      SetErrorLevel 1
++      Abort "现有程序无法与本用户的注册安装目录核对，已停止覆盖；未调用旧卸载器。"
++    ${EndIf}
++  ${EndIf}
++
+@@ -645,9 +583,9 @@
+-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+-
+-  ; Copy main executable
+-  File "${MAINBINARYSRCPATH}"
+-
+-  ; Copy resources
+-  {{#each resources_dirs}}
+-    CreateDirectory "$INSTDIR\\{{this}}"
+-  {{/each}}
++  ReadRegStr $OldMainBinaryName SHCTX "${UNINSTKEY}" "MainBinaryName"
++  ${If} $OldMainBinaryName != ""
++  ${AndIf} $OldMainBinaryName != "${MAINBINARYNAME}.exe"
++    SetErrorLevel 1
++    Abort "旧主程序名称无法安全归入本次事务，已停止安装。"
++  ${EndIf}
++  InitPluginsDir
++  SetOutPath "$PLUGINSDIR\inline-payload"
++  File "/oname=in-line.exe" "${MAINBINARYSRCPATH}"
+@@ -657,2 +594,0 @@
+-
+-  ; Copy external binaries
+@@ -661,0 +598,10 @@
++  ClearErrors
++  WriteUninstaller "$PLUGINSDIR\inline-payload\uninstall.exe"
++  ${If} ${Errors}
++    SetErrorLevel 1
++    Abort "无法准备完整安装载荷，未替换原程序。"
++  ${EndIf}
++  !insertmacro InLineRequireGuard "install"
++  StrCpy $InLineTransactionReady 1
++  SetOutPath $INSTDIR
++  ClearErrors
+@@ -671,0 +618 @@
++    ClearErrors
+@@ -672,0 +620,2 @@
++    IfErrors inline_install_metadata_failed
++    ClearErrors
+@@ -673,0 +623,2 @@
++    IfErrors inline_install_metadata_failed
++    ClearErrors
+@@ -674,0 +626,2 @@
++    IfErrors inline_install_metadata_failed
++    ClearErrors
+@@ -675,0 +629 @@
++    IfErrors inline_install_metadata_failed
+@@ -678,2 +632 @@
+-  ; Create uninstaller
+-  WriteUninstaller "$INSTDIR\uninstall.exe"
++  ; Uninstaller is part of the verified file-group transaction.
+@@ -681,0 +635 @@
++  ClearErrors
+@@ -682,0 +637 @@
++  IfErrors inline_install_metadata_failed
+@@ -686,0 +642 @@
++    ClearErrors
+@@ -688,8 +644,2 @@
+-  !endif
+-
+-  ; Remove old main binary if it doesn't match new main binary name
+-  ReadRegStr $OldMainBinaryName SHCTX "${UNINSTKEY}" "MainBinaryName"
+-  ${If} $OldMainBinaryName != ""
+-  ${AndIf} $OldMainBinaryName != "${MAINBINARYNAME}.exe"
+-    Delete "$INSTDIR\$OldMainBinaryName"
+-  ${EndIf}
++    IfErrors inline_install_metadata_failed
++  !endif
+@@ -697,0 +648 @@
++  ClearErrors
+@@ -698,0 +650 @@
++  IfErrors inline_install_metadata_failed
+@@ -700,0 +653 @@
++  ClearErrors
+@@ -701,0 +655,2 @@
++  IfErrors inline_install_metadata_failed
++  ClearErrors
+@@ -702,0 +658,2 @@
++  IfErrors inline_install_metadata_failed
++  ClearErrors
+@@ -703,0 +661,2 @@
++  IfErrors inline_install_metadata_failed
++  ClearErrors
+@@ -704,0 +664,2 @@
++  IfErrors inline_install_metadata_failed
++  ClearErrors
+@@ -705,0 +667,2 @@
++  IfErrors inline_install_metadata_failed
++  ClearErrors
+@@ -706,0 +670,2 @@
++  IfErrors inline_install_metadata_failed
++  ClearErrors
+@@ -707,0 +673,2 @@
++  IfErrors inline_install_metadata_failed
++  ClearErrors
+@@ -708,0 +676 @@
++  IfErrors inline_install_metadata_failed
+@@ -712,0 +681 @@
++  ClearErrors
+@@ -713,0 +683 @@
++  IfErrors inline_install_metadata_failed
+@@ -715,0 +686 @@
++    ClearErrors
+@@ -716,0 +688,2 @@
++    IfErrors inline_install_metadata_failed
++    ClearErrors
+@@ -717,0 +691,2 @@
++    IfErrors inline_install_metadata_failed
++    ClearErrors
+@@ -718,0 +694 @@
++    IfErrors inline_install_metadata_failed
+@@ -732,0 +709,7 @@
++  Goto inline_install_metadata_ok
++  inline_install_metadata_failed:
++    Call InLineOnAbort
++    SetErrorLevel 1
++    Abort "注册信息写入失败；安装已停止。请核对回滚状态及保留的恢复备份。"
++  inline_install_metadata_ok:
++
+@@ -741,0 +725,28 @@
++
++
++Function InLineOnAbort
++  ${If} $InLineTransactionReady = 1
++    !insertmacro InLineGuard "rollback"
++    ${If} $0 != 0
++      SetErrorLevel 2
++      DetailPrint "回滚未通过校验，恢复备份已保留；请勿启动本安装目录。"
++    ${EndIf}
++    StrCpy $InLineTransactionReady 0
++  ${EndIf}
++FunctionEnd
++Function .onInstFailed
++  Call InLineOnAbort
++FunctionEnd
++Function un.InLineOnAbort
++  ${If} $InLineTransactionReady = 1
++    !insertmacro InLineGuard "rollback"
++    ${If} $0 != 0
++      SetErrorLevel 2
++      DetailPrint "卸载回滚未通过校验，恢复备份已保留。"
++    ${EndIf}
++    StrCpy $InLineTransactionReady 0
++  ${EndIf}
++FunctionEnd
++Function un.onUninstFailed
++  Call un.InLineOnAbort
++FunctionEnd
+@@ -777,0 +789,8 @@
++  ; Do not remove another installation's registration or preferences.
++  ReadRegStr $R7 SHCTX "${UNINSTKEY}" "InstallLocation"
++  ${If} $R7 != "$INSTDIR"
++  ${AndIf} $R7 != "$\"$INSTDIR$\""
++    SetErrorLevel 1
++    Abort "注册安装目录无法与本目录核对，已停止卸载；未修改其他安装或用户数据。"
++  ${EndIf}
++
+@@ -782,15 +801 @@
+-  !insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
+-
+-  ; Delete the app directory and its content from disk
+-  ; Copy main executable
+-  Delete "$INSTDIR\${MAINBINARYNAME}.exe"
+-
+-  ; Delete resources
+-  {{#each resources}}
+-    Delete "$INSTDIR\\{{this.[1]}}"
+-  {{/each}}
+-
+-  ; Delete external binaries
+-  {{#each binaries}}
+-    Delete "$INSTDIR\\{{this}}"
+-  {{/each}}
++  ; Managed files were removed as a verified group by PREUNINSTALL.
+@@ -808,0 +814 @@
++      ClearErrors
+@@ -809,0 +816 @@
++      IfErrors inline_uninstall_metadata_failed
+@@ -814,2 +821 @@
+-  ; Delete uninstaller
+-  Delete "$INSTDIR\uninstall.exe"
++  ; The uninstaller belongs to the same verified file group.
+@@ -852,0 +859 @@
++    ClearErrors
+@@ -853,0 +861 @@
++    IfErrors inline_uninstall_metadata_failed
+@@ -854,0 +863 @@
++    ClearErrors
+@@ -855,0 +865 @@
++    IfErrors inline_uninstall_metadata_failed
+@@ -856,0 +867 @@
++    ClearErrors
+@@ -858,27 +869,13 @@
+-  !endif
+-
+-  ; Removes the Autostart entry for ${PRODUCTNAME} from the HKCU Run key if it exists.
+-  ; This ensures the program does not launch automatically after uninstallation if it exists.
+-  ; If it doesn't exist, it does nothing.
+-  ; We do this when not updating (to preserve the registry value on updates)
+-  ${If} $UpdateMode <> 1
+-    DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "${PRODUCTNAME}"
+-  ${EndIf}
+-
+-  ; Delete app data if the checkbox is selected
+-  ; and if not updating
+-  ${If} $DeleteAppDataCheckboxState = 1
+-  ${AndIf} $UpdateMode <> 1
+-    ; Clear the install location $INSTDIR from registry
+-    DeleteRegKey SHCTX "${MANUPRODUCTKEY}"
+-    DeleteRegKey /ifempty SHCTX "${MANUKEY}"
+-
+-    ; Clear the install language from registry
+-    DeleteRegValue HKCU "${MANUPRODUCTKEY}" "Installer Language"
+-    DeleteRegKey /ifempty HKCU "${MANUPRODUCTKEY}"
+-    DeleteRegKey /ifempty HKCU "${MANUKEY}"
+-
+-    SetShellVarContext current
+-    RmDir /r "$APPDATA\${BUNDLEID}"
+-    RmDir /r "$LOCALAPPDATA\${BUNDLEID}"
+-  ${EndIf}
++    IfErrors inline_uninstall_metadata_failed
++  !endif
++
++  ; Retain the user autostart preference along with the app settings.
++
++  ; Never delete user data, authorization, preferences or MCP configuration.
++
++  Goto inline_uninstall_metadata_ok
++  inline_uninstall_metadata_failed:
++    Call un.InLineOnAbort
++    SetErrorLevel 1
++    Abort "卸载注册信息处理失败；已停止并尝试恢复程序，用户数据保留。"
++  inline_uninstall_metadata_ok:
