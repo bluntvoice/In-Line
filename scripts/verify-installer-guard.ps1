@@ -100,6 +100,16 @@ $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'finalize',-1); Assert ($r.C
 foreach ($name in @('inline.db','authorization.dpapi','preferences.json','config.toml')) { Assert ((Snapshot $f.root)[$name] -eq $before[$name]) 'Uninstall changed protected data' }
 Pass 'uninstall removes complete program group and retains historical data'
 
+$f=Fixture 'uninstall-metadata-rollback'; $privateFile=Join-Path $f.root 'in-line-mcp.exe'
+$privateAcl=Get-Acl -LiteralPath $privateFile; $privateAcl.SetAccessRuleProtection($true,$false)
+$privateAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.WindowsIdentity]::GetCurrent().User,[Security.AccessControl.FileSystemRights]::FullControl,[Security.AccessControl.AccessControlType]::Allow))
+Set-Acl -LiteralPath $privateFile -AclObject $privateAcl
+$before=Snapshot $f.root; $beforeAcl=(Get-Acl -LiteralPath $privateFile).Sddl; $beforeTime=[IO.File]::GetLastWriteTimeUtc($privateFile).Ticks
+$r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'uninstall',-1); Assert ($r.Code -eq 0) $r.Message
+$r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'rollback',-1); Assert ($r.Code -eq 0) $r.Message
+EqualSnapshot $before (Snapshot $f.root); Assert ((Get-Acl -LiteralPath $privateFile).Sddl -eq $beforeAcl -and [IO.File]::GetLastWriteTimeUtc($privateFile).Ticks -eq $beforeTime) 'Recreated uninstall file lost ACL or timestamp'
+Pass 'uninstall metadata failure recreates complete group with original protected ACL and time'
+
 $f=Fixture 'concurrent-change'; $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'install',-1); Assert ($r.Code -eq 0) $r.Message
 [IO.File]::WriteAllText((Join-Path $f.root 'in-line-cli.exe'),'external edit')
 $before=Snapshot $f.root; $r=[InLine.Installer.Guard]::Run($f.root,$f.payload,'rollback',-1)

@@ -6,12 +6,13 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Security.Principal;
+using System.Security.AccessControl;
 using System.Text;
 using System.Xml.Serialization;
 using Microsoft.Win32.SafeHandles;
 
 namespace InLine.Installer {
- public sealed class Entry { public string Name; public bool Existed; public string Before; public string After; public long Created, Accessed, Written; }
+ public sealed class Entry { public string Name; public bool Existed; public string Before; public string After; public string Acl; public long Created, Accessed, Written; }
  public sealed class Journal { public List<Entry> Files = new List<Entry>(); }
  public sealed class Holder { public int Pid; public long Created; public string Path; public string User; public bool IdentityConfirmed; }
  public sealed class Result { public int Code; public string Message; public bool RolledBack; public List<Holder> Holders = new List<Holder>(); }
@@ -60,7 +61,7 @@ namespace InLine.Installer {
   }
   static FileStream Open(string p, bool create) {
    CheckPath(p);
-   var h=CreateFile(p, 0xC0010000, 0, IntPtr.Zero, create?1u:3u, 0x80, IntPtr.Zero); // READ|WRITE|DELETE, share NONE, CREATE_NEW/OPEN_EXISTING
+   var h=CreateFile(p, create?0xC0070000u:0xC0010000u, 0, IntPtr.Zero, create?1u:3u, 0x80, IntPtr.Zero); // READ|WRITE|DELETE; WRITE_DAC only for newly created recovery files
    if(h.IsInvalid) { int code=Marshal.GetLastWin32Error(); h.Dispose(); throw new IOException("Cannot exclusively open target file (Windows error "+code+"): "+Path.GetFileName(p)); }
    try {
     FileInfo i; Require(GetFileInformationByHandle(h,out i) && i.Links==1, "Unverifiable or hard-linked target file.");
@@ -75,8 +76,12 @@ namespace InLine.Installer {
    target.SetLength(target.Position); target.Flush(true);
   }
   static FileTime Time(long value) { return new FileTime { Low=(uint)value, High=(uint)((ulong)value>>32) }; }
-  static void Restore(FileStream target, string folder, Entry e) {
+  static void Restore(FileStream target, string folder, Entry e, bool restoreAcl) {
    Write(target,Path.Combine(folder,e.Name)); Require(Hash(target)==e.Before,"Restored file verification failed.");
+   if(restoreAcl) {
+    var security=new FileSecurity(); security.SetSecurityDescriptorSddlForm(e.Acl,AccessControlSections.Access); target.SetAccessControl(security);
+    Require(target.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access)==e.Acl,"Restored access descriptor could not be verified.");
+   }
    var c=Time(e.Created); var a=Time(e.Accessed); var w=Time(e.Written);
    Require(SetFileTime(target.SafeFileHandle,ref c,ref a,ref w),"Cannot restore file timestamps.");
   }
@@ -88,7 +93,11 @@ namespace InLine.Installer {
    using(var s=File.OpenRead(Path.Combine(folder,"journal.xml"))) j=(Journal)new XmlSerializer(typeof(Journal)).Deserialize(s);
    Require(j.Files.Count==Names.Length,"Invalid transaction file list.");
    for(int i=0;i<Names.Length;i++) Require(j.Files[i].Name==Names[i],"Invalid transaction filename.");
-   foreach(var e in j.Files) if(e.Existed) Require(HashFile(Path.Combine(folder,e.Name))==e.Before,"Rollback backup verification failed.");
+   foreach(var e in j.Files) if(e.Existed) {
+    Require(HashFile(Path.Combine(folder,e.Name))==e.Before,"Rollback backup verification failed.");
+    Require(!String.IsNullOrEmpty(e.Acl),"Missing rollback access descriptor.");
+    new FileSecurity().SetSecurityDescriptorSddlForm(e.Acl,AccessControlSections.Access);
+   }
    return j;
   }
   static void Clean(string folder) {
@@ -177,6 +186,7 @@ namespace InLine.Installer {
       var e=journal.Files[i]; if(!e.Existed) continue;
       FileInfo info; Require(GetFileInformationByHandle(streams[i].SafeFileHandle,out info),"Cannot snapshot file metadata.");
       e.Created=info.Creation.Value; e.Accessed=info.Access.Value; e.Written=info.Write.Value;
+      e.Acl=streams[i].GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access);
       e.Before=Hash(streams[i]); streams[i].Position=0;
       using(var backup=new FileStream(Path.Combine(folder,e.Name),FileMode.CreateNew,FileAccess.Write,FileShare.None)) { streams[i].CopyTo(backup); backup.Flush(true); }
       Require(HashFile(Path.Combine(folder,e.Name))==e.Before,"Backup verification failed.");
@@ -185,7 +195,7 @@ namespace InLine.Installer {
     }
     for(int i=0;i<Names.Length;i++) {
      mutated=true; var e=journal.Files[i];
-     if(restore) { if(e.Existed) Restore(streams[i],folder,e); else DeleteOnClose(streams[i],true); }
+     if(restore) { if(e.Existed) Restore(streams[i],folder,e,created[i]); else DeleteOnClose(streams[i],true); }
      else if(operation=="install") { Write(streams[i],Path.Combine(payload,e.Name)); Require(Hash(streams[i])==e.After,"Installed file verification failed."); }
      else DeleteOnClose(streams[i],true);
      if(i+1==failAfter) throw new IOException("Isolated injected file transaction failure.");
@@ -202,7 +212,7 @@ namespace InLine.Installer {
       for(int i=0;i<streams.Count;i++) {
        var e=journal.Files[i];
        if(e.Existed&&operation=="uninstall") Require(Hash(streams[i])==e.Before,"Uninstall rollback bytes changed.");
-       else if(e.Existed) Restore(streams[i],folder,e);
+       else if(e.Existed) Restore(streams[i],folder,e,false);
        else DeleteOnClose(streams[i],true);
       }
       Clean(folder); result.RolledBack=true;
