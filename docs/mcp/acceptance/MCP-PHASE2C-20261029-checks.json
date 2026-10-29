@@ -1,0 +1,1253 @@
+{
+  "schemaVersion": 1,
+  "phase": "P2-C",
+  "date": "2026-10-29",
+  "timezone": "Asia/Shanghai",
+  "status": "code_and_automated_isolated_acceptance_complete_awaiting_user",
+  "scope": {
+    "p2AAcceptedAsInvestigationOnly": true,
+    "p2BAutomaticReloadDeferred": true,
+    "strictNoManualReconnectGoalRetained": true,
+    "automaticRecoveryAccepted": false,
+    "p2DNotExecuted": true,
+    "phase3Started": false,
+    "phase2Complete": false
+  },
+  "implementation": {
+    "processTerminationApiUsed": false,
+    "matchingBasis": "Exact registered installation files; exclusive file handles; Restart Manager diagnostics use PID+creation time, executable path and Windows SID",
+    "managedFiles": [
+      "in-line.exe",
+      "in-line-mcp.exe",
+      "in-line-cli.exe",
+      "WebView2Loader.dll",
+      "uninstall.exe"
+    ],
+    "fallback": "Stop before mutation when files are held, denied or unverifiable; no process-name fallback",
+    "fileGroupRollback": true,
+    "recreatedFileDaclVerified": true,
+    "existingFileAclPreserved": true,
+    "timestampsRestored": true,
+    "unknownTransactionReplay": false,
+    "launchBarrier": true,
+    "metadataScope": "Program file group rollback; registry and shortcut operations are not a cross-resource atomic transaction and require native acceptance",
+    "residentHelper": false,
+    "newInstalledCompanion": false,
+    "toolContractChanged": false,
+    "authorizationOrDatabaseSchemaChanged": false,
+    "dependenciesOrVersionChanged": false,
+    "daclCompatibility": "Exact binary DACL and control flags; permits only Windows SetSecurityInfo AUTO_INHERITED false-to-true conversion, no downgrade or ACE changes",
+    "ownerGroupSaclRecreationTested": false
+  },
+  "tests": {
+    "frontend": {
+      "files": 22,
+      "passed": 135,
+      "log": "frontend-tests.txt"
+    },
+    "rustFull": {
+      "passed": 248,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "log": "rust-full.txt"
+    },
+    "guardX64": {
+      "passed": true,
+      "cases": 30,
+      "scope": "Local result before final ACL compatibility correction; final x64 validation uses Actions",
+      "results": "guard-x64-r5-final/results.json"
+    },
+    "guardX86": {
+      "passed": true,
+      "cases": 31,
+      "results": "guard-x86-r7-corrected/results.json"
+    },
+    "guardCases": [
+      {
+        "name": "documented legacy AI conversion only; reject changed protection, SID, rights, flags, extra or reordered ACEs",
+        "passed": true
+      },
+      {
+        "name": "fresh install, full group and protected data",
+        "passed": true
+      },
+      {
+        "name": "install failure rollback after file 1",
+        "passed": true
+      },
+      {
+        "name": "install failure rollback after file 2",
+        "passed": true
+      },
+      {
+        "name": "install failure rollback after file 3",
+        "passed": true
+      },
+      {
+        "name": "install failure rollback after file 4",
+        "passed": true
+      },
+      {
+        "name": "install failure rollback after file 5",
+        "passed": true
+      },
+      {
+        "name": "uninstall failure rollback after file 1",
+        "passed": true
+      },
+      {
+        "name": "uninstall failure rollback after file 2",
+        "passed": true
+      },
+      {
+        "name": "uninstall failure rollback after file 3",
+        "passed": true
+      },
+      {
+        "name": "uninstall failure rollback after file 4",
+        "passed": true
+      },
+      {
+        "name": "uninstall failure rollback after file 5",
+        "passed": true
+      },
+      {
+        "name": "failed fresh install leaves no partial programs",
+        "passed": true
+      },
+      {
+        "name": "different old/new file sizes restore as a complete group",
+        "passed": true
+      },
+      {
+        "name": "all-file preflight rejects a locked companion before mutation",
+        "passed": true
+      },
+      {
+        "name": "access denial stops without fallback or data change",
+        "passed": true
+      },
+      {
+        "name": "concurrent installer rejected without deleting another lock",
+        "passed": true
+      },
+      {
+        "name": "missing payload member fails before target mutation",
+        "passed": true
+      },
+      {
+        "name": "missing completion journal cannot report success",
+        "passed": true
+      },
+      {
+        "name": "unknown lock contents retained",
+        "passed": true
+      },
+      {
+        "name": "metadata-phase rollback restores previous complete group, ACL and timestamp",
+        "passed": true
+      },
+      {
+        "name": "uninstall removes complete program group and retains historical data",
+        "passed": true
+      },
+      {
+        "name": "uninstall metadata failure recreates complete group with original protected ACL and time",
+        "passed": true
+      },
+      {
+        "name": "concurrent edit refuses rollback and keeps backups/barrier",
+        "passed": true
+      },
+      {
+        "name": "finalize refuses changed group",
+        "passed": true
+      },
+      {
+        "name": "unknown pending transaction stops without cleanup",
+        "passed": true
+      },
+      {
+        "name": "hard link cannot alter another directory",
+        "passed": true
+      },
+      {
+        "name": "junction target rejected",
+        "passed": true
+      },
+      {
+        "name": "running target blocks; same-name other directory and both process identities unchanged",
+        "passed": true
+      },
+      {
+        "name": "uninstall also stops before removing files while a target is running",
+        "passed": true
+      },
+      {
+        "name": "target exits after identification; retry succeeds without stale-PID action",
+        "passed": true
+      }
+    ],
+    "launchBarrier": {
+      "passed": true,
+      "scope": "Copied debug binaries in an isolated directory only",
+      "offlineQueries": [
+        {
+          "name": "in-line",
+          "offlineBuildInfoAllowed": true
+        },
+        {
+          "name": "in-line-mcp",
+          "offlineBuildInfoAllowed": true
+        },
+        {
+          "name": "in-line-cli",
+          "offlineBuildInfoAllowed": true
+        }
+      ],
+      "mcp": {
+        "exit": 78,
+        "stdoutEmpty": true,
+        "stoppedBeforeInitialization": true
+      },
+      "cli": {
+        "exit": 6,
+        "errorCode": "incompatible",
+        "stoppedBeforeBusinessIpc": true
+      },
+      "nativeGuiStartupTested": false,
+      "formalStoreOrConfigTouched": false
+    },
+    "nsisSyntax": {
+      "passed": true,
+      "log": "nsis-syntax-r3.txt",
+      "usesCachedPreP2CPrograms": true,
+      "isFinalPackageAcceptance": false
+    },
+    "nativeNsisInstallUpgradeUninstall": {
+      "executed": false
+    },
+    "actualSecondUserSession": {
+      "executed": false,
+      "protectionEvidence": "No shutdown/termination APIs; denied-file ACL and distinct-directory live-process tests"
+    },
+    "powerLossDiskFailure": {
+      "executed": false
+    },
+    "defaultReleaseLocalAttempt": {
+      "exitCode": -1,
+      "resourceGuardStopped": true,
+      "minimumFreeGiB": 3.49,
+      "maximumCommitPercent": 90,
+      "formalProcessesStopped": false,
+      "acceptedAsSuccessfulBuild": false
+    },
+    "nonTargetProcessProof": {
+      "targetBytesUnchanged": true,
+      "otherDirectoryNotReported": true,
+      "passed": true,
+      "otherStillRunningAfterRetry": true,
+      "cleanup": "Only private fixture signal files; no termination APIs",
+      "before": {
+        "target": {
+          "running": true,
+          "pid": 51024,
+          "startedUtc": "2026-10-29T03:13:08.4499359Z",
+          "image": "D:\\codex-data\\projects\\inline\\In-Line\\release\\MCP-Phase2C-20261029\\non-target-proof-fixtures\\target\\in-line-mcp.exe"
+        },
+        "other": {
+          "running": true,
+          "pid": 7136,
+          "startedUtc": "2026-10-29T03:13:08.4712594Z",
+          "image": "D:\\codex-data\\projects\\inline\\In-Line\\release\\MCP-Phase2C-20261029\\non-target-proof-fixtures\\other\\in-line-mcp.exe"
+        }
+      },
+      "uninstallExit": 1,
+      "installExit": 1,
+      "identificationThenSelfExitRetrySucceeded": true,
+      "windowsUserMatchesCurrent": true,
+      "exactTargetIdentityConfirmed": true,
+      "otherBytesUnchanged": true,
+      "otherBytesAfterRetryUnchanged": true,
+      "guardSourceSha256": "08A86D4F1148D1724BCECFD7D3BC0A84915751E2CDB63743132D20F6346C28B2",
+      "afterBlockedOperations": {
+        "target": {
+          "running": true,
+          "pid": 51024,
+          "startedUtc": "2026-10-29T03:13:08.4499359Z",
+          "image": "D:\\codex-data\\projects\\inline\\In-Line\\release\\MCP-Phase2C-20261029\\non-target-proof-fixtures\\target\\in-line-mcp.exe"
+        },
+        "other": {
+          "running": true,
+          "pid": 7136,
+          "startedUtc": "2026-10-29T03:13:08.4712594Z",
+          "image": "D:\\codex-data\\projects\\inline\\In-Line\\release\\MCP-Phase2C-20261029\\non-target-proof-fixtures\\other\\in-line-mcp.exe"
+        }
+      },
+      "realEnvironmentTouched": false
+    },
+    "actionsCi": {
+      "runId": 40812225378,
+      "jobId": 123244978897,
+      "conclusion": "success",
+      "sourceCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+      "rustPassed": 248,
+      "rustFailed": 0,
+      "rustIgnored": 0,
+      "summaries": [
+        "2026-10-29T03:28:33.3172070Z  Test Files  22 passed (22)\r",
+        "2026-10-29T03:28:33.3198012Z       Tests  135 passed (135)\r",
+        "2026-10-29T03:30:56.4161832Z test result: ok. 213 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.05s\r",
+        "2026-10-29T03:30:56.4301205Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+        "2026-10-29T03:30:56.4388530Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+        "2026-10-29T03:30:56.4482769Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+        "2026-10-29T03:31:17.2755456Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.82s\r",
+        "2026-10-29T03:31:17.4024754Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s\r",
+        "2026-10-29T03:31:20.9024629Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.48s\r",
+        "2026-10-29T03:31:22.3859107Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s\r",
+        "2026-10-29T03:31:23.4328189Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s\r",
+        "2026-10-29T03:31:23.7184564Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s\r",
+        "2026-10-29T03:31:24.2244129Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s\r",
+        "2026-10-29T03:31:25.8674412Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\r",
+        "2026-10-29T03:31:26.2724308Z PASS: three offline package identities/version files match; no store/IPC/PATH/installation operations.\r",
+        "2026-10-29T03:31:26.6300256Z PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.\r",
+        "2026-10-29T03:31:26.7326430Z PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.\r"
+      ]
+    },
+    "actionsDevelopmentInstaller": {
+      "runId": 40812225368,
+      "jobId": 123244979432,
+      "sourceCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+      "conclusion": "success",
+      "rustPassed": 248,
+      "rustFailed": 0,
+      "rustIgnored": 0,
+      "summaries": [
+        "2026-10-29T03:28:21.6711524Z PASS: 31 isolated installer guard cases; no process termination or native installation.\r",
+        "2026-10-29T03:28:28.9057867Z PASS: 31 isolated installer guard cases; no process termination or native installation.\r",
+        "2026-10-29T03:28:33.9601454Z  Test Files  22 passed (22)\r",
+        "2026-10-29T03:28:33.9603601Z       Tests  135 passed (135)\r",
+        "2026-10-29T03:34:41.0511849Z test result: ok. 213 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.73s\r",
+        "2026-10-29T03:34:41.0733753Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+        "2026-10-29T03:34:41.0893886Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+        "2026-10-29T03:34:41.1060527Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\r",
+        "2026-10-29T03:35:04.7033162Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.58s\r",
+        "2026-10-29T03:35:04.8455955Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s\r",
+        "2026-10-29T03:35:08.8638351Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.99s\r",
+        "2026-10-29T03:35:11.0634273Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s\r",
+        "2026-10-29T03:35:12.4973243Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.42s\r",
+        "2026-10-29T03:35:12.8617117Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s\r",
+        "2026-10-29T03:35:13.4836041Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s\r",
+        "2026-10-29T03:35:15.6838077Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\r",
+        "2026-10-29T03:35:27.0812273Z PASS: pinned NSIS template, guarded payload allowlist, fail-closed callbacks, data preservation and three launch barriers.\r",
+        "2026-10-29T03:45:53.4243314Z PASS: pinned NSIS template, guarded payload allowlist, fail-closed callbacks, data preservation and three launch barriers.\r",
+        "2026-10-29T03:46:01.8958731Z PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.\r",
+        "2026-10-29T03:46:02.0141101Z PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.\r",
+        "2026-10-29T03:46:02.1458934Z PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.\r",
+        "2026-10-29T03:46:02.2691416Z PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data.\r",
+        "2026-10-29T03:46:02.8785959Z PASS: three offline package identities/version files and staged companions match; no store/IPC/PATH/installation operations.\r",
+        "2026-10-29T03:46:03.7480100Z PASS: three offline package identities/version files and exact expected NSIS payload match; no store/IPC/PATH/installation operations.\r",
+        "2026-10-29T03:46:03.8831287Z PASS: actual NSIS payload contains three matching binaries; installer not executed. SHA256 0F72B1ED5EE65895B57507E1E556579BFCFA3D9F1AB2C0CD930473A1D41A6D32\r",
+        "2026-10-29T03:46:05.2952221Z SHA256 digest of uploaded artifact is 4b3c6aa20145142d1c7046bf79c28ba65d8dacf06bb9522c17d81e6c4469887e\r",
+        "2026-10-29T03:46:05.6952239Z Artifact download URL: https://github.com/bluntvoice/In-Line/actions/runs/40812225368/artifacts/12871357406\r"
+      ]
+    },
+    "actionsGuardX86": {
+      "passed": true,
+      "cases": 31,
+      "checks": [
+        {
+          "name": "documented legacy AI conversion only; reject changed protection, SID, rights, flags, extra or reordered ACEs",
+          "passed": true
+        },
+        {
+          "name": "fresh install, full group and protected data",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 1",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 2",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 3",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 4",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 5",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 1",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 2",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 3",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 4",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 5",
+          "passed": true
+        },
+        {
+          "name": "failed fresh install leaves no partial programs",
+          "passed": true
+        },
+        {
+          "name": "different old/new file sizes restore as a complete group",
+          "passed": true
+        },
+        {
+          "name": "all-file preflight rejects a locked companion before mutation",
+          "passed": true
+        },
+        {
+          "name": "access denial stops without fallback or data change",
+          "passed": true
+        },
+        {
+          "name": "concurrent installer rejected without deleting another lock",
+          "passed": true
+        },
+        {
+          "name": "missing payload member fails before target mutation",
+          "passed": true
+        },
+        {
+          "name": "missing completion journal cannot report success",
+          "passed": true
+        },
+        {
+          "name": "unknown lock contents retained",
+          "passed": true
+        },
+        {
+          "name": "metadata-phase rollback restores previous complete group, ACL and timestamp",
+          "passed": true
+        },
+        {
+          "name": "uninstall removes complete program group and retains historical data",
+          "passed": true
+        },
+        {
+          "name": "uninstall metadata failure recreates complete group with original protected ACL and time",
+          "passed": true
+        },
+        {
+          "name": "concurrent edit refuses rollback and keeps backups/barrier",
+          "passed": true
+        },
+        {
+          "name": "finalize refuses changed group",
+          "passed": true
+        },
+        {
+          "name": "unknown pending transaction stops without cleanup",
+          "passed": true
+        },
+        {
+          "name": "hard link cannot alter another directory",
+          "passed": true
+        },
+        {
+          "name": "junction target rejected",
+          "passed": true
+        },
+        {
+          "name": "running target blocks; same-name other directory and both process identities unchanged",
+          "passed": true
+        },
+        {
+          "name": "uninstall also stops before removing files while a target is running",
+          "passed": true
+        },
+        {
+          "name": "target exits after identification; retry succeeds without stale-PID action",
+          "passed": true
+        }
+      ]
+    },
+    "actionsGuardX64": {
+      "passed": true,
+      "cases": 31,
+      "checks": [
+        {
+          "name": "documented legacy AI conversion only; reject changed protection, SID, rights, flags, extra or reordered ACEs",
+          "passed": true
+        },
+        {
+          "name": "fresh install, full group and protected data",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 1",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 2",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 3",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 4",
+          "passed": true
+        },
+        {
+          "name": "install failure rollback after file 5",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 1",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 2",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 3",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 4",
+          "passed": true
+        },
+        {
+          "name": "uninstall failure rollback after file 5",
+          "passed": true
+        },
+        {
+          "name": "failed fresh install leaves no partial programs",
+          "passed": true
+        },
+        {
+          "name": "different old/new file sizes restore as a complete group",
+          "passed": true
+        },
+        {
+          "name": "all-file preflight rejects a locked companion before mutation",
+          "passed": true
+        },
+        {
+          "name": "access denial stops without fallback or data change",
+          "passed": true
+        },
+        {
+          "name": "concurrent installer rejected without deleting another lock",
+          "passed": true
+        },
+        {
+          "name": "missing payload member fails before target mutation",
+          "passed": true
+        },
+        {
+          "name": "missing completion journal cannot report success",
+          "passed": true
+        },
+        {
+          "name": "unknown lock contents retained",
+          "passed": true
+        },
+        {
+          "name": "metadata-phase rollback restores previous complete group, ACL and timestamp",
+          "passed": true
+        },
+        {
+          "name": "uninstall removes complete program group and retains historical data",
+          "passed": true
+        },
+        {
+          "name": "uninstall metadata failure recreates complete group with original protected ACL and time",
+          "passed": true
+        },
+        {
+          "name": "concurrent edit refuses rollback and keeps backups/barrier",
+          "passed": true
+        },
+        {
+          "name": "finalize refuses changed group",
+          "passed": true
+        },
+        {
+          "name": "unknown pending transaction stops without cleanup",
+          "passed": true
+        },
+        {
+          "name": "hard link cannot alter another directory",
+          "passed": true
+        },
+        {
+          "name": "junction target rejected",
+          "passed": true
+        },
+        {
+          "name": "running target blocks; same-name other directory and both process identities unchanged",
+          "passed": true
+        },
+        {
+          "name": "uninstall also stops before removing files while a target is running",
+          "passed": true
+        },
+        {
+          "name": "target exits after identification; retry succeeds without stale-PID action",
+          "passed": true
+        }
+      ]
+    },
+    "downloadedArtifactVerification": {
+      "passed": true,
+      "sourceCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+      "artifactId": 12871357406,
+      "artifactSha256": "4b3c6aa20145142d1c7046bf79c28ba65d8dacf06bb9522c17d81e6c4469887e",
+      "artifactBytes": 4412265,
+      "installer": "In Line_0.5.0_x64-setup.exe",
+      "installerSha256": "0f72b1ed5ee65895b57507e1e556579bfcfa3d9f1ab2c0cd930473a1d41a6d32",
+      "installerBytes": 4427509,
+      "programs": [
+        {
+          "name": "in-line",
+          "bytes": 9055744,
+          "sha256": "bbb0764b77445e924385a7a9415942f41fe85f5fad358f877ac921ceb101fde6",
+          "sourceSha256": "d6a775d070136cfcdc3108933cda86f44231c29f8c5d91a0d12334c7a67ae15e",
+          "exactCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa"
+        },
+        {
+          "name": "in-line-mcp",
+          "bytes": 2440704,
+          "sha256": "14d29a2526a3a39d8acdf3fa248dfd96ae21b7bb0cd60296a39002dd0533e325",
+          "sourceSha256": "14d29a2526a3a39d8acdf3fa248dfd96ae21b7bb0cd60296a39002dd0533e325",
+          "exactCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa"
+        },
+        {
+          "name": "in-line-cli",
+          "bytes": 1066496,
+          "sha256": "5e07584644bd361b2405bd64f0d3f55243b6ee37a3eb1427b6b0255e9f09614e",
+          "sourceSha256": "5e07584644bd361b2405bd64f0d3f55243b6ee37a3eb1427b6b0255e9f09614e",
+          "exactCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa"
+        }
+      ],
+      "helpers": [
+        {
+          "name": "InstallGuard.cs",
+          "matchesSnapshotIgnoringCheckoutLineEndings": true
+        },
+        {
+          "name": "install-guard.ps1",
+          "matchesSnapshotIgnoringCheckoutLineEndings": true
+        }
+      ],
+      "webViewLoaderMatches": true,
+      "installerExecutedLocally": false,
+      "extractedProgramsExecutedLocally": false,
+      "installed": false
+    }
+  },
+  "build": {
+    "method": "GitHub Actions, requested by user; temporary branch explicitly authorized",
+    "temporaryBranch": "codex/p2c-build-20261029",
+    "sourceCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+    "developmentBranch": "feat/scheduled-items",
+    "developmentHead": "5cffe059dfdaa2c153c7f1266c4ca9fa3f7c883b",
+    "developmentBranchAdvanced": false,
+    "mainAdvanced": false,
+    "realIndexChanged": false,
+    "sourceFileCount": 16,
+    "sourceFiles": [
+      {
+        "path": ".github/workflows/dev-build.yml",
+        "workingSha256": "7baf5dae39e5cdb4e20522bdfc98d80eae87510320475367c9a0ff8dfd5c6689",
+        "snapshotBlob": "fc2edeff12223e9df1ac746019198c3a23b433df",
+        "snapshotOnlyTrigger": true
+      },
+      {
+        "path": "scripts/prepare-mcp-sidecar.mjs",
+        "workingSha256": "ae882c50fc4913281e90df0d682f9bcbfe114963bccda8f80d0a73501690bfb0",
+        "snapshotBlob": "a3f5ebfc25e4f9eea19653ef992972fa63d293e2",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "scripts/verify-installer-package.ps1",
+        "workingSha256": "9c83827ad6d28d73f1b1c39638ed6ee793d5fcd25f19172c1c3ba056ebbede58",
+        "snapshotBlob": "ec14b082901a427f64f8ec53682bcc6d43995fcb",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "scripts/verify-installer-guard.ps1",
+        "workingSha256": "85c637e045e37eddee56d994c68ddeff801933fa60de978d2df367eb417fe567",
+        "snapshotBlob": "e20a807137a589914ad3669616402da7c48efa91",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "scripts/verify-installer-safety.mjs",
+        "workingSha256": "726b98abe4d14d64f073eae82381fd01d022211c51463c8d9ce5d8953ff297de",
+        "snapshotBlob": "976e05fad85a9a34682bd5400ea57035a1da1491",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/src/bin/in-line-mcp.rs",
+        "workingSha256": "1d60e363a97752ea3d357e62c43bb1f5483ed988482b06a6668094b062dbd828",
+        "snapshotBlob": "5075dd4a37aeea3fc845a87e1996c4fcdc3cd0bf",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/src/cli/mod.rs",
+        "workingSha256": "96f67313277036cae71e55b0b0d6859ab489c78bd7c7383c235926361224f635",
+        "snapshotBlob": "27c5babcbfb1d61c455e95d110c0ccb005b4be78",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/src/install_gate.rs",
+        "workingSha256": "b9e0f2dc5681e57aa82880c969aa011b2e6c0fa6de3c88c0609d5110faed32b1",
+        "snapshotBlob": "70bcc13aede7b65d8714f27441fcebfee7b8c6ea",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/src/lib.rs",
+        "workingSha256": "a432b9cbeb9bf15ff05019cf257c348b59ea3777ae417d602d4af1ebe047e46d",
+        "snapshotBlob": "bd45b3f7ee875acffc02b8403770f077fe9d63a6",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/src/main.rs",
+        "workingSha256": "ed474032d6cef185d7d7a7298195bef3b824b94168b9b7dc1404e65447863228",
+        "snapshotBlob": "b2fe862bc344a9c88be6db08dfd66ba9b8fd05fe",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/tauri.conf.json",
+        "workingSha256": "341b3faab6883cd16213e33d874844b6be572a2a10b1d477f88c41ad59ddb0ca",
+        "snapshotBlob": "14bcb10a0f487b160823d21d8f40273dd9d7a7f1",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/windows/InstallGuard.cs",
+        "workingSha256": "08a86d4f1148d1724bcecfd7d3bc0a84915751e2cdb63743132d20f6346c28b2",
+        "snapshotBlob": "12bab05f4ceb974e3abea70eaca7f34203d2ed1b",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/windows/install-guard.ps1",
+        "workingSha256": "530c84fd07cc11068247649ba4c91d7dcd860d129c096dfcb7c4d83015145a28",
+        "snapshotBlob": "7bf9967b18cdc7cb280260a9b28708ed3214d3f1",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/windows/installer-hooks.nsh",
+        "workingSha256": "7c8809a21c6a69c6b8ad0ca039b0d42da4fc580e623b14ab0ba4a86c30771f08",
+        "snapshotBlob": "c438d528ffc3054744138dc6f2c19bdeefa3d6dd",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/windows/installer.nsi",
+        "workingSha256": "0189df57b876a5186051654ad742afbb606210de7f51b5a3d0d596c0c3329267",
+        "snapshotBlob": "ec250bcd8db3d71cb8ffbe9e87388df1e1492a4c",
+        "snapshotOnlyTrigger": false
+      },
+      {
+        "path": "src-tauri/windows/README.md",
+        "workingSha256": "65e576ac607015b3122be6b7e8866b69a55858c23ae901cb838be9650400e3bb",
+        "snapshotBlob": "74cf61d1380a3cb564f820395959009eb7cf33b7",
+        "snapshotOnlyTrigger": false
+      }
+    ],
+    "snapshotOnlyChange": "Exact temporary branch push trigger in dev-build.yml; working workflow retains workflow_dispatch only",
+    "temporaryBuildPushAuthorized": true,
+    "formalP2CCommitAuthorized": false,
+    "defaultReleaseOptimizationChanged": false,
+    "actions": [
+      {
+        "id": 40812225378,
+        "html_url": "https://github.com/bluntvoice/In-Line/actions/runs/40812225378",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+        "head_branch": "codex/p2c-build-20261029",
+        "updated_at": "2026-10-29T03:31:31Z"
+      },
+      {
+        "id": 40812225368,
+        "html_url": "https://github.com/bluntvoice/In-Line/actions/runs/40812225368",
+        "status": "completed",
+        "conclusion": "success",
+        "head_sha": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+        "head_branch": "codex/p2c-build-20261029",
+        "updated_at": "2026-10-29T03:47:31Z"
+      }
+    ],
+    "artifact": {
+      "id": 12871357406,
+      "name": "In-Line-dev-windows-x64-497b61fcb92c2d573d60adbaa0d223612fb216aa",
+      "size_in_bytes": 4412265,
+      "url": "https://api.github.com/repos/bluntvoice/In-Line/actions/artifacts/12871357406",
+      "archive_download_url": "https://api.github.com/repos/bluntvoice/In-Line/actions/artifacts/12871357406/zip",
+      "expired": false,
+      "created_at": "2026-10-29T03:46:05Z",
+      "expires_at": "2026-11-12T03:46:04Z",
+      "updated_at": "2026-10-29T03:46:05Z",
+      "digest": "sha256:4b3c6aa20145142d1c7046bf79c28ba65d8dacf06bb9522c17d81e6c4469887e",
+      "workflow_run": {
+        "id": 40812225368,
+        "repository_id": 1302835108,
+        "head_repository_id": 1302835108,
+        "head_branch": "codex/p2c-build-20261029",
+        "head_sha": "497b61fcb92c2d573d60adbaa0d223612fb216aa"
+      },
+      "html_url": "https://github.com/bluntvoice/In-Line/actions/runs/40812225368/artifacts/12871357406"
+    },
+    "tagCreated": false,
+    "releaseCreated": false,
+    "installed": false,
+    "temporarySnapshots": 8,
+    "sourceMatchesFinalSnapshot": true,
+    "installer": {
+      "sourceCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+      "installer": "In Line_0.5.0_x64-setup.exe",
+      "installerSha256": "0f72b1ed5ee65895b57507e1e556579bfcfa3d9f1ab2c0cd930473a1d41a6d32",
+      "installerBytes": 4427509,
+      "programs": [
+        {
+          "name": "in-line",
+          "bytes": 9055744,
+          "sha256": "bbb0764b77445e924385a7a9415942f41fe85f5fad358f877ac921ceb101fde6",
+          "sourceSha256": "d6a775d070136cfcdc3108933cda86f44231c29f8c5d91a0d12334c7a67ae15e",
+          "exactCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa"
+        },
+        {
+          "name": "in-line-mcp",
+          "bytes": 2440704,
+          "sha256": "14d29a2526a3a39d8acdf3fa248dfd96ae21b7bb0cd60296a39002dd0533e325",
+          "sourceSha256": "14d29a2526a3a39d8acdf3fa248dfd96ae21b7bb0cd60296a39002dd0533e325",
+          "exactCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa"
+        },
+        {
+          "name": "in-line-cli",
+          "bytes": 1066496,
+          "sha256": "5e07584644bd361b2405bd64f0d3f55243b6ee37a3eb1427b6b0255e9f09614e",
+          "sourceSha256": "5e07584644bd361b2405bd64f0d3f55243b6ee37a3eb1427b6b0255e9f09614e",
+          "exactCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa"
+        }
+      ]
+    }
+  },
+  "workingTree": {
+    "initialFiles": 822,
+    "priorHistoricalFilesPreserved": true,
+    "currentStageTrackedModifications": 14,
+    "currentStageAddedFiles": 9,
+    "deletedFiles": 0,
+    "actualStagingEmpty": true,
+    "formalStageCommitOrPush": false,
+    "temporaryBuildSnapshotCommitsPushed": true,
+    "finalFiles": 831,
+    "audit": {
+      "baselineFiles": 822,
+      "finalFiles": 831,
+      "changed": [
+        ".github/workflows/dev-build.yml",
+        "CHANGELOG.md",
+        "README.md",
+        "RELEASE_NOTES.md",
+        "docs/prd/app-update.md",
+        "docs/prd/mcp.md",
+        "scripts/prepare-mcp-sidecar.mjs",
+        "scripts/verify-installer-package.ps1",
+        "src-tauri/src/bin/in-line-mcp.rs",
+        "src-tauri/src/cli/mod.rs",
+        "src-tauri/src/lib.rs",
+        "src-tauri/src/main.rs",
+        "src-tauri/tauri.conf.json",
+        "src-tauri/windows/installer-hooks.nsh"
+      ],
+      "added": [
+        "docs/MCP_PHASE2C_ACCEPTANCE.md",
+        "docs/mcp/acceptance/MCP-PHASE2C-20261029-checks.json",
+        "scripts/verify-installer-guard.ps1",
+        "scripts/verify-installer-safety.mjs",
+        "src-tauri/src/install_gate.rs",
+        "src-tauri/windows/InstallGuard.cs",
+        "src-tauri/windows/README.md",
+        "src-tauri/windows/install-guard.ps1",
+        "src-tauri/windows/installer.nsi"
+      ],
+      "deleted": [],
+      "unexpectedChanges": [],
+      "runtimeSourceMismatches": [],
+      "historicalFilesUnchanged": true,
+      "secretPatternMatches": [],
+      "binaryOrCacheInputs": [],
+      "developmentHead": "5cffe059dfdaa2c153c7f1266c4ca9fa3f7c883b",
+      "currentBranch": "feat/scheduled-items",
+      "stagedPaths": [],
+      "remoteRefs": {
+        "refs/heads/codex/p2c-build-20261029": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+        "refs/heads/feat/scheduled-items": "5cffe059dfdaa2c153c7f1266c4ca9fa3f7c883b",
+        "refs/heads/main": "1baac96252af2665274f2a955b3adacfa80519fd"
+      }
+    }
+  },
+  "mountedDuring": {
+    "status": "ok",
+    "errorCode": null,
+    "requestId": "c760b735b48f5c4960700e8646d7d4c7d043e4334f8098c5954e5ae35be3ddd8",
+    "authorizationRevision": 20,
+    "permissions": {
+      "fullRead": true,
+      "regularRead": true,
+      "write": true
+    },
+    "scope": {
+      "departments": null,
+      "taskTypes": null
+    },
+    "toolsCount": 16,
+    "transport": "stdio",
+    "build": {
+      "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    }
+  },
+  "protection": {
+    "formalDuring": {
+      "at": "2026-10-29T10:29:08.4590979+08:00",
+      "processes": [
+        {
+          "ProcessId": 38068,
+          "ParentProcessId": 9036,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:24.798396+08:00"
+        },
+        {
+          "ProcessId": 49080,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:28.351764+08:00"
+        },
+        {
+          "ProcessId": 39180,
+          "ParentProcessId": 49080,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:28.430512+08:00"
+        },
+        {
+          "ProcessId": 9840,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:29.83603+08:00"
+        },
+        {
+          "ProcessId": 25564,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:29.85623+08:00"
+        },
+        {
+          "ProcessId": 28600,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:29.912459+08:00"
+        },
+        {
+          "ProcessId": 49712,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:48.871576+08:00"
+        },
+        {
+          "ProcessId": 25512,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:48.874109+08:00"
+        },
+        {
+          "ProcessId": 18532,
+          "ParentProcessId": 38068,
+          "Name": "codex.exe",
+          "ExecutablePath": "C:\\Users\\KB\\AppData\\Local\\OpenAI\\Codex\\bin\\08d187884f2330d1\\codex.exe",
+          "CreationDate": "2026-10-28T11:02:50.170446+08:00"
+        },
+        {
+          "ProcessId": 40540,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:51.360663+08:00"
+        },
+        {
+          "ProcessId": 6804,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:02:53.688385+08:00"
+        },
+        {
+          "ProcessId": 34632,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:03:03.448495+08:00"
+        },
+        {
+          "ProcessId": 24340,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:03:15.286885+08:00"
+        },
+        {
+          "ProcessId": 21892,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:03:17.766181+08:00"
+        },
+        {
+          "ProcessId": 8304,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:03:19.625469+08:00"
+        },
+        {
+          "ProcessId": 42136,
+          "ParentProcessId": 18532,
+          "Name": "in-line-mcp.exe",
+          "ExecutablePath": "D:\\Application\\In Line\\in-line-mcp.exe",
+          "CreationDate": "2026-10-28T11:03:50.797898+08:00"
+        },
+        {
+          "ProcessId": 28640,
+          "ParentProcessId": 38068,
+          "Name": "ChatGPT.exe",
+          "ExecutablePath": "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.1023.6123.0_x64__2p2nqsd0c76g0\\app\\ChatGPT.exe",
+          "CreationDate": "2026-10-28T11:03:55.011011+08:00"
+        },
+        {
+          "ProcessId": 23992,
+          "ParentProcessId": 38068,
+          "Name": "codex.exe",
+          "ExecutablePath": "C:\\Users\\KB\\AppData\\Local\\OpenAI\\Codex\\bin\\08d187884f2330d1\\codex.exe",
+          "CreationDate": "2026-10-28T17:25:50.501697+08:00"
+        }
+      ],
+      "binaries": [
+        {
+          "name": "in-line",
+          "sha256": "857E151EB1FB25C73DDCE6204659E706AAE0247AECDBFCFA49D611324A93D143"
+        },
+        {
+          "name": "in-line-mcp",
+          "sha256": "7820147887DEBD205BAD104A5BB59B2A0F9907220D7EB838272DAC2359B4A47B"
+        },
+        {
+          "name": "in-line-cli",
+          "sha256": "C4C399BD83A9144A4F8A9F97489259FC09996CE1E81CE249604BE344F3230C8F"
+        }
+      ]
+    },
+    "formalFinalReadback": {
+      "observedAt": "2026-10-29T11:48:59.3484233+08:00",
+      "sourceCommit": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+      "runtimeSources": 16,
+      "sourceMismatch": [],
+      "formalProcesses": [
+        {
+          "pid": 38068,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 49080,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 39180,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 9840,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 25564,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 28600,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 49712,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 25512,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 18532,
+          "name": "codex.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 40540,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 6804,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 34632,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 24340,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 21892,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 8304,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 42136,
+          "name": "in-line-mcp.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 28640,
+          "name": "ChatGPT.exe",
+          "running": true,
+          "sameCreationTime": true
+        },
+        {
+          "pid": 23992,
+          "name": "codex.exe",
+          "running": true,
+          "sameCreationTime": true
+        }
+      ],
+      "formalBinaries": [
+        {
+          "name": "in-line",
+          "unchanged": true
+        },
+        {
+          "name": "in-line-mcp",
+          "unchanged": true
+        },
+        {
+          "name": "in-line-cli",
+          "unchanged": true
+        }
+      ],
+      "remainingFixtureProcesses": [],
+      "developmentHead": "5cffe059dfdaa2c153c7f1266c4ca9fa3f7c883b",
+      "stagedPaths": []
+    },
+    "realClientAuthorizationModified": false,
+    "realMcpConfigModified": false,
+    "realWorkItemsModified": false,
+    "formalCodexOrMcpProcessesStopped": false,
+    "formalProgramsUpgraded": false,
+    "currentSessionNewBuildAccepted": false,
+    "realInLineCredentialOrTicketReadOrReplayed": false
+  },
+  "pendingAcceptance": [
+    "Real NSIS install, upgrade, uninstall, cancellation and registry/shortcut rollback",
+    "Enterprise PowerShell, AppLocker and antivirus environment",
+    "Actual second-user process session",
+    "Power-loss/storage failure recovery and old-version launch behavior",
+    "Native GUI transaction-warning presentation",
+    "P2-D current-session first-connect/live-refresh/closed-connection/upgrade recovery",
+    "Complete real business-tool matrix; protocol compatibility is not business acceptance",
+    "Final-source full regression before formal release and additional tests for later changes"
+  ],
+  "evidenceDirectory": "release/MCP-Phase2C-20261029",
+  "stopGate": "Wait for P2-C user acceptance; do not formally commit/push the development branch or proceed to P2-B/P2-D/Phase3.",
+  "mountedAfter": {
+    "status": "ok",
+    "errorCode": null,
+    "requestId": "8fa9a9e92c87287037f330316d91b20378ebabf127b43f5135bcbbc954037419",
+    "sameClientIdentity": true,
+    "authorizationRevision": 20,
+    "samePermissions": true,
+    "sameScope": true,
+    "toolsCount": 16,
+    "transport": "stdio",
+    "build": {
+      "baselineCommit": "4d9bb89258c9870fb70dc360b493b42430edf5c6",
+      "commitVerification": "unverified_local_source",
+      "databaseSchemaVersion": 14,
+      "exactCommit": null,
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": true
+    },
+    "meaning": "Existing formally installed pre-P2-C build only; no new-package or automatic-recovery acceptance."
+  }
+}

@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import "./verify-installer-safety.mjs";
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 const manifest=join(root,"src-tauri","Cargo.toml");

@@ -42,6 +42,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify isolated installer transactions in Windows PowerShell x86 and x64
+        shell: pwsh
+        run: |
+          & "$env:WINDIR\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-installer-guard.ps1 -OutputDirectory "$env:GITHUB_WORKSPACE\release\installer-guard-x86"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-installer-guard.ps1 -OutputDirectory "$env:GITHUB_WORKSPACE\release\installer-guard-x64"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run tests
         shell: pwsh
         run: |
@@ -88,5 +96,6 @@ jobs:
             release/package-build.json
             release/installer-payload.json
             release/installer-verification.json
+            release/installer-guard-*/results.json
           if-no-files-found: error
           retention-days: 14

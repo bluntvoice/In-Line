@@ -2,6 +2,7 @@ pub(crate) mod application;
 pub mod cli;
 pub mod database;
 pub mod fonts;
+pub mod install_gate;
 pub mod mcp;
 pub mod models;
 pub mod recommended_font;

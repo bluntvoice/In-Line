@@ -1,0 +1,25 @@
+// Build-time safety boundary for the vendored Tauri NSIS template.
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {dirname,resolve} from 'node:path';
+import assert from 'node:assert/strict';
+const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const read=p=>readFileSync(resolve(root,p),'utf8');
+const config=JSON.parse(read('src-tauri/tauri.conf.json'));
+const version=JSON.parse(read('node_modules/@tauri-apps/cli/package.json')).version;
+assert.equal(version,'2.11.4','Review the pinned NSIS template before changing Tauri CLI');
+assert.equal(config.bundle.windows.nsis.template,'windows/installer.nsi');
+assert.equal(config.bundle.windows.nsis.installMode,'currentUser');
+assert.deepEqual(config.bundle.resources,{'resources/WebView2Loader.dll':'WebView2Loader.dll'},'Review the guarded file group when changing resources');
+assert.deepEqual(config.bundle.externalBin,['binaries/in-line-mcp','binaries/in-line-cli']);
+const template=read('src-tauri/windows/installer.nsi'),hooks=read('src-tauri/windows/installer-hooks.nsh'),guard=read('src-tauri/windows/InstallGuard.cs');
+assert(!/insertmacro CheckIfAppIsRunning|ExecWait '\$R1'|RmDir \/r|Delete "\$INSTDIR\\\$OldMainBinaryName"/.test(template));
+assert(!/taskkill|KillProcess|Stop-Process|RmShutdown|TerminateProcess/.test(hooks+guard));
+for(const marker of ['InLineRequireGuard "install"','Function .onInstFailed','Function un.onUninstFailed','MUI_CUSTOMFUNCTION_ABORT','MUI_CUSTOMFUNCTION_UNABORT'])assert(template.includes(marker),`Missing ${marker}`);
+assert(hooks.includes('InLineRequireGuard "uninstall"'));
+assert(!template.includes('WriteUninstaller "$INSTDIR\\uninstall.exe"'));
+assert(template.includes('WriteUninstaller "$PLUGINSDIR\\inline-payload\\uninstall.exe"'));
+assert(template.includes('Existing program files require matching registration, including silent mode.'));
+assert(template.includes('IfErrors inline_install_metadata_failed')&&template.includes('IfErrors inline_uninstall_metadata_failed'));
+for(const p of ['src-tauri/src/main.rs','src-tauri/src/bin/in-line-mcp.rs','src-tauri/src/cli/mod.rs'])assert(read(p).includes('install_gate::ready()'));
+console.log('PASS: pinned NSIS template, guarded payload allowlist, fail-closed callbacks, data preservation and three launch barriers.');
