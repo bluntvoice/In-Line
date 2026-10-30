@@ -1,5 +1,7 @@
 # In Line｜排着呢
 
+2026-10-30 P2-C-R1：原生 NSIS 测试资产已验收并独立提交 `ebeb571`；上一轮原生生命周期未通过。本轮仅修复本产品快捷方式失败识别/恢复及安装目录记忆值，GitHub 托管 Windows 的 R1 目标回归通过，原生总套件因 ps-hang 保留未通过，产品修复仍待用户阶段验收，未正式提交、安装或发布。技术范围和证据见[R1 验收报告](docs/MCP_PHASE2C_R1_ACCEPTANCE.md)，辅助程序有界等待仅完成[R2 技术调查](docs/MCP_PHASE2C_R2_HELPER_WAIT_REVIEW.md)，未实现超时强杀。以下为历史阶段状态。
+
 In Line 是一款通用的 Windows 本地取号与事项队列工具。它适合个人或内部支持岗位记录任务、展示排队顺序、发送取号卡片，适合业务量较大的职能部门使用。
 
 [![GitHub Release](https://img.shields.io/github/v/release/bluntvoice/In-Line)](https://github.com/bluntvoice/In-Line/releases/latest)

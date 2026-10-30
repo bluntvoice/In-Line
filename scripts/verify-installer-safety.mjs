@@ -12,7 +12,7 @@ assert.equal(config.bundle.windows.nsis.template,'windows/installer.nsi');
 assert.equal(config.bundle.windows.nsis.installMode,'currentUser');
 assert.deepEqual(config.bundle.resources,{'resources/WebView2Loader.dll':'WebView2Loader.dll'},'Review the guarded file group when changing resources');
 assert.deepEqual(config.bundle.externalBin,['binaries/in-line-mcp','binaries/in-line-cli']);
-const template=read('src-tauri/windows/installer.nsi'),hooks=read('src-tauri/windows/installer-hooks.nsh'),guard=read('src-tauri/windows/InstallGuard.cs');
+const template=read('src-tauri/windows/installer.nsi'),hooks=read('src-tauri/windows/installer-hooks.nsh'),guard=read('src-tauri/windows/InstallGuard.cs')+read('src-tauri/windows/InstallMetadata.cs');
 assert(!/insertmacro CheckIfAppIsRunning|ExecWait '\$R1'|RmDir \/r|Delete "\$INSTDIR\\\$OldMainBinaryName"/.test(template));
 assert(!/taskkill|KillProcess|Stop-Process|RmShutdown|TerminateProcess/.test(hooks+guard));
 for(const marker of ['InLineRequireGuard "install"','Function .onInstFailed','Function un.onUninstFailed','MUI_CUSTOMFUNCTION_ABORT','MUI_CUSTOMFUNCTION_UNABORT'])assert(template.includes(marker),`Missing ${marker}`);

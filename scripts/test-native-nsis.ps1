@@ -189,6 +189,15 @@ function Assert-Installed([string]$label) {
     Check ((@($names | Where-Object { !(Test-Path -LiteralPath (Join-Path $install $_) -PathType Leaf) })).Count -eq 0) "$label complete five-file group"
     $states=RegistryState;$registered=@($states.Values | Where-Object { $_.values.DisplayVersion -eq '0.5.0' -and $_.values.InstallLocation.Trim('"') -eq $install })
     Check ($registered.Count -ge 1) "$label registered version/location matches installed files"
+    $payloadBytes=0L
+    foreach($name in @('in-line.exe','in-line-mcp.exe','in-line-cli.exe','WebView2Loader.dll')) { $payloadBytes+=(Get-Item -LiteralPath (Join-Path $install $name)).Length }
+    # The pinned Tauri estimate counts source entries, including the CLI's two
+    # packaging sources for one destination. Preserve that upstream estimate;
+    # do not silently substitute the deduplicated installed-file sum.
+    Check ($sizeManifest.estimatedPayloadKiB -ge [int][Math]::Floor($payloadBytes/1024)) "$label pinned Tauri estimate covers the actual installed payload"
+    $expectedSize=[int]$sizeManifest.estimatedPayloadKiB+[int][Math]::Floor((Get-Item -LiteralPath (Join-Path $install 'uninstall.exe')).Length/1024)
+    Check ((@($registered | Where-Object { $_.values.EstimatedSize -ne $expectedSize })).Count -eq 0) "$label ARP estimated size includes actual payload and generated uninstaller"
+    foreach($view in @('Registry32','Registry64')) { Check ($states["$view/$vendor"].values[''] -eq $install) "$label remembers successful installation directory" }
     Check (!(Test-Path -LiteralPath (Join-Path $install '.in-line-install-transaction'))) "$label transaction finalized"
 }
 function Install-Candidate([string]$label='install') { $op=Run-NSIS $candidate $label;Check (!$op.timedOut -and $op.exitCode -eq 0) "$label native installer returned success" $true;Assert-Installed $label;return $op }
@@ -266,6 +275,8 @@ try {
     $provenance=Get-Content (Join-Path $package 'provenance.json') -Raw | ConvertFrom-Json
     $verification=Get-Content (Join-Path $package 'installer-verification.json') -Raw | ConvertFrom-Json
     $payload=Get-Content (Join-Path $package 'installer-payload.json') -Raw | ConvertFrom-Json
+    $sizeManifest=Get-Content (Join-Path $package 'estimated-size.json') -Raw | ConvertFrom-Json
+    Check ($sizeManifest.productCommit -eq $ExpectedCommit -and (Hash (Join-Path $package 'estimated-size.json')) -eq $provenance.estimatedSizeManifestSha256.ToLowerInvariant()) 'Pinned Tauri size manifest matches exact product and package provenance' $true
     Check ($provenance.productCommit -eq $ExpectedCommit -and $payload.build.exactCommit -eq $ExpectedCommit -and (Hash $candidate) -eq $verification.Sha256.ToLowerInvariant()) 'Verified formal source and installer digest' $true
     $result.installerSha256=Hash $candidate;$result.baselineSha256=Hash $baseline
     New-Item -ItemType Directory -Path $install -Force | Out-Null
@@ -279,7 +290,10 @@ try {
         Check ((@($preserved.Values | Where-Object { !$_.Length })).Count -eq 0) 'Product data preservation baseline is readable' $true
         $null=Install-Candidate 'same-version-repair';$null=Snapshot 'repair'
         Check (Equal $preserved (DataState)) 'Repair preserves synthetic database, preferences, authorization and other MCP config'
-        $null=Uninstall-Candidate 'actual-uninstall';$null=Snapshot 'uninstall'
+        $null=Uninstall-Candidate 'actual-uninstall';$removed=Snapshot 'uninstall'
+        foreach($view in @('Registry32','Registry64')) {
+            Check ($removed.registry["$view/$vendor"].values[''] -eq $install) 'Successful uninstall retains last successful install directory'
+        }
         Check (Equal $preserved (DataState)) 'Uninstall preserves all seeded data and authorization bytes'
         $null=Install-Candidate 'reinstall';Check (Equal $preserved (DataState)) 'Reinstall preserves seeded data'
     } elseif($Scenario -eq 'upgrade') {
@@ -318,6 +332,10 @@ try {
                     Check ((Equal $old.programs $reset.programs) -and (Equal $old.registry $reset.registry) -and (Equal $old.shortcuts $reset.shortcuts)) 'Independent replay fixture matches original baseline' $true
                     $result.independentFixtureResets+=@(@{forAttempt=2;externalHarnessAction=$true;productRollback=$false;originalFailureRetained=$true})
                 }
+                if($attempt -eq 2 -and $Scenario -eq 'registry-deny') {
+                    $memory=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($vendor)
+                    try { $memory.SetValue('',(Join-Path $lab 'synthetic-previous-install-directory'));$memory.SetValue('NativeLabPreference','synthetic-preserve') } finally { $memory.Dispose() }
+                }
                 $attemptBefore=Snapshot "before-registry-denied-$attempt"
                 $op=if($Scenario -eq 'registry-deny') { Run-NSIS $candidate "registry-denied-$attempt" } else { Run-NSIS (Join-Path $install 'uninstall.exe') "uninstall-registry-denied-$attempt" $true }
                 $now=Snapshot "registry-denied-$attempt"
@@ -338,6 +356,18 @@ try {
         $null=Install-Candidate 'retry-after-restoring-test-key-permissions';$null=Snapshot 'retry'
     } elseif($Scenario -eq 'shortcut-deny') {
         $desktop=(ShortcutPaths)[0];$program=(ShortcutPaths)[1];$shell=New-Object -ComObject WScript.Shell
+        # An exact test-owned directory blocks creating this otherwise absent
+        # .lnk without changing any parent desktop ACL or runner service policy.
+        New-Item -ItemType Directory -Path $desktop | Out-Null
+        $blocked=Snapshot 'absent-shortcut-path-blocked-by-test-directory'
+        $op=Run-NSIS $candidate 'shortcut-new-file-create-denied';$now=Snapshot 'shortcut-new-file-create-denied'
+        Check ($op.exitCode -ne 0 -and !$op.timedOut) 'Actual absent shortcut creation failure returns failure'
+        Check ((Test-Path -LiteralPath $desktop -PathType Container) -and @(Get-ChildItem -LiteralPath $desktop).Count -eq 0) 'Exact shortcut path fixture remains unchanged' $true
+        Check (Equal $blocked.programs $now.programs) 'Absent shortcut creation failure restores complete program group'
+        Check (Equal $blocked.registry $now.registry) 'Absent shortcut creation failure restores registry and directory memory'
+        Check (Equal $blocked.shortcuts $now.shortcuts) 'Absent shortcut creation failure preserves link baseline'
+        Check (Equal $blocked.data $now.data) 'Absent shortcut creation failure preserves data'
+        Remove-Item -LiteralPath $desktop
         foreach($path in @($desktop,$program)) { New-Item -ItemType Directory -Path (Split-Path $path) -Force | Out-Null;$link=$shell.CreateShortcut($path);$link.TargetPath=Join-Path $lab 'synthetic-old-target.exe';$link.Save();$streams.Add([IO.File]::Open($path,'Open','Read','Read')) }
         $old=Snapshot 'locked-shortcuts'
         for($attempt=1;$attempt -le 2;$attempt++) {
@@ -345,22 +375,39 @@ try {
             $correct=@($now.shortcuts.Values | Where-Object { $_.target -eq (Join-Path $install 'in-line.exe') })
             Check ($op.exitCode -ne 0 -or $correct.Count -ge 2) "Shortcut creation failure attempt $attempt is not falsely reported as success"
         }
-        # Only links that actually target this installation are uninstall targets.
-        # Preserve the failed-creation snapshots, then seed a separate valid-target
-        # deletion fixture; retaining a foreign target must not be called a defect.
         foreach($stream in $streams) { $stream.Dispose() };$streams.Clear()
+        $foreign=Snapshot 'foreign-links-after-denied-creation'
+        Check (Equal $old.shortcuts $foreign.shortcuts) 'Foreign shortcut targets and bytes were preserved'
+        Check (Equal $old.programs $foreign.programs) 'Required shortcut failure rolls back complete program group'
+        Check (Equal $old.registry $foreign.registry) 'Required shortcut failure rolls back registry and directory memory'
+        Check (Equal $old.data $foreign.data) 'Required shortcut failure preserves data and authorization'
+        # Explicitly remove only the exact synthetic foreign fixture, then create
+        # a real installation before exercising owned-link update and deletion.
+        foreach($path in @($desktop,$program)) {
+            Check ((Hash $path) -eq $old.shortcuts[$path].sha256) 'Foreign fixture cleanup refuses concurrent replacement' $true
+            Remove-Item -LiteralPath $path
+        }
+        $null=Install-Candidate 'prepare-owned-shortcuts'
         foreach($path in (ShortcutPaths)) {
-            if(Test-Path -LiteralPath $path -PathType Leaf) {
-                $link=$shell.CreateShortcut($path);$link.TargetPath=Join-Path $install 'in-line.exe';$link.Save()
-                $streams.Add([IO.File]::Open($path,'Open','Read','Read'))
-            }
+            if(Test-Path -LiteralPath $path -PathType Leaf) { $streams.Add([IO.File]::Open($path,'Open','Read','Read')) }
         }
-        $null=Snapshot 'locked-valid-target-shortcut-deletion-fixture'
-        if(Test-Path -LiteralPath (Join-Path $install 'uninstall.exe')) {
-            $op=Run-NSIS (Join-Path $install 'uninstall.exe') 'shortcut-delete-denied' $true;$now=Snapshot 'shortcut-delete-denied'
-            Check ($op.exitCode -ne 0 -or @($now.shortcuts.Values | Where-Object exists).Count -eq 0) 'Shortcut deletion failure is not falsely reported as success'
-        }
+        $ownedBefore=Snapshot 'locked-owned-shortcut-update-and-deletion-fixture'
+        $op=Run-NSIS $candidate 'shortcut-update-denied';$now=Snapshot 'shortcut-update-denied'
+        Check ($op.exitCode -ne 0 -and !$op.timedOut) 'Required owned shortcut update failure returns failure'
+        Check (Equal $ownedBefore.programs $now.programs) 'Denied owned shortcut update restores complete program group'
+        Check (Equal $ownedBefore.registry $now.registry) 'Denied owned shortcut update restores registry and directory memory'
+        Check (Equal $ownedBefore.shortcuts $now.shortcuts) 'Denied owned shortcut update preserves exact link bytes and targets'
+        Check (Equal $ownedBefore.data $now.data) 'Denied owned shortcut update preserves data'
+        $op=Run-NSIS (Join-Path $install 'uninstall.exe') 'shortcut-delete-denied' $true;$now=Snapshot 'shortcut-delete-denied'
+        Check ($op.exitCode -ne 0 -or @($now.shortcuts.Values | Where-Object exists).Count -eq 0) 'Shortcut deletion failure is not falsely reported as success'
+        Check ($op.exitCode -ne 0 -and !$op.timedOut) 'Required owned shortcut deletion failure returns failure'
+        Check (Equal $ownedBefore.programs $now.programs) 'Denied shortcut deletion restores complete program group'
+        Check (Equal $ownedBefore.registry $now.registry) 'Denied shortcut deletion restores registry and directory memory'
+        Check (Equal $ownedBefore.shortcuts $now.shortcuts) 'Denied shortcut deletion preserves exact link bytes and targets'
+        Check (Equal $ownedBefore.data $now.data) 'Denied shortcut deletion preserves all data'
         foreach($stream in $streams) { $stream.Dispose() };$streams.Clear()
+        $null=Install-Candidate 'retry-shortcuts-unlocked'
+        $null=Uninstall-Candidate 'retry-uninstall-shortcuts-unlocked'
     } else {
         if($Scenario -in @('ps-exit','ps-compile-deny','ps-hang')) {
             $fault=switch($Scenario) { 'ps-exit' {'terminate-helper'} 'ps-compile-deny' {'deny-compile-temp'} 'ps-hang' {'suspend-helper'} }

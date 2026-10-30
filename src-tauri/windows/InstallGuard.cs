@@ -13,7 +13,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace InLine.Installer {
  public sealed class Entry { public string Name; public bool Existed; public string Before; public string After; public string Acl; public long Created, Accessed, Written; }
- public sealed class Journal { public List<Entry> Files = new List<Entry>(); }
+ public sealed class Journal { public List<Entry> Files = new List<Entry>(); public MetadataState Metadata; }
  public sealed class Holder { public int Pid; public long Created; public string Path; public string User; public bool IdentityConfirmed; }
  public sealed class Result { public int Code; public string Message; public bool RolledBack; public List<Holder> Holders = new List<Holder>(); }
  public static class Guard {
@@ -43,10 +43,10 @@ namespace InLine.Installer {
   [DllImport("rstrtmgr.dll")] static extern int RmGetList(uint session, out uint needed, ref uint count, [In,Out] ProcessInfo[] list, ref uint reason);
   [DllImport("rstrtmgr.dll")] static extern int RmEndSession(uint session);
 
-  static void Require(bool condition, string message) { if (!condition) throw new IOException(message); }
-  static string Hash(Stream s) { s.Position=0; using(var hash=SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(s)).Replace("-", ""); }
+  internal static void Require(bool condition, string message) { if (!condition) throw new IOException(message); }
+  internal static string Hash(Stream s) { s.Position=0; using(var hash=SHA256.Create()) return BitConverter.ToString(hash.ComputeHash(s)).Replace("-", ""); }
   static string HashFile(string p) { using(var s=File.OpenRead(p)) return Hash(s); }
-  static void CheckPath(string path) {
+  internal static void CheckPath(string path) {
    string p=Path.GetFullPath(path);
    Require(!p.StartsWith(@"\\"), "Network paths are not supported.");
    for(string next=p; next!=null; next=Path.GetDirectoryName(next)) {
@@ -59,7 +59,7 @@ namespace InLine.Installer {
    CheckPath(p); Require(new DriveInfo(Path.GetPathRoot(p)).DriveFormat=="NTFS", "A local NTFS installation directory is required.");
    return p;
   }
-  static FileStream Open(string p, bool create) {
+  internal static FileStream Open(string p, bool create) {
    CheckPath(p);
    var h=CreateFile(p, create?0xC0070000u:0xC0010000u, 0, IntPtr.Zero, create?1u:3u, 0x80, IntPtr.Zero); // READ|WRITE|DELETE; WRITE_DAC only for newly created recovery files
    if(h.IsInvalid) { int code=Marshal.GetLastWin32Error(); h.Dispose(); throw new IOException("Cannot exclusively open target file (Windows error "+code+"): "+Path.GetFileName(p)); }
@@ -70,12 +70,20 @@ namespace InLine.Installer {
     return new FileStream(h,FileAccess.ReadWrite);
    } catch { h.Dispose(); throw; }
   }
-  static void DeleteOnClose(FileStream s, bool delete) { int value=delete?1:0; Require(SetFileInformationByHandle(s.SafeFileHandle,4,ref value,4),"Cannot safely mark/unmark target deletion."); }
+  internal static void DeleteOnClose(FileStream s, bool delete) { int value=delete?1:0; Require(SetFileInformationByHandle(s.SafeFileHandle,4,ref value,4),"Cannot safely mark/unmark target deletion."); }
   static void Write(FileStream target, string source) {
    target.Position=0; using(var input=File.OpenRead(source)) input.CopyTo(target);
    target.SetLength(target.Position); target.Flush(true);
   }
   static FileTime Time(long value) { return new FileTime { Low=(uint)value, High=(uint)((ulong)value>>32) }; }
+  internal static void RestoreShortcutMetadata(FileStream target, ShortcutChange link, bool restoreAcl) {
+   if(restoreAcl) {
+    var security=new FileSecurity(); security.SetSecurityDescriptorSddlForm(link.Acl,AccessControlSections.Access); target.SetAccessControl(security);
+    Require(AccessEquivalent(link.Acl,target.GetAccessControl().GetSecurityDescriptorSddlForm(AccessControlSections.Access)),"Restored shortcut access descriptor could not be verified.");
+   }
+   var c=Time(link.Created); var a=Time(link.Accessed); var w=Time(link.Written);
+   Require(SetFileTime(target.SafeFileHandle,ref c,ref a,ref w),"Cannot restore shortcut timestamps.");
+  }
   public static bool AccessEquivalent(string expected, string actual) {
    var before=new RawSecurityDescriptor(expected); var after=new RawSecurityDescriptor(actual);
    // SetSecurityInfo may mark a legacy descriptor as converted to the current
@@ -150,8 +158,26 @@ namespace InLine.Installer {
    return holders;
   }
   // failAfter is used by isolated fault-injection tests only; the packaged wrapper always passes -1.
+  public static Result OptionalDesktop(string directory, MetadataOptions options) {
+   var result=new Result(); MetadataTransaction metadata=null;
+   try {
+    string root=Root(directory);
+    using(var serial=Open(Path.Combine(root,".in-line-install.lock"),!File.Exists(Path.Combine(root,".in-line-install.lock")))) {
+     Require(serial.Length==0&&!Directory.Exists(Path.Combine(root,Transaction)),"An installation transaction is pending; optional shortcut was not created.");
+     DeleteOnClose(serial,true);
+     metadata=new MetadataTransaction(); metadata.Prepare(options,root,"desktop"); metadata.Apply();
+    }
+    result.Message="Optional desktop shortcut verified.";
+   } catch { result.Code=1; result.Message="Optional desktop shortcut could not be verified. The completed installation is unchanged; no success is claimed for this optional action."; if(metadata!=null) try { metadata.Rollback(); } catch { result.Code=2; result.Message+=" Shortcut recovery could not be verified."; } }
+   finally { if(metadata!=null) metadata.Dispose(); }
+   return result;
+  }
   public static Result Run(string directory, string payload, string operation, int failAfter) {
+   return Run(directory,payload,operation,failAfter,null);
+  }
+  public static Result Run(string directory, string payload, string operation, int failAfter, MetadataOptions options) {
    var result=new Result(); var streams=new List<FileStream>(); var created=new List<bool>(); FileStream serial=null; SafeFileHandle directoryHandle=null;
+   MetadataTransaction metadata=null;
    string root=null,folder=null; Journal journal=null; bool mutated=false,prepared=false,success=false,ownedFolder=false;
    try {
     Require(operation=="install"||operation=="uninstall"||operation=="rollback"||operation=="finalize","Invalid installer operation.");
@@ -165,6 +191,7 @@ namespace InLine.Installer {
      if(Directory.Exists(folder)) {
       var complete=Load(folder);
       foreach(var e in complete.Files) Require(e.After==null?!File.Exists(Path.Combine(root,e.Name)):HashFile(Path.Combine(root,e.Name))==e.After,"Installed group changed; recovery backups retained.");
+      MetadataTransaction.Verify(complete.Metadata,root);
       Clean(folder);
      }
      success=true; return result;
@@ -190,6 +217,8 @@ namespace InLine.Installer {
       var e=journal.Files[i]; string actual=Hash(streams[i]);
       Require((e.After==null&&created[i])||actual==e.After||actual==e.Before,"Target changed since transaction; rollback refused.");
      }
+     metadata=MetadataTransaction.Reopen(journal.Metadata,root);
+     if(metadata!=null) metadata.Rollback();
      // Release new-group allocation before restoring differently sized old files.
      // All handles and verified backups are retained throughout this operation.
      mutated=true;
@@ -197,6 +226,11 @@ namespace InLine.Installer {
     } else {
      Directory.CreateDirectory(folder);
      ownedFolder=true;
+     if(options!=null) {
+      metadata=new MetadataTransaction();
+      metadata.Prepare(options,root,operation);
+      journal.Metadata=metadata.State;
+     }
      for(int i=0;i<Names.Length;i++) {
       var e=journal.Files[i]; if(!e.Existed) continue;
       FileInfo info; Require(GetFileInformationByHandle(streams[i].SafeFileHandle,out info),"Cannot snapshot file metadata.");
@@ -215,6 +249,7 @@ namespace InLine.Installer {
      else DeleteOnClose(streams[i],true);
      if(i+1==failAfter) throw new IOException("Isolated injected file transaction failure.");
     }
+    if(!restore&&metadata!=null) metadata.Apply();
     if(restore) Clean(folder);
     success=true; result.Message="Verified complete "+operation+" file group."; return result;
    } catch(Exception error) {
@@ -230,6 +265,7 @@ namespace InLine.Installer {
        else if(e.Existed) Restore(streams[i],folder,e,false);
        else DeleteOnClose(streams[i],true);
       }
+      if(metadata!=null) metadata.Rollback();
       Clean(folder); result.RolledBack=true;
      } catch { result.Code=2; result.Message+=" Rollback could not be verified. Keep recovery backups and stop using this installation; manual recovery is required."; }
     }
@@ -239,6 +275,7 @@ namespace InLine.Installer {
    } finally {
     // Empty files created solely during a failed preflight must not survive.
     if(!success&&!mutated) for(int i=0;i<streams.Count;i++) if(created[i]) DeleteOnClose(streams[i],true);
+    if(metadata!=null) metadata.Dispose();
     foreach(var s in streams) s.Dispose(); if(serial!=null) serial.Dispose(); if(directoryHandle!=null) directoryHandle.Dispose();
    }
   }

@@ -631,86 +631,14 @@ Section Install
 
   ; Uninstaller is part of the verified file-group transaction.
 
-  ; Save $INSTDIR in registry for future installations
-  ClearErrors
-  WriteRegStr SHCTX "${MANUPRODUCTKEY}" "" $INSTDIR
-  IfErrors inline_install_metadata_failed
-
-  !if "${INSTALLMODE}" == "both"
-    ; Save install mode to be selected by default for the next installation such as updating
-    ; or when uninstalling
-    ClearErrors
-    WriteRegStr SHCTX "${UNINSTKEY}" $MultiUser.InstallMode 1
-    IfErrors inline_install_metadata_failed
-  !endif
-
-  ; Save current MAINBINARYNAME for future updates
-  ClearErrors
-  WriteRegStr SHCTX "${UNINSTKEY}" "MainBinaryName" "${MAINBINARYNAME}.exe"
-  IfErrors inline_install_metadata_failed
-
-  ; Registry information for add/remove programs
-  ClearErrors
-  WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${PRODUCTNAME}"
-  IfErrors inline_install_metadata_failed
-  ClearErrors
-  WriteRegStr SHCTX "${UNINSTKEY}" "DisplayIcon" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\""
-  IfErrors inline_install_metadata_failed
-  ClearErrors
-  WriteRegStr SHCTX "${UNINSTKEY}" "DisplayVersion" "${VERSION}"
-  IfErrors inline_install_metadata_failed
-  ClearErrors
-  WriteRegStr SHCTX "${UNINSTKEY}" "Publisher" "${MANUFACTURER}"
-  IfErrors inline_install_metadata_failed
-  ClearErrors
-  WriteRegStr SHCTX "${UNINSTKEY}" "InstallLocation" "$\"$INSTDIR$\""
-  IfErrors inline_install_metadata_failed
-  ClearErrors
-  WriteRegStr SHCTX "${UNINSTKEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\""
-  IfErrors inline_install_metadata_failed
-  ClearErrors
-  WriteRegDWORD SHCTX "${UNINSTKEY}" "NoModify" "1"
-  IfErrors inline_install_metadata_failed
-  ClearErrors
-  WriteRegDWORD SHCTX "${UNINSTKEY}" "NoRepair" "1"
-  IfErrors inline_install_metadata_failed
-
-  ${GetSize} "$INSTDIR" "/M=uninstall.exe /S=0K /G=0" $0 $1 $2
-  IntOp $0 $0 + ${ESTIMATEDSIZE}
-  IntFmt $0 "0x%08X" $0
-  ClearErrors
-  WriteRegDWORD SHCTX "${UNINSTKEY}" "EstimatedSize" "$0"
-  IfErrors inline_install_metadata_failed
-
-  !if "${HOMEPAGE}" != ""
-    ClearErrors
-    WriteRegStr SHCTX "${UNINSTKEY}" "URLInfoAbout" "${HOMEPAGE}"
-    IfErrors inline_install_metadata_failed
-    ClearErrors
-    WriteRegStr SHCTX "${UNINSTKEY}" "URLUpdateInfo" "${HOMEPAGE}"
-    IfErrors inline_install_metadata_failed
-    ClearErrors
-    WriteRegStr SHCTX "${UNINSTKEY}" "HelpLink" "${HOMEPAGE}"
-    IfErrors inline_install_metadata_failed
-  !endif
-
-  ; Create start menu shortcut
-  !insertmacro MUI_STARTMENU_WRITE_BEGIN Application
-    Call CreateOrUpdateStartMenuShortcut
-  !insertmacro MUI_STARTMENU_WRITE_END
-
-  ; Create desktop shortcut for silent and passive installers
-  ; because finish page will be skipped
-  ${If} $PassiveMode = 1
-  ${OrIf} ${Silent}
-    Call CreateOrUpdateDesktopShortcut
-  ${EndIf}
+  ; Fixed product registry values and required shortcuts are verified inside
+  ; the same finite guard transaction as the five program files.
 
   Goto inline_install_metadata_ok
   inline_install_metadata_failed:
     Call InLineOnAbort
     SetErrorLevel 1
-    Abort "注册信息写入失败；安装已停止。请核对回滚状态及保留的恢复备份。"
+    Abort "注册信息处理失败；安装已停止，请核对保留的恢复证据。"
   inline_install_metadata_ok:
 
   !ifmacrodef NSIS_HOOK_POSTINSTALL
@@ -825,59 +753,14 @@ Section Uninstall
   {{/each}}
   RMDir "$INSTDIR"
 
-  ; Remove shortcuts if not updating
-  ${If} $UpdateMode <> 1
-    !insertmacro DeleteAppUserModelId
-
-    ; Remove start menu shortcut
-    !insertmacro MUI_STARTMENU_GETFOLDER Application $AppStartMenuFolder
-    !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    Pop $0
-    ${If} $0 = 1
-      !insertmacro UnpinShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
-      Delete "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
-      RMDir "$SMPROGRAMS\$AppStartMenuFolder"
-    ${EndIf}
-    !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    Pop $0
-    ${If} $0 = 1
-      !insertmacro UnpinShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk"
-      Delete "$SMPROGRAMS\${PRODUCTNAME}.lnk"
-    ${EndIf}
-
-    ; Remove desktop shortcuts
-    !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    Pop $0
-    ${If} $0 = 1
-      !insertmacro UnpinShortcut "$DESKTOP\${PRODUCTNAME}.lnk"
-      Delete "$DESKTOP\${PRODUCTNAME}.lnk"
-    ${EndIf}
-  ${EndIf}
-
-  ; Remove registry information for add/remove programs
-  !if "${INSTALLMODE}" == "both"
-    ClearErrors
-    DeleteRegKey SHCTX "${UNINSTKEY}"
-    IfErrors inline_uninstall_metadata_failed
-  !else if "${INSTALLMODE}" == "perMachine"
-    ClearErrors
-    DeleteRegKey HKLM "${UNINSTKEY}"
-    IfErrors inline_uninstall_metadata_failed
-  !else
-    ClearErrors
-    DeleteRegKey HKCU "${UNINSTKEY}"
-    IfErrors inline_uninstall_metadata_failed
-  !endif
-
-  ; Retain the user autostart preference along with the app settings.
-
-  ; Never delete user data, authorization, preferences or MCP configuration.
+  ; Product registration and owned shortcuts were handled transactionally by
+  ; PREUNINSTALL. User data and the remembered installation directory remain.
 
   Goto inline_uninstall_metadata_ok
   inline_uninstall_metadata_failed:
     Call un.InLineOnAbort
     SetErrorLevel 1
-    Abort "卸载注册信息处理失败；已停止并尝试恢复程序，用户数据保留。"
+    Abort "卸载注册信息处理失败；已停止，请核对保留的恢复证据。"
   inline_uninstall_metadata_ok:
 
   !ifmacrodef NSIS_HOOK_POSTUNINSTALL
@@ -908,67 +791,13 @@ Function un.SkipIfPassive
   ${IfThen} $PassiveMode = 1  ${|} Abort ${|}
 FunctionEnd
 
-Function CreateOrUpdateStartMenuShortcut
-  ; We used to use product name as MAINBINARYNAME
-  ; migrate old shortcuts to target the new MAINBINARYNAME
-  StrCpy $R0 0
-
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
-  Pop $0
-  ${If} $0 = 1
-    !insertmacro SetShortcutTarget "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    StrCpy $R0 1
-  ${EndIf}
-
-  !insertmacro IsShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
-  Pop $0
-  ${If} $0 = 1
-    !insertmacro SetShortcutTarget "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    StrCpy $R0 1
-  ${EndIf}
-
-  ${If} $R0 = 1
-    Return
-  ${EndIf}
-
-  ; Skip creating shortcut if in update mode or no shortcut mode
-  ; but always create if migrating from wix
-  ${If} $WixMode = 0
-    ${If} $UpdateMode = 1
-    ${OrIf} $NoShortcutMode = 1
-      Return
-    ${EndIf}
-  ${EndIf}
-
-  !if "${STARTMENUFOLDER}" != ""
-    CreateDirectory "$SMPROGRAMS\$AppStartMenuFolder"
-    CreateShortcut "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
-  !else
-    CreateShortcut "$SMPROGRAMS\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    !insertmacro SetLnkAppUserModelId "$SMPROGRAMS\${PRODUCTNAME}.lnk"
-  !endif
-FunctionEnd
-
 Function CreateOrUpdateDesktopShortcut
-  ; We used to use product name as MAINBINARYNAME
-  ; migrate old shortcuts to target the new MAINBINARYNAME
-  !insertmacro IsShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\$OldMainBinaryName"
-  Pop $0
-  ${If} $0 = 1
-    !insertmacro SetShortcutTarget "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-    Return
+  ; This finish-page choice happens after the required installation transaction.
+  ; A failure is an optional-action warning, never a false creation-success claim.
+  StrCpy $InLineCreateDesktop 1
+  !insertmacro InLineGuard "optional-desktop"
+  ${If} $0 != 0
+    DetailPrint "可选桌面快捷方式未创建或未通过验证；已完成的安装不受影响。"
+    MessageBox MB_ICONEXCLAMATION "可选桌面快捷方式未创建或未通过验证。请检查同名快捷方式及访问权限；安装主体已完成。"
   ${EndIf}
-
-  ; Skip creating shortcut if in update mode or no shortcut mode
-  ; but always create if migrating from wix
-  ${If} $WixMode = 0
-    ${If} $UpdateMode = 1
-    ${OrIf} $NoShortcutMode = 1
-      Return
-    ${EndIf}
-  ${EndIf}
-
-  CreateShortcut "$DESKTOP\${PRODUCTNAME}.lnk" "$INSTDIR\${MAINBINARYNAME}.exe"
-  !insertmacro SetLnkAppUserModelId "$DESKTOP\${PRODUCTNAME}.lnk"
 FunctionEnd
