@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([string]$OutputDirectory)
 $ErrorActionPreference = 'Stop'
 $repository = [IO.Directory]::GetParent($PSScriptRoot).FullName
@@ -6,7 +6,7 @@ if (!$OutputDirectory) { $OutputDirectory = Join-Path $repository ('release/inst
 $testRoot = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $testRoot) { throw 'Use a new isolated output directory' }
 New-Item -ItemType Directory -Path $testRoot | Out-Null
-Add-Type -Path (Join-Path $repository 'src-tauri/windows/InstallGuard.cs') -ReferencedAssemblies 'System.dll','System.Core.dll','System.Xml.dll'
+Add-Type -Path (Join-Path $repository 'src-tauri/windows/InstallGuard.cs'),(Join-Path $repository 'src-tauri/windows/InstallMetadata.cs') -ReferencedAssemblies 'System.dll','System.Core.dll','System.Xml.dll'
 $names = [InLine.Installer.Guard]::Names
 $results = [Collections.Generic.List[object]]::new()
 function Assert($condition, [string]$message) { if (!$condition) { throw $message } }

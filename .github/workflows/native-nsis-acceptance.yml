@@ -6,7 +6,10 @@ on:
       product_ref:
         description: Reviewed development commit (40-character SHA)
         required: true
-        default: "45a778d1646a6b0aded4df606ccc6d72cbac4ced"
+        default: "ebeb57106a898fb47e0a0d3a6ca05e7b56cfbe75"
+      candidate_branch:
+        description: Authorized R1 test snapshot branch only; leave empty for reviewed development HEAD
+        default: ""
       compare_2022:
         description: Also run the lifecycle control on windows-2022
         type: boolean
@@ -24,6 +27,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  metadata-components:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.product_ref }}
+      - name: Verify file and metadata transaction boundaries
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-installer-guard.ps1 -OutputDirectory release/guard-x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "$env:WINDIR/SysWOW64/WindowsPowerShell/v1.0/powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-installer-guard.ps1 -OutputDirectory release/guard-x86
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/verify-installer-metadata.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: installer-metadata-components
+          path: |
+            release/guard-*/results.json
+            release/installer-metadata-tests/results.json
+          if-no-files-found: error
+          retention-days: 14
+
   package:
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-2025
@@ -42,10 +72,20 @@ jobs:
         shell: pwsh
         env:
           PRODUCT_REF: ${{ inputs.product_ref }}
+          CANDIDATE_BRANCH: ${{ inputs.candidate_branch }}
         run: |
           if ($env:PRODUCT_REF -cnotmatch '^[0-9a-f]{40}$') { throw 'A full commit SHA is required' }
           $remote = git -C harness ls-remote origin refs/heads/feat/scheduled-items
-          if (($remote -split '\s+')[0] -ne $env:PRODUCT_REF) { throw 'Requested source must be the reviewed development branch head' }
+          $baseSha = ($remote -split '\s+')[0]
+          if ($env:CANDIDATE_BRANCH) {
+            if ($env:CANDIDATE_BRANCH -ne 'codex/p2c-r1-20261030' -or $baseSha -ne 'ebeb57106a898fb47e0a0d3a6ca05e7b56cfbe75') { throw 'Unapproved candidate branch or changed development baseline' }
+            $candidate = git -C harness ls-remote origin "refs/heads/$env:CANDIDATE_BRANCH"
+            if (($candidate -split '\s+')[0] -ne $env:PRODUCT_REF) { throw 'Candidate SHA differs from the explicitly selected temporary test branch' }
+            git -C harness fetch origin $env:PRODUCT_REF $baseSha
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            git -C harness merge-base --is-ancestor $baseSha $env:PRODUCT_REF
+            if ($LASTEXITCODE -ne 0) { throw 'Candidate does not descend from reviewed development baseline' }
+          } elseif ($baseSha -ne $env:PRODUCT_REF) { throw 'Requested source must be the reviewed development branch head' }
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.product_ref }}
@@ -63,7 +103,7 @@ jobs:
         with:
           workspaces: product/src-tauri
           cache-on-failure: true
-      - name: Build unchanged product and verify actual payload
+      - name: Build exact selected source and verify actual payload
         if: inputs.verified_package_run == ''
         working-directory: product
         shell: pwsh
@@ -138,7 +178,7 @@ jobs:
             $originCommit = if ($origin.originBuildWorkflowCommit) { $origin.originBuildWorkflowCommit } else { $origin.harnessCommit }
             $originImage = $origin.runnerImage
           }
-          @{productCommit=$env:PRODUCT_REF;harnessCommit=$env:GITHUB_SHA;originBuildRun=$originRun;originBuildWorkflowCommit=$originCommit;installerSha256=(Get-FileHash product/release/native-package/candidate.exe).Hash;runnerImage=$originImage;baselineVersion='0.4.0'} | ConvertTo-Json | Set-Content product/release/native-package/provenance.json
+          @{productCommit=$env:PRODUCT_REF;harnessCommit=$env:GITHUB_SHA;originBuildRun=$originRun;originBuildWorkflowCommit=$originCommit;installerSha256=(Get-FileHash product/release/native-package/candidate.exe).Hash;runnerImage=$originImage;baselineVersion='0.4.0';reviewedDevelopmentBaseline='ebeb57106a898fb47e0a0d3a6ca05e7b56cfbe75'} | ConvertTo-Json | Set-Content product/release/native-package/provenance.json
       - uses: actions/upload-artifact@v7
         with:
           name: native-nsis-package
