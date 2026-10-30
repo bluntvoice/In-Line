@@ -1,4 +1,4 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
     [Parameter(Mandatory)][ValidateSet('lifecycle','upgrade','file-lock','mcp-lock','uninstaller-lock','file-deny','registry-deny','uninstall-registry-deny','shortcut-deny','ps-exit','ps-compile-deny','ps-hang')][string]$Scenario,
     [Parameter(Mandatory)][string]$PackageDirectory,

@@ -65,6 +65,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           path: harness
+          fetch-depth: 0
       - name: Check action policy
         shell: pwsh
         run: ./harness/scripts/check-github-actions-runtime.ps1

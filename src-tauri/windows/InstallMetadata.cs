@@ -237,7 +237,12 @@ namespace InLine.Installer {
    foreach(var link in state.Shortcuts) Need(link.After==null?!File.Exists(link.Path):(File.Exists(link.Path)&&Digest(File.ReadAllBytes(link.Path))==link.AfterHash),"final shortcut readback failed; recovery retained.");
   }
   public void Dispose() {
-   for(int i=0;i<streams.Count;i++) { if(!completed&&created[i]&&State.Shortcuts[i].Before==null) Guard.DeleteOnClose(streams[i],true); streams[i].Dispose(); }
+   for(int i=0;i<streams.Count;i++) {
+    // A failed recovery preflight may have opened an absent link with CREATE_NEW.
+    // Remove that empty placeholder, but retain any original bytes already restored.
+    if(!completed&&created[i]&&(State.Shortcuts[i].Before==null||Guard.Hash(streams[i])!=State.Shortcuts[i].BeforeHash)) Guard.DeleteOnClose(streams[i],true);
+    streams[i].Dispose();
+   }
    if(!completed) for(int i=directories.Count-1;i>=0;i--) if(Directory.Exists(directories[i])&&Directory.GetFileSystemEntries(directories[i]).Length==0) Directory.Delete(directories[i]);
   }
  }
