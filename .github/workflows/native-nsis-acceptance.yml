@@ -138,6 +138,10 @@ jobs:
           New-Item -ItemType Directory -Path $destination | Out-Null
           Copy-Item product/src-tauri/target/release/bundle/nsis/*.exe "$destination/candidate.exe"
           Copy-Item product/release/installer-payload.json,product/release/installer-verification.json,product/release/package-build.json $destination
+          $rendered = 'product/src-tauri/target/release/nsis/x64/installer.nsi'
+          $size = [regex]::Match((Get-Content $rendered -Raw), '(?m)^!define ESTIMATEDSIZE "(\d+)"')
+          if (!$size.Success) { throw 'Cannot read the pinned Tauri payload size estimate' }
+          @{productCommit=(git -C product rev-parse HEAD);estimatedPayloadKiB=[int]$size.Groups[1].Value;renderedTemplateSha256=(Get-FileHash $rendered).Hash;rule='Tauri 2.11.4 source-file sum, including repeated destinations, divided by 1024'} | ConvertTo-Json | Set-Content "$destination/estimated-size.json"
           Invoke-WebRequest https://github.com/bluntvoice/In-Line/releases/download/v0.4.0/In.Line_0.4.0_x64-setup.exe -OutFile "$destination/baseline-0.4.0.exe"
           if ((Get-FileHash "$destination/baseline-0.4.0.exe").Hash -ne 'F8E0BF5D1EC4EF1C4759579713AA8CA49BE05624ACD74C50AF49A62B30842F68') { throw 'Baseline digest mismatch' }
       - name: Reuse only an already verified package for the unchanged product SHA
@@ -158,6 +162,8 @@ jobs:
           $origin = Get-Content "$destination/provenance.json" -Raw | ConvertFrom-Json
           $verification = Get-Content "$destination/installer-verification.json" -Raw | ConvertFrom-Json
           $payload = Get-Content "$destination/installer-payload.json" -Raw | ConvertFrom-Json
+          $size = Get-Content "$destination/estimated-size.json" -Raw | ConvertFrom-Json
+          if ($size.productCommit -ne $env:PRODUCT_REF -or (Get-FileHash "$destination/estimated-size.json").Hash -ne $origin.estimatedSizeManifestSha256) { throw 'Reused Tauri size manifest differs from the verified package' }
           if ($origin.productCommit -ne $env:PRODUCT_REF -or $verification.ExpectedCommit -ne $env:PRODUCT_REF -or !$verification.PayloadMatched -or $payload.build.exactCommit -ne $env:PRODUCT_REF -or $payload.build.sourceDirty -or (Get-FileHash "$destination/candidate.exe").Hash -ne $verification.Sha256 -or (Get-FileHash "$destination/baseline-0.4.0.exe").Hash -ne 'F8E0BF5D1EC4EF1C4759579713AA8CA49BE05624ACD74C50AF49A62B30842F68') { throw 'Reused source/build/digest verification failed' }
       - id: manifest
         name: Record provenance and fresh-job matrix
@@ -179,7 +185,7 @@ jobs:
             $originCommit = if ($origin.originBuildWorkflowCommit) { $origin.originBuildWorkflowCommit } else { $origin.harnessCommit }
             $originImage = $origin.runnerImage
           }
-          @{productCommit=$env:PRODUCT_REF;harnessCommit=$env:GITHUB_SHA;originBuildRun=$originRun;originBuildWorkflowCommit=$originCommit;installerSha256=(Get-FileHash product/release/native-package/candidate.exe).Hash;runnerImage=$originImage;baselineVersion='0.4.0';reviewedDevelopmentBaseline='ebeb57106a898fb47e0a0d3a6ca05e7b56cfbe75'} | ConvertTo-Json | Set-Content product/release/native-package/provenance.json
+          @{productCommit=$env:PRODUCT_REF;harnessCommit=$env:GITHUB_SHA;originBuildRun=$originRun;originBuildWorkflowCommit=$originCommit;installerSha256=(Get-FileHash product/release/native-package/candidate.exe).Hash;estimatedSizeManifestSha256=(Get-FileHash product/release/native-package/estimated-size.json).Hash;runnerImage=$originImage;baselineVersion='0.4.0';reviewedDevelopmentBaseline='ebeb57106a898fb47e0a0d3a6ca05e7b56cfbe75'} | ConvertTo-Json | Set-Content product/release/native-package/provenance.json
       - uses: actions/upload-artifact@v7
         with:
           name: native-nsis-package

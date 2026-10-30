@@ -191,7 +191,11 @@ function Assert-Installed([string]$label) {
     Check ($registered.Count -ge 1) "$label registered version/location matches installed files"
     $payloadBytes=0L
     foreach($name in @('in-line.exe','in-line-mcp.exe','in-line-cli.exe','WebView2Loader.dll')) { $payloadBytes+=(Get-Item -LiteralPath (Join-Path $install $name)).Length }
-    $expectedSize=[int][Math]::Floor($payloadBytes/1024)+[int][Math]::Floor((Get-Item -LiteralPath (Join-Path $install 'uninstall.exe')).Length/1024)
+    # The pinned Tauri estimate counts source entries, including the CLI's two
+    # packaging sources for one destination. Preserve that upstream estimate;
+    # do not silently substitute the deduplicated installed-file sum.
+    Check ($sizeManifest.estimatedPayloadKiB -ge [int][Math]::Floor($payloadBytes/1024)) "$label pinned Tauri estimate covers the actual installed payload"
+    $expectedSize=[int]$sizeManifest.estimatedPayloadKiB+[int][Math]::Floor((Get-Item -LiteralPath (Join-Path $install 'uninstall.exe')).Length/1024)
     Check ((@($registered | Where-Object { $_.values.EstimatedSize -ne $expectedSize })).Count -eq 0) "$label ARP estimated size includes actual payload and generated uninstaller"
     foreach($view in @('Registry32','Registry64')) { Check ($states["$view/$vendor"].values[''] -eq $install) "$label remembers successful installation directory" }
     Check (!(Test-Path -LiteralPath (Join-Path $install '.in-line-install-transaction'))) "$label transaction finalized"
@@ -271,6 +275,8 @@ try {
     $provenance=Get-Content (Join-Path $package 'provenance.json') -Raw | ConvertFrom-Json
     $verification=Get-Content (Join-Path $package 'installer-verification.json') -Raw | ConvertFrom-Json
     $payload=Get-Content (Join-Path $package 'installer-payload.json') -Raw | ConvertFrom-Json
+    $sizeManifest=Get-Content (Join-Path $package 'estimated-size.json') -Raw | ConvertFrom-Json
+    Check ($sizeManifest.productCommit -eq $ExpectedCommit -and (Hash (Join-Path $package 'estimated-size.json')) -eq $provenance.estimatedSizeManifestSha256.ToLowerInvariant()) 'Pinned Tauri size manifest matches exact product and package provenance' $true
     Check ($provenance.productCommit -eq $ExpectedCommit -and $payload.build.exactCommit -eq $ExpectedCommit -and (Hash $candidate) -eq $verification.Sha256.ToLowerInvariant()) 'Verified formal source and installer digest' $true
     $result.installerSha256=Hash $candidate;$result.baselineSha256=Hash $baseline
     New-Item -ItemType Directory -Path $install -Force | Out-Null
