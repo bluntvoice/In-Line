@@ -189,6 +189,11 @@ function Assert-Installed([string]$label) {
     Check ((@($names | Where-Object { !(Test-Path -LiteralPath (Join-Path $install $_) -PathType Leaf) })).Count -eq 0) "$label complete five-file group"
     $states=RegistryState;$registered=@($states.Values | Where-Object { $_.values.DisplayVersion -eq '0.5.0' -and $_.values.InstallLocation.Trim('"') -eq $install })
     Check ($registered.Count -ge 1) "$label registered version/location matches installed files"
+    $payloadBytes=0L
+    foreach($name in @('in-line.exe','in-line-mcp.exe','in-line-cli.exe','WebView2Loader.dll')) { $payloadBytes+=(Get-Item -LiteralPath (Join-Path $install $name)).Length }
+    $expectedSize=[int][Math]::Floor($payloadBytes/1024)+[int][Math]::Floor((Get-Item -LiteralPath (Join-Path $install 'uninstall.exe')).Length/1024)
+    Check ((@($registered | Where-Object { $_.values.EstimatedSize -ne $expectedSize })).Count -eq 0) "$label ARP estimated size includes actual payload and generated uninstaller"
+    foreach($view in @('Registry32','Registry64')) { Check ($states["$view/$vendor"].values[''] -eq $install) "$label remembers successful installation directory" }
     Check (!(Test-Path -LiteralPath (Join-Path $install '.in-line-install-transaction'))) "$label transaction finalized"
 }
 function Install-Candidate([string]$label='install') { $op=Run-NSIS $candidate $label;Check (!$op.timedOut -and $op.exitCode -eq 0) "$label native installer returned success" $true;Assert-Installed $label;return $op }
@@ -345,6 +350,18 @@ try {
         $null=Install-Candidate 'retry-after-restoring-test-key-permissions';$null=Snapshot 'retry'
     } elseif($Scenario -eq 'shortcut-deny') {
         $desktop=(ShortcutPaths)[0];$program=(ShortcutPaths)[1];$shell=New-Object -ComObject WScript.Shell
+        # An exact test-owned directory blocks creating this otherwise absent
+        # .lnk without changing any parent desktop ACL or runner service policy.
+        New-Item -ItemType Directory -Path $desktop | Out-Null
+        $blocked=Snapshot 'absent-shortcut-path-blocked-by-test-directory'
+        $op=Run-NSIS $candidate 'shortcut-new-file-create-denied';$now=Snapshot 'shortcut-new-file-create-denied'
+        Check ($op.exitCode -ne 0 -and !$op.timedOut) 'Actual absent shortcut creation failure returns failure'
+        Check ((Test-Path -LiteralPath $desktop -PathType Container) -and @(Get-ChildItem -LiteralPath $desktop).Count -eq 0) 'Exact shortcut path fixture remains unchanged' $true
+        Check (Equal $blocked.programs $now.programs) 'Absent shortcut creation failure restores complete program group'
+        Check (Equal $blocked.registry $now.registry) 'Absent shortcut creation failure restores registry and directory memory'
+        Check (Equal $blocked.shortcuts $now.shortcuts) 'Absent shortcut creation failure preserves link baseline'
+        Check (Equal $blocked.data $now.data) 'Absent shortcut creation failure preserves data'
+        Remove-Item -LiteralPath $desktop
         foreach($path in @($desktop,$program)) { New-Item -ItemType Directory -Path (Split-Path $path) -Force | Out-Null;$link=$shell.CreateShortcut($path);$link.TargetPath=Join-Path $lab 'synthetic-old-target.exe';$link.Save();$streams.Add([IO.File]::Open($path,'Open','Read','Read')) }
         $old=Snapshot 'locked-shortcuts'
         for($attempt=1;$attempt -le 2;$attempt++) {

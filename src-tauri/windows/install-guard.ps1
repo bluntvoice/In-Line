@@ -23,6 +23,12 @@ try {
     if (!$StartMenuFolder.StartsWith('.')) { throw 'Invalid start menu folder transport' }
     $options.Desktop=$DesktopDirectory; $options.Programs=$ProgramsDirectory; $options.StartMenuFolder=$StartMenuFolder.Substring(1); $options.Hive=$RegistryHive
     $options.StartMenu=($CreateStartMenu -eq 1); $options.DesktopShortcut=($CreateDesktop -eq 1); $options.RemoveShortcuts=($RemoveShortcuts -eq 1); $options.EstimatedSize=$EstimatedSize
+    if ($Operation -eq 'install') {
+        # Match the original NSIS EstimatedSize: packaged payload plus the
+        # generated uninstaller, in whole KiB. Read only the private staged file.
+        $uninstaller = [IO.FileInfo]::new((Join-Path $PayloadDirectory 'uninstall.exe'))
+        $options.EstimatedSize += [int][Math]::Floor($uninstaller.Length / 1024)
+    }
     if ($Operation -eq 'optional-desktop') {
         $result = [InLine.Installer.Guard]::OptionalDesktop($InstallDirectory,$options)
     } else {
