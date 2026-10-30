@@ -1,0 +1,1603 @@
+{
+  "phase": "P2-C native NSIS",
+  "date": "2026-10-29",
+  "timezone": "Asia/Shanghai",
+  "status": "native_acceptance_failed_findings_awaiting_user_review",
+  "productCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+  "testCommit": "d9c2979bb36f5a721108818a75171b18c75bacda",
+  "originBuildRun": "40853399854",
+  "originBuildWorkflowCommit": "e9aebd7edbc1bd3076ed3c0f9b5b8d4eb3bc143b",
+  "run": {
+    "id": 40858188456,
+    "html_url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456",
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "failure",
+    "head_sha": "d9c2979bb36f5a721108818a75171b18c75bacda",
+    "head_branch": "codex/p2c-native-acceptance-20261029",
+    "created_at": "2026-10-29T10:31:08Z",
+    "updated_at": "2026-10-29T10:34:53Z"
+  },
+  "caseCounts": {
+    "executed": 13,
+    "passed": 9,
+    "notSatisfied": 4,
+    "harnessExceptions": 0
+  },
+  "installer": {
+    "sha256": "c168eed6934a1f5569eacb71985357587dc83b94a2144064a69ab8961427a4b3",
+    "bytes": 4425692,
+    "baselineSha256": "f8e0bf5d1ec4ef1c4759579713aa8ca49be05624acd74c50af49a62b30842f68",
+    "build": {
+      "baselineCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+      "commitVerification": "clean_checkout_readback",
+      "databaseSchemaVersion": 14,
+      "exactCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+      "mcpVersion": 1,
+      "softwareVersion": "0.5.0",
+      "sourceDirty": false
+    },
+    "programs": [
+      {
+        "name": "in-line",
+        "bytes": 9055744,
+        "sha256": "3d2c3ff83c58cfc7d6fccd21329a2cab2d6622fe7f4e5ec49583048083466230",
+        "build": {
+          "baselineCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+          "commitVerification": "clean_checkout_readback",
+          "databaseSchemaVersion": 14,
+          "exactCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": false
+        },
+        "sourceSha256": "f40ca17f33ed65e7818ecb8ef4e4485a3be3df9b12d500488060d34be585a3fb",
+        "sourceTransformation": "tauri_nsis_bundle_type_marker"
+      },
+      {
+        "name": "in-line-mcp",
+        "bytes": 2440704,
+        "sha256": "ddfb8b8b2c7b68dbea2b0431bd66e5a453e2c6e5f57ea025ae74484a4e124a8a",
+        "build": {
+          "baselineCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+          "commitVerification": "clean_checkout_readback",
+          "databaseSchemaVersion": 14,
+          "exactCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": false
+        },
+        "sourceSha256": "ddfb8b8b2c7b68dbea2b0431bd66e5a453e2c6e5f57ea025ae74484a4e124a8a",
+        "sourceTransformation": "none"
+      },
+      {
+        "name": "in-line-cli",
+        "bytes": 1066496,
+        "sha256": "a740135c81d99fc70311aeb9345c84c8baeee589df36b05c5ff052f2d5a6ac7a",
+        "build": {
+          "baselineCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+          "commitVerification": "clean_checkout_readback",
+          "databaseSchemaVersion": 14,
+          "exactCommit": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+          "mcpVersion": 1,
+          "softwareVersion": "0.5.0",
+          "sourceDirty": false
+        },
+        "cliPhase": 5,
+        "sourceSha256": "a740135c81d99fc70311aeb9345c84c8baeee589df36b05c5ff052f2d5a6ac7a",
+        "sourceTransformation": "none"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "case": "windows-2022/lifecycle",
+      "passed": true,
+      "checks": 46,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win22",
+      "imageVersion": "20261026.347.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12890043000,
+        "name": "native-nsis-windows-2022-lifecycle",
+        "sha256": "37d58c37a74d9f97315ba979d365c51881172901478e297466f0f4af545a58ac",
+        "bytes": 5507,
+        "expiresAt": "2026-11-12T10:34:48Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890043000"
+      },
+      "operations": [
+        {
+          "label": "fresh",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "gui-running-install",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "same-version-repair",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "actual-uninstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [
+            {
+              "path": "D:\\a\\_temp\\inline-native-fa5203a19b04428481df0d0d3ca4dd43\\private-temp-4\\~nsu1.tmp\\Un.exe",
+              "pid": 4596,
+              "exitCodeSource": "GetExitCodeProcess-held-handle",
+              "exitCode": 0,
+              "parent": 3728,
+              "created": 639288668852488399
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "reinstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": {
+        "authorizationCreated": true,
+        "closeRequested": true,
+        "aliveAfterClose": true,
+        "cleanup": "Harness-only identity-verified test process termination; tray exit not exercised",
+        "processAlive": true,
+        "databaseCreated": true
+      },
+      "syntheticAuthorization": {
+        "contentsUploaded": false,
+        "permissions": {
+          "regularRead": true,
+          "write": false,
+          "fullRead": false
+        },
+        "dpapiProtected": true,
+        "syntheticClientCount": 1,
+        "revision": 2
+      },
+      "cliDoctorExit": 0
+    },
+    {
+      "case": "windows-2025/file-deny",
+      "passed": true,
+      "checks": 28,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12889514529,
+        "name": "native-nsis-windows-2025-file-deny",
+        "sha256": "6b0ac8081b503aa77d7d47c15fff9df3b3f284751b2bc07d72d938532ba105fd",
+        "bytes": 3858,
+        "expiresAt": "2026-11-12T10:33:18Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889514529"
+      },
+      "operations": [
+        {
+          "label": "prepare",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-install",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-uninstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [
+            {
+              "created": 639288667956007585,
+              "parent": 3092,
+              "pid": 8948,
+              "path": "D:\\a\\_temp\\inline-native-fc347147d0984fbb9f553ba7a25a8b78\\private-temp-3\\~nsu1.tmp\\Un.exe",
+              "exitCode": 1,
+              "exitCodeSource": "GetExitCodeProcess-held-handle"
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "retry-after-occupation-cleared",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/file-lock",
+      "passed": true,
+      "checks": 28,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12889988400,
+        "name": "native-nsis-windows-2025-file-lock",
+        "sha256": "adf3e86211494de724e914eebc4599f828b203102c761f7550760412c5731e3a",
+        "bytes": 3842,
+        "expiresAt": "2026-11-12T10:32:29Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889988400"
+      },
+      "operations": [
+        {
+          "label": "prepare",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-install",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-uninstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [
+            {
+              "path": "D:\\a\\_temp\\inline-native-50cdb134e5bc41f78d9ca4caa5b941c1\\private-temp-3\\~nsu1.tmp\\Un.exe",
+              "exitCode": 1,
+              "parent": 9144,
+              "created": 639288667471886006,
+              "pid": 8892,
+              "exitCodeSource": "GetExitCodeProcess-held-handle"
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "retry-after-occupation-cleared",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/lifecycle",
+      "passed": true,
+      "checks": 46,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12890795593,
+        "name": "native-nsis-windows-2025-lifecycle",
+        "sha256": "be8d34f41d8d6159cb28f4d789fa2fe19cf28b16e1de2b84860aaf19e69ed5ef",
+        "bytes": 5518,
+        "expiresAt": "2026-11-12T10:32:43Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890795593"
+      },
+      "operations": [
+        {
+          "label": "fresh",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "gui-running-install",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "same-version-repair",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "actual-uninstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [
+            {
+              "pid": 7496,
+              "path": "D:\\a\\_temp\\inline-native-304272242c3b477788d61644f3ba68e8\\private-temp-4\\~nsu1.tmp\\Un.exe",
+              "exitCodeSource": "GetExitCodeProcess-held-handle",
+              "created": 639288667591344691,
+              "parent": 696,
+              "exitCode": 0
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "reinstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": {
+        "aliveAfterClose": true,
+        "closeRequested": true,
+        "processAlive": true,
+        "databaseCreated": true,
+        "cleanup": "Harness-only identity-verified test process termination; tray exit not exercised",
+        "authorizationCreated": true
+      },
+      "syntheticAuthorization": {
+        "dpapiProtected": true,
+        "contentsUploaded": false,
+        "revision": 2,
+        "syntheticClientCount": 1,
+        "permissions": {
+          "regularRead": true,
+          "fullRead": false,
+          "write": false
+        }
+      },
+      "cliDoctorExit": 0
+    },
+    {
+      "case": "windows-2025/mcp-lock",
+      "passed": true,
+      "checks": 33,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12890631096,
+        "name": "native-nsis-windows-2025-mcp-lock",
+        "sha256": "2be75290cd37651b5c2ccf8aa1b90391970b3f2dddc7f50ad07b102252e4c4cf",
+        "bytes": 4068,
+        "expiresAt": "2026-11-12T10:32:26Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890631096"
+      },
+      "operations": [
+        {
+          "label": "prepare",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-install",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-uninstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [
+            {
+              "exitCodeSource": "GetExitCodeProcess-held-handle",
+              "parent": 6476,
+              "created": 639288667435043052,
+              "exitCode": 1,
+              "path": "D:\\a\\_temp\\inline-native-0f91d3a9765f4d57ad921fff7384259a\\private-temp-3\\~nsu1.tmp\\Un.exe",
+              "pid": 5224
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "retry-after-occupation-cleared",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/ps-compile-deny",
+      "passed": true,
+      "checks": 17,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": false,
+      "artifact": {
+        "id": 12890611605,
+        "name": "native-nsis-windows-2025-ps-compile-deny",
+        "sha256": "2656c95fe41ba90e45faa02db0d9f05decbc7967fd51c259f273e3c5d3eb5c97",
+        "bytes": 3119,
+        "expiresAt": "2026-11-12T10:34:12Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890611605"
+      },
+      "operations": [
+        {
+          "label": "ps-compile-deny",
+          "fault": "deny-compile-temp",
+          "faultApplied": true,
+          "helper": {
+            "createdUtcTicks": 639288668381832518,
+            "image": "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "pid": 5768,
+            "parent": 6032
+          },
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false,
+          "helperExitCode": null
+        },
+        {
+          "label": "retry-after-helper-fault-cleared",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/ps-exit",
+      "passed": true,
+      "checks": 17,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": false,
+      "artifact": {
+        "id": 12890970331,
+        "name": "native-nsis-windows-2025-ps-exit",
+        "sha256": "c59ab9dd493034aa4c928aa6eac542406d851a75e2dcf094c5d8a74a780c4327",
+        "bytes": 3087,
+        "expiresAt": "2026-11-12T10:34:01Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890970331"
+      },
+      "operations": [
+        {
+          "label": "ps-exit",
+          "fault": "terminate-helper",
+          "faultApplied": true,
+          "helper": {
+            "parent": 1684,
+            "pid": 684,
+            "createdUtcTicks": 639288668306068854,
+            "image": "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe"
+          },
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false,
+          "helperExitCode": null
+        },
+        {
+          "label": "retry-after-helper-fault-cleared",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/ps-hang",
+      "passed": false,
+      "checks": 16,
+      "failedChecks": [
+        "Product independently handled the hung helper in the observed window; harness resume does not verify bounded handling"
+      ],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": false,
+      "artifact": {
+        "id": 12890920573,
+        "name": "native-nsis-windows-2025-ps-hang",
+        "sha256": "f15923fc41df67b049cd3f1eef1dca5e2813d224e8517533df642f7f6b248b4a",
+        "bytes": 3494,
+        "expiresAt": "2026-11-12T10:34:39Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890920573"
+      },
+      "operations": [
+        {
+          "label": "ps-hang",
+          "fault": "suspend-helper",
+          "faultApplied": true,
+          "helper": {
+            "pid": 6028,
+            "image": "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe",
+            "createdUtcTicks": 639288668492174732,
+            "parent": 8272
+          },
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "installerStillWaitingAfter15Seconds": true,
+          "resumedByHarness": true,
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false,
+          "helperExitCode": null
+        },
+        {
+          "label": "retry-after-helper-fault-cleared",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/registry-deny",
+      "passed": false,
+      "checks": 26,
+      "failedChecks": [
+        "Registry denied attempt 1 restores installation registry",
+        "Registry denied attempt 2 restores installation registry"
+      ],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": false,
+      "artifact": {
+        "id": 12889749085,
+        "name": "native-nsis-windows-2025-registry-deny",
+        "sha256": "e7be6123f7a265b5193248a876bf5e16e02c65617b2046c7ddea756f8feb0f79",
+        "bytes": 3770,
+        "expiresAt": "2026-11-12T10:33:19Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889749085"
+      },
+      "operations": [
+        {
+          "label": "registry-denied-1",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "registry-denied-2",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "retry-after-restoring-test-key-permissions",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/shortcut-deny",
+      "passed": false,
+      "checks": 10,
+      "failedChecks": [
+        "Shortcut creation failure attempt 1 is not falsely reported as success",
+        "Shortcut creation failure attempt 2 is not falsely reported as success",
+        "Shortcut deletion failure is not falsely reported as success"
+      ],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12889549697,
+        "name": "native-nsis-windows-2025-shortcut-deny",
+        "sha256": "39c90318a91c839bfa25c99519f20eaff2b43917a4b1ec2cc1ad89e6f6e88cda",
+        "bytes": 3509,
+        "expiresAt": "2026-11-12T10:33:54Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889549697"
+      },
+      "operations": [
+        {
+          "label": "shortcut-create-denied-1",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "shortcut-create-denied-2",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "shortcut-delete-denied",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [
+            {
+              "path": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\private-temp-3\\~nsu1.tmp\\Un.exe",
+              "parent": 1336,
+              "created": 639288668322503587,
+              "exitCode": 0,
+              "pid": 7504,
+              "exitCodeSource": "GetExitCodeProcess-held-handle"
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/uninstall-registry-deny",
+      "passed": false,
+      "checks": 34,
+      "failedChecks": [
+        "Registry denied attempt 1 restores shortcuts",
+        "Registry denied attempt 2 restores shortcuts"
+      ],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12890905286,
+        "name": "native-nsis-windows-2025-uninstall-registry-deny",
+        "sha256": "61f7af6d12a8d9cc4f47b067849dc549556af79644ed757f45e9727a8261ecb0",
+        "bytes": 4352,
+        "expiresAt": "2026-11-12T10:33:29Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890905286"
+      },
+      "operations": [
+        {
+          "label": "prepare",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "uninstall-registry-denied-1",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [
+            {
+              "created": 639288668031148095,
+              "exitCodeSource": "GetExitCodeProcess-held-handle",
+              "pid": 8060,
+              "path": "D:\\a\\_temp\\inline-native-5dfe72a108234207bf407492ad966024\\private-temp-2\\~nsu1.tmp\\Un.exe",
+              "exitCode": 1,
+              "parent": 10040
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "uninstall-registry-denied-2",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [
+            {
+              "created": 639288668051250169,
+              "exitCodeSource": "GetExitCodeProcess-held-handle",
+              "pid": 8252,
+              "path": "D:\\a\\_temp\\inline-native-5dfe72a108234207bf407492ad966024\\private-temp-3\\~nsu1.tmp\\Un.exe",
+              "exitCode": 1,
+              "parent": 5608
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "retry-after-restoring-test-key-permissions",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/uninstaller-lock",
+      "passed": true,
+      "checks": 28,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12889154707,
+        "name": "native-nsis-windows-2025-uninstaller-lock",
+        "sha256": "57087bfa7fe02f7a4f370d0f5ed80c825daa26a28a7f1ed4112f747c2c8c9fcc",
+        "bytes": 3858,
+        "expiresAt": "2026-11-12T10:33:10Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889154707"
+      },
+      "operations": [
+        {
+          "label": "prepare",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-install",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [],
+          "rootExitCode": 1,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "occupied-uninstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 1,
+          "descendants": [
+            {
+              "path": "D:\\a\\_temp\\inline-native-df31a536093a4279892454391dc23e41\\private-temp-3\\~nsu1.tmp\\Un.exe",
+              "pid": 9520,
+              "created": 639288667883064236,
+              "parent": 5356,
+              "exitCode": 1,
+              "exitCodeSource": "GetExitCodeProcess-held-handle"
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        },
+        {
+          "label": "retry-after-occupation-cleared",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    },
+    {
+      "case": "windows-2025/upgrade",
+      "passed": true,
+      "checks": 20,
+      "failedChecks": [],
+      "harnessError": null,
+      "imageOS": "win25-vs2026",
+      "imageVersion": "20261021.278.1",
+      "nativeInstallerExecuted": true,
+      "nativeUninstallerExecuted": true,
+      "artifact": {
+        "id": 12889593504,
+        "name": "native-nsis-windows-2025-upgrade",
+        "sha256": "3ca62f5103a5e6b0d3ac1536c1faa2a462f0152ba413b413e631bcf8ba255d50",
+        "bytes": 3521,
+        "expiresAt": "2026-11-12T10:32:30Z",
+        "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889593504"
+      },
+      "operations": [
+        {
+          "label": "baseline-install",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "upgrade",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": false
+        },
+        {
+          "label": "upgrade-uninstall",
+          "fault": "",
+          "faultApplied": false,
+          "helper": null,
+          "timedOut": false,
+          "exitCode": 0,
+          "descendants": [
+            {
+              "exitCode": 0,
+              "pid": 10076,
+              "exitCodeSource": "GetExitCodeProcess-held-handle",
+              "parent": 2312,
+              "created": 639288667487726613,
+              "path": "D:\\a\\_temp\\inline-native-f0353d40f7c647c4a97a7494688fe981\\private-temp-3\\~nsu1.tmp\\Un.exe"
+            }
+          ],
+          "rootExitCode": 0,
+          "copiedUninstallerObserved": true
+        }
+      ],
+      "guiStartup": null,
+      "syntheticAuthorization": null,
+      "cliDoctorExit": null
+    }
+  ],
+  "coverage": [
+    {
+      "id": "N01",
+      "result": "通过：静默原生安装",
+      "primaryScenario": "lifecycle",
+      "boundary": "windows-2025/2022，交互向导未覆盖"
+    },
+    {
+      "id": "N02",
+      "result": "通过：原生 0.4.0→0.5.0 程序升级",
+      "primaryScenario": "upgrade",
+      "boundary": "保留合成夹具；旧版真实业务库迁移未覆盖"
+    },
+    {
+      "id": "N03",
+      "result": "通过：同版本修复",
+      "primaryScenario": "lifecycle",
+      "boundary": "版本、文件摘要、数据及合成授权字节一致"
+    },
+    {
+      "id": "N04",
+      "result": "部分覆盖",
+      "primaryScenario": "lifecycle",
+      "boundary": "GUI 启动及运行中安装失败；关闭请求后仍存活；托盘正常退出未测"
+    },
+    {
+      "id": "N05",
+      "result": "通过：实际 MCP 占用保护",
+      "primaryScenario": "mcp-lock",
+      "boundary": "安装/卸载失败保护，EOF 退出后可重试；非目标同名实例不变"
+    },
+    {
+      "id": "N06",
+      "result": "通过：真实卸载及自身文件占用保护",
+      "primaryScenario": "uninstaller-lock",
+      "boundary": "正常生命周期实际临时卸载体退出0；占用时内层退出1，启动桩可为0"
+    },
+    {
+      "id": "N07",
+      "result": "失败：安装元数据回滚不完整",
+      "primaryScenario": "registry-deny",
+      "boundary": "安装失败留厂商目录项；卸载失败丢失快捷方式，各独立基线两次"
+    },
+    {
+      "id": "N08",
+      "result": "失败：快捷方式错误被报告为成功",
+      "primaryScenario": "shortcut-deny",
+      "boundary": "创建/修复两次及有效目标删除失败时实际退出0"
+    },
+    {
+      "id": "N09",
+      "result": "未覆盖",
+      "primaryScenario": "",
+      "boundary": "交互取消没有可靠自动化，本轮未伪造取消"
+    },
+    {
+      "id": "N10",
+      "result": "未覆盖",
+      "primaryScenario": "",
+      "boundary": "未执行物理掉电或 NSIS 写入中异常中断"
+    },
+    {
+      "id": "N11",
+      "result": "通过：限定的合成存储保留",
+      "primaryScenario": "lifecycle",
+      "boundary": "有效 SQLite、JSON、DPAPI、TOML，实际GUI生成测试库/授权库；不等于完整业务或凭证登录验收"
+    },
+    {
+      "id": "N12",
+      "result": "部分覆盖：构建身份及原生启动通过",
+      "primaryScenario": "lifecycle",
+      "boundary": "GUI进程/数据库、MCP初始化及16匿名调用、CLI结构化doctor；视觉/业务/正式会话未验"
+    },
+    {
+      "id": "N13",
+      "result": "部分通过，挂起处理未验证",
+      "primaryScenario": "ps-hang",
+      "boundary": "辅助异常退出/私有编译目录拒写安全停止；15秒仍等待且由测试恢复，企业策略未测"
+    },
+    {
+      "id": "N14",
+      "result": "部分覆盖",
+      "primaryScenario": "file-deny",
+      "boundary": "拒绝访问、目标退出后重试及非目标实例保护通过；第二用户/完整竞态未测"
+    },
+    {
+      "id": "N15",
+      "result": "仅环境与重试记录，前置组件故障未覆盖",
+      "primaryScenario": "lifecycle",
+      "boundary": "记录OS/镜像及正常安装重试，未单独采集WebView2版本，未移除组件或阻断基础网络"
+    }
+  ],
+  "confirmedDefects": [
+    {
+      "id": "NSIS-NATIVE-02",
+      "title": "卸载注册失败后程序恢复但快捷方式未恢复",
+      "scenario": "uninstall-registry-deny",
+      "exitCodes": [
+        1,
+        1
+      ],
+      "independentBaselineReplays": 2,
+      "evidence": [
+        {
+          "attempt": 1,
+          "programGroupRestored": true,
+          "dataUnchanged": true,
+          "registryChanges": {},
+          "shortcutChanges": {
+            "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line.lnk": {
+              "before": {
+                "sha256": "cc606994299bb42ea257cf295eab80421c9327b2da3ace8a5c21a65f20d8ab35",
+                "arguments": "",
+                "target": "D:\\a\\_temp\\inline-native-5dfe72a108234207bf407492ad966024\\install\\in-line.exe",
+                "exists": true
+              },
+              "after": {
+                "sha256": null,
+                "arguments": null,
+                "target": null,
+                "exists": false
+              }
+            },
+            "C:\\Users\\runneradmin\\Desktop\\In Line.lnk": {
+              "before": {
+                "sha256": "cc606994299bb42ea257cf295eab80421c9327b2da3ace8a5c21a65f20d8ab35",
+                "arguments": "",
+                "target": "D:\\a\\_temp\\inline-native-5dfe72a108234207bf407492ad966024\\install\\in-line.exe",
+                "exists": true
+              },
+              "after": {
+                "sha256": null,
+                "arguments": null,
+                "target": null,
+                "exists": false
+              }
+            }
+          }
+        },
+        {
+          "attempt": 2,
+          "programGroupRestored": true,
+          "dataUnchanged": true,
+          "registryChanges": {},
+          "shortcutChanges": {
+            "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line.lnk": {
+              "before": {
+                "sha256": "cc606994299bb42ea257cf295eab80421c9327b2da3ace8a5c21a65f20d8ab35",
+                "arguments": "",
+                "target": "D:\\a\\_temp\\inline-native-5dfe72a108234207bf407492ad966024\\install\\in-line.exe",
+                "exists": true
+              },
+              "after": {
+                "sha256": null,
+                "arguments": null,
+                "target": null,
+                "exists": false
+              }
+            },
+            "C:\\Users\\runneradmin\\Desktop\\In Line.lnk": {
+              "before": {
+                "sha256": "cc606994299bb42ea257cf295eab80421c9327b2da3ace8a5c21a65f20d8ab35",
+                "arguments": "",
+                "target": "D:\\a\\_temp\\inline-native-5dfe72a108234207bf407492ad966024\\install\\in-line.exe",
+                "exists": true
+              },
+              "after": {
+                "sha256": null,
+                "arguments": null,
+                "target": null,
+                "exists": false
+              }
+            }
+          }
+        }
+      ],
+      "retryAfterExternalPermissionRestoreSucceeded": true
+    },
+    {
+      "id": "NSIS-NATIVE-03",
+      "title": "快捷方式创建、修复和删除失败仍退出0",
+      "scenario": "shortcut-deny",
+      "exitCodes": [
+        0,
+        0,
+        0
+      ],
+      "creationReplays": 2,
+      "deletionUsesKnownValidTargetFixture": true,
+      "evidence": {
+        "creation1": {
+          "C:\\Users\\runneradmin\\Desktop\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\synthetic-old-target.exe",
+            "sha256": "eb3605a1d46ad53cc02067196a5083698780d5c738c982fc2937a94d36199e30"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\synthetic-old-target.exe",
+            "sha256": "eb3605a1d46ad53cc02067196a5083698780d5c738c982fc2937a94d36199e30"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line\\In Line.lnk": {
+            "arguments": null,
+            "exists": false,
+            "target": null,
+            "sha256": null
+          }
+        },
+        "creation2": {
+          "C:\\Users\\runneradmin\\Desktop\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\synthetic-old-target.exe",
+            "sha256": "eb3605a1d46ad53cc02067196a5083698780d5c738c982fc2937a94d36199e30"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\synthetic-old-target.exe",
+            "sha256": "eb3605a1d46ad53cc02067196a5083698780d5c738c982fc2937a94d36199e30"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line\\In Line.lnk": {
+            "arguments": null,
+            "exists": false,
+            "target": null,
+            "sha256": null
+          }
+        },
+        "beforeDeletion": {
+          "C:\\Users\\runneradmin\\Desktop\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\install\\in-line.exe",
+            "sha256": "07242bc6108ea561572b0b70dd8d75e279ba8655486a97ef519e345e5e98bd29"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\install\\in-line.exe",
+            "sha256": "07242bc6108ea561572b0b70dd8d75e279ba8655486a97ef519e345e5e98bd29"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line\\In Line.lnk": {
+            "arguments": null,
+            "exists": false,
+            "target": null,
+            "sha256": null
+          }
+        },
+        "afterDeletion": {
+          "C:\\Users\\runneradmin\\Desktop\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\install\\in-line.exe",
+            "sha256": "07242bc6108ea561572b0b70dd8d75e279ba8655486a97ef519e345e5e98bd29"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line.lnk": {
+            "arguments": "",
+            "exists": true,
+            "target": "D:\\a\\_temp\\inline-native-dc9e7782b0ef4ad8ae6622e7c1b83ac3\\install\\in-line.exe",
+            "sha256": "07242bc6108ea561572b0b70dd8d75e279ba8655486a97ef519e345e5e98bd29"
+          },
+          "C:\\Users\\runneradmin\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\In Line\\In Line.lnk": {
+            "arguments": null,
+            "exists": false,
+            "target": null,
+            "sha256": null
+          }
+        }
+      }
+    }
+  ],
+  "hangObservation": {
+    "productTimeoutObserved": false,
+    "installerStillWaiting": true,
+    "seconds": 15,
+    "resumedByHarness": true
+  },
+  "hangScope": "15-second observation only; no approved timeout threshold and no claim of an infinite hang. Product handling remains unverified; harness recovery is not product recovery.",
+  "nonTargetProof": {
+    "comparisonPassed": true,
+    "evidence": {
+      "before": {
+        "otherSha256": "ddfb8b8b2c7b68dbea2b0431bd66e5a453e2c6e5f57ea025ae74484a4e124a8a",
+        "targetCreated": 639288667416656943,
+        "otherPid": 8728,
+        "otherCreated": 639288667416756687,
+        "targetPid": 8752
+      },
+      "after": {
+        "otherSha256": "ddfb8b8b2c7b68dbea2b0431bd66e5a453e2c6e5f57ea025ae74484a4e124a8a",
+        "targetCreated": 639288667416656943,
+        "otherPid": 8728,
+        "otherCreated": 639288667416756687,
+        "targetPid": 8752
+      }
+    }
+  },
+  "artifactIntegrity": {
+    "archivesVerified": 14,
+    "sha256MatchedGitHub": true,
+    "credentialsOrDatabaseFilesUploaded": false,
+    "credentialPatternMatches": false
+  },
+  "artifacts": [
+    {
+      "id": 12890970331,
+      "name": "native-nsis-windows-2025-ps-exit",
+      "sha256": "c59ab9dd493034aa4c928aa6eac542406d851a75e2dcf094c5d8a74a780c4327",
+      "bytes": 3087,
+      "expiresAt": "2026-11-12T10:34:01Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890970331"
+    },
+    {
+      "id": 12890920573,
+      "name": "native-nsis-windows-2025-ps-hang",
+      "sha256": "f15923fc41df67b049cd3f1eef1dca5e2813d224e8517533df642f7f6b248b4a",
+      "bytes": 3494,
+      "expiresAt": "2026-11-12T10:34:39Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890920573"
+    },
+    {
+      "id": 12890905286,
+      "name": "native-nsis-windows-2025-uninstall-registry-deny",
+      "sha256": "61f7af6d12a8d9cc4f47b067849dc549556af79644ed757f45e9727a8261ecb0",
+      "bytes": 4352,
+      "expiresAt": "2026-11-12T10:33:29Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890905286"
+    },
+    {
+      "id": 12890795593,
+      "name": "native-nsis-windows-2025-lifecycle",
+      "sha256": "be8d34f41d8d6159cb28f4d789fa2fe19cf28b16e1de2b84860aaf19e69ed5ef",
+      "bytes": 5518,
+      "expiresAt": "2026-11-12T10:32:43Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890795593"
+    },
+    {
+      "id": 12890631096,
+      "name": "native-nsis-windows-2025-mcp-lock",
+      "sha256": "2be75290cd37651b5c2ccf8aa1b90391970b3f2dddc7f50ad07b102252e4c4cf",
+      "bytes": 4068,
+      "expiresAt": "2026-11-12T10:32:26Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890631096"
+    },
+    {
+      "id": 12890611605,
+      "name": "native-nsis-windows-2025-ps-compile-deny",
+      "sha256": "2656c95fe41ba90e45faa02db0d9f05decbc7967fd51c259f273e3c5d3eb5c97",
+      "bytes": 3119,
+      "expiresAt": "2026-11-12T10:34:12Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890611605"
+    },
+    {
+      "id": 12890267026,
+      "name": "native-nsis-package",
+      "sha256": "0286305d79072e69e5bc87277f67c84b4c1d8542e8361945312d216514f3425c",
+      "bytes": 7794254,
+      "expiresAt": "2026-11-12T10:31:37Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890267026"
+    },
+    {
+      "id": 12890043000,
+      "name": "native-nsis-windows-2022-lifecycle",
+      "sha256": "37d58c37a74d9f97315ba979d365c51881172901478e297466f0f4af545a58ac",
+      "bytes": 5507,
+      "expiresAt": "2026-11-12T10:34:48Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12890043000"
+    },
+    {
+      "id": 12889988400,
+      "name": "native-nsis-windows-2025-file-lock",
+      "sha256": "adf3e86211494de724e914eebc4599f828b203102c761f7550760412c5731e3a",
+      "bytes": 3842,
+      "expiresAt": "2026-11-12T10:32:29Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889988400"
+    },
+    {
+      "id": 12889749085,
+      "name": "native-nsis-windows-2025-registry-deny",
+      "sha256": "e7be6123f7a265b5193248a876bf5e16e02c65617b2046c7ddea756f8feb0f79",
+      "bytes": 3770,
+      "expiresAt": "2026-11-12T10:33:19Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889749085"
+    },
+    {
+      "id": 12889593504,
+      "name": "native-nsis-windows-2025-upgrade",
+      "sha256": "3ca62f5103a5e6b0d3ac1536c1faa2a462f0152ba413b413e631bcf8ba255d50",
+      "bytes": 3521,
+      "expiresAt": "2026-11-12T10:32:30Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889593504"
+    },
+    {
+      "id": 12889549697,
+      "name": "native-nsis-windows-2025-shortcut-deny",
+      "sha256": "39c90318a91c839bfa25c99519f20eaff2b43917a4b1ec2cc1ad89e6f6e88cda",
+      "bytes": 3509,
+      "expiresAt": "2026-11-12T10:33:54Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889549697"
+    },
+    {
+      "id": 12889514529,
+      "name": "native-nsis-windows-2025-file-deny",
+      "sha256": "6b0ac8081b503aa77d7d47c15fff9df3b3f284751b2bc07d72d938532ba105fd",
+      "bytes": 3858,
+      "expiresAt": "2026-11-12T10:33:18Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889514529"
+    },
+    {
+      "id": 12889154707,
+      "name": "native-nsis-windows-2025-uninstaller-lock",
+      "sha256": "57087bfa7fe02f7a4f370d0f5ed80c825daa26a28a7f1ed4112f747c2c8c9fcc",
+      "bytes": 3858,
+      "expiresAt": "2026-11-12T10:33:10Z",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/40858188456/artifacts/12889154707"
+    }
+  ],
+  "executionBoundary": {
+    "githubHostedWindowsOnly": true,
+    "selfHostedUsed": false,
+    "localNsisExecuted": false,
+    "realInLineCredentialsUsed": false,
+    "formalCodexOrInLineConnected": false,
+    "installerBusinessLogicChanged": false,
+    "officialCiBuildReleaseChanged": false,
+    "tagOrReleaseCreated": false,
+    "formalDevelopmentBranchCommittedOrPushed": false,
+    "p2BAutomaticRecoveryComplete": false,
+    "p2DStarted": false,
+    "phase3Started": false,
+    "phase2Complete": false
+  },
+  "stopGate": "No product fixes or formal branch submission; wait for user acceptance and approval of a minimal repair scope.",
+  "rollbackPolicyDifferences": [
+    {
+      "id": "NSIS-NATIVE-01",
+      "title": "安装注册失败后厂商安装目录项未回滚",
+      "scenario": "registry-deny",
+      "exitCodes": [
+        1,
+        1
+      ],
+      "independentBaselineReplays": 2,
+      "evidence": [
+        {
+          "attempt": 1,
+          "programGroupRestored": true,
+          "dataUnchanged": true,
+          "registryChanges": {
+            "Registry32/Software\\github\\In Line": {
+              "before": {
+                "exists": false,
+                "values": {}
+              },
+              "after": {
+                "exists": true,
+                "values": {
+                  "": "D:\\a\\_temp\\inline-native-bcf5d87ff7c14a148b71b5e122bafda1\\install"
+                }
+              }
+            },
+            "Registry64/Software\\github\\In Line": {
+              "before": {
+                "exists": false,
+                "values": {}
+              },
+              "after": {
+                "exists": true,
+                "values": {
+                  "": "D:\\a\\_temp\\inline-native-bcf5d87ff7c14a148b71b5e122bafda1\\install"
+                }
+              }
+            }
+          },
+          "shortcutChanges": {}
+        },
+        {
+          "attempt": 2,
+          "programGroupRestored": true,
+          "dataUnchanged": true,
+          "registryChanges": {
+            "Registry32/Software\\github\\In Line": {
+              "before": {
+                "exists": false,
+                "values": {}
+              },
+              "after": {
+                "exists": true,
+                "values": {
+                  "": "D:\\a\\_temp\\inline-native-bcf5d87ff7c14a148b71b5e122bafda1\\install"
+                }
+              }
+            },
+            "Registry64/Software\\github\\In Line": {
+              "before": {
+                "exists": false,
+                "values": {}
+              },
+              "after": {
+                "exists": true,
+                "values": {
+                  "": "D:\\a\\_temp\\inline-native-bcf5d87ff7c14a148b71b5e122bafda1\\install"
+                }
+              }
+            }
+          },
+          "shortcutChanges": {}
+        }
+      ],
+      "retryAfterExternalPermissionRestoreSucceeded": true,
+      "classification": "confirmed_rollback_difference_requires_install_path_preference_policy_decision",
+      "normalUninstallAlsoRetainsVendorPath": true,
+      "arpFalseDisplayVersionObserved": false,
+      "meaning": "RestorePreviousInstallLocation reads this vendor default value; it is not the ARP installed-state marker. The strict baseline assertion remains failed pending policy review."
+    }
+  ],
+  "confirmedDefectCount": 2,
+  "normalUninstallBoundary": "Program group, ARP and target shortcuts removed; vendor install-path preference remains by current template design. No claim that all registry traces are deleted.",
+  "deliveryAudit": {
+    "formalDevelopmentHead": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+    "nativeSnapshot": "d9c2979bb36f5a721108818a75171b18c75bacda",
+    "files": [
+      ".github/workflows/native-nsis-acceptance.yml",
+      "scripts/test-native-nsis.ps1",
+      "docs/MCP_PHASE2C_NATIVE_NSIS_TEST_PLAN.md",
+      "docs/MCP_PHASE2C_NATIVE_NSIS_RESULTS.md",
+      "docs/mcp/acceptance/MCP-PHASE2C-NATIVE-20261029-checks.json"
+    ],
+    "unrelatedTrackedChanges": [],
+    "historicalUntrackedFilesPreserved": 12,
+    "stagingEmpty": true,
+    "existingProductCiBuildReleaseUnchanged": true,
+    "workingTestAssetsMatchValidatedSnapshot": true,
+    "snapshotOnlyRegistrationExcluded": true,
+    "remoteRefs": {
+      "refs/heads/codex/p2c-build-20261029": "497b61fcb92c2d573d60adbaa0d223612fb216aa",
+      "refs/heads/codex/p2c-native-acceptance-20261029": "d9c2979bb36f5a721108818a75171b18c75bacda",
+      "refs/heads/feat/scheduled-items": "45a778d1646a6b0aded4df606ccc6d72cbac4ced",
+      "refs/heads/main": "1baac96252af2665274f2a955b3adacfa80519fd"
+    },
+    "nativeNsisExecutedLocally": false,
+    "formalCommitPushPerformed": false,
+    "tagReleaseCreated": false
+  }
+}
