@@ -59,8 +59,9 @@ R1 hosted native evidence and remaining gates are recorded separately in
 `docs/MCP_PHASE2C_R1_ACCEPTANCE.md`. Power loss, device failure, enterprise policy,
 second-user sessions and visual wizard/tray behavior retain their acceptance gates.
 This protocol is verified recovery under stated conditions, not cross-resource
-atomicity across Windows registry and files. Helper waiting/cancellation is a
-separate, unimplemented R2 proposal.
+atomicity across Windows registry and files. R2 decision (2026-10-30) is option B: retain safe waiting and the recovery
+barrier; defer product development. Long hangs remain unresolved, and the native
+suite remains 12/13 with `ps-hang` unsatisfied.
 Never clear a pending transaction directory blindly: inspect `journal.xml`,
 verify the fixed-name backup hashes and current files, then use the guard's
 explicit rollback operation only when ownership and expected bytes are confirmed.
@@ -68,3 +69,18 @@ explicit rollback operation only when ownership and expected bytes are confirmed
 `verify-installer-guard.ps1` uses only a newly created isolated directory,
 synthetic data and console fixture processes that exit via private signal files.
 It never invokes the native installer or touches an installed application.
+
+## Known compatibility limit: prolonged helper waits
+
+The installer may continue waiting if its safety helper hangs. There is no fixed
+cancellation or exit guarantee for every transaction. Do not forcibly terminate
+PowerShell, NSIS or MCP processes or rerun installation/uninstallation while the
+state is unconfirmed. Preserve the original journal, backups and existing logs;
+never remove a transaction marker to bypass the launch barrier.
+
+Active file handles and retained recovery files are different: after a process
+exits it no longer holds its former handles, although another process may still
+hold files. Retained recovery data alone is neither an active lock nor proof of
+completion. This limitation has no automatic release waiver. See the concise
+[Chinese user guidance and current gates](../../docs/MCP_PHASE2C_R2_B_CLOSEOUT.md).
+No timeout, cooperative cancellation, Job Object or new launcher is implemented.
