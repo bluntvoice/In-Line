@@ -11,8 +11,25 @@ use rmcp::{
     transport::{ConfigureCommandExt, TokioChildProcess},
     ServiceExt,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 use std::sync::Arc;
+
+// P3-A evidence is restricted to explicitly selected synthetic facts. Never log
+// raw protocol responses, config, credentials or credential digests.
+fn p3a_fact(tool: &str, action: &str, expected: Value, actual: Value) {
+    use std::io::Write;
+    let passed = actual == expected;
+    writeln!(
+        std::io::stdout().lock(),
+        "P3A_EVIDENCE {}",
+        json!({
+            "tool":tool,"action":action,"fixture":"one-completed-task",
+            "expected":expected,"actual":actual,"passed":passed
+        })
+    )
+    .unwrap();
+    assert!(passed, "P3-A synthetic fact mismatch: {tool}/{action}");
+}
 
 #[tokio::test]
 async fn stdio_server_lists_and_calls_read_only_report_tools(
@@ -136,7 +153,8 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
 
     let arguments = serde_json::from_value(json!({
         "startDate": "2026-08-08",
-        "endDate": "2026-08-08"
+        "endDate": "2026-08-08",
+        "timezoneOffsetMinutes": 480
     }))?;
     let summary = client
         .call_tool(CallToolRequestParams::new("get_report_summary").with_arguments(arguments))
@@ -145,10 +163,31 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         summary.structured_content.as_ref().unwrap()["data"]["statistics"]["summary"]["completed"],
         1
     );
+    let report = &summary.structured_content.as_ref().unwrap()["data"];
+    let statistics = &report["statistics"];
+    // Independent fixture oracle: one completed task, one type/department/day.
+    // API completionRate is a ratio (1.0), not a percentage number (100).
+    p3a_fact(
+        "get_report_summary",
+        "summary",
+        json!({"handled":1,"completed":1,"numerator":1,"denominator":1,"rate":1.0}),
+        json!({"handled":statistics["summary"]["handledTasks"],"completed":statistics["summary"]["completed"],
+            "numerator":statistics["summary"]["rateNumerator"],"denominator":statistics["summary"]["rateDenominator"],"rate":statistics["summary"]["completionRate"]}),
+    );
+    p3a_fact(
+        "get_report_summary",
+        "dimensions",
+        json!({"types":[{"taskType":"功能开发","handledTasks":1,"completed":1,"pendingFollowUp":0}],
+        "departments":[{"department":"产品组","handledTasks":1,"completed":1,"pendingFollowUp":0}],"trendDays":1,"trendDate":"2026-08-08","trendHandled":1,"trendCompleted":1}),
+        json!({"types":statistics["byTaskType"],"departments":statistics["byDepartment"],"trendDays":statistics["trend"].as_array().unwrap().len(),
+        "trendDate":statistics["trend"][0]["periodStart"],"trendHandled":statistics["trend"][0]["handledTasks"],"trendCompleted":statistics["trend"][0]["completed"]}),
+    );
 
     let arguments = serde_json::from_value(json!({
         "startDate": "2026-08-08",
         "endDate": "2026-08-08",
+        "timezoneOffsetMinutes": 480,
+        "snapshot": report["meta"]["snapshotId"],
         "limit": 100,
         "offset": 0
     }))?;
@@ -156,19 +195,116 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         .call_tool(CallToolRequestParams::new("list_report_items").with_arguments(arguments))
         .await?;
     assert_eq!(details.is_error, Some(false));
-    let details_json = details.structured_content.unwrap().to_string();
+    let details_json = details.structured_content.as_ref().unwrap().to_string();
     assert!(details_json.contains("完成 MCP 接入"));
     assert!(details_json.contains("完成只读 MCP 协议验证"));
     assert!(!details_json.contains("不应暴露的联系人"));
     assert!(!details_json.contains("不应暴露的事项详情"));
     assert!(!details_json.contains("不应暴露的内部备注"));
+    let items = &details.structured_content.as_ref().unwrap()["data"];
+    p3a_fact(
+        "list_report_items",
+        "same_snapshot",
+        json!({"total":1,"workEvents":1,"sameSnapshot":true,"sameBasis":true}),
+        json!({"total":items["page"]["total"],"workEvents":items["page"]["items"][0]["workEvents"].as_array().unwrap().len(),
+            "sameSnapshot":items["meta"]["snapshotId"]==report["meta"]["snapshotId"],"sameBasis":items["meta"]["dataVersion"]==report["meta"]["dataVersion"]}),
+    );
+
+    let history = client
+        .call_tool(
+            CallToolRequestParams::new("query_task_history").with_arguments(
+                serde_json::from_value(json!({"taskId":task.id,"kinds":["work"]}))?,
+            ),
+        )
+        .await?;
+    assert_eq!(history.is_error, Some(false));
+    let history = &history.structured_content.as_ref().unwrap()["data"];
+    p3a_fact(
+        "query_task_history",
+        "known_work_event",
+        json!({"total":1,"taskId":task.id,"status":"completed","at":"2026-08-08T09:00:00+08:00","voided":false}),
+        json!({"total":history["total"],"taskId":history["items"][0]["taskId"],"status":history["items"][0]["from"],
+            "at":history["items"][0]["at"],"voided":!history["items"][0]["voidedAt"].is_null()}),
+    );
+
+    // 09:00 +08 = 01:00 UTC = previous day 23:00 at -02:00.
+    // Expected calendar membership is defined from this fixture timestamp,
+    // independently of report/calendar results and of the runner's local zone.
+    for (day, offset, expected) in [
+        ("2026-08-08", 480, 1),
+        ("2026-08-07", -120, 1),
+        ("2026-08-08", -120, 0),
+    ] {
+        let calendar = client
+            .call_tool(
+                CallToolRequestParams::new("query_work_calendar").with_arguments(
+                    serde_json::from_value(
+                        json!({"startDate":day,"endDate":day,"timezoneOffsetMinutes":offset}),
+                    )?,
+                ),
+            )
+            .await?;
+        assert_eq!(calendar.is_error, Some(false));
+        let calendar = &calendar.structured_content.as_ref().unwrap()["data"];
+        let events = calendar["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|r| r["kind"] == "workEvent")
+            .collect::<Vec<_>>();
+        p3a_fact(
+            "query_work_calendar",
+            "timezone_membership",
+            json!({"day":day,"offset":offset,"rounds":expected,"completed":expected,"events":expected,"fixtureOnly":true}),
+            json!({"day":day,"offset":offset,"rounds":calendar["summary"]["handlingRounds"],"completed":calendar["summary"]["completedTasks"],"events":events.len(),
+                "fixtureOnly":events.iter().all(|r|r["taskId"]==task.id && r["resultStatus"]=="completed" && r["handledAt"]=="2026-08-08T09:00:00+08:00")}),
+        );
+    }
+    let full = client
+        .call_tool(CallToolRequestParams::new("query_changes").with_arguments(
+            serde_json::from_value(json!({"mode":"current","projection":["id","title"]}))?,
+        ))
+        .await?;
+    assert_eq!(full.is_error, Some(false));
+    let full = &full.structured_content.as_ref().unwrap()["data"];
+    p3a_fact(
+        "query_changes",
+        "initial_full",
+        json!({"complete":true,"rows":1,"kind":"current","taskId":task.id,"title":"完成 MCP 接入"}),
+        json!({"complete":full["fullSyncComplete"],"rows":full["items"].as_array().unwrap().len(),"kind":full["items"][0]["kind"],"taskId":full["items"][0]["taskId"],"title":full["items"][0]["currentTask"]["title"]}),
+    );
+    let incremental = client
+        .call_tool(CallToolRequestParams::new("query_changes").with_arguments(
+            serde_json::from_value(
+                json!({"mode":"current","projection":["id","title"],"cursor":full["nextCursor"]}),
+            )?,
+        ))
+        .await?;
+    assert_eq!(incremental.is_error, Some(false));
+    p3a_fact(
+        "query_changes",
+        "idle_incremental",
+        json!([]),
+        incremental.structured_content.as_ref().unwrap()["data"]["items"].clone(),
+    );
+
+    let trace = client.call_tool(CallToolRequestParams::new("inspect_data")
+        .with_arguments(serde_json::from_value(json!({"action":"trace","metric":"completed","report":{"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480,"snapshot":report["meta"]["snapshotId"]}}))?)).await?;
+    assert_eq!(trace.is_error, Some(false));
+    let trace = &trace.structured_content.as_ref().unwrap()["data"];
+    p3a_fact(
+        "inspect_data",
+        "trace_completed",
+        json!({"value":1,"sources":1,"complete":true,"sameSnapshot":true}),
+        json!({"value":trace["value"],"sources":trace["totalSources"],"complete":trace["complete"],"sameSnapshot":trace["meta"]["snapshotId"]==report["meta"]["snapshotId"]}),
+    );
 
     // Each old tool re-checks current permissions on an already-connected stdio session.
     security.set_groups(Permissions::default())?;
     let regular = client
         .call_tool(
             CallToolRequestParams::new("list_report_items").with_arguments(serde_json::from_value(
-                json!({"startDate":"2026-08-08","endDate":"2026-08-08"}),
+                json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":480}),
             )?),
         )
         .await?;

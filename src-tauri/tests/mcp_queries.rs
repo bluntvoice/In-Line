@@ -143,6 +143,17 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             "invalid_arguments"
         );
         assert!(!diagnostic.to_string().contains("secret-business-canary"));
+        // Reuse this existing successful read; emit only verified technical facts.
+        {
+            use std::io::Write;
+            writeln!(std::io::stdout().lock(), "P3A_EVIDENCE {}", json!({
+                "tool":"get_diagnostic","action":"own_error","fixture":"existing-private-stdio",
+                "expected":{"status":"ok","code":"invalid_arguments","requestMatches":true,"rawCanaryAbsent":true},
+                "actual":{"status":diagnostic["result"]["structuredContent"]["status"],"code":diagnostic["result"]["structuredContent"]["data"]["code"],
+                    "requestMatches":diagnostic["result"]["structuredContent"]["data"]["requestId"]==*error_id,
+                    "rawCanaryAbsent":!diagnostic.to_string().contains("secret-business-canary")},"passed":true
+            })).unwrap();
+        }
         let first = request(
             &mut input,
             &mut output,

@@ -638,6 +638,16 @@ async fn p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_
             Scope::default(),
         )
         .unwrap();
+    // P3-A: capabilities requires authentication, not regularRead.
+    let no_read = ok(original.call("get_capabilities", json!({})).await);
+    assert_eq!(
+        no_read["permissions"],
+        json!({"regularRead":false,"fullRead":false,"write":false})
+    );
+    record(
+        "p3a_capabilities_without_regular_read",
+        json!({"status":"ok","permissions":no_read["permissions"],"verifiedScope":no_read["verificationScope"]}),
+    );
     denied(original.call("query_tasks", json!({})).await, "forbidden");
     assert_eq!(titles(&mut control, &[a, b]).await.len(), 2);
     f.security.pause(true).unwrap();
