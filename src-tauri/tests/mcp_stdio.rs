@@ -151,6 +151,13 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
             )
     }));
 
+    // Compare business/auth state, not whole SQLite/cache files: read tools may
+    // legitimately persist derived snapshots, cursors and diagnostic metadata.
+    let task_before = serde_json::to_value(database.get_task(task.id).unwrap())?;
+    let events_before = serde_json::to_value(database.list_work_events(task.id).unwrap())?;
+    let preferences_before = database.settings().unwrap();
+    let audit_before = database.mcp_audit_state().unwrap();
+    let authorization_before = std::fs::read(security_root.join("authorization.dpapi"))?;
     let arguments = serde_json::from_value(json!({
         "startDate": "2026-08-08",
         "endDate": "2026-08-08",
@@ -297,6 +304,17 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         "trace_completed",
         json!({"value":1,"sources":1,"complete":true,"sameSnapshot":true}),
         json!({"value":trace["value"],"sources":trace["totalSources"],"complete":trace["complete"],"sameSnapshot":trace["meta"]["snapshotId"]==report["meta"]["snapshotId"]}),
+    );
+
+    p3a_fact(
+        "fixture_safety",
+        "read_segment_preserves_business_and_authorization",
+        json!({"task":true,"events":true,"preferences":true,"businessAudit":true,"authorization":true}),
+        json!({"task":serde_json::to_value(database.get_task(task.id).unwrap())?==task_before,
+            "events":serde_json::to_value(database.list_work_events(task.id).unwrap())?==events_before,
+            "preferences":database.settings().unwrap()==preferences_before,
+            "businessAudit":database.mcp_audit_state().unwrap()==audit_before,
+            "authorization":std::fs::read(security_root.join("authorization.dpapi"))?==authorization_before}),
     );
 
     // Each old tool re-checks current permissions on an already-connected stdio session.
