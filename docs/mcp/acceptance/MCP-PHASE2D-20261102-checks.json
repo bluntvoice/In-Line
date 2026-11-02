@@ -1,0 +1,1358 @@
+{
+  "schemaVersion": 1,
+  "phase": "P2-D",
+  "date": "2026-11-02",
+  "timezone": "Asia/Shanghai",
+  "status": "minimal_isolated_acceptance_user_approved_formal_codex_host_and_original_session_recovery_unverified",
+  "baseline": "5cae01c9de1eb5a0d239704627dd50a4d24a3da5",
+  "candidate": {
+    "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+    "branch": "codex/p2d-isolated-acceptance-20261102",
+    "promotedToDevelopment": false,
+    "onlyChangedFile": "src-tauri/tests/mcp_connection_acceptance.rs",
+    "gitBlob": "58873d6fb605247f5a018ae68258c42b78607a19",
+    "workingFileSha256": "a668ba3ec83a84de697d47f767ffaa887761b22cc5a8a0df3f5bb0e3237c1c72"
+  },
+  "runs": [
+    {
+      "id": 41373481329,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41373481329",
+      "sha": "5387295e7f31952abef928e5b0458e0b6f2ac51c",
+      "conclusion": "success",
+      "purpose": "Initial four tests"
+    },
+    {
+      "id": 41373819052,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41373819052",
+      "sha": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+      "job": 125049680992,
+      "conclusion": "success",
+      "purpose": "Same four tests plus redacted logs and process creation-time assertions"
+    }
+  ],
+  "runner": {
+    "workflow": ".github/workflows/ci.yml",
+    "label": "windows-latest",
+    "githubHosted": true,
+    "os": "Microsoft Windows Server 2025",
+    "osVersion": "10.0.26100 Datacenter",
+    "image": "windows-2025-vs2026",
+    "imageVersion": "20261021.278.1",
+    "runnerVersion": "2.338.2",
+    "selfHosted": false
+  },
+  "regression": {
+    "frontendTests": 135,
+    "frontendFiles": 22,
+    "rust": {
+      "passed": 252,
+      "failed": 0,
+      "ignored": 0
+    },
+    "newIntegrationTests": 4,
+    "typescriptViteBuild": "passed",
+    "rustfmt": "passed",
+    "threeBinaryOfflineIdentities": "passed",
+    "actual16ToolSchemasAnnotations": "passed",
+    "anonymous16ToolsPlus3RepeatedRejections": "passed",
+    "newNsisBuildOrInstall": false
+  },
+  "newTests": [
+    "p2d_d01_unbound_missing_invalid_and_mismatched_credentials_are_rejected",
+    "p2d_d01_first_import_authorized_sentinel_credentials_and_d05_eof_reconnect",
+    "p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_revocation",
+    "p2d_d03_equivalent_import_preserves_active_transport_host_policy_and_loaded_credentials"
+  ],
+  "matrix": [
+    {
+      "id": "D01",
+      "isolated": "passed",
+      "configurationVerified": true,
+      "currentSessionVerified": false,
+      "newTests": [
+        "p2d_d01_unbound_missing_invalid_and_mismatched_credentials_are_rejected",
+        "p2d_d01_first_import_authorized_sentinel_credentials_and_d05_eof_reconnect"
+      ],
+      "checks": [
+        "Fresh empty security store creates one explicit identity and an unexpired short-lived package",
+        "Actual importer exits 0 and matches selected identity",
+        "Actual stdio capabilities and authorized synthetic sentinel read succeed",
+        "Fresh unbound fixture rejects missing, invalid and mismatched credentials for both capabilities and read: 6 unauthenticated responses"
+      ],
+      "notCovered": [
+        "Formal Codex loading/authorization/session"
+      ]
+    },
+    {
+      "id": "D02",
+      "isolated": "passed_reused_existing_assertions",
+      "newTests": [],
+      "checks": [
+        "Sole active Codex identity reused; multiple identities require disambiguation; CLI/revoked excluded",
+        "Reissue and two equivalent imports keep identity, authorization bytes, scope, permissions, config bytes and file identity; no grant/rotation fallback",
+        "Expired, used/interrupted and invalid/bound package failures retain distinct semantics; package/import failures preserve authorization"
+      ],
+      "evidence": "Existing Rust and six frontend onboarding cases rerun by final CI",
+      "notCovered": [
+        "Native GUI selection interaction"
+      ]
+    },
+    {
+      "id": "D03",
+      "isolated": "passed",
+      "newTests": [
+        "p2d_d03_equivalent_import_preserves_active_transport_host_policy_and_loaded_credentials"
+      ],
+      "sameConnectionPid": 1752,
+      "creationTimeFiletime": "134380577425434873",
+      "checks": [
+        "Original transport, child handle, PID and creation time retained",
+        "Two equivalent imports configurationChanged=false; config bytes, file identity, auth bytes unchanged",
+        "Other MCP, host policy prompt, model and comment preserved",
+        "Disk-only bad credential causes onboarding_credentials_unavailable but original connection keeps unchanged valid loaded credentials and sentinel read",
+        "Existing live connection rotation test separately proves explicit credential change"
+      ],
+      "currentSessionVerified": false,
+      "hostReloadClaimed": false
+    },
+    {
+      "id": "D04",
+      "isolated": "passed",
+      "newTests": [
+        "p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_revocation"
+      ],
+      "originalPid": 8064,
+      "controlPid": 8328,
+      "checks": [
+        "Global/client permission intersection checked in both directions",
+        "Two private projections and two MCP writes forbidden; no successful new MCP business write",
+        "Scope narrowed to A/T: A read, B omitted including explicit B ID (empty successful query, not invented error code)",
+        "Regular-read removal forbidden; global pause paused; revocation revoked on same original transport",
+        "Other synthetic client retains identity, permissions, scope and both tasks after client-local changes; global pause applies globally",
+        "No denied mutation materialized; exactly two fixture tasks remain"
+      ]
+    },
+    {
+      "id": "D05",
+      "isolated": "passed",
+      "oldPid": 7812,
+      "newPid": 9492,
+      "checks": [
+        "Original stdin EOF, held Child wait exitCode 0 and stdout EOF",
+        "Driver-created new process reads same authorized synthetic sentinel, then EOF exitCode 0"
+      ],
+      "formalCodexAutomaticRecovery": "not_verified_host_capability_limited",
+      "newConnectionIsOriginalSessionRecovery": false
+    },
+    {
+      "id": "D06",
+      "isolated": "historical_evidence_subsets_passed",
+      "newNativeExecution": false,
+      "evidenceRun": 41015746222,
+      "evidenceCommit": "2b5ad71951374b49222682825147e59f1a894f2d",
+      "cases": [
+        "mcp-lock: 42 assertions",
+        "upgrade: 25 assertions",
+        "windows-2025 lifecycle: 61 assertions; existing windows-2022 control retained"
+      ],
+      "checks": [
+        "15 original ZIP SHA-256 digests match",
+        "MCP target and other-directory same-name process remain; held target EOF enables retry",
+        "Occupied install exit 1 and actual copied uninstall body exit 1; retry exit 0",
+        "Synthetic data/config preserved and installed payload/version/registration match"
+      ],
+      "notCovered": [
+        "Formal Codex authenticated protocol continuity across upgrade",
+        "Original formal session automatic recovery",
+        "Old real business database migration"
+      ]
+    }
+  ],
+  "reusedTestLogLines": [
+    "2026-11-02T01:42:25.7934710Z  ✓ src/lib/mcp-onboarding.test.ts (6 tests) 5ms",
+    "2026-11-02T01:48:20.4970615Z test mcp::codex_import::tests::detects_concurrent_config_change_and_lock_is_reusable_after_release ... ok",
+    "2026-11-02T01:48:20.5047293Z test mcp::codex_import::tests::capability_requires_matching_identity_permissions_scope_and_version ... ok",
+    "2026-11-02T01:48:20.6528827Z test mcp::codex_import::tests::merge_adds_only_managed_sections_and_preserves_partial_env_comments ... ok",
+    "2026-11-02T01:48:20.6869671Z test mcp::codex_import::tests::merge_keeps_safe_host_policy_and_unchanged_bytes_including_inline_env ... ok",
+    "2026-11-02T01:48:20.6928317Z test mcp::codex_import::tests::merge_preserves_other_servers_settings_comments_and_uses_env_only ... ok",
+    "2026-11-02T01:48:20.7203499Z test mcp::codex_import::tests::merge_preserves_each_approval_policy_and_its_decoration ... ok",
+    "2026-11-02T01:48:20.7712815Z test mcp::codex_import::tests::merge_rejects_invalid_approval_policy_types_values_and_unsafe_settings ... ok",
+    "2026-11-02T01:48:20.8218774Z test mcp::codex_import::tests::merge_rejects_invalid_host_options_with_static_redacted_reasons ... ok",
+    "2026-11-02T01:48:21.4848574Z test mcp::codex_import::tests::unchanged_configuration_keeps_private_file_identity_when_stdio_fails ... ok",
+    "2026-11-02T01:48:21.5246170Z test mcp::codex_import::tests::unchanged_import_rejects_nonprivate_acl_before_consuming_ticket ... ok",
+    "2026-11-02T01:48:26.6741911Z test mcp::onboarding::tests::expiration_and_backward_clock_are_rejected_at_exact_boundary ... ok",
+    "2026-11-02T01:48:27.1665793Z test mcp::onboarding::tests::interrupted_or_completed_ticket_cannot_be_replayed ... ok",
+    "2026-11-02T01:48:27.3169463Z test mcp::onboarding::tests::binding_and_format_tampering_are_rejected ... ok",
+    "2026-11-02T01:48:27.4095340Z test mcp::onboarding::tests::package_failure_does_not_create_or_rotate_authorization ... ok",
+    "2026-11-02T01:48:27.9941642Z test mcp::onboarding::tests::reuse_reissues_for_same_identity_without_changing_store_token_scope_or_config ... ok",
+    "2026-11-02T01:48:28.2315989Z test mcp::onboarding::tests::reuse_never_falls_back_to_grant_or_rotation_for_missing_mismatched_or_stale_credentials ... ok",
+    "2026-11-02T01:48:34.3041750Z test mcp::runtime_credentials::tests::pid_reuse_wrong_binary_and_corruption_never_acquire_a_binding ... ok",
+    "2026-11-02T01:48:34.9116152Z test mcp::runtime_credentials::tests::refresh_is_bound_to_the_user_authorized_identity_and_encrypted_at_rest ... ok",
+    "2026-11-02T01:48:35.6268934Z test mcp::runtime_credentials::tests::resolution_distinguishes_binding_application_from_actual_credential_change ... ok",
+    "2026-11-02T01:48:36.2192075Z test mcp::security::tests::persistence_failure_does_not_claim_revocation_or_change_memory ... ok",
+    "2026-11-02T01:48:36.3213155Z test mcp::security::tests::rotate_revoke_pause_and_group_intersection ... ok",
+    "2026-11-02T01:49:10.3540550Z test actual_importer_config_and_sidecar_verify_identity_intersection_scope_without_claiming_current_session ... ok",
+    "2026-11-02T01:49:11.5748669Z test existing_stdio_connection_refreshes_authorized_identity_without_restarting ... ok",
+    "2026-11-02T01:49:13.1595441Z test scope_filters_summary_denominator_trend_details_and_cross_client_calls ... ok"
+  ],
+  "protocolEvidence": {
+    "records": 61,
+    "connectionsStarted": 8,
+    "connectionsExitedViaEof": 8,
+    "allRecordedEofExitCodesZero": true,
+    "importerSuccesses": 5,
+    "toolCalls": 35,
+    "expectedAuthorizationRejections": {
+      "unauthenticated": 6,
+      "forbidden": 5,
+      "paused": 1,
+      "revoked": 2
+    },
+    "unexpectedTestFailures": 0,
+    "build": {
+      "softwareVersion": "0.5.0",
+      "mcpVersion": 1,
+      "databaseSchemaVersion": 14,
+      "exactCommit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2"
+    },
+    "sidecarBinarySha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db",
+    "creationTimeEncoding": "Exact original Windows FILETIME decimal values preserved as strings during log extraction; no JavaScript rounding.",
+    "rows": [
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D01-rejected",
+          "created": "134380577415214680",
+          "pid": 5280,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-rejected",
+          "errorCode": "unauthenticated",
+          "pid": 5280,
+          "status": "error",
+          "tool": "get_capabilities"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-rejected",
+          "errorCode": "unauthenticated",
+          "pid": 5280,
+          "status": "error",
+          "tool": "query_tasks"
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D01-rejected",
+          "created": "134380577415214680",
+          "exitCode": 0,
+          "pid": 5280,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "import_result",
+        "fields": {
+          "case": "D01-first-D05",
+          "configurationChanged": true,
+          "configurationVerified": true,
+          "currentSessionVerified": false,
+          "exitCode": 0,
+          "identityMatches": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "import_result",
+        "fields": {
+          "case": "D03",
+          "configurationChanged": true,
+          "configurationVerified": true,
+          "currentSessionVerified": false,
+          "exitCode": 0,
+          "identityMatches": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "import_result",
+        "fields": {
+          "case": "D04",
+          "configurationChanged": true,
+          "configurationVerified": true,
+          "currentSessionVerified": false,
+          "exitCode": 0,
+          "identityMatches": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D01-rejected",
+          "created": "134380577423080814",
+          "pid": 9516,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-rejected",
+          "errorCode": "unauthenticated",
+          "pid": 9516,
+          "status": "error",
+          "tool": "get_capabilities"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-rejected",
+          "errorCode": "unauthenticated",
+          "pid": 9516,
+          "status": "error",
+          "tool": "query_tasks"
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D01-first-D05",
+          "created": "134380577425327341",
+          "pid": 7812,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D03",
+          "created": "134380577425434873",
+          "pid": 1752,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D01-rejected",
+          "created": "134380577423080814",
+          "exitCode": 0,
+          "pid": 9516,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D04",
+          "created": "134380577426841007",
+          "pid": 8064,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D03",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "runtimeBinding"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 1752,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-first-D05",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "runtimeBinding"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 7812,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-first-D05",
+          "errorCode": null,
+          "pid": 7812,
+          "returnedItems": 1,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 1
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D01-first-D05",
+          "created": "134380577425327341",
+          "exitCode": 0,
+          "pid": 7812,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D01-rejected",
+          "created": "134380577436348892",
+          "pid": 9276,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D01-first-D05",
+          "created": "134380577438094084",
+          "pid": 9492,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-rejected",
+          "errorCode": "unauthenticated",
+          "pid": 9276,
+          "status": "error",
+          "tool": "get_capabilities"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-rejected",
+          "errorCode": "unauthenticated",
+          "pid": 9276,
+          "status": "error",
+          "tool": "query_tasks"
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_start",
+        "fields": {
+          "case": "D04",
+          "created": "134380577438122044",
+          "pid": 8328,
+          "sidecarSha256": "2c1fdb187d79ef2d4b188f502711bc9dd4309e1acaf8d48c4d35e1d57c4bf6db"
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D01-rejected",
+          "created": "134380577436348892",
+          "exitCode": 0,
+          "pid": 9276,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D01-first-D05",
+          "errorCode": null,
+          "pid": 9492,
+          "returnedItems": 1,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 1
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D01-first-D05",
+          "created": "134380577438094084",
+          "exitCode": 0,
+          "pid": 9492,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "runtimeBinding"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 8064,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": null,
+          "pid": 8064,
+          "returnedItems": 2,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 2
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "forbidden",
+          "pid": 8064,
+          "status": "error",
+          "tool": "query_tasks"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "forbidden",
+          "pid": 8064,
+          "status": "error",
+          "tool": "mutate_task"
+        },
+        "schema": 1
+      },
+      {
+        "event": "same_process_alive",
+        "fields": {
+          "case": "D04",
+          "created": "134380577426841007",
+          "pid": 8064
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "runtimeBinding"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 8064,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": [
+              "A"
+            ],
+            "taskTypes": [
+              "T"
+            ]
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "import_result",
+        "fields": {
+          "case": "D03",
+          "configurationChanged": false,
+          "configurationVerified": true,
+          "currentSessionVerified": false,
+          "exitCode": 0,
+          "identityMatches": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "same_process_alive",
+        "fields": {
+          "case": "D03",
+          "created": "134380577425434873",
+          "pid": 1752
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": null,
+          "pid": 8064,
+          "returnedItems": 1,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 1
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D03",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "runtimeBinding"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 1752,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "forbidden",
+          "pid": 8064,
+          "status": "error",
+          "tool": "query_tasks"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D03",
+          "errorCode": null,
+          "pid": 1752,
+          "returnedItems": 1,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 1
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": null,
+          "pid": 8064,
+          "returnedItems": 0,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 0
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "forbidden",
+          "pid": 8064,
+          "status": "error",
+          "tool": "mutate_task"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "currentCredentials"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 8328,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": null,
+          "pid": 8328,
+          "returnedItems": 2,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 2
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "forbidden",
+          "pid": 8064,
+          "status": "error",
+          "tool": "query_tasks"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": null,
+          "pid": 8328,
+          "returnedItems": 2,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 2
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "paused",
+          "pid": 8064,
+          "status": "error",
+          "tool": "get_capabilities"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "revoked",
+          "pid": 8064,
+          "status": "error",
+          "tool": "get_capabilities"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": "revoked",
+          "pid": 8064,
+          "status": "error",
+          "tool": "query_tasks"
+        },
+        "schema": 1
+      },
+      {
+        "event": "same_process_alive",
+        "fields": {
+          "case": "D04",
+          "created": "134380577426841007",
+          "pid": 8064
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "currentCredentials"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 8328,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": null,
+          "pid": 8328,
+          "returnedItems": 2,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 2
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D04",
+          "errorCode": null,
+          "pid": 8328,
+          "returnedItems": 2,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 2
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D04",
+          "created": "134380577426841007",
+          "exitCode": 0,
+          "pid": 8064,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D04",
+          "created": "134380577438122044",
+          "exitCode": 0,
+          "pid": 8328,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "import_result",
+        "fields": {
+          "case": "D03",
+          "configurationChanged": false,
+          "configurationVerified": true,
+          "currentSessionVerified": false,
+          "exitCode": 0,
+          "identityMatches": true
+        },
+        "schema": 1
+      },
+      {
+        "event": "same_process_alive",
+        "fields": {
+          "case": "D03",
+          "created": "134380577425434873",
+          "pid": 1752
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D03",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "runtimeBinding"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 1752,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D03",
+          "errorCode": null,
+          "pid": 1752,
+          "returnedItems": 1,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 1
+        },
+        "schema": 1
+      },
+      {
+        "event": "same_process_alive",
+        "fields": {
+          "case": "D03",
+          "created": "134380577425434873",
+          "pid": 1752
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D03",
+          "commit": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+          "credentialResolution": {
+            "changed": false,
+            "source": "runtimeBinding"
+          },
+          "errorCode": null,
+          "mcpVersion": 1,
+          "permissions": {
+            "fullRead": false,
+            "regularRead": true,
+            "write": false
+          },
+          "pid": 1752,
+          "schemaVersion": 14,
+          "scope": {
+            "departments": null,
+            "taskTypes": null
+          },
+          "softwareVersion": "0.5.0",
+          "status": "ok",
+          "tool": "get_capabilities",
+          "verificationScope": "thisToolCall"
+        },
+        "schema": 1
+      },
+      {
+        "event": "tool_result",
+        "fields": {
+          "case": "D03",
+          "errorCode": null,
+          "pid": 1752,
+          "returnedItems": 1,
+          "status": "ok",
+          "tool": "query_tasks",
+          "total": 1
+        },
+        "schema": 1
+      },
+      {
+        "event": "connection_eof_exit",
+        "fields": {
+          "case": "D03",
+          "created": "134380577425434873",
+          "exitCode": 0,
+          "pid": 1752,
+          "stderrEmpty": true,
+          "stdoutEof": true
+        },
+        "schema": 1
+      }
+    ]
+  },
+  "historicalEvidence": {
+    "sourceRun": 41015746222,
+    "archives": [
+      {
+        "name": "native-nsis-windows-2025-upgrade",
+        "sha256": "f17537033a29863055cd9c366fdb4d1bab9abb68c1af07b3a5ab70ae575a106f",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-uninstaller-lock",
+        "sha256": "6d1a58b8ae6f05edb562d56083360b9f14e294013c3c634d09d9d23583e0a3eb",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-lifecycle",
+        "sha256": "e5538db80a1a406736f875d63a2a3ceb59a1364af4b4e22b22e45dbd62024d8f",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-mcp-lock",
+        "sha256": "bffd55ebe9f851666fc4c77af7092da63fc9e88c003accfee30cae0cdcc72ca2",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-ps-compile-deny",
+        "sha256": "5f319967a687c8550229672614679ed0173dbcfceb22f3a9be9e4a1811adaa30",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-registry-deny",
+        "sha256": "f5bb672df0f3f6788d01ae68594dcea8c1e87b73da20e132c9dff68ee81301e8",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-package",
+        "sha256": "7babe2507ec588ae256f7ac6250c5d5e11731411e152954758d0be9aafbe2911",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-file-lock",
+        "sha256": "e5a8a2cc376dffa2572f703929076ef6b9a83d0758a021ab7a679562656bed6a",
+        "matched": true
+      },
+      {
+        "name": "installer-metadata-components",
+        "sha256": "6452f7cf16e440062c79b1642b1e099fbee9c32a6463edb46419f7e78dc1f887",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-file-deny",
+        "sha256": "5a17570ac8b152470bf0aae3814a591671253ffc1004a0b1398513c06c0e77d8",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-ps-exit",
+        "sha256": "4e68454e85d94e2fbcc32a80ee9114ace1e98e6ab1961bb7a2fd9bd56b42dafe",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2022-lifecycle",
+        "sha256": "d5d4f5a094061a54792ffdf4cd2630d7569a2257badb94a421ff2d27a633e220",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-ps-hang",
+        "sha256": "517e9dcfcc987a8d5e2e71d975c1e07955e644051b8241f1fda495d060d16f12",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-uninstall-registry-deny",
+        "sha256": "87b92c2600c5a63f327ba20b50bb5f55ee24a1959aa61a2aae855e8ed52a8505",
+        "matched": true
+      },
+      {
+        "name": "native-nsis-windows-2025-shortcut-deny",
+        "sha256": "3085528d579b74cd15bd2d308d6c9afc6834559887bd2e0e6e0473277b6b15d0",
+        "matched": true
+      }
+    ],
+    "cases": [
+      {
+        "case": "mcp-lock",
+        "passed": true,
+        "checks": 42,
+        "allChecksPassed": true,
+        "productCommit": "2b5ad71951374b49222682825147e59f1a894f2d",
+        "installerSha256": "a6ae36da4f835708886e14ba2c335602d6943db021ca8984e6e2c02e7af3fea2",
+        "operations": [
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "prepare"
+          },
+          {
+            "exitCode": 1,
+            "timedOut": false,
+            "label": "occupied-install"
+          },
+          {
+            "exitCode": 1,
+            "timedOut": false,
+            "label": "occupied-uninstall"
+          },
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "retry-after-occupation-cleared"
+          }
+        ],
+        "evidenceSha256": "ccf9704a4a1949ea88c375bab3a5fc28493a14b9d8002782be4f2f4a2aa42516"
+      },
+      {
+        "case": "upgrade",
+        "passed": true,
+        "checks": 25,
+        "allChecksPassed": true,
+        "productCommit": "2b5ad71951374b49222682825147e59f1a894f2d",
+        "installerSha256": "a6ae36da4f835708886e14ba2c335602d6943db021ca8984e6e2c02e7af3fea2",
+        "operations": [
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "baseline-install"
+          },
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "upgrade"
+          },
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "upgrade-uninstall"
+          }
+        ],
+        "evidenceSha256": "17bc66466f763717f12de612aa56b64e58686bb33b78bff9e67db0f0b4f71841"
+      },
+      {
+        "case": "lifecycle",
+        "passed": true,
+        "checks": 61,
+        "allChecksPassed": true,
+        "productCommit": "2b5ad71951374b49222682825147e59f1a894f2d",
+        "installerSha256": "a6ae36da4f835708886e14ba2c335602d6943db021ca8984e6e2c02e7af3fea2",
+        "operations": [
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "fresh"
+          },
+          {
+            "exitCode": 1,
+            "timedOut": false,
+            "label": "gui-running-install"
+          },
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "same-version-repair"
+          },
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "actual-uninstall"
+          },
+          {
+            "exitCode": 0,
+            "timedOut": false,
+            "label": "reinstall"
+          }
+        ],
+        "evidenceSha256": "e110b6c6c934b4ecede64ae3738e014b45af6a92567bba400631f45f711492fa"
+      }
+    ],
+    "newNsisExecution": false,
+    "productDiffFromOldCandidate": [
+      "src-tauri/windows/README.md"
+    ]
+  },
+  "preservation": {
+    "baseline": "5cae01c9de1eb5a0d239704627dd50a4d24a3da5",
+    "currentHead": "5cae01c9de1eb5a0d239704627dd50a4d24a3da5",
+    "existingFilesChecked": 850,
+    "existingFilesUnchanged": true,
+    "previouslyUntrackedPreserved": 14,
+    "historicalUntrackedPreserved": 12,
+    "reviewedReadinessDocumentsPreserved": 2,
+    "trackedDiff": [],
+    "stagedDiff": []
+  },
+  "changes": [
+    {
+      "path": "src-tauri/tests/mcp_connection_acceptance.rs",
+      "location": "Isolated temporary worktree/branch; two authorized test-only commits"
+    },
+    {
+      "path": "docs/MCP_PHASE2D_ACCEPTANCE.md",
+      "location": "Main worktree, untracked, pending acceptance"
+    },
+    {
+      "path": "docs/mcp/acceptance/MCP-PHASE2D-20261102-checks.json",
+      "location": "Main worktree, untracked, pending acceptance"
+    }
+  ],
+  "safety": {
+    "productCodeChanged": false,
+    "nsisChanged": false,
+    "workflowChanged": false,
+    "existingAssertionsWeakened": false,
+    "continueOnErrorAdded": false,
+    "localMcpFixtureExecuted": false,
+    "localNsisExecuted": false,
+    "realCredentialsOrDataOrCodexConfigurationAccessed": false,
+    "currentFormalSessionTouched": false,
+    "newSuccessfulMcpBusinessWrite": false,
+    "tagReleaseOrUpdateChannelChanged": false,
+    "tempBranchAndHistoricalEvidencePreserved": true,
+    "rawCredentialsConfigOrDpapiInLogsOrArtifacts": false
+  },
+  "phaseStatus": {
+    "phase1": "complete",
+    "p2A": "investigation_complete_host_recovery_unresolved",
+    "p2B": "incomplete_deferred",
+    "p2CR1": "complete_formally_committed",
+    "p2CR2": "B_development_deferred_compatibility_limit_retained",
+    "p2CNativeSuite": "12/13_ps-hang_not_passed",
+    "p2D": "minimal_isolated_acceptance_approved_formal_host_and_original_session_recovery_unverified",
+    "phase3": "not_started",
+    "phase2": "incomplete"
+  },
+  "uncovered": [
+    "Formal Codex first connection/configuration loading/reload/automatic recovery",
+    "Authenticated real-host continuity across upgrade",
+    "Native GUI interaction",
+    "Power loss",
+    "Actual enterprise policies",
+    "Old real business database migration",
+    "Phase 3 full 16-tool business matrix"
+  ],
+  "deliveryAudit": {
+    "scope": "Historical pre-acceptance candidate snapshot; formal commit/CI readback must use its new SHA separately.",
+    "developmentLocalHead": "5cae01c9de1eb5a0d239704627dd50a4d24a3da5",
+    "developmentRemoteHead": "5cae01c9de1eb5a0d239704627dd50a4d24a3da5",
+    "temporaryLocalHead": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+    "temporaryRemoteHead": "b997b3fe78a37c27363c433d9eda39d34f7a02a2",
+    "mainRemoteHead": "1baac96252af2665274f2a955b3adacfa80519fd",
+    "remoteReadback": "git ls-remote; final Actions API confirms head SHA and completed/success",
+    "temporaryWorktreeClean": true,
+    "formalTrackedWorktreeUnchanged": true,
+    "formalIndexEmpty": true,
+    "preexistingFilesCheckedUnchanged": 850,
+    "preexistingUntrackedFilesPreserved": 14,
+    "originalNativeEvidenceArchivesPreservedAndDigestMatched": 15,
+    "newUntrackedReviewDocuments": 2,
+    "jsonAndLocalLinksAndWhitespaceChecks": "passed",
+    "sensitiveLiteralScan": "no matches; metadata records reviewed against explicit whitelist",
+    "productDefectsFoundByThisRun": [],
+    "formalBranchCommitOrPushPerformed": false
+  },
+  "acceptanceDecision": {
+    "date": "2026-11-02",
+    "decision": "P2-D minimal isolated acceptance approved by user",
+    "formalCommitPushAuthorized": true,
+    "approvedFiles": [
+      "src-tauri/tests/mcp_connection_acceptance.rs",
+      "docs/MCP_PHASE2D_ACCEPTANCE.md",
+      "docs/mcp/acceptance/MCP-PHASE2D-20261102-checks.json"
+    ],
+    "candidateTestSourceMustRemainExact": true,
+    "originalRunsAndBinaryDigestsRemainCandidateEvidence": true,
+    "formalCiRequiresNewCommitIdentity": true,
+    "phase3PlanOnly": true,
+    "phase3BusinessExecutionAuthorized": false,
+    "formalCodexHostVerified": false,
+    "p2BAutomaticRecoveryComplete": false,
+    "phase2Complete": false,
+    "formalReleaseAuthorized": false
+  },
+  "stopGate": "Commit only the three approved files, verify formal CI against the new SHA, prepare Phase 3 plan only, then stop for user confirmation."
+}
