@@ -14,11 +14,40 @@ use in_line_lib::{
     models::TaskInput,
 };
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{path::PathBuf, process::Stdio, sync::Arc, time::Duration};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, Lines},
     process::{Child, ChildStdin, ChildStdout, Command},
 };
+
+// Write only explicit metadata fields, never raw requests, responses, config or stores.
+// Direct stdout keeps these records in ordinary CI logs without changing the Workflow
+// or requiring --nocapture. Normal test assertions and failure behavior are unchanged.
+fn record(event: &str, fields: Value) {
+    use std::io::Write;
+    let row = json!({"schema":1,"event":event,"fields":fields});
+    let mut output = std::io::stdout().lock();
+    writeln!(output, "P2D_EVIDENCE {row}").unwrap();
+}
+fn creation_time(child: &Child) -> u64 {
+    use windows_sys::Win32::{Foundation::FILETIME, System::Threading::GetProcessTimes};
+    let mut created: FILETIME = unsafe { std::mem::zeroed() };
+    let mut exit = created;
+    let mut kernel = created;
+    let mut user = created;
+    let result = unsafe {
+        GetProcessTimes(
+            child.raw_handle().unwrap(),
+            &mut created,
+            &mut exit,
+            &mut kernel,
+            &mut user,
+        )
+    };
+    assert_ne!(result, 0, "test-owned process creation time unavailable");
+    ((created.dwHighDateTime as u64) << 32) | created.dwLowDateTime as u64
+}
 
 // Keep protocol/process ownership explicit: EOF and wait() prove the old child exited.
 // Deadlines fail the test; they are not product timeouts or forced termination rules.
@@ -27,6 +56,8 @@ struct Connection {
     input: Option<ChildStdin>,
     lines: Lines<BufReader<ChildStdout>>,
     sequence: u64,
+    case: &'static str,
+    created: u64,
 }
 impl Connection {
     async fn open(f: &Fixture, credentials: Option<&Credentials>) -> Self {
@@ -41,6 +72,12 @@ impl Connection {
                 .env("IN_LINE_MCP_TOKEN", &c.token);
         }
         let mut child = command.spawn().expect("spawn synthetic sidecar");
+        let created = creation_time(&child);
+        record(
+            "connection_start",
+            json!({"case":f.case,"pid":child.id(),"created":created,
+            "sidecarSha256":format!("{:x}",Sha256::digest(std::fs::read(env!("CARGO_BIN_EXE_in-line-mcp")).unwrap()))}),
+        );
         let input = child.stdin.take();
         let lines = BufReader::new(child.stdout.take().unwrap()).lines();
         let mut connection = Self {
@@ -48,6 +85,8 @@ impl Connection {
             input,
             lines,
             sequence: 0,
+            case: f.case,
+            created,
         };
         let initialized = connection
             .request(
@@ -112,6 +151,27 @@ impl Connection {
         let body = result["structuredContent"].clone();
         assert!(body.is_object(), "structured MCP envelope required");
         assert_eq!(result["isError"], body["status"] == "error");
+        let mut fields = json!({"case":self.case,"pid":self.child.id(),"tool":name,
+            "status":body["status"],"errorCode":body["error"]["code"]});
+        if name == "get_capabilities" && body["status"] == "ok" {
+            for field in [
+                "permissions",
+                "scope",
+                "credentialResolution",
+                "verificationScope",
+                "softwareVersion",
+                "mcpVersion",
+                "schemaVersion",
+                "commit",
+            ] {
+                fields[field] = body["data"][field].clone();
+            }
+        }
+        if name == "query_tasks" && body["status"] == "ok" {
+            fields["returnedItems"] = json!(body["data"]["items"].as_array().map(Vec::len));
+            fields["total"] = body["data"]["total"].clone();
+        }
+        record("tool_result", fields);
         body
     }
     fn still_running(&mut self, original_pid: u32) {
@@ -120,8 +180,14 @@ impl Connection {
             self.child.try_wait().unwrap().is_none(),
             "original sidecar ended"
         );
+        assert_eq!(creation_time(&self.child), self.created);
+        record(
+            "same_process_alive",
+            json!({"case":self.case,"pid":original_pid,"created":self.created}),
+        );
     }
     async fn eof(mut self) {
+        let pid = self.child.id().unwrap();
         drop(self.input.take());
         let status = tokio::time::timeout(Duration::from_secs(30), self.child.wait())
             .await
@@ -145,16 +211,21 @@ impl Connection {
             .await
             .unwrap();
         assert!(stderr.is_empty(), "unexpected sidecar stderr (redacted)");
+        record(
+            "connection_eof_exit",
+            json!({"case":self.case,"pid":pid,"created":self.created,"exitCode":status.code(),"stdoutEof":true,"stderrEmpty":true}),
+        );
     }
 }
 
 struct Fixture {
+    case: &'static str,
     root: PathBuf,
     security: Arc<Security>,
     db: Arc<Database>,
 }
 impl Fixture {
-    fn new() -> Self {
+    fn new(case: &'static str) -> Self {
         let root =
             std::env::temp_dir().join(format!("inline-p2d-{}", platform::random_secret().unwrap()));
         std::fs::create_dir_all(root.join("codex")).unwrap();
@@ -167,7 +238,12 @@ impl Fixture {
             Arc::new(move |c, t, a| service::execute(&sec, &database, c, t, a)),
         )
         .unwrap();
-        Self { root, security, db }
+        Self {
+            root,
+            security,
+            db,
+            case,
+        }
     }
     fn command(&self) -> Command {
         let mut c = Command::new(env!("CARGO_BIN_EXE_in-line-mcp"));
@@ -223,6 +299,12 @@ impl Fixture {
         assert!(
             result["data"]["clientId"] == receipt.client_id,
             "imported identity mismatch"
+        );
+        record(
+            "import_result",
+            json!({"case":self.case,"exitCode":output.status.code(),
+            "configurationChanged":result["data"]["configurationChanged"],
+            "configurationVerified":true,"currentSessionVerified":false,"identityMatches":true}),
         );
         result
     }
@@ -282,7 +364,7 @@ async fn titles(connection: &mut Connection, ids: &[i64]) -> Vec<String> {
 
 #[tokio::test]
 async fn p2d_d01_first_import_authorized_sentinel_credentials_and_d05_eof_reconnect() {
-    let f = Fixture::new();
+    let f = Fixture::new("D01-first-D05");
     let sentinel = f.seed("p2d-first-sentinel", "A");
     assert!(f.security.view().unwrap().clients.is_empty());
     let receipt = f.prepare(Permissions::default(), Scope::default());
@@ -322,7 +404,7 @@ async fn p2d_d01_first_import_authorized_sentinel_credentials_and_d05_eof_reconn
 async fn p2d_d01_unbound_missing_invalid_and_mismatched_credentials_are_rejected() {
     // No import/runtime binding in this fresh fixture: an explicitly authorized
     // binding refresh is a separate case, not a credential-rejection bypass.
-    let f = Fixture::new();
+    let f = Fixture::new("D01-rejected");
     f.seed("p2d-inaccessible-sentinel", "A");
     let issued = f
         .security
@@ -368,7 +450,7 @@ async fn p2d_d01_unbound_missing_invalid_and_mismatched_credentials_are_rejected
 
 #[tokio::test]
 async fn p2d_d03_equivalent_import_preserves_active_transport_host_policy_and_loaded_credentials() {
-    let f = Fixture::new();
+    let f = Fixture::new("D03");
     let sentinel = f.seed("p2d-active-sentinel", "A");
     std::fs::write(f.config(), "# synthetic host policy\nmodel='keep-model'\n[mcp_servers.other]\ncommand='keep-other'\nargs=[]\n").unwrap();
     let receipt = f.prepare(Permissions::default(), Scope::default());
@@ -461,7 +543,7 @@ async fn p2d_d03_equivalent_import_preserves_active_transport_host_policy_and_lo
 
 #[tokio::test]
 async fn p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_revocation() {
-    let f = Fixture::new();
+    let f = Fixture::new("D04");
     let a = f.seed("p2d-A-sentinel", "A");
     let b = f.seed("p2d-B-sentinel", "B");
     let receipt = f.prepare(
