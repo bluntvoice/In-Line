@@ -90,6 +90,17 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         full_read: true,
         write: false,
     })?;
+    // Keep the existing four-snapshot per-client limit. Boundary probes use
+    // an independently granted read-only sibling, initialized before reads.
+    let calendar_issued = security.grant(Grant {
+        name: "P3-A calendar boundary reader".into(),
+        permissions: Permissions {
+            regular_read: true,
+            full_read: true,
+            write: false,
+        },
+        scope: Scope::default(),
+    })?;
     let host_security = security.clone();
     let host_db = database.clone();
     in_line_lib::mcp::ipc::start(
@@ -111,6 +122,19 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         }),
     )?;
     let client = ().serve(transport).await?;
+    let calendar_transport = TokioChildProcess::new(
+        tokio::process::Command::new(env!("CARGO_BIN_EXE_in-line-mcp")).configure(|command| {
+            command
+                .env("IN_LINE_MCP_TEST_SECURITY_ROOT", &security_root)
+                .env(
+                    "IN_LINE_MCP_TEST_HOST_EXE",
+                    std::env::current_exe().unwrap(),
+                )
+                .env("IN_LINE_MCP_CLIENT_ID", &calendar_issued.client_id)
+                .env("IN_LINE_MCP_TOKEN", &calendar_issued.token);
+        }),
+    )?;
+    let calendar_client = ().serve(calendar_transport).await?;
     let tools = client.list_all_tools().await?;
     assert_eq!(tools.len(), 16);
     assert!(tools.iter().any(|tool| tool.name == "get_capabilities"));
@@ -242,7 +266,12 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         ("2026-08-07", -120, 1),
         ("2026-08-08", -120, 0),
     ] {
-        let calendar = client
+        let reader = if offset == 480 {
+            &client
+        } else {
+            &calendar_client
+        };
+        let calendar = reader
             .call_tool(
                 CallToolRequestParams::new("query_work_calendar").with_arguments(
                     serde_json::from_value(
@@ -293,6 +322,18 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         "idle_incremental",
         json!([]),
         incremental.structured_content.as_ref().unwrap()["data"]["items"].clone(),
+    );
+    // Original reader now owns report/history/calendar/query snapshots. This
+    // reproduces the initial harness failure's limit without weakening it;
+    // the same calendar business query above must still succeed on its sibling.
+    let limited = client.call_tool(CallToolRequestParams::new("query_work_calendar")
+        .with_arguments(serde_json::from_value(json!({"startDate":"2026-08-08","endDate":"2026-08-08","timezoneOffsetMinutes":-120}))?)).await?;
+    assert_eq!(limited.is_error, Some(true));
+    p3a_fact(
+        "query_work_calendar",
+        "four_snapshot_limit",
+        json!("resource_limit"),
+        limited.structured_content.as_ref().unwrap()["error"]["code"].clone(),
     );
 
     let trace = client.call_tool(CallToolRequestParams::new("inspect_data")
@@ -436,6 +477,7 @@ async fn stdio_server_lists_and_calls_read_only_report_tools(
         "revoked"
     );
 
+    calendar_client.cancel().await?;
     client.cancel().await?;
     let _ = std::fs::remove_dir_all(root);
     Ok(())
