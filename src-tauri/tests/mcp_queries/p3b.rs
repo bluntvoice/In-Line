@@ -350,6 +350,11 @@ fn receipt(
         )
         .unwrap();
     let stored: Value = serde_json::from_str(&row.1).unwrap();
+    // mcp_transaction stores the operation receipt before COMMIT, then performs
+    // an independent readback under the same mutex and promotes the wire result.
+    // Assert both exact stages; every other receipt field must match unchanged.
+    let mut transaction_receipt = data.clone();
+    transaction_receipt["verificationStatus"] = json!("verified_in_transaction");
     let audits = f.db.mcp_audit_state().unwrap();
     let audit = audits["audits"]
         .as_array()
@@ -359,8 +364,8 @@ fn receipt(
         .unwrap();
     record(
         &format!("Q/{key}/receipt_audit"),
-        json!({"linked":true,"storedReceiptMatches":true,"action":"preferences","ownerMatches":true,"base":base,"value":value,"beforeVersion":version,"afterVersion":version+1,"reason":summary,"intent":summary,"undoOf":null}),
-        json!({"linked":row.0==data["auditId"].as_i64(),"storedReceiptMatches":stored==*data,"action":audit["action"],"ownerMatches":audit["clientId"]==f.owner.client_id,"base":audit["before"]["week_start_day"],"value":audit["after"]["week_start_day"],"beforeVersion":audit["before"]["fieldVersions"]["week_start_day"],"afterVersion":audit["after"]["fieldVersions"]["week_start_day"],"reason":audit["reason"],"intent":audit["intent"],"undoOf":audit["undoOf"]}),
+        json!({"linked":true,"storedReceiptMatchesTransactionStage":true,"storedVerification":"verified_in_transaction","wireVerification":"verified_after_commit","action":"preferences","ownerMatches":true,"base":base,"value":value,"beforeVersion":version,"afterVersion":version+1,"reason":summary,"intent":summary,"undoOf":null}),
+        json!({"linked":row.0==data["auditId"].as_i64(),"storedReceiptMatchesTransactionStage":stored==transaction_receipt,"storedVerification":stored["verificationStatus"],"wireVerification":data["verificationStatus"],"action":audit["action"],"ownerMatches":audit["clientId"]==f.owner.client_id,"base":audit["before"]["week_start_day"],"value":audit["after"]["week_start_day"],"beforeVersion":audit["before"]["fieldVersions"]["week_start_day"],"afterVersion":audit["after"]["fieldVersions"]["week_start_day"],"reason":audit["reason"],"intent":audit["intent"],"undoOf":audit["undoOf"]}),
     );
 }
 
@@ -516,7 +521,7 @@ async fn p3b_q_saved_query_and_shared_preference_compensation_over_original_stdi
         .await;
     record(
         "Q/first_commit",
-        json!({"commitStatus":"committed","value":"sunday","version":version+1,"replayed":false,"changedFields":["week_start_day"],"verification":"verified_in_transaction"}),
+        json!({"commitStatus":"committed","value":"sunday","version":version+1,"replayed":false,"changedFields":["week_start_day"],"verification":"verified_after_commit"}),
         json!({"commitStatus":committed["commitStatus"],"value":committed["preferences"]["week_start_day"],"version":committed["fieldVersions"]["week_start_day"],"replayed":committed["replayed"],"changedFields":committed["changedFields"],"verification":committed["verificationStatus"]}),
     );
     receipt(
