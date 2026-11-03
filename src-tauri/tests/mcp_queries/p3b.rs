@@ -194,15 +194,31 @@ struct Fixture {
     other: Credentials,
 }
 impl Fixture {
-    fn new(kind: &str) -> Self {
+    fn new(kind: &str) -> Option<Self> {
         // This gate precedes all database/security/process creation. Never run
         // these acceptance actions against a local workstation or self-hosted host.
-        assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
+        if std::env::var_os("GITHUB_ACTIONS").is_none() {
+            use std::io::Write;
+            writeln!(std::io::stdout().lock(), "P3B_NOT_RUN {}", json!({
+                "fixture":kind,"status":"not_run","reason":"non_github_environment","businessExecuted":false
+            })).unwrap();
+            return None;
+        }
+        assert_eq!(
+            std::env::var("GITHUB_ACTIONS").as_deref(),
+            Ok("true"),
+            "P3-B requires GITHUB_ACTIONS=true"
+        );
         assert_eq!(
             std::env::var("RUNNER_ENVIRONMENT").as_deref(),
-            Ok("github-hosted")
+            Ok("github-hosted"),
+            "P3-B requires RUNNER_ENVIRONMENT=github-hosted"
         );
-        assert_eq!(std::env::var("RUNNER_OS").as_deref(), Ok("Windows"));
+        assert_eq!(
+            std::env::var("RUNNER_OS").as_deref(),
+            Ok("Windows"),
+            "P3-B requires RUNNER_OS=Windows"
+        );
         let root = std::env::temp_dir().join(format!(
             "inline-p3b-{kind}-{}",
             platform::random_secret().unwrap()
@@ -250,12 +266,12 @@ impl Fixture {
         let binary = std::fs::read(env!("CARGO_BIN_EXE_in-line-mcp")).unwrap();
         use std::io::Write;
         writeln!(std::io::stdout().lock(), "P3B_BUILD {}", json!({"fixture":kind,"commit":std::env::var("GITHUB_SHA").unwrap(),"runnerEnvironment":std::env::var("RUNNER_ENVIRONMENT").unwrap(),"runnerOS":std::env::var("RUNNER_OS").unwrap(),"runnerImage":std::env::var("ImageOS").ok(),"runnerImageVersion":std::env::var("ImageVersion").ok(),"sidecarSha256":format!("{:x}",Sha256::digest(binary)),"debug":cfg!(debug_assertions)})).unwrap();
-        Self {
+        Some(Self {
             root,
             db,
             owner,
             other,
-        }
+        })
     }
     fn authorization(&self) -> Vec<u8> {
         std::fs::read(self.root.join("security/authorization.dpapi")).unwrap()
@@ -369,9 +385,108 @@ fn receipt(
     );
 }
 
+// Exercise the same registered test bodies in child harnesses. Environment
+// changes are child-only, so the approved Q/J tests can run concurrently.
+// These probes never simulate an approved runner or create a resource root.
+#[test]
+fn p3b_environment_gate_skips_local_and_rejects_unsupported_ci_before_resources() {
+    use std::{io::Write, os::windows::process::CommandExt};
+    let q = "p3b::p3b_q_saved_query_and_shared_preference_compensation_over_original_stdio";
+    let j = "p3b::p3b_j_one_read_job_two_waiters_and_owner_isolation_over_original_stdio";
+    for (case, test, fixture, github, runner, os, rejection) in [
+        ("local_Q", q, "Q", None, "self-hosted", "Linux", None),
+        ("local_J", j, "J", None, "self-hosted", "Linux", None),
+        (
+            "invalid_ci_declaration",
+            q,
+            "Q",
+            Some("false"),
+            "github-hosted",
+            "Windows",
+            Some("P3-B requires GITHUB_ACTIONS=true"),
+        ),
+        (
+            "unsupported_runner",
+            q,
+            "Q",
+            Some("true"),
+            "self-hosted",
+            "Windows",
+            Some("P3-B requires RUNNER_ENVIRONMENT=github-hosted"),
+        ),
+        (
+            "unsupported_os",
+            q,
+            "Q",
+            Some("true"),
+            "github-hosted",
+            "Linux",
+            Some("P3-B requires RUNNER_OS=Windows"),
+        ),
+    ] {
+        let temp = std::env::temp_dir().join(format!(
+            "inline-p3b-gate-{}-{}-{case}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        assert!(!temp.exists(), "gate probe root already exists");
+        let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+        command
+            .args(["--exact", test, "--nocapture"])
+            .env_remove("GITHUB_ACTIONS")
+            .env("RUNNER_ENVIRONMENT", runner)
+            .env("RUNNER_OS", os)
+            .env("TMP", &temp)
+            .env("TEMP", &temp)
+            .env_remove("IN_LINE_MCP_CLIENT_ID")
+            .env_remove("IN_LINE_MCP_TOKEN")
+            .env_remove("IN_LINE_MCP_TEST_SECURITY_ROOT")
+            .env_remove("IN_LINE_MCP_TEST_HOST_EXE")
+            .creation_flags(0x08000000);
+        if let Some(value) = github {
+            command.env("GITHUB_ACTIONS", value);
+        }
+        let output = command.output().unwrap();
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        let markers: Vec<Value> = stdout
+            .lines()
+            .filter_map(|line| {
+                line.find("P3B_NOT_RUN ")
+                    .map(|at| serde_json::from_str(&line[at + "P3B_NOT_RUN ".len()..]).unwrap())
+            })
+            .collect();
+        let expected_markers = if rejection.is_none() {
+            vec![
+                json!({"fixture":fixture,"status":"not_run","reason":"non_github_environment","businessExecuted":false}),
+            ]
+        } else {
+            vec![]
+        };
+        let passed = output.status.success() == rejection.is_none()
+            && markers == expected_markers
+            && rejection.is_none_or(|message| stderr.contains(message))
+            && !temp.exists()
+            && !["P3B_BUILD ", "P3B_CALL ", "P3B_EVIDENCE "]
+                .iter()
+                .any(|prefix| stdout.contains(prefix));
+        writeln!(std::io::stdout().lock(), "P3B_GATE_CHECK {}", json!({
+            "case":case,"fixture":fixture,"businessExecution":"not_run",
+            "expectedHarnessSuccess":rejection.is_none(),"actualHarnessSuccess":output.status.success(),
+            "exitCode":output.status.code(),"notRunMarkers":markers,
+            "resourceRootAbsent":!temp.exists(),"businessEvidenceAbsent":!["P3B_BUILD ","P3B_CALL ","P3B_EVIDENCE "].iter().any(|prefix|stdout.contains(prefix)),
+            "rejectionReasonMatched":rejection.is_none_or(|message|stderr.contains(message)),"passed":passed
+        })).unwrap();
+        assert!(passed, "P3-B environment gate mismatch: {case}");
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn p3b_q_saved_query_and_shared_preference_compensation_over_original_stdio() {
-    let f = Fixture::new("Q");
+    let Some(f) = Fixture::new("Q") else { return };
     let business = f.business();
     let auth = f.authorization();
     let initial = f.preferences();
@@ -738,7 +853,7 @@ async fn p3b_q_saved_query_and_shared_preference_compensation_over_original_stdi
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn p3b_j_one_read_job_two_waiters_and_owner_isolation_over_original_stdio() {
-    let f = Fixture::new("J");
+    let Some(f) = Fixture::new("J") else { return };
     let business = f.business();
     let prefs = f.preferences();
     let auth = f.authorization();
