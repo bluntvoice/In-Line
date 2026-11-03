@@ -544,6 +544,17 @@ async fn p3b_q_saved_query_and_shared_preference_compensation_over_original_stdi
         .await;
     let mut expected = committed.clone();
     expected["replayed"] = json!(true);
+    // The existing F=false redact_receipt uses IndexMut on items: a receipt
+    // without items gains items:null. Prove this exact representation effect
+    // independently from the no-second-business-commit requirement.
+    let mut replay_fields = replay.clone();
+    let replay_items = replay_fields.as_object_mut().unwrap().remove("items");
+    record(
+        "Q/replay_redaction_and_atomicity",
+        json!({"onlyAddedItemsNull":true,"allOriginalReceiptFieldsMatch":true,"preferencesVersionsAuditsReceiptsUnchanged":true}),
+        json!({"onlyAddedItemsNull":replay_items==Some(Value::Null),"allOriginalReceiptFieldsMatch":replay_fields==expected,"preferencesVersionsAuditsReceiptsUnchanged":f.preferences()==after_first}),
+    );
+    expected["items"] = Value::Null;
     record(
         "Q/replay_original_receipt",
         json!(true),
