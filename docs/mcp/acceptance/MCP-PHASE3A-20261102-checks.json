@@ -1,0 +1,2774 @@
+{
+  "schemaVersion": 1,
+  "phase": "P3-A",
+  "date": "2026-11-02",
+  "timezone": "Asia/Shanghai",
+  "status": "user_approved_minimal_nine_readonly_L3_acceptance_formal_host_and_full_actions_unverified",
+  "baseline": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+  "candidate": {
+    "sha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+    "branch": "codex/p3a-readonly-acceptance-20261102",
+    "formalDevelopmentBranchPromoted": false,
+    "manifest": {
+      "baseline": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "candidate": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "files": [
+        {
+          "path": "src-tauri/tests/mcp_stdio.rs",
+          "sha256": "e97730d4c39a88ea7bf74ec564038eb3cdc3ca2572f902581ab57d5f616c8800",
+          "gitBlob": "c468ee48ac0e9eed569aa1f632c2fb52585c3674"
+        },
+        {
+          "path": "src-tauri/tests/mcp_queries.rs",
+          "sha256": "6890259a452fb7c6bf02c81988eb878561919166a03647affeeb99d89802996a",
+          "gitBlob": "495d2d9aa586dfb4a4e36da892e8d431d74bdcc3"
+        },
+        {
+          "path": "src-tauri/tests/mcp_connection_acceptance.rs",
+          "sha256": "00cce9eb3b2c28574bec7d6e65a0c93dff343d5d67c70d8b54568a7219d4cec9",
+          "gitBlob": "fdf5a988727a7baca336fd877e2df27344bd04eb"
+        }
+      ],
+      "newTestCases": 0,
+      "productCodeChanged": false,
+      "newWorkflow": false,
+      "newSuccessfulMcpBusinessWrites": false
+    }
+  },
+  "runs": [
+    {
+      "id": 41415440373,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41415440373",
+      "sha": "40823b684c853923d0c4261813ed8e8d1fb3f02a",
+      "status": "completed",
+      "conclusion": "failure",
+      "reason": "Combined fixture exceeded existing 4-snapshot-per-client limit; original failed assertion retained"
+    },
+    {
+      "id": 41416168941,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41416168941",
+      "sha": "e6dba877acf1c92c1b0bb893a9a980d6fa123dd7",
+      "status": "completed",
+      "conclusion": "failure",
+      "reason": "Same snapshot-budget orchestration failure before preservation assertion"
+    },
+    {
+      "id": 41417095655,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41417095655",
+      "sha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "status": "completed",
+      "conclusion": "success",
+      "job": 125183521290
+    }
+  ],
+  "runner": {
+    "workflow": ".github/workflows/ci.yml",
+    "label": "windows-latest",
+    "githubHosted": true,
+    "selfHosted": false,
+    "os": "Microsoft Windows Server 2025",
+    "osVersion": "10.0.26100",
+    "image": "windows-2025-vs2026",
+    "imageVersion": "20261021.278.1",
+    "runnerVersion": "2.338.2"
+  },
+  "build": {
+    "softwareVersion": "0.5.0",
+    "mcpVersion": 1,
+    "databaseSchemaVersion": 14,
+    "exactCommit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+    "sidecarBinarySha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748",
+    "kind": "debug_CI_not_installer_or_release",
+    "source": "CARGO_BIN_EXE_in-line-mcp; existing P2-D actual capability/build records and three-binary offline verification on same CI checkout"
+  },
+  "regression": {
+    "rust": {
+      "passed": 252,
+      "failed": 0,
+      "ignored": 0
+    },
+    "frontend": {
+      "passed": 135,
+      "files": 22
+    },
+    "newTestCases": 0,
+    "existingTestExtensions": 3,
+    "newFramework": false,
+    "typescriptVite": "passed",
+    "rustfmt": "passed",
+    "threeBinaryIdentity": "passed",
+    "actual16ToolSchemaAndAnnotations": "passed",
+    "anonymous16ToolsPlus3RepeatCalls": "passed",
+    "phase3Full16BusinessMatrixCompleted": false
+  },
+  "matrix": [
+    {
+      "tool": "get_capabilities",
+      "action": "{}",
+      "test": "mcp_connection_acceptance::p2d_d01_first_import_authorized_sentinel_credentials_and_d05_eof_reconnect; p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_revocation",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Authenticated actual stdio succeeds with regularRead/fullRead/write all false; thisToolCall scope; normal read then forbidden",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "event": "p3a_capabilities_without_regular_read",
+          "fields": {
+            "permissions": {
+              "fullRead": false,
+              "regularRead": false,
+              "write": false
+            },
+            "status": "ok",
+            "verifiedScope": "thisToolCall"
+          },
+          "schema": 1
+        }
+      ],
+      "permissions": {
+        "regularRead": false,
+        "fullRead": false,
+        "write": false
+      },
+      "scope": {
+        "departments": null,
+        "taskTypes": null
+      },
+      "preimplementationAssessment": {
+        "level": "L3",
+        "assertion": "Actual identity/build/permissions; same transport authorization updates. Missing explicit successful capabilities with regularRead=false.",
+        "gap": "L3 normal success yes; add one no-R success assertion to existing live test"
+      }
+    },
+    {
+      "tool": "get_report_summary",
+      "action": "date range + filters/timezone/snapshot",
+      "test": "mcp_stdio::stdio_server_lists_and_calls_read_only_report_tools; query_tests::metric_trace_all_counts_rates_dimensions_trend_and_scope_match_gui",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Independent one-task oracle: handled/completed/numerator/denominator 1, ratio 1.0, exact type/department/day counts",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "action": "summary",
+          "actual": {
+            "completed": 1,
+            "denominator": 1,
+            "handled": 1,
+            "numerator": 1,
+            "rate": 1
+          },
+          "expected": {
+            "completed": 1,
+            "denominator": 1,
+            "handled": 1,
+            "numerator": 1,
+            "rate": 1
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "get_report_summary"
+        },
+        {
+          "action": "dimensions",
+          "actual": {
+            "departments": [
+              {
+                "completed": 1,
+                "department": "产品组",
+                "handledTasks": 1,
+                "pendingFollowUp": 0
+              }
+            ],
+            "trendCompleted": 1,
+            "trendDate": "2026-08-08",
+            "trendDays": 1,
+            "trendHandled": 1,
+            "types": [
+              {
+                "completed": 1,
+                "handledTasks": 1,
+                "pendingFollowUp": 0,
+                "taskType": "功能开发"
+              }
+            ]
+          },
+          "expected": {
+            "departments": [
+              {
+                "completed": 1,
+                "department": "产品组",
+                "handledTasks": 1,
+                "pendingFollowUp": 0
+              }
+            ],
+            "trendCompleted": 1,
+            "trendDate": "2026-08-08",
+            "trendDays": 1,
+            "trendHandled": 1,
+            "types": [
+              {
+                "completed": 1,
+                "handledTasks": 1,
+                "pendingFollowUp": 0,
+                "taskType": "功能开发"
+              }
+            ]
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "get_report_summary"
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": true,
+        "write": false
+      },
+      "scope": {
+        "departments": null,
+        "taskTypes": null
+      },
+      "preimplementationAssessment": {
+        "level": "L3 completed=1; L2 complete metric/scope rules",
+        "assertion": "One known completed synthetic task; L2 compares metrics/traces/shared statistics and excludes trash/voided/out-of-scope.",
+        "gap": "Strengthen existing one-task L3 fixture with independent denominator/rate/dimensions/trend and shared snapshot"
+      }
+    },
+    {
+      "tool": "list_report_items",
+      "action": "range + snapshot + page",
+      "test": "mcp_stdio::stdio_server_lists_and_calls_read_only_report_tools; query_tests::report_and_calendar_share_ui_calculations_and_snapshot_with_long_history",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "One item and one event on identical report snapshot/dataVersion; original title/privacy assertions retained",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "action": "same_snapshot",
+          "actual": {
+            "sameBasis": true,
+            "sameSnapshot": true,
+            "total": 1,
+            "workEvents": 1
+          },
+          "expected": {
+            "sameBasis": true,
+            "sameSnapshot": true,
+            "total": 1,
+            "workEvents": 1
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "list_report_items"
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": true,
+        "write": false
+      },
+      "scope": {
+        "departments": null,
+        "taskTypes": null
+      },
+      "preimplementationAssessment": {
+        "level": "L3; L2",
+        "assertion": "Actual expected title/work note, omitted contact/details/notes; L2 exact snapshot/2 events and offset rejection.",
+        "gap": "Add same-report-snapshot/total/event count checks to existing L3; retain original privacy assertions"
+      }
+    },
+    {
+      "tool": "query_tasks",
+      "action": "filters/projection/paging",
+      "test": "mcp_connection_acceptance D01/D03/D04; mcp_queries::p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Existing L3 fixed sentinels, scoped A-only/B-empty result and two-row frozen pagination assertions all rerun successfully",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D01-rejected",
+            "errorCode": "unauthenticated",
+            "pid": 6000,
+            "status": "error",
+            "tool": "query_tasks"
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D01-rejected",
+            "errorCode": "unauthenticated",
+            "pid": 6212,
+            "status": "error",
+            "tool": "query_tasks"
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D01-rejected",
+            "errorCode": "unauthenticated",
+            "pid": 812,
+            "status": "error",
+            "tool": "query_tasks"
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D01-first-D05",
+            "errorCode": null,
+            "pid": 3728,
+            "returnedItems": 1,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 1
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": null,
+            "pid": 4656,
+            "returnedItems": 2,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 2
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": "forbidden",
+            "pid": 4656,
+            "status": "error",
+            "tool": "query_tasks"
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D01-first-D05",
+            "errorCode": null,
+            "pid": 2440,
+            "returnedItems": 1,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 1
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": null,
+            "pid": 4656,
+            "returnedItems": 1,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 1
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": "forbidden",
+            "pid": 4656,
+            "status": "error",
+            "tool": "query_tasks"
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": null,
+            "pid": 4656,
+            "returnedItems": 0,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 0
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": null,
+            "pid": 8764,
+            "returnedItems": 2,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 2
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": "forbidden",
+            "pid": 4656,
+            "status": "error",
+            "tool": "query_tasks"
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D03",
+            "errorCode": null,
+            "pid": 9412,
+            "returnedItems": 1,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 1
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": null,
+            "pid": 8764,
+            "returnedItems": 2,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 2
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": "revoked",
+            "pid": 4656,
+            "status": "error",
+            "tool": "query_tasks"
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": null,
+            "pid": 8764,
+            "returnedItems": 2,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 2
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D04",
+            "errorCode": null,
+            "pid": 8764,
+            "returnedItems": 2,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 2
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D03",
+            "errorCode": null,
+            "pid": 9412,
+            "returnedItems": 1,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 1
+          },
+          "schema": 1
+        },
+        {
+          "event": "tool_result",
+          "fields": {
+            "case": "D03",
+            "errorCode": null,
+            "pid": 9412,
+            "returnedItems": 1,
+            "status": "ok",
+            "tool": "query_tasks",
+            "total": 1
+          },
+          "schema": 1
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": false,
+        "write": false
+      },
+      "scope": "Independent P2-D sentinel fixtures: unrestricted and A/T scope; original source title/ID assertions rerun successfully.",
+      "businessOracle": "Known p2d-first-sentinel, p2d-active-sentinel; A-only returns p2d-A-sentinel; explicit B query empty; existing two-row pagination returns original-second at fixed dataVersion.",
+      "preimplementationAssessment": {
+        "level": "L3",
+        "assertion": "Known sentinel IDs/title; A-only scoped result/B ID empty; exact two-row immutable pagination after direct fixture edit.",
+        "gap": "Reuse existing L3 and L2 over-100/ABA/scope/projection; no repeated new query fixture"
+      }
+    },
+    {
+      "tool": "query_task_history",
+      "action": "taskId/kinds/includeVoided",
+      "test": "mcp_queries existing history; query_tests::history_projection_voided_and_trash_require_full_read; database mcp_p4 correction history tests",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Actual kinds=work result is exactly one initialized completed event at 2026-08-08T09:00:00+08:00, not voided",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "action": "known_work_event",
+          "actual": {
+            "at": "2026-08-08T09:00:00+08:00",
+            "status": "completed",
+            "taskId": 1,
+            "total": 1,
+            "voided": false
+          },
+          "expected": {
+            "at": "2026-08-08T09:00:00+08:00",
+            "status": "completed",
+            "taskId": 1,
+            "total": 1,
+            "voided": false
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "query_task_history"
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": true,
+        "write": false
+      },
+      "scope": {
+        "departments": null,
+        "taskTypes": null
+      },
+      "preimplementationAssessment": {
+        "level": "L3 basic success/redaction; L2 exact history/projection; L1 correction chain",
+        "assertion": "L3 currently status/redaction only; L2 two work events incl voided and sensitive log restrictions.",
+        "gap": "Add exact one initialized work-event status/time/id read to existing read-only L3 fixture; reuse correction chain L1/L2 with level boundary"
+      }
+    },
+    {
+      "tool": "query_work_calendar",
+      "action": "fixed date + timezone",
+      "test": "mcp_queries queueTask success; query_tests::report_and_calendar_share_ui_calculations_and_snapshot_with_long_history",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Exact fixed membership 1/1/0 at +480/-120 and fifth-snapshot resource_limit; business success uses correctly budgeted read-only identities",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "action": "timezone_membership",
+          "actual": {
+            "completed": 1,
+            "day": "2026-08-08",
+            "events": 1,
+            "fixtureOnly": true,
+            "offset": 480,
+            "rounds": 1
+          },
+          "expected": {
+            "completed": 1,
+            "day": "2026-08-08",
+            "events": 1,
+            "fixtureOnly": true,
+            "offset": 480,
+            "rounds": 1
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "query_work_calendar"
+        },
+        {
+          "action": "timezone_membership",
+          "actual": {
+            "completed": 1,
+            "day": "2026-08-07",
+            "events": 1,
+            "fixtureOnly": true,
+            "offset": -120,
+            "rounds": 1
+          },
+          "expected": {
+            "completed": 1,
+            "day": "2026-08-07",
+            "events": 1,
+            "fixtureOnly": true,
+            "offset": -120,
+            "rounds": 1
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "query_work_calendar"
+        },
+        {
+          "action": "timezone_membership",
+          "actual": {
+            "completed": 0,
+            "day": "2026-08-08",
+            "events": 0,
+            "fixtureOnly": true,
+            "offset": -120,
+            "rounds": 0
+          },
+          "expected": {
+            "completed": 0,
+            "day": "2026-08-08",
+            "events": 0,
+            "fixtureOnly": true,
+            "offset": -120,
+            "rounds": 0
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "query_work_calendar"
+        },
+        {
+          "action": "four_snapshot_limit",
+          "actual": "resource_limit",
+          "expected": "resource_limit",
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "query_work_calendar"
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": true,
+        "write": false
+      },
+      "scope": {
+        "departments": null,
+        "taskTypes": null
+      },
+      "preimplementationAssessment": {
+        "level": "L3 queue membership; L2 exact event/calendar counts",
+        "assertion": "L3 checks known queue row but date based on clock; L2 two rounds/one complete and UTC explicit range.",
+        "gap": "Add fixed historical one-event dates and UTC/-120 minute day boundary to existing read-only fixture"
+      }
+    },
+    {
+      "tool": "query_changes",
+      "action": "initial full current + idle incremental",
+      "test": "mcp_queries actual full and incremental; jobs_tests::full_sync_pagination_generation_and_event_modes; changes_capture_gui_events_leave_scope_without_leaking_body_and_bind_client",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Initial current full contains the known single fixture task/title; unchanged source then returns empty incremental items",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "action": "initial_full",
+          "actual": {
+            "complete": true,
+            "kind": "current",
+            "rows": 1,
+            "taskId": 1,
+            "title": "完成 MCP 接入"
+          },
+          "expected": {
+            "complete": true,
+            "kind": "current",
+            "rows": 1,
+            "taskId": 1,
+            "title": "完成 MCP 接入"
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "query_changes"
+        },
+        {
+          "action": "idle_incremental",
+          "actual": [],
+          "expected": [],
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "query_changes"
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": true,
+        "write": false
+      },
+      "scope": {
+        "departments": null,
+        "taskTypes": null
+      },
+      "preimplementationAssessment": {
+        "level": "L3 flags/empty delta; L2 exact mutation/current/removal/cursor semantics",
+        "assertion": "L3 fullSyncComplete=true and idle delta empty, but full item values not fixed; L2 exact edits and removed event without leaked title.",
+        "gap": "Add exact fixture task/current title in initial full + zero idle delta without any post-start business mutation"
+      }
+    },
+    {
+      "tool": "inspect_data",
+      "action": "health/trace/compare/cache/recompute",
+      "test": "mcp_queries health healthy=true/trace ok; query_tests metric_trace and cache tests",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Existing health=true L3; exact completed trace value/sources 1 and same snapshot; other actions separately limited",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "action": "trace_completed",
+          "actual": {
+            "complete": true,
+            "sameSnapshot": true,
+            "sources": 1,
+            "value": 1
+          },
+          "expected": {
+            "complete": true,
+            "sameSnapshot": true,
+            "sources": 1,
+            "value": 1
+          },
+          "fixture": "one-completed-task",
+          "passed": true,
+          "tool": "inspect_data"
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": true,
+        "write": false
+      },
+      "scope": {
+        "departments": null,
+        "taskTypes": null
+      },
+      "otherActions": {
+        "health": {
+          "level": "L3_reused",
+          "expectedHealthy": true,
+          "source": "mcp_queries::p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction",
+          "passed": true
+        },
+        "compare": {
+          "level": "L2_reused",
+          "source": "mcp::query::tests::trace_pagination_is_bound_to_metric_client_and_original_snapshot"
+        },
+        "cache": {
+          "level": "L2_cache_rules_and_CLI_auxiliary",
+          "endpointL3NotNewlyExercised": true
+        },
+        "recompute": {
+          "status": "not_covered_by_independent_positive_action_assertion",
+          "explicitSummaryRequeryIsNotRecomputeEndpoint": true
+        }
+      },
+      "preimplementationAssessment": {
+        "level": "L3 health exact and trace status; L2 full metrics/cache/compare",
+        "assertion": "L3 trace lacks explicit numeric source set assertion; L2 independently scoped source facts and valid winner/voided exclusions.",
+        "gap": "Add completed=1 trace source/id/value to same report snapshot; reuse health exact check and L2 other actions"
+      }
+    },
+    {
+      "tool": "get_diagnostic",
+      "action": "own errorId",
+      "test": "mcp_queries invalid query -> own diagnostic; p7_tests::diagnostics_own_only_pause_revoke_and_unhealthy_basis_are_enforced",
+      "level": "L3 minimum authorized action passed; L1/L2 support explicitly distinguished",
+      "assertion": "Existing authorized own diagnostic succeeds, matches known invalid_arguments request, does not echo raw canary",
+      "runSha": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+      "sufficient": "yes_for_listed_minimum_L3_actions_only",
+      "preparationRunSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "status": "passed_minimal_authorized_L3",
+      "resultRecords": [
+        {
+          "action": "own_error",
+          "actual": {
+            "code": "invalid_arguments",
+            "rawCanaryAbsent": true,
+            "requestMatches": true,
+            "status": "ok"
+          },
+          "expected": {
+            "code": "invalid_arguments",
+            "rawCanaryAbsent": true,
+            "requestMatches": true,
+            "status": "ok"
+          },
+          "fixture": "existing-private-stdio",
+          "passed": true,
+          "tool": "get_diagnostic"
+        }
+      ],
+      "permissions": {
+        "regularRead": true,
+        "fullRead": false,
+        "write": false
+      },
+      "scope": {
+        "departments": [
+          "synthetic A"
+        ],
+        "taskTypes": [
+          "synthetic T"
+        ]
+      },
+      "preimplementationAssessment": {
+        "level": "L3; L2",
+        "assertion": "Actual own error requestId/code invalid_arguments match; raw business canary not echoed; L2 other client not_found, pause/revoke.",
+        "gap": "Reuse exact existing L3, add only redacted evidence emission, no duplicate request"
+      }
+    }
+  ],
+  "preimplementationMap": [
+    {
+      "tool": "get_capabilities",
+      "action": "{}",
+      "test": "mcp_connection_acceptance::p2d_d01_first_import_authorized_sentinel_credentials_and_d05_eof_reconnect; p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_revocation",
+      "level": "L3",
+      "assertion": "Actual identity/build/permissions; same transport authorization updates. Missing explicit successful capabilities with regularRead=false.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "L3 normal success yes; add one no-R success assertion to existing live test"
+    },
+    {
+      "tool": "get_report_summary",
+      "action": "date range + filters/timezone/snapshot",
+      "test": "mcp_stdio::stdio_server_lists_and_calls_read_only_report_tools; query_tests::metric_trace_all_counts_rates_dimensions_trend_and_scope_match_gui",
+      "level": "L3 completed=1; L2 complete metric/scope rules",
+      "assertion": "One known completed synthetic task; L2 compares metrics/traces/shared statistics and excludes trash/voided/out-of-scope.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Strengthen existing one-task L3 fixture with independent denominator/rate/dimensions/trend and shared snapshot"
+    },
+    {
+      "tool": "list_report_items",
+      "action": "range + snapshot + page",
+      "test": "mcp_stdio::stdio_server_lists_and_calls_read_only_report_tools; query_tests::report_and_calendar_share_ui_calculations_and_snapshot_with_long_history",
+      "level": "L3; L2",
+      "assertion": "Actual expected title/work note, omitted contact/details/notes; L2 exact snapshot/2 events and offset rejection.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Add same-report-snapshot/total/event count checks to existing L3; retain original privacy assertions"
+    },
+    {
+      "tool": "query_tasks",
+      "action": "filters/projection/paging",
+      "test": "mcp_connection_acceptance D01/D03/D04; mcp_queries::p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction",
+      "level": "L3",
+      "assertion": "Known sentinel IDs/title; A-only scoped result/B ID empty; exact two-row immutable pagination after direct fixture edit.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Reuse existing L3 and L2 over-100/ABA/scope/projection; no repeated new query fixture"
+    },
+    {
+      "tool": "query_task_history",
+      "action": "taskId/kinds/includeVoided",
+      "test": "mcp_queries existing history; query_tests::history_projection_voided_and_trash_require_full_read; database mcp_p4 correction history tests",
+      "level": "L3 basic success/redaction; L2 exact history/projection; L1 correction chain",
+      "assertion": "L3 currently status/redaction only; L2 two work events incl voided and sensitive log restrictions.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Add exact one initialized work-event status/time/id read to existing read-only L3 fixture; reuse correction chain L1/L2 with level boundary"
+    },
+    {
+      "tool": "query_work_calendar",
+      "action": "fixed date + timezone",
+      "test": "mcp_queries queueTask success; query_tests::report_and_calendar_share_ui_calculations_and_snapshot_with_long_history",
+      "level": "L3 queue membership; L2 exact event/calendar counts",
+      "assertion": "L3 checks known queue row but date based on clock; L2 two rounds/one complete and UTC explicit range.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Add fixed historical one-event dates and UTC/-120 minute day boundary to existing read-only fixture"
+    },
+    {
+      "tool": "query_changes",
+      "action": "initial full current + idle incremental",
+      "test": "mcp_queries actual full and incremental; jobs_tests::full_sync_pagination_generation_and_event_modes; changes_capture_gui_events_leave_scope_without_leaking_body_and_bind_client",
+      "level": "L3 flags/empty delta; L2 exact mutation/current/removal/cursor semantics",
+      "assertion": "L3 fullSyncComplete=true and idle delta empty, but full item values not fixed; L2 exact edits and removed event without leaked title.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Add exact fixture task/current title in initial full + zero idle delta without any post-start business mutation"
+    },
+    {
+      "tool": "inspect_data",
+      "action": "health/trace/compare/cache/recompute",
+      "test": "mcp_queries health healthy=true/trace ok; query_tests metric_trace and cache tests",
+      "level": "L3 health exact and trace status; L2 full metrics/cache/compare",
+      "assertion": "L3 trace lacks explicit numeric source set assertion; L2 independently scoped source facts and valid winner/voided exclusions.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Add completed=1 trace source/id/value to same report snapshot; reuse health exact check and L2 other actions"
+    },
+    {
+      "tool": "get_diagnostic",
+      "action": "own errorId",
+      "test": "mcp_queries invalid query -> own diagnostic; p7_tests::diagnostics_own_only_pause_revoke_and_unhealthy_basis_are_enforced",
+      "level": "L3; L2",
+      "assertion": "Actual own error requestId/code invalid_arguments match; raw business canary not echoed; L2 other client not_found, pause/revoke.",
+      "runSha": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+      "sufficient": "Reuse exact existing L3, add only redacted evidence emission, no duplicate request"
+    }
+  ],
+  "independentFixture": {
+    "label": "one-completed-task",
+    "initialTaskCount": 1,
+    "initialWorkEventCount": 1,
+    "title": "完成 MCP 接入",
+    "department": "产品组",
+    "taskType": "功能开发",
+    "resultStatus": "completed",
+    "handledAt": "2026-08-08T09:00:00+08:00",
+    "apiCompletionRate": 1,
+    "completionRateMeaning": "ratio 1.0 (display 100 percent), not numeric API value 100",
+    "timeIdentity": "09:00 +08 = 01:00 UTC = previous day 23:00 -02",
+    "calendarExpected": [
+      {
+        "day": "2026-08-08",
+        "offsetMinutes": 480,
+        "events": 1
+      },
+      {
+        "day": "2026-08-07",
+        "offsetMinutes": -120,
+        "events": 1
+      },
+      {
+        "day": "2026-08-08",
+        "offsetMinutes": -120,
+        "events": 0
+      }
+    ],
+    "businessExpectedValuesFromReturnedStatistics": false,
+    "dynamicSnapshotCursorIdsUsedOnlyForProtocolContinuation": true
+  },
+  "readonlyFacts": [
+    {
+      "action": "own_error",
+      "actual": {
+        "code": "invalid_arguments",
+        "rawCanaryAbsent": true,
+        "requestMatches": true,
+        "status": "ok"
+      },
+      "expected": {
+        "code": "invalid_arguments",
+        "rawCanaryAbsent": true,
+        "requestMatches": true,
+        "status": "ok"
+      },
+      "fixture": "existing-private-stdio",
+      "passed": true,
+      "tool": "get_diagnostic"
+    },
+    {
+      "action": "summary",
+      "actual": {
+        "completed": 1,
+        "denominator": 1,
+        "handled": 1,
+        "numerator": 1,
+        "rate": 1
+      },
+      "expected": {
+        "completed": 1,
+        "denominator": 1,
+        "handled": 1,
+        "numerator": 1,
+        "rate": 1
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "get_report_summary"
+    },
+    {
+      "action": "dimensions",
+      "actual": {
+        "departments": [
+          {
+            "completed": 1,
+            "department": "产品组",
+            "handledTasks": 1,
+            "pendingFollowUp": 0
+          }
+        ],
+        "trendCompleted": 1,
+        "trendDate": "2026-08-08",
+        "trendDays": 1,
+        "trendHandled": 1,
+        "types": [
+          {
+            "completed": 1,
+            "handledTasks": 1,
+            "pendingFollowUp": 0,
+            "taskType": "功能开发"
+          }
+        ]
+      },
+      "expected": {
+        "departments": [
+          {
+            "completed": 1,
+            "department": "产品组",
+            "handledTasks": 1,
+            "pendingFollowUp": 0
+          }
+        ],
+        "trendCompleted": 1,
+        "trendDate": "2026-08-08",
+        "trendDays": 1,
+        "trendHandled": 1,
+        "types": [
+          {
+            "completed": 1,
+            "handledTasks": 1,
+            "pendingFollowUp": 0,
+            "taskType": "功能开发"
+          }
+        ]
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "get_report_summary"
+    },
+    {
+      "action": "same_snapshot",
+      "actual": {
+        "sameBasis": true,
+        "sameSnapshot": true,
+        "total": 1,
+        "workEvents": 1
+      },
+      "expected": {
+        "sameBasis": true,
+        "sameSnapshot": true,
+        "total": 1,
+        "workEvents": 1
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "list_report_items"
+    },
+    {
+      "action": "known_work_event",
+      "actual": {
+        "at": "2026-08-08T09:00:00+08:00",
+        "status": "completed",
+        "taskId": 1,
+        "total": 1,
+        "voided": false
+      },
+      "expected": {
+        "at": "2026-08-08T09:00:00+08:00",
+        "status": "completed",
+        "taskId": 1,
+        "total": 1,
+        "voided": false
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "query_task_history"
+    },
+    {
+      "action": "timezone_membership",
+      "actual": {
+        "completed": 1,
+        "day": "2026-08-08",
+        "events": 1,
+        "fixtureOnly": true,
+        "offset": 480,
+        "rounds": 1
+      },
+      "expected": {
+        "completed": 1,
+        "day": "2026-08-08",
+        "events": 1,
+        "fixtureOnly": true,
+        "offset": 480,
+        "rounds": 1
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "query_work_calendar"
+    },
+    {
+      "action": "timezone_membership",
+      "actual": {
+        "completed": 1,
+        "day": "2026-08-07",
+        "events": 1,
+        "fixtureOnly": true,
+        "offset": -120,
+        "rounds": 1
+      },
+      "expected": {
+        "completed": 1,
+        "day": "2026-08-07",
+        "events": 1,
+        "fixtureOnly": true,
+        "offset": -120,
+        "rounds": 1
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "query_work_calendar"
+    },
+    {
+      "action": "timezone_membership",
+      "actual": {
+        "completed": 0,
+        "day": "2026-08-08",
+        "events": 0,
+        "fixtureOnly": true,
+        "offset": -120,
+        "rounds": 0
+      },
+      "expected": {
+        "completed": 0,
+        "day": "2026-08-08",
+        "events": 0,
+        "fixtureOnly": true,
+        "offset": -120,
+        "rounds": 0
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "query_work_calendar"
+    },
+    {
+      "action": "initial_full",
+      "actual": {
+        "complete": true,
+        "kind": "current",
+        "rows": 1,
+        "taskId": 1,
+        "title": "完成 MCP 接入"
+      },
+      "expected": {
+        "complete": true,
+        "kind": "current",
+        "rows": 1,
+        "taskId": 1,
+        "title": "完成 MCP 接入"
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "query_changes"
+    },
+    {
+      "action": "idle_incremental",
+      "actual": [],
+      "expected": [],
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "query_changes"
+    },
+    {
+      "action": "four_snapshot_limit",
+      "actual": "resource_limit",
+      "expected": "resource_limit",
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "query_work_calendar"
+    },
+    {
+      "action": "trace_completed",
+      "actual": {
+        "complete": true,
+        "sameSnapshot": true,
+        "sources": 1,
+        "value": 1
+      },
+      "expected": {
+        "complete": true,
+        "sameSnapshot": true,
+        "sources": 1,
+        "value": 1
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "inspect_data"
+    },
+    {
+      "action": "read_segment_preserves_business_and_authorization",
+      "actual": {
+        "authorization": true,
+        "businessAudit": true,
+        "events": true,
+        "preferences": true,
+        "task": true
+      },
+      "expected": {
+        "authorization": true,
+        "businessAudit": true,
+        "events": true,
+        "preferences": true,
+        "task": true
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "fixture_safety"
+    }
+  ],
+  "capabilityWithoutRegularRead": {
+    "event": "p3a_capabilities_without_regular_read",
+    "fields": {
+      "permissions": {
+        "fullRead": false,
+        "regularRead": false,
+        "write": false
+      },
+      "status": "ok",
+      "verifiedScope": "thisToolCall"
+    },
+    "schema": 1
+  },
+  "supportingP2DRecords": [
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D01-rejected",
+        "created": "134380840181877837",
+        "pid": 6000,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-rejected",
+        "errorCode": "unauthenticated",
+        "pid": 6000,
+        "status": "error",
+        "tool": "get_capabilities"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-rejected",
+        "errorCode": "unauthenticated",
+        "pid": 6000,
+        "status": "error",
+        "tool": "query_tasks"
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D01-rejected",
+        "created": "134380840181877837",
+        "exitCode": 0,
+        "pid": 6000,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "import_result",
+      "fields": {
+        "case": "D03",
+        "configurationChanged": true,
+        "configurationVerified": true,
+        "currentSessionVerified": false,
+        "exitCode": 0,
+        "identityMatches": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "import_result",
+      "fields": {
+        "case": "D01-first-D05",
+        "configurationChanged": true,
+        "configurationVerified": true,
+        "currentSessionVerified": false,
+        "exitCode": 0,
+        "identityMatches": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "import_result",
+      "fields": {
+        "case": "D04",
+        "configurationChanged": true,
+        "configurationVerified": true,
+        "currentSessionVerified": false,
+        "exitCode": 0,
+        "identityMatches": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D01-rejected",
+        "created": "134380840192115688",
+        "pid": 6212,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D03",
+        "created": "134380840192806033",
+        "pid": 9412,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-rejected",
+        "errorCode": "unauthenticated",
+        "pid": 6212,
+        "status": "error",
+        "tool": "get_capabilities"
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D01-first-D05",
+        "created": "134380840193561718",
+        "pid": 3728,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-rejected",
+        "errorCode": "unauthenticated",
+        "pid": 6212,
+        "status": "error",
+        "tool": "query_tasks"
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D01-rejected",
+        "created": "134380840192115688",
+        "exitCode": 0,
+        "pid": 6212,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D04",
+        "created": "134380840196068809",
+        "pid": 4656,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D01-rejected",
+        "created": "134380840207712672",
+        "pid": 812,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-rejected",
+        "errorCode": "unauthenticated",
+        "pid": 812,
+        "status": "error",
+        "tool": "get_capabilities"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-rejected",
+        "errorCode": "unauthenticated",
+        "pid": 812,
+        "status": "error",
+        "tool": "query_tasks"
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D01-rejected",
+        "created": "134380840207712672",
+        "exitCode": 0,
+        "pid": 812,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D04",
+        "created": "134380840209745532",
+        "pid": 8764,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D03",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 9412,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-first-D05",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 3728,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 4656,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-first-D05",
+        "errorCode": null,
+        "pid": 3728,
+        "returnedItems": 1,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 1
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D01-first-D05",
+        "created": "134380840193561718",
+        "exitCode": 0,
+        "pid": 3728,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": null,
+        "pid": 4656,
+        "returnedItems": 2,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 2
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "forbidden",
+        "pid": 4656,
+        "status": "error",
+        "tool": "query_tasks"
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_start",
+      "fields": {
+        "case": "D01-first-D05",
+        "created": "134380840234896255",
+        "pid": 2440,
+        "sidecarSha256": "1f53b372aa7891b2dbe1d4ad94b55fc0706d4de306e62eda77c7b81dc9827748"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "forbidden",
+        "pid": 4656,
+        "status": "error",
+        "tool": "mutate_task"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D01-first-D05",
+        "errorCode": null,
+        "pid": 2440,
+        "returnedItems": 1,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 1
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D01-first-D05",
+        "created": "134380840234896255",
+        "exitCode": 0,
+        "pid": 2440,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "same_process_alive",
+      "fields": {
+        "case": "D04",
+        "created": "134380840196068809",
+        "pid": 4656
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 4656,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": [
+            "A"
+          ],
+          "taskTypes": [
+            "T"
+          ]
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": null,
+        "pid": 4656,
+        "returnedItems": 1,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 1
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "forbidden",
+        "pid": 4656,
+        "status": "error",
+        "tool": "query_tasks"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": null,
+        "pid": 4656,
+        "returnedItems": 0,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 0
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "forbidden",
+        "pid": 4656,
+        "status": "error",
+        "tool": "mutate_task"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "currentCredentials"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 8764,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "import_result",
+      "fields": {
+        "case": "D03",
+        "configurationChanged": false,
+        "configurationVerified": true,
+        "currentSessionVerified": false,
+        "exitCode": 0,
+        "identityMatches": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "same_process_alive",
+      "fields": {
+        "case": "D03",
+        "created": "134380840192806033",
+        "pid": 9412
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": null,
+        "pid": 8764,
+        "returnedItems": 2,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 2
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D03",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 9412,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": false,
+          "write": false
+        },
+        "pid": 4656,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "p3a_capabilities_without_regular_read",
+      "fields": {
+        "permissions": {
+          "fullRead": false,
+          "regularRead": false,
+          "write": false
+        },
+        "status": "ok",
+        "verifiedScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "forbidden",
+        "pid": 4656,
+        "status": "error",
+        "tool": "query_tasks"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D03",
+        "errorCode": null,
+        "pid": 9412,
+        "returnedItems": 1,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 1
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": null,
+        "pid": 8764,
+        "returnedItems": 2,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 2
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "paused",
+        "pid": 4656,
+        "status": "error",
+        "tool": "get_capabilities"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "revoked",
+        "pid": 4656,
+        "status": "error",
+        "tool": "get_capabilities"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": "revoked",
+        "pid": 4656,
+        "status": "error",
+        "tool": "query_tasks"
+      },
+      "schema": 1
+    },
+    {
+      "event": "same_process_alive",
+      "fields": {
+        "case": "D04",
+        "created": "134380840196068809",
+        "pid": 4656
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "currentCredentials"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 8764,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": null,
+        "pid": 8764,
+        "returnedItems": 2,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 2
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D04",
+        "errorCode": null,
+        "pid": 8764,
+        "returnedItems": 2,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 2
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D04",
+        "created": "134380840196068809",
+        "exitCode": 0,
+        "pid": 4656,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D04",
+        "created": "134380840209745532",
+        "exitCode": 0,
+        "pid": 8764,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "import_result",
+      "fields": {
+        "case": "D03",
+        "configurationChanged": false,
+        "configurationVerified": true,
+        "currentSessionVerified": false,
+        "exitCode": 0,
+        "identityMatches": true
+      },
+      "schema": 1
+    },
+    {
+      "event": "same_process_alive",
+      "fields": {
+        "case": "D03",
+        "created": "134380840192806033",
+        "pid": 9412
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D03",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 9412,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D03",
+        "errorCode": null,
+        "pid": 9412,
+        "returnedItems": 1,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 1
+      },
+      "schema": 1
+    },
+    {
+      "event": "same_process_alive",
+      "fields": {
+        "case": "D03",
+        "created": "134380840192806033",
+        "pid": 9412
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D03",
+        "commit": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+        "credentialResolution": {
+          "changed": false,
+          "source": "runtimeBinding"
+        },
+        "errorCode": null,
+        "mcpVersion": 1,
+        "permissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": false
+        },
+        "pid": 9412,
+        "schemaVersion": 14,
+        "scope": {
+          "departments": null,
+          "taskTypes": null
+        },
+        "softwareVersion": "0.5.0",
+        "status": "ok",
+        "tool": "get_capabilities",
+        "verificationScope": "thisToolCall"
+      },
+      "schema": 1
+    },
+    {
+      "event": "tool_result",
+      "fields": {
+        "case": "D03",
+        "errorCode": null,
+        "pid": 9412,
+        "returnedItems": 1,
+        "status": "ok",
+        "tool": "query_tasks",
+        "total": 1
+      },
+      "schema": 1
+    },
+    {
+      "event": "connection_eof_exit",
+      "fields": {
+        "case": "D03",
+        "created": "134380840192806033",
+        "exitCode": 0,
+        "pid": 9412,
+        "stderrEmpty": true,
+        "stdoutEof": true
+      },
+      "schema": 1
+    }
+  ],
+  "recordCounts": {
+    "newWhiteListFactRows": 13,
+    "supportingP2DWhiteListRows": 63
+  },
+  "recordNormalization": "JSON parsed from immutable CI logs; Windows FILETIME created values stored as original decimal strings to avoid JavaScript precision loss.",
+  "reusedPassedTestLogLines": [
+    "2026-11-02T09:05:57.0767508Z test database::mcp_p4_tests::p4_backup_merge_translates_correction_ids_and_preserves_original_voided_history ... ok",
+    "2026-11-02T09:05:57.3148769Z test database::mcp_p4_tests::p4_future_creation_queue_real_work_and_correction_keep_linked_history ... ok",
+    "2026-11-02T09:06:13.8343938Z test mcp::jobs::tests::changes_capture_gui_events_leave_scope_without_leaking_body_and_bind_client ... ok",
+    "2026-11-02T09:06:14.5875554Z test mcp::jobs::tests::full_sync_pagination_generation_and_event_modes ... ok",
+    "2026-11-02T09:06:18.9432589Z test mcp::p7_tests::diagnostics_own_only_pause_revoke_and_unhealthy_basis_are_enforced ... ok",
+    "2026-11-02T09:06:19.3081577Z test mcp::p7_tests::forged_client_never_claims_recent_state_and_post_guard_error_keeps_audit_reference ... ok",
+    "2026-11-02T09:06:20.2444553Z test mcp::query::tests::history_projection_voided_and_trash_require_full_read ... ok",
+    "2026-11-02T09:06:20.8662083Z test mcp::query::tests::live_scope_change_expiry_revocation_and_generation_invalidate_results ... ok",
+    "2026-11-02T09:06:21.3891341Z test mcp::query::tests::metric_trace_all_counts_rates_dimensions_trend_and_scope_match_gui ... ok",
+    "2026-11-02T09:06:22.0057887Z test mcp::query::tests::query_filters_are_bound_and_injection_has_no_sql_access ... ok",
+    "2026-11-02T09:06:22.1085051Z test mcp::query::tests::report_and_calendar_share_ui_calculations_and_snapshot_with_long_history ... ok",
+    "2026-11-02T09:06:22.6746973Z test mcp::query::tests::resource_caps_and_database_generation_changes_fail_closed ... ok",
+    "2026-11-02T09:06:22.7231665Z test mcp::query::tests::report_cache_is_short_client_owned_invalidates_on_basis_auth_and_explicit_requery ... ok",
+    "2026-11-02T09:06:25.9159224Z test mcp::query::tests::pages_freeze_content_and_order_over_100_items_and_concurrent_writes ... ok",
+    "2026-11-02T09:06:31.7832959Z test mcp::query::tests::trace_pagination_is_bound_to_metric_client_and_original_snapshot ... ok",
+    "2026-11-02T09:07:01.5052183Z test p2d_d01_unbound_missing_invalid_and_mismatched_credentials_are_rejected ... ok",
+    "2026-11-02T09:07:04.5908006Z test p2d_d01_first_import_authorized_sentinel_credentials_and_d05_eof_reconnect ... ok",
+    "2026-11-02T09:07:06.8569339Z test p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_revocation ... ok",
+    "2026-11-02T09:07:07.4030777Z test p2d_d03_equivalent_import_preserves_active_transport_host_policy_and_loaded_credentials ... ok",
+    "2026-11-02T09:07:30.1933574Z test p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction ... ok",
+    "2026-11-02T09:07:30.2118564Z test scope_all_departments_missing_departments_and_literal_names ... ok",
+    "2026-11-02T09:07:32.8944850Z test scope_filters_summary_denominator_trend_details_and_cross_client_calls ... ok",
+    "2026-11-02T09:07:37.4321522Z test stdio_server_lists_and_calls_read_only_report_tools ... ok"
+  ],
+  "failures": {
+    "originalRunsRetained": true,
+    "originalAssertionsNotRemovedOrWeakened": true,
+    "records": [
+      {
+        "run": 41415440373,
+        "sha": "40823b684c853923d0c4261813ed8e8d1fb3f02a",
+        "conclusion": "failure",
+        "facts": [
+          {
+            "action": "own_error",
+            "actual": {
+              "code": "invalid_arguments",
+              "rawCanaryAbsent": true,
+              "requestMatches": true,
+              "status": "ok"
+            },
+            "expected": {
+              "code": "invalid_arguments",
+              "rawCanaryAbsent": true,
+              "requestMatches": true,
+              "status": "ok"
+            },
+            "fixture": "existing-private-stdio",
+            "passed": true,
+            "tool": "get_diagnostic"
+          },
+          {
+            "action": "summary",
+            "actual": {
+              "completed": 1,
+              "denominator": 1,
+              "handled": 1,
+              "numerator": 1,
+              "rate": 1
+            },
+            "expected": {
+              "completed": 1,
+              "denominator": 1,
+              "handled": 1,
+              "numerator": 1,
+              "rate": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "get_report_summary"
+          },
+          {
+            "action": "dimensions",
+            "actual": {
+              "departments": [
+                {
+                  "completed": 1,
+                  "department": "产品组",
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0
+                }
+              ],
+              "trendCompleted": 1,
+              "trendDate": "2026-08-08",
+              "trendDays": 1,
+              "trendHandled": 1,
+              "types": [
+                {
+                  "completed": 1,
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0,
+                  "taskType": "功能开发"
+                }
+              ]
+            },
+            "expected": {
+              "departments": [
+                {
+                  "completed": 1,
+                  "department": "产品组",
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0
+                }
+              ],
+              "trendCompleted": 1,
+              "trendDate": "2026-08-08",
+              "trendDays": 1,
+              "trendHandled": 1,
+              "types": [
+                {
+                  "completed": 1,
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0,
+                  "taskType": "功能开发"
+                }
+              ]
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "get_report_summary"
+          },
+          {
+            "action": "same_snapshot",
+            "actual": {
+              "sameBasis": true,
+              "sameSnapshot": true,
+              "total": 1,
+              "workEvents": 1
+            },
+            "expected": {
+              "sameBasis": true,
+              "sameSnapshot": true,
+              "total": 1,
+              "workEvents": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "list_report_items"
+          },
+          {
+            "action": "known_work_event",
+            "actual": {
+              "at": "2026-08-08T09:00:00+08:00",
+              "status": "completed",
+              "taskId": 1,
+              "total": 1,
+              "voided": false
+            },
+            "expected": {
+              "at": "2026-08-08T09:00:00+08:00",
+              "status": "completed",
+              "taskId": 1,
+              "total": 1,
+              "voided": false
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "query_task_history"
+          },
+          {
+            "action": "timezone_membership",
+            "actual": {
+              "completed": 1,
+              "day": "2026-08-08",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": 480,
+              "rounds": 1
+            },
+            "expected": {
+              "completed": 1,
+              "day": "2026-08-08",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": 480,
+              "rounds": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "query_work_calendar"
+          },
+          {
+            "action": "timezone_membership",
+            "actual": {
+              "completed": 1,
+              "day": "2026-08-07",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": -120,
+              "rounds": 1
+            },
+            "expected": {
+              "completed": 1,
+              "day": "2026-08-07",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": -120,
+              "rounds": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "query_work_calendar"
+          }
+        ],
+        "failures": [
+          "2026-11-02T08:53:14.9064616Z thread 'stdio_server_lists_and_calls_read_only_report_tools' (5504) panicked at tests\\mcp_stdio.rs:247:9:",
+          "2026-11-02T08:53:14.9067128Z   left: Some(true)",
+          "2026-11-02T08:53:14.9067529Z  right: Some(false)",
+          "2026-11-02T08:53:14.9070594Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s",
+          "2026-11-02T08:53:14.9100197Z error: test failed, to rerun pass `--test mcp_stdio`"
+        ],
+        "finding": "Failure before the third calendar result; source inspection identifies a fifth snapshot on one client against existing per-client limit 4. Final candidate keeps the business assertion, uses a separate read-only fixture identity and explicitly probes the unchanged cap. Product is not modified.",
+        "sourceRootCause": {
+          "file": "src-tauri/src/mcp/query.rs",
+          "function": "QueryState::begin",
+          "maxPerClientSnapshots": 4
+        }
+      },
+      {
+        "run": 41416168941,
+        "sha": "e6dba877acf1c92c1b0bb893a9a980d6fa123dd7",
+        "conclusion": "failure",
+        "facts": [
+          {
+            "action": "own_error",
+            "actual": {
+              "code": "invalid_arguments",
+              "rawCanaryAbsent": true,
+              "requestMatches": true,
+              "status": "ok"
+            },
+            "expected": {
+              "code": "invalid_arguments",
+              "rawCanaryAbsent": true,
+              "requestMatches": true,
+              "status": "ok"
+            },
+            "fixture": "existing-private-stdio",
+            "passed": true,
+            "tool": "get_diagnostic"
+          },
+          {
+            "action": "summary",
+            "actual": {
+              "completed": 1,
+              "denominator": 1,
+              "handled": 1,
+              "numerator": 1,
+              "rate": 1
+            },
+            "expected": {
+              "completed": 1,
+              "denominator": 1,
+              "handled": 1,
+              "numerator": 1,
+              "rate": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "get_report_summary"
+          },
+          {
+            "action": "dimensions",
+            "actual": {
+              "departments": [
+                {
+                  "completed": 1,
+                  "department": "产品组",
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0
+                }
+              ],
+              "trendCompleted": 1,
+              "trendDate": "2026-08-08",
+              "trendDays": 1,
+              "trendHandled": 1,
+              "types": [
+                {
+                  "completed": 1,
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0,
+                  "taskType": "功能开发"
+                }
+              ]
+            },
+            "expected": {
+              "departments": [
+                {
+                  "completed": 1,
+                  "department": "产品组",
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0
+                }
+              ],
+              "trendCompleted": 1,
+              "trendDate": "2026-08-08",
+              "trendDays": 1,
+              "trendHandled": 1,
+              "types": [
+                {
+                  "completed": 1,
+                  "handledTasks": 1,
+                  "pendingFollowUp": 0,
+                  "taskType": "功能开发"
+                }
+              ]
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "get_report_summary"
+          },
+          {
+            "action": "same_snapshot",
+            "actual": {
+              "sameBasis": true,
+              "sameSnapshot": true,
+              "total": 1,
+              "workEvents": 1
+            },
+            "expected": {
+              "sameBasis": true,
+              "sameSnapshot": true,
+              "total": 1,
+              "workEvents": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "list_report_items"
+          },
+          {
+            "action": "known_work_event",
+            "actual": {
+              "at": "2026-08-08T09:00:00+08:00",
+              "status": "completed",
+              "taskId": 1,
+              "total": 1,
+              "voided": false
+            },
+            "expected": {
+              "at": "2026-08-08T09:00:00+08:00",
+              "status": "completed",
+              "taskId": 1,
+              "total": 1,
+              "voided": false
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "query_task_history"
+          },
+          {
+            "action": "timezone_membership",
+            "actual": {
+              "completed": 1,
+              "day": "2026-08-08",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": 480,
+              "rounds": 1
+            },
+            "expected": {
+              "completed": 1,
+              "day": "2026-08-08",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": 480,
+              "rounds": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "query_work_calendar"
+          },
+          {
+            "action": "timezone_membership",
+            "actual": {
+              "completed": 1,
+              "day": "2026-08-07",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": -120,
+              "rounds": 1
+            },
+            "expected": {
+              "completed": 1,
+              "day": "2026-08-07",
+              "events": 1,
+              "fixtureOnly": true,
+              "offset": -120,
+              "rounds": 1
+            },
+            "fixture": "one-completed-task",
+            "passed": true,
+            "tool": "query_work_calendar"
+          }
+        ],
+        "failures": [
+          "2026-11-02T09:03:20.3616084Z thread 'stdio_server_lists_and_calls_read_only_report_tools' (3152) panicked at tests\\mcp_stdio.rs:254:9:",
+          "2026-11-02T09:03:20.3618148Z   left: Some(true)",
+          "2026-11-02T09:03:20.3618562Z  right: Some(false)",
+          "2026-11-02T09:03:20.3622298Z test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+          "2026-11-02T09:03:20.3861162Z error: test failed, to rerun pass `--test mcp_stdio`"
+        ],
+        "finding": "Same third-calendar snapshot-budget failure; added preservation assertion is not reached. All failing assertions retained in branch history."
+      }
+    ],
+    "rootCause": {
+      "classification": "test_harness_orchestration",
+      "source": "src-tauri/src/mcp/query.rs::QueryState::begin",
+      "existingPerClientSnapshotLimit": 4,
+      "originalFailedRunDidNotLogErrorCode": true,
+      "existingGlobalSnapshotLimit": 16,
+      "initialSequence": "report + history + calendar(+480) + calendar(-120 prior day) = four; next calendar needs fifth",
+      "testOnlyCorrection": "Initialize one independent R/F=true,W=false sibling before reads for two calendar boundary probes; keep original 1/1/0 assertions; explicitly verify original client's fifth new snapshot returns resource_limit",
+      "runtimeNegativeReproduction": {
+        "action": "four_snapshot_limit",
+        "actual": "resource_limit",
+        "expected": "resource_limit",
+        "fixture": "one-completed-task",
+        "passed": true,
+        "tool": "query_work_calendar"
+      },
+      "productCodeOrProtectionThresholdChanged": false
+    },
+    "newProductDefectsFound": []
+  },
+  "preservation": {
+    "baseline": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+    "formalBranch": "feat/scheduled-items",
+    "currentHead": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+    "originalFiles": 855,
+    "originalUntracked": 16,
+    "originalFilesUnchanged": true,
+    "historicalUntracked": 12,
+    "priorPreparationDocumentsPreserved": 4,
+    "nativeZipDigestsMatched": 15,
+    "formalTrackedDiff": [],
+    "formalStagedDiff": [],
+    "readonlySegment": {
+      "action": "read_segment_preserves_business_and_authorization",
+      "actual": {
+        "authorization": true,
+        "businessAudit": true,
+        "events": true,
+        "preferences": true,
+        "task": true
+      },
+      "expected": {
+        "authorization": true,
+        "businessAudit": true,
+        "events": true,
+        "preferences": true,
+        "task": true
+      },
+      "fixture": "one-completed-task",
+      "passed": true,
+      "tool": "fixture_safety"
+    },
+    "productionBusinessStoreAccessedForHashes": false
+  },
+  "changeList": [
+    {
+      "path": "src-tauri/tests/mcp_stdio.rs",
+      "location": "Temporary branch/worktree only",
+      "sha256": "e97730d4c39a88ea7bf74ec564038eb3cdc3ca2572f902581ab57d5f616c8800",
+      "gitBlob": "c468ee48ac0e9eed569aa1f632c2fb52585c3674"
+    },
+    {
+      "path": "src-tauri/tests/mcp_queries.rs",
+      "location": "Temporary branch/worktree only",
+      "sha256": "6890259a452fb7c6bf02c81988eb878561919166a03647affeeb99d89802996a",
+      "gitBlob": "495d2d9aa586dfb4a4e36da892e8d431d74bdcc3"
+    },
+    {
+      "path": "src-tauri/tests/mcp_connection_acceptance.rs",
+      "location": "Temporary branch/worktree only",
+      "sha256": "00cce9eb3b2c28574bec7d6e65a0c93dff343d5d67c70d8b54568a7219d4cec9",
+      "gitBlob": "fdf5a988727a7baca336fd877e2df27344bd04eb"
+    },
+    {
+      "path": "docs/MCP_PHASE3A_ACCEPTANCE.md",
+      "location": "Main worktree, untracked, awaiting acceptance"
+    },
+    {
+      "path": "docs/mcp/acceptance/MCP-PHASE3A-20261102-checks.json",
+      "location": "Main worktree, untracked, awaiting acceptance"
+    }
+  ],
+  "safety": {
+    "newSuccessfulMcpBusinessWrites": false,
+    "newWriteToolRequestsInP3ADiff": false,
+    "onlyExistingStandardCiBusinessRegressionsRerun": true,
+    "thoseRegressionsNotP3BOrP3CAcceptance": true,
+    "fixtureInitializationDirectSyntheticOnly": true,
+    "derivedCachesSnapshotsCursorsDiagnosticsAllowed": true,
+    "realCredentialsOrDataOrFormalCodexConfigAccessed": false,
+    "currentFormalConnectionTouched": false,
+    "localFixtureOrNsisExecuted": false,
+    "productImplementationChanged": false,
+    "workflowChanged": false,
+    "existingAssertionsWeakened": false,
+    "continueOnErrorAdded": false,
+    "nsisDevBuildReleaseTriggered": false,
+    "tagReleaseOrUpdateChannelChanged": false,
+    "rawTokensTokenHashesDpapiPackagesConfigsOrDatabasesLoggedOrUploaded": false
+  },
+  "uncovered": [
+    {
+      "item": "inspect_data.recompute positive action",
+      "reason": "No independent positive assertion found; minimum tool proof uses health and trace; explicitRequery not substituted"
+    },
+    {
+      "item": "Full correction-chain L3 read",
+      "reason": "Reuse L1 correction chain and L2 history projection; no new successful write authorized"
+    },
+    {
+      "item": "Non-empty incremental change/removal L3",
+      "reason": "Reuse existing L2 known edits/removals; new L3 fixed-data sequence only full then idle delta"
+    },
+    {
+      "item": ">100-row whole business L3 pagination",
+      "reason": "Existing L2 101-row freeze and L3 two-row pagination reused; avoid duplicating large fixture"
+    },
+    {
+      "item": "Other inspect action L3",
+      "reason": "Existing L2 and CLI evidence distinguished from L3"
+    },
+    {
+      "item": "Native GUI interactions",
+      "reason": "Not authorized; shared APIs not screen acceptance"
+    },
+    {
+      "item": "Formal Codex host access/loading/automatic recovery and cross-upgrade recovery",
+      "reason": "Not authorized and existing P2-B host capability limit remains"
+    },
+    {
+      "item": "Real old business database migration, enterprise policies, power failure",
+      "reason": "Outside this isolated scope"
+    },
+    {
+      "item": "Remaining seven tools and P3-B/P3-C/P3-D",
+      "reason": "Not authorized; not started"
+    }
+  ],
+  "phaseStatus": {
+    "p2D": "minimal_isolated_acceptance_complete_formally_committed_and_CI_passed",
+    "p2B": "formal_Codex_automatic_recovery_incomplete",
+    "p2C": "12/13_ps-hang_not_passed",
+    "r2": "B_compatibility_limitation_retained",
+    "phase2": "incomplete",
+    "p3A": "user_approved_minimal_nine_tool_L3_acceptance_full_actions_GUI_and_formal_host_unverified",
+    "p3B": "not_started",
+    "p3C": "not_started",
+    "p3D": "not_started",
+    "phase3Full16BusinessAcceptance": "incomplete",
+    "formalRelease": "not_authorized"
+  },
+  "stopGate": "Commit only five approved P3-A files, verify formal CI against new SHA, prepare P3-B checklist only, then stop for user confirmation.",
+  "deliveryAudit": {
+    "scope": "Historical pre-acceptance candidate audit; formal commit/CI must be read back separately against its new SHA.",
+    "developmentLocalHead": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+    "developmentRemoteHead": "9a8a957569dfff1274dc3b58dd7b52faeca3132e",
+    "temporaryLocalHead": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+    "temporaryRemoteHead": "a344ae8dd5643f464b44bb4adb416fdb98d6cbb9",
+    "mainRemoteHead": "1baac96252af2665274f2a955b3adacfa80519fd",
+    "temporaryWorktreeClean": true,
+    "formalTrackedTreeUnchanged": true,
+    "formalIndexEmpty": true,
+    "sourceFilesMatchTestedManifest": true,
+    "originalFilesCheckedUnchanged": 855,
+    "priorUntrackedPreserved": 16,
+    "currentUntrackedCount": 18,
+    "nativeZipDigestsMatched": 15,
+    "newReviewDocuments": 2,
+    "qa": "JSON, exact 9 tools, 13 passed facts, source hashes, local references, whitespace and sensitive literal scan passed",
+    "formalBranchCommitPushPerformed": false
+  },
+  "acceptanceDecision": {
+    "date": "2026-11-03",
+    "userApproved": true,
+    "approvedFiles": [
+      "src-tauri/tests/mcp_stdio.rs",
+      "src-tauri/tests/mcp_connection_acceptance.rs",
+      "src-tauri/tests/mcp_queries.rs",
+      "docs/MCP_PHASE3A_ACCEPTANCE.md",
+      "docs/mcp/acceptance/MCP-PHASE3A-20261102-checks.json"
+    ],
+    "testBlobsMustMatchCandidate": true,
+    "originalCandidateAndFailureEvidenceRetained": true,
+    "formalCiMustUseNewSha": true,
+    "nineMinimalL3PathsOnly": true,
+    "allActionsAccepted": false,
+    "newSuccessfulMcpBusinessWrites": false,
+    "phase3Complete": false,
+    "p3BPreparationOnly": true,
+    "p3BExecutionAuthorized": false
+  },
+  "snapshotUsabilityRisk": {
+    "status": "registered_for_future_usability_evaluation_not_confirmed_security_defect",
+    "testHarnessFailure": "Fifth snapshot requested on a client holding four; failure history retained and harness corrected without changing business expectations",
+    "confirmedMechanism": {
+      "globalSnapshots": 16,
+      "ttlSeconds": 600,
+      "expiredOrDifferentRevisionCleanupBeforeBegin": true,
+      "perClientSnapshots": 4,
+      "identicalClientHashAndBasisMayReuse": true
+    },
+    "potentialDailyUse": "Different queries/ranges or data basis changes may consume new snapshots before TTL; actual frequency and user impact not measured",
+    "productChangesAuthorized": false,
+    "limitTtlReleaseOrEvictionChanged": false
+  }
+}
