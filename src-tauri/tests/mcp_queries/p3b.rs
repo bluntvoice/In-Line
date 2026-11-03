@@ -299,6 +299,7 @@ impl Fixture {
             "tasks",
             "task_queue_entries",
             "daily_sequences",
+            "queue_number_allocations",
             "task_logs",
             "status_history",
             "task_work_events",
@@ -316,6 +317,12 @@ impl Fixture {
             "mcp_receipts",
             "mcp_undo_requests",
         ])
+    }
+    fn basis(&self) -> Value {
+        // Integration tests cannot call crate-private mcp_basis. Compare every
+        // stored basis input through this synthetic database's read-only handle;
+        // query/statistics schema constants are fixed by the same test SHA.
+        self.tables(&["mcp_data_basis", "mcp_change_index", "schema_meta"])
     }
 }
 fn patch(key: &str, base: &str, value: &str, version: i64, summary: &str) -> Value {
@@ -719,7 +726,7 @@ async fn p3b_j_one_read_job_two_waiters_and_owner_isolation_over_original_stdio(
     let business = f.business();
     let prefs = f.preferences();
     let auth = f.authorization();
-    let basis = serde_json::to_value(f.db.mcp_basis().unwrap()).unwrap();
+    let basis = f.basis();
     let mut owner = Wire::open(&f, &f.owner, "J-owner", "A", false).await;
     let mut other = Wire::open(&f, &f.other, "J-other", "A", false).await;
     let start = json!({"action":"start","kind":"query_tasks","arguments":{"filters":{"departments":["A"],"taskTypes":["T"]},"projection":["id","title"],"limit":100}});
@@ -761,7 +768,7 @@ async fn p3b_j_one_read_job_two_waiters_and_owner_isolation_over_original_stdio(
     record(
         "J/stable_basis_before_reuse",
         json!(true),
-        json!(serde_json::to_value(f.db.mcp_basis().unwrap()).unwrap() == basis),
+        json!(f.basis() == basis),
     );
     let second = owner
         .call("manage_jobs", start, "equivalent_start", "ok")
@@ -872,7 +879,7 @@ async fn p3b_j_one_read_job_two_waiters_and_owner_isolation_over_original_stdio(
     record(
         "J/final_preservation",
         json!({"business":true,"preferencesAuditsReceipts":true,"authorization":true,"basis":true}),
-        json!({"business":f.business()==business,"preferencesAuditsReceipts":f.preferences()==prefs,"authorization":f.authorization()==auth,"basis":serde_json::to_value(f.db.mcp_basis().unwrap()).unwrap()==basis}),
+        json!({"business":f.business()==business,"preferencesAuditsReceipts":f.preferences()==prefs,"authorization":f.authorization()==auth,"basis":f.basis()==basis}),
     );
     owner.close().await;
     other.close().await;
