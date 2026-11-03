@@ -12,6 +12,9 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
+#[path = "mcp_queries/p3b.rs"]
+mod p3b;
+
 #[tokio::test]
 async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction() {
     let root = std::env::temp_dir().join(format!(
