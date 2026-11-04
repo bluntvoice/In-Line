@@ -2,6 +2,7 @@
 use super::*;
 use in_line_lib::mcp::contract::Credentials;
 use rusqlite::{Connection, OpenFlags};
+use std::os::windows::process::CommandExt;
 use std::{
     io::Write,
     path::{Path, PathBuf},
