@@ -438,10 +438,25 @@ impl Probe {
             .as_i64()
             .unwrap()
             + 1;
+        // A successful create uses the three existing dictionary entries once.
+        // Require exactly those usage increments and preserve every other column.
+        let mut expected_dictionary = before["master_values"].clone();
+        for row in expected_dictionary.as_array_mut().unwrap() {
+            if [
+                ("department", "synthetic A"),
+                ("task_type", "synthetic T"),
+                ("contact", "synthetic C"),
+            ]
+            .iter()
+            .any(|(kind, name)| row["kind"] == *kind && row["name"] == *name)
+            {
+                row["usage_count"] = json!(row["usage_count"].as_i64().unwrap() + 1);
+            }
+        }
         record(
             "batch_apply/exact_number_and_audit",
-            json!({"knownNumber":true,"oldAllocationsRetained":true,"allocationsAdded":1,"queuesAdded":1,"auditsAdded":2,"receiptsAdded":2,"dictionaryPreserved":true}),
-            json!({"knownNumber":t["permanent_number"]==format!("{}-{:02}",date.replace('-',""),sequence)&&t["daily_sequence"]==sequence&&by(&after,"daily_sequences","ticket_date",&json!(date))["last_sequence"]==sequence,"oldAllocationsRetained":old_allocations.iter().all(|r|rows(&after,"queue_number_allocations").contains(r)),"allocationsAdded":rows(&after,"queue_number_allocations").len()-old_allocations.len(),"queuesAdded":rows(&after,"task_queue_entries").len()-rows(before,"task_queue_entries").len(),"auditsAdded":rows(&after,"mcp_ai_audit").len()-rows(before,"mcp_ai_audit").len(),"receiptsAdded":rows(&after,"mcp_receipts").len()-rows(before,"mcp_receipts").len(),"dictionaryPreserved":before["master_values"]==after["master_values"]}),
+            json!({"knownNumber":true,"oldAllocationsRetained":true,"allocationsAdded":1,"queuesAdded":1,"auditsAdded":2,"receiptsAdded":2,"dictionaryExactlyExpected":true}),
+            json!({"knownNumber":t["permanent_number"]==format!("{}-{:02}",date.replace('-',""),sequence)&&t["daily_sequence"]==sequence&&by(&after,"daily_sequences","ticket_date",&json!(date))["last_sequence"]==sequence,"oldAllocationsRetained":old_allocations.iter().all(|r|rows(&after,"queue_number_allocations").contains(r)),"allocationsAdded":rows(&after,"queue_number_allocations").len()-old_allocations.len(),"queuesAdded":rows(&after,"task_queue_entries").len()-rows(before,"task_queue_entries").len(),"auditsAdded":rows(&after,"mcp_ai_audit").len()-rows(before,"mcp_ai_audit").len(),"receiptsAdded":rows(&after,"mcp_receipts").len()-rows(before,"mcp_receipts").len(),"dictionaryExactlyExpected":expected_dictionary==after["master_values"]}),
         );
     }
     pub(super) fn sentinel(&self) {
