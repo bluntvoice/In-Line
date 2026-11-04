@@ -1,0 +1,3399 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-04",
+  "timezone": "Asia/Shanghai",
+  "status": "minimum_scope_automated_checks_passed_pending_user_acceptance",
+  "baseline": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+  "candidate": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+  "branch": "codex/p3c-isolated-acceptance-20261104",
+  "run": {
+    "id": 41787792742,
+    "sha": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+    "event": "push",
+    "path": ".github/workflows/ci.yml"
+  },
+  "runner": [
+    "2026-11-04T06:46:49.1159984Z Current runner version: '2.338.2'",
+    "2026-11-04T06:46:49.1182300Z ##[group]Runner Image Provisioner",
+    "2026-11-04T06:46:49.1188087Z ##[group]Operating System",
+    "2026-11-04T06:46:49.1188572Z Microsoft Windows Server 2025",
+    "2026-11-04T06:46:49.1190837Z Image: windows-2025-vs2026"
+  ],
+  "runnerImage": "win25-vs2026",
+  "runnerImageVersion": "20261030.294.1",
+  "verification": {
+    "rust": {
+      "passed": 257,
+      "failed": 0,
+      "ignored": 0
+    },
+    "frontend": {
+      "passed": 135,
+      "files": 22
+    },
+    "standardSteps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-11-04T06:46:49Z",
+        "completed_at": "2026-11-04T06:46:50Z"
+      },
+      {
+        "name": "Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-11-04T06:46:50Z",
+        "completed_at": "2026-11-04T06:46:56Z"
+      },
+      {
+        "name": "Check GitHub Actions runtime policy",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-11-04T06:46:56Z",
+        "completed_at": "2026-11-04T06:46:57Z"
+      },
+      {
+        "name": "Set up Node.js",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-11-04T06:46:57Z",
+        "completed_at": "2026-11-04T06:47:03Z"
+      },
+      {
+        "name": "Set up Rust",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-11-04T06:47:03Z",
+        "completed_at": "2026-11-04T06:47:10Z"
+      },
+      {
+        "name": "Cache Rust",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-11-04T06:47:10Z",
+        "completed_at": "2026-11-04T06:47:13Z"
+      },
+      {
+        "name": "Run npm ci",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-11-04T06:47:13Z",
+        "completed_at": "2026-11-04T06:47:24Z"
+      },
+      {
+        "name": "Run npm test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-11-04T06:47:24Z",
+        "completed_at": "2026-11-04T06:47:28Z"
+      },
+      {
+        "name": "Run npm run build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-11-04T06:47:28Z",
+        "completed_at": "2026-11-04T06:47:36Z"
+      },
+      {
+        "name": "Run cargo fmt --manifest-path src-tauri/Cargo.toml --check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-11-04T06:47:36Z",
+        "completed_at": "2026-11-04T06:47:43Z"
+      },
+      {
+        "name": "Run cargo test --locked --manifest-path src-tauri/Cargo.toml",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-11-04T06:47:43Z",
+        "completed_at": "2026-11-04T06:53:24Z"
+      },
+      {
+        "name": "Verify offline three-binary build identities",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-11-04T06:53:24Z",
+        "completed_at": "2026-11-04T06:53:25Z"
+      },
+      {
+        "name": "Verify actual MCP tool contract and anonymous authorization",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-11-04T06:53:25Z",
+        "completed_at": "2026-11-04T06:53:25Z"
+      },
+      {
+        "name": "Post Cache Rust",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24,
+        "started_at": "2026-11-04T06:53:25Z",
+        "completed_at": "2026-11-04T06:53:59Z"
+      },
+      {
+        "name": "Post Set up Node.js",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 25,
+        "started_at": "2026-11-04T06:53:59Z",
+        "completed_at": "2026-11-04T06:54:14Z"
+      },
+      {
+        "name": "Post Checkout",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 26,
+        "started_at": "2026-11-04T06:54:14Z",
+        "completed_at": "2026-11-04T06:54:17Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 27,
+        "started_at": "2026-11-04T06:54:17Z",
+        "completed_at": "2026-11-04T06:54:18Z"
+      }
+    ],
+    "verifierResults": [
+      "2026-11-04T06:53:25.1047718Z PASS: three offline package identities/version files match; no store/IPC/PATH/installation operations.",
+      "2026-11-04T06:53:25.5958958Z PASS: actual 16 tool names, complete input schemas and all protocol annotations match the reviewed API v1 baseline. No credentials/host/config writes.",
+      "2026-11-04T06:53:25.7342775Z PASS: P7 sidecar initialize/tools/list/16 anonymous tools + 3 repeat calls (6th and later rate_limited); stdout JSON only; structured errors with isError=true and no business data."
+    ],
+    "threeProgramIdentity": {
+      "programs": [
+        "in-line",
+        "in-line-mcp",
+        "in-line-cli"
+      ],
+      "expectedCommit": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+      "method": "unchanged verify-cli-package.mjs --expected-commit GITHUB_SHA independently validates offline exactCommit/baselineCommit/sourceDirty/version consistency; successful step and PASS retained"
+    },
+    "p3c": {
+      "calls": 18,
+      "facts": 107,
+      "passed": true,
+      "gateChecks": 5,
+      "approvalSimulations": 1,
+      "sidecarSha256": "0d08b8012b1eeaf56ab9c81dcaa3b930500c0b3960bcc69ba3c03202c2ad628b"
+    },
+    "p3b": {
+      "calls": 47,
+      "facts": 104,
+      "matchedBaseline": true,
+      "gateChecks": 5
+    }
+  },
+  "counting": {
+    "p3cCalls": "18 selected four-tool S calls = 14 existing + N1-N4; excludes initialize, tools/list, other old S readonly tools and other tests",
+    "p3cEvidence": "107 expected/actual records, including process facts; not 107 independent business actions",
+    "p3cGateChecks": "5 separate non-business checks; 2 new Windows test functions make Rust total 257; harness success alone is not P3-C business execution",
+    "p3b": "47 calls/104 original business facts and all normalized inputs/permissions/scope/status match formal baseline; 5 original gates unchanged"
+  },
+  "newCalls": [
+    {
+      "action": "backup",
+      "arguments": {
+        "action": "backup",
+        "idempotencyKey": "p3c-backup-denied",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "reason": "synthetic no-write backup isolation"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": false
+      },
+      "pid": 6100,
+      "requestId": 803,
+      "status": "forbidden",
+      "tool": "manage_business_data"
+    },
+    {
+      "action": null,
+      "arguments": {
+        "auditId": "patch-audit",
+        "idempotencyKey": "p3c-foreign-undo",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic foreign audit isolation"
+        },
+        "reason": "synthetic foreign audit isolation"
+      },
+      "creationTime": "134382488003914187",
+      "identity": "S-control",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 1352,
+      "requestId": 801,
+      "status": "not_found",
+      "tool": "request_undo"
+    },
+    {
+      "action": "apply",
+      "arguments": {
+        "action": "apply",
+        "idempotencyKey": "p3c-mixed-invalid",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "operations": [
+          {
+            "operation": {
+              "action": "create",
+              "task": {
+                "contacts": [
+                  "synthetic C"
+                ],
+                "departments": [
+                  "synthetic A"
+                ],
+                "taskType": "synthetic T",
+                "title": "p3c-never-created"
+              }
+            }
+          },
+          {
+            "operation": {
+              "action": "setStatus",
+              "status": "pending",
+              "target": {
+                "taskId": 9999
+              },
+              "taskVersion": 0
+            }
+          }
+        ],
+        "reason": "synthetic atomic apply refusal"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 802,
+      "status": "not_found",
+      "tool": "batch_mutate"
+    },
+    {
+      "action": "export",
+      "arguments": {
+        "action": "export",
+        "format": "json",
+        "idempotencyKey": "p3c-export-private-field",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "projection": [
+          "id",
+          "contacts"
+        ],
+        "reason": "synthetic private projection refusal"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 804,
+      "status": "forbidden",
+      "tool": "manage_business_data"
+    }
+  ],
+  "reusedCalls": [
+    {
+      "action": "patch",
+      "arguments": {
+        "action": "patch",
+        "fieldBase": {
+          "title": {
+            "value": "original-first",
+            "version": 0
+          }
+        },
+        "idempotencyKey": "p3-real-patch",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "patch": {
+          "title": "MCP changed"
+        },
+        "reason": "synthetic exact title",
+        "target": {
+          "taskId": 1
+        }
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": false
+      },
+      "pid": 6100,
+      "requestId": 8,
+      "status": "forbidden",
+      "tool": "mutate_task"
+    },
+    {
+      "action": "patch",
+      "arguments": {
+        "action": "patch",
+        "fieldBase": {
+          "title": {
+            "value": "original-first",
+            "version": 0
+          }
+        },
+        "idempotencyKey": "p3-real-patch",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "patch": {
+          "title": "MCP changed"
+        },
+        "reason": "synthetic exact title",
+        "target": {
+          "taskId": 1
+        }
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 9,
+      "status": "ok",
+      "tool": "mutate_task"
+    },
+    {
+      "action": "patch",
+      "arguments": {
+        "action": "patch",
+        "fieldBase": {
+          "title": {
+            "value": "original-first",
+            "version": 0
+          }
+        },
+        "idempotencyKey": "p3-real-patch",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "patch": {
+          "title": "MCP changed"
+        },
+        "reason": "synthetic exact title",
+        "target": {
+          "taskId": 1
+        }
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 10,
+      "status": "ok",
+      "tool": "mutate_task"
+    },
+    {
+      "action": null,
+      "arguments": {
+        "auditId": "patch-audit",
+        "idempotencyKey": "p3-real-undo",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "reason": "synthetic approval required"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 11,
+      "status": "ok",
+      "tool": "request_undo"
+    },
+    {
+      "action": "create",
+      "arguments": {
+        "action": "create",
+        "idempotencyKey": "original-uncertain-key",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "reason": "synthetic response loss",
+        "task": {
+          "contacts": [
+            "synthetic C"
+          ],
+          "departments": [
+            "synthetic A"
+          ],
+          "taskType": "synthetic T",
+          "title": "uncertain-create"
+        }
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 14,
+      "status": "result_unknown",
+      "tool": "mutate_task"
+    },
+    {
+      "action": "create",
+      "arguments": {
+        "action": "create",
+        "idempotencyKey": "original-uncertain-key",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "reason": "synthetic response loss",
+        "task": {
+          "contacts": [
+            "synthetic C"
+          ],
+          "departments": [
+            "synthetic A"
+          ],
+          "taskType": "synthetic T",
+          "title": "uncertain-create"
+        }
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 15,
+      "status": "ok",
+      "tool": "mutate_task"
+    },
+    {
+      "action": "dryRun",
+      "arguments": {
+        "action": "dryRun",
+        "idempotencyKey": "p4-wire",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "operations": [
+          {
+            "operation": {
+              "action": "create",
+              "task": {
+                "contacts": [
+                  "synthetic C"
+                ],
+                "departments": [
+                  "synthetic A"
+                ],
+                "taskType": "synthetic T",
+                "title": "p4-stdio-created"
+              }
+            }
+          }
+        ],
+        "reason": "explicit synthetic batch"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 16,
+      "status": "ok",
+      "tool": "batch_mutate"
+    },
+    {
+      "action": "apply",
+      "arguments": {
+        "action": "apply",
+        "idempotencyKey": "p4-wire",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "operations": [
+          {
+            "operation": {
+              "action": "create",
+              "task": {
+                "contacts": [
+                  "synthetic C"
+                ],
+                "departments": [
+                  "synthetic A"
+                ],
+                "taskType": "synthetic T",
+                "title": "p4-stdio-created"
+              }
+            }
+          }
+        ],
+        "reason": "explicit synthetic batch"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 17,
+      "status": "ok",
+      "tool": "batch_mutate"
+    },
+    {
+      "action": "apply",
+      "arguments": {
+        "action": "apply",
+        "idempotencyKey": "p4-wire",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "operations": [
+          {
+            "operation": {
+              "action": "create",
+              "task": {
+                "contacts": [
+                  "synthetic C"
+                ],
+                "departments": [
+                  "synthetic A"
+                ],
+                "taskType": "synthetic T",
+                "title": "p4-stdio-created"
+              }
+            }
+          }
+        ],
+        "reason": "explicit synthetic batch"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 18,
+      "status": "ok",
+      "tool": "batch_mutate"
+    },
+    {
+      "action": "backup",
+      "arguments": {
+        "action": "backup",
+        "idempotencyKey": "p4-wire-backup",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "reason": "explicit synthetic artifact"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 19,
+      "status": "ok",
+      "tool": "manage_business_data"
+    },
+    {
+      "action": "export",
+      "arguments": {
+        "action": "export",
+        "format": "json",
+        "idempotencyKey": "p4-wire-export",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "reason": "explicit synthetic artifact"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 20,
+      "status": "ok",
+      "tool": "manage_business_data"
+    },
+    {
+      "action": "apply",
+      "arguments": {
+        "action": "apply",
+        "idempotencyKey": "p4-original-uncertain",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "operations": [
+          {
+            "operation": {
+              "action": "create",
+              "task": {
+                "contacts": [
+                  "synthetic C"
+                ],
+                "departments": [
+                  "synthetic A"
+                ],
+                "taskType": "synthetic T",
+                "title": "p4-uncertain-once"
+              }
+            }
+          }
+        ],
+        "reason": "synthetic batch response loss"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 21,
+      "status": "result_unknown",
+      "tool": "batch_mutate"
+    },
+    {
+      "action": "apply",
+      "arguments": {
+        "action": "apply",
+        "idempotencyKey": "p4-original-uncertain",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "operations": [
+          {
+            "operation": {
+              "action": "create",
+              "task": {
+                "contacts": [
+                  "synthetic C"
+                ],
+                "departments": [
+                  "synthetic A"
+                ],
+                "taskType": "synthetic T",
+                "title": "p4-uncertain-once"
+              }
+            }
+          }
+        ],
+        "reason": "synthetic batch response loss"
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": false,
+      "level": "L3",
+      "permission": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "pid": 6100,
+      "requestId": 22,
+      "status": "ok",
+      "tool": "batch_mutate"
+    },
+    {
+      "action": "patch",
+      "arguments": {
+        "action": "patch",
+        "fieldBase": {
+          "title": {
+            "value": "original-first",
+            "version": 0
+          }
+        },
+        "idempotencyKey": "p3-real-patch",
+        "intent": {
+          "explicitUserRequest": true,
+          "summary": "synthetic user edits title"
+        },
+        "patch": {
+          "title": "MCP changed"
+        },
+        "reason": "synthetic exact title",
+        "target": {
+          "taskId": 1
+        }
+      },
+      "creationTime": "134382487989340307",
+      "identity": "S-owner",
+      "isError": true,
+      "level": "L3",
+      "permission": {
+        "configuredPermissions": {
+          "fullRead": false,
+          "regularRead": true,
+          "write": true
+        },
+        "effectivePermissions": "denied_by_pause",
+        "paused": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        }
+      },
+      "pid": 6100,
+      "requestId": 13,
+      "status": "paused",
+      "tool": "mutate_task"
+    }
+  ],
+  "facts": [
+    {
+      "actual": true,
+      "case": "connection/8",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": false
+      },
+      "case": "N803/effective_permissions",
+      "expected": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": false
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/803",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "code": "forbidden",
+        "isError": true
+      },
+      "case": "N803/refusal",
+      "expected": {
+        "code": "forbidden",
+        "isError": true
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "case": "N803/all_tables",
+      "expected": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N803/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N803/no_files",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/9",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": 0,
+      "case": "patch/initial_title_version",
+      "expected": 0,
+      "passed": true
+    },
+    {
+      "actual": {
+        "otherTaskFields": true,
+        "taskVersionAdvanced": true,
+        "title": "MCP changed",
+        "titleVersion": 1
+      },
+      "case": "patch/title_version",
+      "expected": {
+        "otherTaskFields": true,
+        "taskVersionAdvanced": true,
+        "title": "MCP changed",
+        "titleVersion": 1
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/daily_sequences",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/queue_number_allocations",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/status_history",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/task_work_events",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/urgent_records",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/master_values",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/settings",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/preserve/mcp_preference_versions",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "businessUnchanged": true,
+        "timestampMatchesTask": true
+      },
+      "case": "patch/queue_business_and_metadata",
+      "expected": {
+        "businessUnchanged": true,
+        "timestampMatchesTask": true
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "auditsAdded": 1,
+        "kinds": [
+          "updated"
+        ],
+        "ownTask": true,
+        "receiptsAdded": 1
+      },
+      "case": "patch/exact_history_additions",
+      "expected": {
+        "auditsAdded": 1,
+        "kinds": [
+          "updated"
+        ],
+        "ownTask": true,
+        "receiptsAdded": 1
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/other_fields_versions",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/other_tasks",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/old_logs_retained",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "action": "patch",
+        "keyCount": 1,
+        "linked": true,
+        "owner": true,
+        "storedVerification": "verified_in_transaction",
+        "wireVerification": "verified_after_commit"
+      },
+      "case": "p3-real-patch/receipt_audit",
+      "expected": {
+        "action": "patch",
+        "keyCount": 1,
+        "linked": true,
+        "owner": true,
+        "storedVerification": "verified_in_transaction",
+        "wireVerification": "verified_after_commit"
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/10",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "case": "patch_replay/all_tables",
+      "expected": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "patch_replay/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "case": "N801/effective_permissions",
+      "expected": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/801",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "code": "not_found",
+        "isError": true
+      },
+      "case": "N801/refusal",
+      "expected": {
+        "code": "not_found",
+        "isError": true
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "case": "N801/all_tables",
+      "expected": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N801/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N801/no_files",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "control/eof",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/11",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/tasks",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/task_queue_entries",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/daily_sequences",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/queue_number_allocations",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/task_logs",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/status_history",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/task_work_events",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/urgent_records",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/master_values",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/mcp_task_versions",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/mcp_field_versions",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/preserve/mcp_ai_audit",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "linked": true,
+        "owner": true,
+        "receiptsAdded": 1,
+        "requestsAdded": 1,
+        "status": "pending",
+        "title": "MCP changed"
+      },
+      "case": "undo_pending/request",
+      "expected": {
+        "linked": true,
+        "owner": true,
+        "receiptsAdded": 1,
+        "requestsAdded": 1,
+        "status": "pending",
+        "title": "MCP changed"
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "undo_pending/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": 1,
+      "case": "approved_undo/initial_title_version",
+      "expected": 1,
+      "passed": true
+    },
+    {
+      "actual": {
+        "otherTaskFields": true,
+        "taskVersionAdvanced": true,
+        "title": "original-first",
+        "titleVersion": 2
+      },
+      "case": "approved_undo/title_version",
+      "expected": {
+        "otherTaskFields": true,
+        "taskVersionAdvanced": true,
+        "title": "original-first",
+        "titleVersion": 2
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/daily_sequences",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/queue_number_allocations",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/status_history",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/task_work_events",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/urgent_records",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/master_values",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/settings",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/preserve/mcp_preference_versions",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "businessUnchanged": true,
+        "timestampMatchesTask": true
+      },
+      "case": "approved_undo/queue_business_and_metadata",
+      "expected": {
+        "businessUnchanged": true,
+        "timestampMatchesTask": true
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "auditsAdded": 1,
+        "kinds": [
+          "audit",
+          "updated"
+        ],
+        "ownTask": true,
+        "receiptsAdded": 0
+      },
+      "case": "approved_undo/exact_history_additions",
+      "expected": {
+        "auditsAdded": 1,
+        "kinds": [
+          "audit",
+          "updated"
+        ],
+        "ownTask": true,
+        "receiptsAdded": 0
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/other_fields_versions",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/other_tasks",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/old_logs_retained",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "approved_undo/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "action": "approvedUndo",
+        "auditsAdded": 1,
+        "compensations": 1,
+        "originalAuditRetained": true,
+        "receiptRetained": true,
+        "status": "approved"
+      },
+      "case": "approved_undo/history",
+      "expected": {
+        "action": "approvedUndo",
+        "auditsAdded": 1,
+        "compensations": 1,
+        "originalAuditRetained": true,
+        "receiptRetained": true,
+        "status": "approved"
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/14",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/15",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/16",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "case": "batch_dry_run/all_tables",
+      "expected": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "batch_dry_run/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/17",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "added": 1,
+        "allocations": 1,
+        "authorization": true,
+        "itemVersionMatches": true,
+        "newPermanentNumber": true,
+        "nextSequence": true,
+        "noWorkEvent": true,
+        "oldTasksRetained": true,
+        "title": "p4-stdio-created"
+      },
+      "case": "batch_apply/known_create",
+      "expected": {
+        "added": 1,
+        "allocations": 1,
+        "authorization": true,
+        "itemVersionMatches": true,
+        "newPermanentNumber": true,
+        "nextSequence": true,
+        "noWorkEvent": true,
+        "oldTasksRetained": true,
+        "title": "p4-stdio-created"
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "action": "batch",
+        "keyCount": 1,
+        "linked": true,
+        "owner": true,
+        "storedVerification": null,
+        "wireVerification": "verified_after_commit"
+      },
+      "case": "p4-wire/receipt_audit",
+      "expected": {
+        "action": "batch",
+        "keyCount": 1,
+        "linked": true,
+        "owner": true,
+        "storedVerification": null,
+        "wireVerification": "verified_after_commit"
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "allocationsAdded": 1,
+        "auditsAdded": 2,
+        "dictionaryExactlyExpected": true,
+        "knownNumber": true,
+        "oldAllocationsRetained": true,
+        "queuesAdded": 1,
+        "receiptsAdded": 2
+      },
+      "case": "batch_apply/exact_number_and_audit",
+      "expected": {
+        "allocationsAdded": 1,
+        "auditsAdded": 2,
+        "dictionaryExactlyExpected": true,
+        "knownNumber": true,
+        "oldAllocationsRetained": true,
+        "queuesAdded": 1,
+        "receiptsAdded": 2
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/18",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "case": "batch_replay/all_tables",
+      "expected": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "batch_replay/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "id": 5,
+        "originalId1Unchanged": true,
+        "tasks": 5
+      },
+      "case": "sentinel/late_initialization",
+      "expected": {
+        "id": 5,
+        "originalId1Unchanged": true,
+        "tasks": 5
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "case": "N802/effective_permissions",
+      "expected": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "passed": true
+    },
+    {
+      "actual": false,
+      "case": "N2/absent_target",
+      "expected": false,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/802",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "code": "not_found",
+        "isError": true
+      },
+      "case": "N802/refusal",
+      "expected": {
+        "code": "not_found",
+        "isError": true
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "case": "N802/all_tables",
+      "expected": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N802/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N2/never_created",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N802/no_files",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "case": "N804/effective_permissions",
+      "expected": {
+        "fullRead": false,
+        "regularRead": true,
+        "scope": {
+          "departments": [
+            "synthetic A"
+          ],
+          "taskTypes": [
+            "synthetic T"
+          ]
+        },
+        "write": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/804",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "code": "forbidden",
+        "isError": true
+      },
+      "case": "N804/refusal",
+      "expected": {
+        "code": "forbidden",
+        "isError": true
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "case": "N804/all_tables",
+      "expected": {
+        "daily_sequences": true,
+        "master_values": true,
+        "mcp_ai_audit": true,
+        "mcp_artifact_jobs": true,
+        "mcp_batch_approvals": true,
+        "mcp_batch_usage": true,
+        "mcp_change_events": true,
+        "mcp_change_index": true,
+        "mcp_data_basis": true,
+        "mcp_field_versions": true,
+        "mcp_preference_versions": true,
+        "mcp_receipts": true,
+        "mcp_task_versions": true,
+        "mcp_undo_requests": true,
+        "queue_number_allocations": true,
+        "schema_meta": true,
+        "settings": true,
+        "sqlite_sequence": true,
+        "status_history": true,
+        "task_logs": true,
+        "task_queue_entries": true,
+        "task_work_events": true,
+        "tasks": true,
+        "urgent_records": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N804/authorization",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "N804/no_files",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/19",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "allFinalFiles": true,
+        "extension": "db",
+        "files": 1,
+        "inside": true,
+        "noBody": true,
+        "noPartial": true
+      },
+      "case": "backup/file_boundary",
+      "expected": {
+        "allFinalFiles": true,
+        "extension": "db",
+        "files": 1,
+        "inside": true,
+        "noBody": true,
+        "noPartial": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "backup/private_acl",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "businessMatchesBefore": true,
+        "credentialTables": 0,
+        "outsideSentinels": 1,
+        "tasks": 5
+      },
+      "case": "backup/content",
+      "expected": {
+        "businessMatchesBefore": true,
+        "credentialTables": 0,
+        "outsideSentinels": 1,
+        "tasks": 5
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "action": "backup",
+        "auditsAdded": 1,
+        "authorization": true,
+        "businessPreserved": true,
+        "complete": true,
+        "linked": true,
+        "owner": true
+      },
+      "case": "backup/audit_receipt",
+      "expected": {
+        "action": "backup",
+        "auditsAdded": 1,
+        "authorization": true,
+        "businessPreserved": true,
+        "complete": true,
+        "linked": true,
+        "owner": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/20",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "allFinalFiles": true,
+        "extension": "json",
+        "files": 2,
+        "inside": true,
+        "noBody": true,
+        "noPartial": true
+      },
+      "case": "export/file_boundary",
+      "expected": {
+        "allFinalFiles": true,
+        "extension": "json",
+        "files": 2,
+        "inside": true,
+        "noBody": true,
+        "noPartial": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "export/private_acl",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": {
+        "complete": true,
+        "knownTitles": true,
+        "noOutside": true,
+        "privateKeysAbsent": true,
+        "privateValuesAbsent": true,
+        "rows": 4
+      },
+      "case": "export/content",
+      "expected": {
+        "complete": true,
+        "knownTitles": true,
+        "noOutside": true,
+        "privateKeysAbsent": true,
+        "privateValuesAbsent": true,
+        "rows": 4
+      },
+      "passed": true
+    },
+    {
+      "actual": {
+        "action": "export",
+        "auditsAdded": 1,
+        "authorization": true,
+        "businessPreserved": true,
+        "complete": true,
+        "linked": true,
+        "owner": true
+      },
+      "case": "export/audit_receipt",
+      "expected": {
+        "action": "export",
+        "auditsAdded": 1,
+        "authorization": true,
+        "businessPreserved": true,
+        "complete": true,
+        "linked": true,
+        "owner": true
+      },
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/21",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/22",
+      "expected": true,
+      "passed": true
+    },
+    {
+      "actual": true,
+      "case": "connection/13",
+      "expected": true,
+      "passed": true
+    }
+  ],
+  "builds": {
+    "S": [
+      {
+        "creationTime": "134382487989340307",
+        "fixture": "S-additions",
+        "pid": 6100,
+        "runnerEnvironment": "github-hosted",
+        "runnerOs": "Windows",
+        "sha": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+        "sidecarSha256": "0d08b8012b1eeaf56ab9c81dcaa3b930500c0b3960bcc69ba3c03202c2ad628b"
+      }
+    ],
+    "QJ": [
+      {
+        "commit": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+        "debug": true,
+        "fixture": "J",
+        "runnerEnvironment": "github-hosted",
+        "runnerImage": "win25-vs2026",
+        "runnerImageVersion": "20261030.294.1",
+        "runnerOS": "Windows",
+        "sidecarSha256": "0d08b8012b1eeaf56ab9c81dcaa3b930500c0b3960bcc69ba3c03202c2ad628b"
+      },
+      {
+        "commit": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+        "debug": true,
+        "fixture": "Q",
+        "runnerEnvironment": "github-hosted",
+        "runnerImage": "win25-vs2026",
+        "runnerImageVersion": "20261030.294.1",
+        "runnerOS": "Windows",
+        "sidecarSha256": "0d08b8012b1eeaf56ab9c81dcaa3b930500c0b3960bcc69ba3c03202c2ad628b"
+      }
+    ]
+  },
+  "gateChecks": [
+    {
+      "businessExecuted": false,
+      "case": "local",
+      "exitCode": 0,
+      "notRunMarker": true,
+      "passed": true,
+      "resourceRootAbsent": true
+    },
+    {
+      "businessExecuted": false,
+      "case": "false_github",
+      "exitCode": 101,
+      "notRunMarker": false,
+      "passed": true,
+      "resourceRootAbsent": true
+    },
+    {
+      "businessExecuted": false,
+      "case": "self_hosted",
+      "exitCode": 101,
+      "notRunMarker": false,
+      "passed": true,
+      "resourceRootAbsent": true
+    },
+    {
+      "businessExecuted": false,
+      "case": "linux_label",
+      "exitCode": 101,
+      "notRunMarker": false,
+      "passed": true,
+      "resourceRootAbsent": true
+    },
+    {
+      "businessExecuted": false,
+      "case": "missing_runner",
+      "exitCode": 101,
+      "notRunMarker": false,
+      "passed": true,
+      "resourceRootAbsent": true
+    }
+  ],
+  "softwareApproval": [
+    {
+      "audit": "patch-audit",
+      "count": 1,
+      "guiVerified": false,
+      "level": "L1_local_approval_after_L3_request",
+      "method": "db.mcp_resolve_undo(true)",
+      "scope": "self_synthetic_title_only"
+    }
+  ],
+  "actionEvidenceMapping": {
+    "mutateHeader": [
+      "action / mode",
+      "已有L1成功/拒绝",
+      "已有L2或CLI路径",
+      "已有L3成功/拒绝与待补边界"
+    ],
+    "mutate": [
+      [
+        "create",
+        "W：成功、重开/并发重放、重复possible_duplicate、scope/无W forbidden、审计失败整体回滚",
+        "M、S经service；A有拒绝",
+        "M正常create成功并对照业务/编号；S为result_unknown后同键恢复且create审计仅1；A无W拒绝。无需再造成功创建"
+      ],
+      [
+        "patch",
+        "W：独立字段合并、同字段/ABA conflict、全文替换明确意图、scope拒绝；undo后不影响其他字段",
+        "S、R、C4W",
+        "S标题MCP changed→批准撤销后original-first、auditId复用；补精确字段版本、回执/审计关联及编号/事件保全，不新增成功patch"
+      ],
+      [
+        "setStatus",
+        "W：no_change不产事件；processed有事件，补偿保留历史",
+        "M、R、C4W",
+        "M processing成功；R并发赢家/冲突及总审计1。不是所有目标状态和真实办理分支完整L3"
+      ],
+      [
+        "setUrgent",
+        "W::p3_gui_changes_invalidate_versions_urgent_neighbour_scope_and_undo_are_checked：成功、撤销与排序保全",
+        "C4W同工具set/clear",
+        "未定位直接stdio成功；不将CLI当L3。最小阶段不默认追加催办/义务字段"
+      ],
+      [
+        "recordWorkEvent",
+        "W/P：真实办理意图不足explicit_intent_required；成功及未来预约/撤销保全",
+        "C4W同工具，固定时间事件并查到note",
+        "未定位直接stdio成功，后续若纳入必须单独授权事件、时间、resultStatus、note及confirmedRealWork，不因合成自动推定真实办理"
+      ],
+      [
+        "createSubtask",
+        "P::p4_batch_refs_two_level_structure_and_group_undo_are_atomic：父子创建、第三层拒绝、幂等/组撤销",
+        "C4的child命令为私有CLI路由，只作共享领域辅证",
+        "未定位mutate_task该action的直接L3，不能由CLI私有路由或batch的operation代替"
+      ],
+      [
+        "setParent",
+        "P::p4_link_sort_trash_restore_and_indirect_scope_roll_back_as_a_group：两子链接、间接scope回滚",
+        "C4同工具set/clear",
+        "未定位直接L3；旧/新父及间接受影响scope需单列，不默认全量补"
+      ],
+      [
+        "reorderSubtasks",
+        "P同测试：两子顺序实际比较",
+        "C4同工具单子排序成功",
+        "未定位直接L3；单子成功也不证明多子排序全部边界"
+      ],
+      [
+        "queue/enqueue",
+        "P/W共享队列/预约保全",
+        "M、C4W",
+        "M直接L3成功及跨入口业务/编号快照一致"
+      ],
+      [
+        "queue/processRound",
+        "P未来事项无真实意图拒绝；领域办理历史",
+        "M、C4W",
+        "M直接L3成功；不能外推未明确授权时也允许"
+      ],
+      [
+        "queue/completeRound",
+        "W/P事件、补偿/队列规则",
+        "M、C4W",
+        "M直接L3成功及跨入口一致"
+      ],
+      [
+        "queue/reopen",
+        "共享领域经C4W，未单列独立L1场景",
+        "C4W同工具成功",
+        "未定位直接L3"
+      ],
+      [
+        "queue/moveUp",
+        "共享领域经C4W，未单列多项排序oracle",
+        "C4W同工具up成功",
+        "未定位直接L3，不宣称相对顺序完整验证"
+      ],
+      [
+        "queue/moveDown",
+        "当前源码支持；本次未定位直接专项成功断言",
+        "未定位本次CLI用例调用down",
+        "未定位直接L3；本最小建议不补此mode"
+      ],
+      [
+        "reschedule",
+        "P::p4_bulk_date_approval_is_once_rechecks_revocation_conflicts_and_preserves_number_history：多事项本地批准、撤权/冲突、不改永久编号",
+        "C4同工具单事项；C5B多事项pending",
+        "未定位直接mutate_task.reschedule L3；不能将批次日期审批当单事项相同路径"
+      ],
+      [
+        "archive",
+        "共享领域经C4W；该用例未独立断言每步归档flag",
+        "C4W同工具exit0",
+        "未定位直接L3；父子联动参数不默认纳入"
+      ],
+      [
+        "trash",
+        "P间接scope批次整体拒绝、整组trash成功",
+        "C4W同工具成功及旧版本conflict；R的范围外trash为CLI拒绝",
+        "未定位直接stdio trash成功/拒绝；不将所有权not_found与scope forbidden互换"
+      ],
+      [
+        "restore",
+        "P父restore后子仍在trash的实际状态断言",
+        "C4W同工具成功，最终deleted_at为空",
+        "未定位直接L3；是恢复单事项，不是恢复覆盖数据库"
+      ],
+      [
+        "correctWorkEvent",
+        "P未来创建/纠错链：旧事件void、新事件correction_of关联、撤销回到原办理事实",
+        "C4W同工具并查到纠正note",
+        "未定位直接L3；真实事件/历史影响确认需另批"
+      ],
+      [
+        "voidWorkEvent",
+        "CLI同工具成功；当前检索未单列该action独立L1专项",
+        "C4W同工具exit0及后续版本冲突",
+        "未定位直接L3；不能由correctWorkEvent使旧事件void代替该端点"
+      ]
+    ],
+    "otherHeader": [
+      "工具 / action或分支",
+      "L1成功/拒绝",
+      "L2 / CLI辅证",
+      "L3及真正缺口"
+    ],
+    "other": [
+      [
+        "request_undo（无action字段）/申请",
+        "W：pending不改业务、同字段冲突阻止批准、跨client申请not_found；P组撤销、backup/export的undo unsupported",
+        "C4调用同工具pending，子项状态在批准前不变",
+        "S实际stdio返回needs_user_approval，标题仍MCP changed；已有成功申请。缺另一个有效写客户端冒用patch审计的直接L3拒绝"
+      ],
+      [
+        "软件端批准撤销",
+        "W/P：mcp_resolve_undo(true)成功补偿、版本/历史/编号保全，冲突不部分提交",
+        "C4本地API批准成功，补偿verified_after_commit",
+        "S：stdio申请后直接db.mcp_resolve_undo(true)，标题恢复；这是L3申请+L1软件API模拟，不是GUI按钮，也不是MCP approve action"
+      ],
+      [
+        "软件端拒绝撤销",
+        "源码存在mcp_resolve_undo(false)；本次未定位独立成功测试",
+        "未定位专项",
+        "不是MCP action；最小建议不增加一次拒绝审批，不标通过"
+      ],
+      [
+        "batch_mutate/dryRun",
+        "P：整库业务/编号/版本/字典/回执不变；超限/歧义拒绝",
+        "C5B有完整预演快照不变",
+        "S直接L3 dry_run且目标事项未创建；B3实际L3预演basis后续绑定apply。可加强原段全量业务保全，不新增同类预演"
+      ],
+      [
+        "batch_mutate/apply",
+        "P：成功/refs、同键重放、混合失败not_found整体不变、超限/间接scope拒绝",
+        "C5B成功；CLI的预演阻止apply不能冒充apply端点失败；C5未知回包只取原回执",
+        "S实际L3创建1条、同键重放仍仅1条；S回包丢失result_unknown后原键恢复仅1条；B3带expectedBasis成功、编号一致。缺真实stdio混合apply拒绝及独立全表不变断言"
+      ],
+      [
+        "多事项日期/截止调整审批",
+        "P：needs_user_approval、软件mcp_resolve_batch(true)重查撤权/版本、重复批准不重做",
+        "C5B通过CLI仅pending，业务不变",
+        "本次未定位直接L3 pending→软件批准闭环。最小P3-C不包含多事项改期/截止调整或批次审批模拟"
+      ],
+      [
+        "manage_business_data/backup",
+        "F：1个固定根内.db、同键不重复、可读业务标题、无token/credential表；undo unsupported；未知/变参原键拒绝",
+        "C5F实际同工具成功并确认.db且无items",
+        "S真实L3 artifact_created、backup列表存在该名称、回包无私密canary。缺同一stdio请求实际文件数量/内容/隔离范围的精确独立oracle；有身份无W拒绝未单独证明"
+      ],
+      [
+        "manage_business_data/export JSON",
+        "F：已知1行、complete、排除范围外/私密字段；私密projection forbidden，业务不变",
+        "C5F成功，无items正文，CLI只读receipt不改业务",
+        "S真实L3 artifact_created、无私密canary，但未读取文件核对内容。缺范围外哨兵和真实stdio私密projection拒绝"
+      ],
+      [
+        "manage_business_data/export CSV",
+        "F：公式值前置单引号、私密字段/scope限制",
+        "本次该C5F执行JSON，不把它记作CSV",
+        "未定位直接L3 CSV。最小建议只JSON，不再生成第三个文件"
+      ]
+    ],
+    "sourceBaseline": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+    "sourceCi": "https://github.com/bluntvoice/In-Line/actions/runs/41604479696",
+    "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+    "additions": {
+      "patch": [
+        "patch/title_version",
+        "p3-real-patch/receipt_audit",
+        "patch_replay/all_tables",
+        "approved_undo/title_version"
+      ],
+      "undo": [
+        "undo_pending/request",
+        "N801/refusal",
+        "N801/all_tables",
+        "approved_undo/history"
+      ],
+      "batch": [
+        "batch_dry_run/all_tables",
+        "batch_apply/known_create",
+        "batch_apply/exact_number_and_audit",
+        "p4-wire/receipt_audit",
+        "batch_replay/all_tables",
+        "N802/refusal",
+        "N802/all_tables",
+        "N2/never_created"
+      ],
+      "backup": [
+        "N803/refusal",
+        "N803/all_tables",
+        "backup/file_boundary",
+        "backup/private_acl",
+        "backup/content",
+        "backup/audit_receipt"
+      ],
+      "export": [
+        "N804/refusal",
+        "N804/all_tables",
+        "export/file_boundary",
+        "export/private_acl",
+        "export/content",
+        "export/audit_receipt"
+      ]
+    },
+    "uncovered": [
+      "complex mutate_task direct stdio actions",
+      "positive in-flight cancelJob",
+      "software reject undo",
+      "CSV actual stdio",
+      "L4 formal GUI and Codex host",
+      "P2-B auto recovery",
+      "P2-C ps-hang",
+      "real old-db migration",
+      "full Phase 2",
+      "full Phase 3",
+      "release"
+    ]
+  },
+  "reusedTests": [
+    "p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction",
+    "gui_cli_and_actual_mcp_stdio_share_task_queue_number_event_and_status_rules",
+    "cli_and_actual_mcp_concurrent_versions_conflict_and_profiles_cannot_expand_scope",
+    "phase5_actual_mcp_and_cli_batch_share_future_numbers_transactions_and_audit_rules",
+    "cli_real_parent_children_future_scope_completion_and_local_undo_approval",
+    "cli_task_edit_urgency_queue_real_work_archive_trash_restore_and_reopen_use_versions",
+    "phase5_batch_forces_preview_no_number_consumption_atomic_conflict_and_local_approval",
+    "phase5_saved_queries_preferences_incremental_inspection_and_jobs_use_original_services"
+  ],
+  "files": {
+    "approvedGenerationRequests": 2,
+    "finalArtifacts": [
+      {
+        "alias": "backup-1.db",
+        "format": "db",
+        "tasks": 5,
+        "outsideSentinels": 1
+      },
+      {
+        "alias": "export-1.json",
+        "format": "json",
+        "tasks": 4,
+        "outsideSentinels": 0
+      }
+    ],
+    "fixedRoot": "synthetic-root/backups/mcp-created",
+    "privateAclVerified": true,
+    "noPartial": true,
+    "noFileBodiesReturnedOrUploaded": true,
+    "noReadDownloadRestoreEndpointAdded": true
+  },
+  "failureHistory": [
+    {
+      "sha": "45d8555ff00229009afb218d18578947805165bb",
+      "run": 41758681633,
+      "cause": "new test json! syntax: array-expression method chains needed parentheses",
+      "businessExecuted": false,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41758681633",
+      "failedSteps": [
+        "Run cargo test --locked --manifest-path src-tauri/Cargo.toml"
+      ],
+      "p3bBusinessExecuted": false,
+      "productDefectObserved": false,
+      "writeCompensationState": "no business tests executed; no P3-C writes or compensation in this run"
+    },
+    {
+      "sha": "f9a0e914763c324b89b5487635118daece39b03c",
+      "run": 41759681082,
+      "cause": "text transport appended one extra final blank line; rustfmt failed",
+      "businessExecuted": false,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41759681082",
+      "failedSteps": [
+        "Run cargo fmt --manifest-path src-tauri/Cargo.toml --check"
+      ],
+      "p3bBusinessExecuted": false,
+      "productDefectObserved": false,
+      "writeCompensationState": "no business tests executed; no P3-C writes or compensation in this run"
+    },
+    {
+      "sha": "a10c37cc14ed80a6c41b762d4d661aab70b7b9a7",
+      "run": 41759756218,
+      "cause": "new std Command.creation_flags missing Windows CommandExt import, E0599",
+      "businessExecuted": false,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41759756218",
+      "failedSteps": [
+        "Run cargo test --locked --manifest-path src-tauri/Cargo.toml"
+      ],
+      "p3bBusinessExecuted": false,
+      "productDefectObserved": false,
+      "writeCompensationState": "no business tests executed; no P3-C writes or compensation in this run"
+    },
+    {
+      "sha": "72df9743a9528a625af6997993d42d221124c43b",
+      "run": 41760035756,
+      "cause": "same E0599; this candidate was already in progress when previous compile failure read back",
+      "businessExecuted": false,
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41760035756",
+      "failedSteps": [
+        "Run cargo test --locked --manifest-path src-tauri/Cargo.toml"
+      ],
+      "p3bBusinessExecuted": false,
+      "productDefectObserved": false,
+      "writeCompensationState": "no business tests executed; no P3-C writes or compensation in this run"
+    }
+  ],
+  "testChanges": {
+    "baseline": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+    "candidate": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+    "changedFiles": [
+      "src-tauri/tests/mcp_queries.rs",
+      "src-tauri/tests/mcp_queries/p3c.rs",
+      "src-tauri/tests/p3c_unsupported_platform.rs"
+    ],
+    "existingSourceLinesRemoved": 0,
+    "p3bBlobUnchanged": true,
+    "productWorkflowDependenciesUnchanged": true,
+    "localActualMcpCliTestsRun": false,
+    "localCargoTestRun": false,
+    "formatCheckPassed": true,
+    "extraOperationsGuarded": true,
+    "unsupportedNativeLinuxMacValidated": false,
+    "testBlobs": [
+      {
+        "path": "src-tauri/tests/mcp_queries.rs",
+        "sha": "dd47a1e8f0fb86bf34427d1d583f15d606be6f07"
+      },
+      {
+        "path": "src-tauri/tests/mcp_queries/p3c.rs",
+        "sha": "26548ca53d008e6d4b8b5c79386ad2114b2fd264"
+      },
+      {
+        "path": "src-tauri/tests/p3c_unsupported_platform.rs",
+        "sha": "a0332f7bf91a4576d0086869a9b7a6fcfa3460b2"
+      }
+    ],
+    "compileMacroCorrection": "41758681633 compile failed before business",
+    "queueOracleCorrection": "Shared domain save refreshes updated_at; preserve all queue business columns and require metadata equals task timestamp",
+    "dictionaryOracleCorrection": "Create increments existing department/type/contact usage_count once each; exact expected dictionary, no new entries",
+    "transportNewlineCorrection": "f9a0e914 to a10c37cc differ only final extra blank line; normalized contents equal",
+    "parent": "72df9743a9528a625af6997993d42d221124c43b",
+    "specificScopeUnchanged": true,
+    "commandExtImportFix": "30927f5683faa590e2d91e9a7d10991895ffaa80 adds std::os::windows::process::CommandExt only"
+  },
+  "protection": {
+    "checkedAt": "2026-11-04T06:59:17.797Z",
+    "trees": [
+      {
+        "root": "D:\\codex-data\\projects\\inline\\In-Line",
+        "files": 865,
+        "changed": [],
+        "headUnchanged": true,
+        "statusUnchanged": true
+      },
+      {
+        "root": "D:\\codex-data\\projects\\inline\\In-Line-p2d",
+        "files": 837,
+        "changed": [],
+        "headUnchanged": true,
+        "statusUnchanged": true
+      },
+      {
+        "root": "D:\\codex-data\\projects\\inline\\In-Line-p3a",
+        "files": 839,
+        "changed": [],
+        "headUnchanged": true,
+        "statusUnchanged": true
+      },
+      {
+        "root": "D:\\codex-data\\projects\\inline\\In-Line-p3b",
+        "files": 845,
+        "changed": [],
+        "headUnchanged": true,
+        "statusUnchanged": true
+      }
+    ],
+    "zips": {
+      "count": 64,
+      "changed": 0
+    },
+    "historicalEvidence": {
+      "count": 190,
+      "changed": 0
+    },
+    "allPreserved": true
+  },
+  "refs": {
+    "feat/scheduled-items": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+    "main": "1baac96252af2665274f2a955b3adacfa80519fd",
+    "codex/p3b-isolated-acceptance-20261103": "dfed2252c880da572bc67e233f1a0c27554cb01c",
+    "codex/p3c-isolated-acceptance-20261104": "30927f5683faa590e2d91e9a7d10991895ffaa80"
+  },
+  "securityDecision": {
+    "topic": "full_database_backup_with_scoped_R_W_and_F_false",
+    "status": "independent_preproduction_security_decision_required",
+    "observed": "current backup requires R+W+explicit intent, is full business DB, does not trim task scope and does not additionally require F",
+    "authorization": "full synthetic snapshot including B/T explicitly authorized only for this fixture",
+    "conclusion": "existing behavior tested; no permission implementation change and not automatically classified as vulnerability"
+  },
+  "limitations": [
+    "complex mutate_task direct stdio actions",
+    "positive in-flight cancelJob",
+    "software reject undo",
+    "CSV actual stdio",
+    "L4 formal GUI and Codex host",
+    "P2-B auto recovery",
+    "P2-C ps-hang",
+    "real old-db migration",
+    "full Phase 2",
+    "full Phase 3",
+    "release"
+  ],
+  "platformLimit": "non-Windows guard source checked; Linux label simulated on Windows only; no real Linux/macOS runner validation",
+  "stages": {
+    "p3a": "accepted_formally_submitted_ci_passed",
+    "p3b": "accepted_formally_submitted_ci_passed",
+    "p3c": "minimum_automated_acceptance_passed_waiting_user_review_no_formal_submission",
+    "p3d": "not_started",
+    "p2b": "automatic_recovery_incomplete",
+    "p2c": "native_12_of_13_ps_hang_failed",
+    "snapshots": "usability_risk_pending_assessment",
+    "inFlightCancelJob": "not_covered",
+    "phase2": "incomplete",
+    "fullPhase3": "incomplete",
+    "release": "not_completed_not_authorized"
+  },
+  "evidenceSourceIndex": [
+    {
+      "alias": "S",
+      "tests": "src-tauri/tests/mcp_queries.rs::p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction",
+      "levelAndAssertions": "L3：patch成功/原键重放、undo pending→本地批准→标题恢复、create回包丢失与原键恢复、batch dryRun/apply/重放、backup和JSON export成功；禁止私密canary回显"
+    },
+    {
+      "alias": "M",
+      "tests": "src-tauri/tests/cli/phase4.rs::gui_cli_and_actual_mcp_stdio_share_task_queue_number_event_and_status_rules",
+      "levelAndAssertions": "L3：create、setStatus(processing)、queue(processRound/enqueue/completeRound)；CLI/MCP/共享GUI领域的事项、队列、编号和事件快照一致。不是GUI界面验收"
+    },
+    {
+      "alias": "R",
+      "tests": "同文件::cli_and_actual_mcp_concurrent_versions_conflict_and_profiles_cannot_expand_scope",
+      "levelAndAssertions": "L3+CLI：并发同版本只能一方成功、另一方conflict，总审计1；具体赢家由时序决定，不宣称MCP一定是赢家"
+    },
+    {
+      "alias": "C4",
+      "tests": "同文件::cli_real_parent_children_future_scope_completion_and_local_undo_approval",
+      "levelAndAssertions": "CLI/认证IPC：日期、父子关系、单子排序、undo pending及本地批准；CLI child create走私有cli_create_subtask，不能冒充mutate_task.createSubtask"
+    },
+    {
+      "alias": "C4W",
+      "tests": "同文件::cli_task_edit_urgency_queue_real_work_archive_trash_restore_and_reopen_use_versions",
+      "levelAndAssertions": "CLI→认证IPC→mutate_task：title、urgent、queue、archive/trash/restore、record/correct/void；逐调用exit=0，末态标题/队列及旧版本conflict。部分action只有成功回码，不能冒充逐步独立状态oracle"
+    },
+    {
+      "alias": "B3",
+      "tests": "src-tauri/tests/cli/phase5.rs::phase5_actual_mcp_and_cli_batch_share_future_numbers_transactions_and_audit_rules",
+      "levelAndAssertions": "L3：两个operation的dryRun→带expectedBasis的apply、verified_after_commit、编号/业务快照与CLI一致；未来事项不产生办理事件"
+    },
+    {
+      "alias": "C5B",
+      "tests": "同文件::phase5_batch_forces_preview_no_number_consumption_atomic_conflict_and_local_approval",
+      "levelAndAssertions": "CLI/L2路径：预演不变、实际apply成功、陈旧预演拒绝、多事项日期返回needs_user_approval、超限resource_limit；拒绝停在CLI预演，不能冒充真实stdio混合apply失败"
+    },
+    {
+      "alias": "C5F",
+      "tests": "同文件::phase5_saved_queries_preferences_incremental_inspection_and_jobs_use_original_services",
+      "levelAndAssertions": "CLI/L2路径：export/backup成功、无items正文、只读原键回执不改业务；作业部分不作为本阶段扩展授权"
+    },
+    {
+      "alias": "W",
+      "tests": "src-tauri/src/database/mcp_write_tests.rs",
+      "levelAndAssertions": "L1：p3_receipts_survive_reopen_concurrent_retry_and_do_not_leak（1事项/1审计、异参idempotency_conflict、权限/scope拒绝）；p3_unrelated_fields_merge_same_field_and_aba_conflict；p3_atomic_failure_rolls_back_business_dictionary_versions_and_receipt；p3_duplicates_disambiguation_whole_text_and_scope_are_explicit；p3_status_no_change_and_gui_share_domain_rules；p3_patch_undo_is_gui_only_preserves_unrelated_and_rejects_conflict；p3_explicit_real_work_and_future_undo_preserve_history_and_reservations"
+    },
+    {
+      "alias": "P",
+      "tests": "src-tauri/src/database/mcp_p4_tests.rs",
+      "levelAndAssertions": "L1：p4_dry_run_and_mixed_failure_preserve_every_business_number_version_dictionary_and_receipt；p4_batch_refs_two_level_structure_and_group_undo_are_atomic；p4_future_creation_queue_real_work_and_correction_keep_linked_history；p4_link_sort_trash_restore_and_indirect_scope_roll_back_as_a_group；p4_scope_all_affected_batch_receipts_and_permission_downgrade_are_enforced；p4_bulk_date_approval_is_once_rechecks_revocation_conflicts_and_preserves_number_history"
+    },
+    {
+      "alias": "F",
+      "tests": "同文件::p4_backup_is_local_full_business_only_durable_idempotent_and_unreadable_via_api / p4_business_export_filters_scope_fields_and_csv_formulas_without_backup_access / p4_artifact_unknown_result_never_regenerates_and_permission_change_rejects_old_receipt",
+      "levelAndAssertions": "L1/工具纯函数：backup固定根内1文件、业务内容、无token/credential表、同键不增文件；export排除范围外/私密字段、JSON1行、CSV公式加引号前缀保护、私密projection forbidden；保留结果未知与参数/权限变更后的原键拒绝"
+    },
+    {
+      "alias": "A",
+      "tests": "src-tauri/tests/mcp_security.rs::scope_filters_summary_denominator_trend_details_and_cross_client_calls；src-tauri/tests/mcp_connection_acceptance.rs::p2d_d04_original_connection_enforces_live_intersection_scope_pause_and_revocation",
+      "levelAndAssertions": "L2读/权限交集及L3无有效W的mutate_task.create拒绝。不能把mutate拒绝外推为其他三个工具全部有身份负向覆盖"
+    }
+  ],
+  "currentActionResults": [
+    {
+      "tool": "mutate_task",
+      "action": "create",
+      "existingL1": "W：成功、重开/并发重放、重复possible_duplicate、scope/无W forbidden、审计失败整体回滚",
+      "existingL2": "M、S经service；A有拒绝",
+      "existingL3": "M正常create成功并对照业务/编号；S为result_unknown后同键恢复且create审计仅1；A无W拒绝。无需再造成功创建",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "reuse_existing_L3_only"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "patch",
+      "existingL1": "W：独立字段合并、同字段/ABA conflict、全文替换明确意图、scope拒绝；undo后不影响其他字段",
+      "existingL2": "S、R、C4W",
+      "existingL3": "S标题MCP changed→批准撤销后original-first、auditId复用；补精确字段版本、回执/审计关联及编号/事件保全，不新增成功patch",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [
+        "patch/title_version",
+        "p3-real-patch/receipt_audit",
+        "patch_replay/all_tables",
+        "approved_undo/title_version"
+      ],
+      "currentScope": "strengthened_existing_S_success_replay_and_compensation"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "setStatus",
+      "existingL1": "W：no_change不产事件；processed有事件，补偿保留历史",
+      "existingL2": "M、R、C4W",
+      "existingL3": "M processing成功；R并发赢家/冲突及总审计1。不是所有目标状态和真实办理分支完整L3",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "reuse_existing_L3_only"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "setUrgent",
+      "existingL1": "W::p3_gui_changes_invalidate_versions_urgent_neighbour_scope_and_undo_are_checked：成功、撤销与排序保全",
+      "existingL2": "C4W同工具set/clear",
+      "existingL3": "未定位直接stdio成功；不将CLI当L3。最小阶段不默认追加催办/义务字段",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "recordWorkEvent",
+      "existingL1": "W/P：真实办理意图不足explicit_intent_required；成功及未来预约/撤销保全",
+      "existingL2": "C4W同工具，固定时间事件并查到note",
+      "existingL3": "未定位直接stdio成功，后续若纳入必须单独授权事件、时间、resultStatus、note及confirmedRealWork，不因合成自动推定真实办理",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "createSubtask",
+      "existingL1": "P::p4_batch_refs_two_level_structure_and_group_undo_are_atomic：父子创建、第三层拒绝、幂等/组撤销",
+      "existingL2": "C4的child命令为私有CLI路由，只作共享领域辅证",
+      "existingL3": "未定位mutate_task该action的直接L3，不能由CLI私有路由或batch的operation代替",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "setParent",
+      "existingL1": "P::p4_link_sort_trash_restore_and_indirect_scope_roll_back_as_a_group：两子链接、间接scope回滚",
+      "existingL2": "C4同工具set/clear",
+      "existingL3": "未定位直接L3；旧/新父及间接受影响scope需单列，不默认全量补",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "reorderSubtasks",
+      "existingL1": "P同测试：两子顺序实际比较",
+      "existingL2": "C4同工具单子排序成功",
+      "existingL3": "未定位直接L3；单子成功也不证明多子排序全部边界",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "queue/enqueue",
+      "existingL1": "P/W共享队列/预约保全",
+      "existingL2": "M、C4W",
+      "existingL3": "M直接L3成功及跨入口业务/编号快照一致",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "reuse_existing_L3_only"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "queue/processRound",
+      "existingL1": "P未来事项无真实意图拒绝；领域办理历史",
+      "existingL2": "M、C4W",
+      "existingL3": "M直接L3成功；不能外推未明确授权时也允许",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "reuse_existing_L3_only"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "queue/completeRound",
+      "existingL1": "W/P事件、补偿/队列规则",
+      "existingL2": "M、C4W",
+      "existingL3": "M直接L3成功及跨入口一致",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "reuse_existing_L3_only"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "queue/reopen",
+      "existingL1": "共享领域经C4W，未单列独立L1场景",
+      "existingL2": "C4W同工具成功",
+      "existingL3": "未定位直接L3",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "queue/moveUp",
+      "existingL1": "共享领域经C4W，未单列多项排序oracle",
+      "existingL2": "C4W同工具up成功",
+      "existingL3": "未定位直接L3，不宣称相对顺序完整验证",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "queue/moveDown",
+      "existingL1": "当前源码支持；本次未定位直接专项成功断言",
+      "existingL2": "未定位本次CLI用例调用down",
+      "existingL3": "未定位直接L3；本最小建议不补此mode",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "reschedule",
+      "existingL1": "P::p4_bulk_date_approval_is_once_rechecks_revocation_conflicts_and_preserves_number_history：多事项本地批准、撤权/冲突、不改永久编号",
+      "existingL2": "C4同工具单事项；C5B多事项pending",
+      "existingL3": "未定位直接mutate_task.reschedule L3；不能将批次日期审批当单事项相同路径",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "archive",
+      "existingL1": "共享领域经C4W；该用例未独立断言每步归档flag",
+      "existingL2": "C4W同工具exit0",
+      "existingL3": "未定位直接L3；父子联动参数不默认纳入",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "trash",
+      "existingL1": "P间接scope批次整体拒绝、整组trash成功",
+      "existingL2": "C4W同工具成功及旧版本conflict；R的范围外trash为CLI拒绝",
+      "existingL3": "未定位直接stdio trash成功/拒绝；不将所有权not_found与scope forbidden互换",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "restore",
+      "existingL1": "P父restore后子仍在trash的实际状态断言",
+      "existingL2": "C4W同工具成功，最终deleted_at为空",
+      "existingL3": "未定位直接L3；是恢复单事项，不是恢复覆盖数据库",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "correctWorkEvent",
+      "existingL1": "P未来创建/纠错链：旧事件void、新事件correction_of关联、撤销回到原办理事实",
+      "existingL2": "C4W同工具并查到纠正note",
+      "existingL3": "未定位直接L3；真实事件/历史影响确认需另批",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "mutate_task",
+      "action": "voidWorkEvent",
+      "existingL1": "CLI同工具成功；当前检索未单列该action独立L1专项",
+      "existingL2": "C4W同工具exit0及后续版本冲突",
+      "existingL3": "未定位直接L3；不能由correctWorkEvent使旧事件void代替该端点",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newSuccessfulToolCalls": 0,
+      "newEvidence": [],
+      "currentScope": "no_new_direct_L3_coverage"
+    },
+    {
+      "tool": "request_undo",
+      "branch": "request_undo（无action字段）/申请",
+      "localApi": null,
+      "existingL1": "W：pending不改业务、同字段冲突阻止批准、跨client申请not_found；P组撤销、backup/export的undo unsupported",
+      "existingL2": "C4调用同工具pending，子项状态在批准前不变",
+      "existingL3": "S实际stdio返回needs_user_approval，标题仍MCP changed；已有成功申请。缺另一个有效写客户端冒用patch审计的直接L3拒绝",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [
+        "undo_pending/request",
+        "N801/refusal",
+        "N801/all_tables",
+        "approved_undo/history"
+      ],
+      "coverage": "minimum_authorized_case_passed"
+    },
+    {
+      "tool": null,
+      "branch": "软件端批准撤销",
+      "localApi": "db.mcp_resolve_undo (not MCP action)",
+      "existingL1": "W/P：mcp_resolve_undo(true)成功补偿、版本/历史/编号保全，冲突不部分提交",
+      "existingL2": "C4本地API批准成功，补偿verified_after_commit",
+      "existingL3": "S：stdio申请后直接db.mcp_resolve_undo(true)，标题恢复；这是L3申请+L1软件API模拟，不是GUI按钮，也不是MCP approve action",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [
+        "undo_pending/request",
+        "N801/refusal",
+        "N801/all_tables",
+        "approved_undo/history"
+      ],
+      "coverage": "minimum_authorized_case_passed"
+    },
+    {
+      "tool": null,
+      "branch": "软件端拒绝撤销",
+      "localApi": "db.mcp_resolve_undo (not MCP action)",
+      "existingL1": "源码存在mcp_resolve_undo(false)；本次未定位独立成功测试",
+      "existingL2": "未定位专项",
+      "existingL3": "不是MCP action；最小建议不增加一次拒绝审批，不标通过",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [],
+      "coverage": "unchanged_gap_or_existing_auxiliary_evidence_only"
+    },
+    {
+      "tool": "batch_mutate",
+      "branch": "batch_mutate/dryRun",
+      "localApi": null,
+      "existingL1": "P：整库业务/编号/版本/字典/回执不变；超限/歧义拒绝",
+      "existingL2": "C5B有完整预演快照不变",
+      "existingL3": "S直接L3 dry_run且目标事项未创建；B3实际L3预演basis后续绑定apply。可加强原段全量业务保全，不新增同类预演",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [
+        "batch_dry_run/all_tables",
+        "batch_apply/known_create",
+        "batch_apply/exact_number_and_audit",
+        "p4-wire/receipt_audit",
+        "batch_replay/all_tables",
+        "N802/refusal",
+        "N802/all_tables",
+        "N2/never_created"
+      ],
+      "coverage": "minimum_authorized_case_passed"
+    },
+    {
+      "tool": "batch_mutate",
+      "branch": "batch_mutate/apply",
+      "localApi": null,
+      "existingL1": "P：成功/refs、同键重放、混合失败not_found整体不变、超限/间接scope拒绝",
+      "existingL2": "C5B成功；CLI的预演阻止apply不能冒充apply端点失败；C5未知回包只取原回执",
+      "existingL3": "S实际L3创建1条、同键重放仍仅1条；S回包丢失result_unknown后原键恢复仅1条；B3带expectedBasis成功、编号一致。缺真实stdio混合apply拒绝及独立全表不变断言",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [
+        "batch_dry_run/all_tables",
+        "batch_apply/known_create",
+        "batch_apply/exact_number_and_audit",
+        "p4-wire/receipt_audit",
+        "batch_replay/all_tables",
+        "N802/refusal",
+        "N802/all_tables",
+        "N2/never_created"
+      ],
+      "coverage": "minimum_authorized_case_passed"
+    },
+    {
+      "tool": "batch_mutate",
+      "branch": "多事项日期/截止调整审批",
+      "localApi": null,
+      "existingL1": "P：needs_user_approval、软件mcp_resolve_batch(true)重查撤权/版本、重复批准不重做",
+      "existingL2": "C5B通过CLI仅pending，业务不变",
+      "existingL3": "本次未定位直接L3 pending→软件批准闭环。最小P3-C不包含多事项改期/截止调整或批次审批模拟",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [],
+      "coverage": "unchanged_gap_or_existing_auxiliary_evidence_only"
+    },
+    {
+      "tool": "manage_business_data",
+      "branch": "manage_business_data/backup",
+      "localApi": null,
+      "existingL1": "F：1个固定根内.db、同键不重复、可读业务标题、无token/credential表；undo unsupported；未知/变参原键拒绝",
+      "existingL2": "C5F实际同工具成功并确认.db且无items",
+      "existingL3": "S真实L3 artifact_created、backup列表存在该名称、回包无私密canary。缺同一stdio请求实际文件数量/内容/隔离范围的精确独立oracle；有身份无W拒绝未单独证明",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [
+        "N803/refusal",
+        "N803/all_tables",
+        "backup/file_boundary",
+        "backup/private_acl",
+        "backup/content",
+        "backup/audit_receipt"
+      ],
+      "coverage": "minimum_authorized_case_passed"
+    },
+    {
+      "tool": "manage_business_data",
+      "branch": "manage_business_data/export JSON",
+      "localApi": null,
+      "existingL1": "F：已知1行、complete、排除范围外/私密字段；私密projection forbidden，业务不变",
+      "existingL2": "C5F成功，无items正文，CLI只读receipt不改业务",
+      "existingL3": "S真实L3 artifact_created、无私密canary，但未读取文件核对内容。缺范围外哨兵和真实stdio私密projection拒绝",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [
+        "N804/refusal",
+        "N804/all_tables",
+        "export/file_boundary",
+        "export/private_acl",
+        "export/content",
+        "export/audit_receipt"
+      ],
+      "coverage": "minimum_authorized_case_passed"
+    },
+    {
+      "tool": "manage_business_data",
+      "branch": "manage_business_data/export CSV",
+      "localApi": null,
+      "existingL1": "F：公式值前置单引号、私密字段/scope限制",
+      "existingL2": "本次该C5F执行JSON，不把它记作CSV",
+      "existingL3": "未定位直接L3 CSV。最小建议只JSON，不再生成第三个文件",
+      "existingEvidenceSha": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+      "currentRun": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "newEvidence": [],
+      "coverage": "unchanged_gap_or_existing_auxiliary_evidence_only"
+    }
+  ],
+  "formalSubmissionApproval": {
+    "date": "2026-11-04",
+    "timezone": "Asia/Shanghai",
+    "acceptedCandidate": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+    "acceptedRun": {
+      "id": 41787792742,
+      "sha": "30927f5683faa590e2d91e9a7d10991895ffaa80",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/bluntvoice/In-Line/actions/runs/41787792742",
+      "event": "push",
+      "path": ".github/workflows/ci.yml"
+    },
+    "formalBaseline": "b6312a9dad8d25f0d8f4d6332182e153ab8b3a42",
+    "status": "user_accepted_minimum_scope_formal_commit_and_new_sha_ci_pending",
+    "approvedFiles": [
+      "src-tauri/tests/mcp_queries.rs",
+      "src-tauri/tests/mcp_queries/p3c.rs",
+      "src-tauri/tests/p3c_unsupported_platform.rs",
+      "docs/MCP_PHASE3C_ACCEPTANCE.md",
+      "docs/mcp/acceptance/MCP-PHASE3C-20261104-checks.json"
+    ],
+    "frozenTestBlobs": [
+      {
+        "path": "src-tauri/tests/mcp_queries.rs",
+        "blob": "dd47a1e8f0fb86bf34427d1d583f15d606be6f07"
+      },
+      {
+        "path": "src-tauri/tests/mcp_queries/p3c.rs",
+        "blob": "26548ca53d008e6d4b8b5c79386ad2114b2fd264"
+      },
+      {
+        "path": "src-tauri/tests/p3c_unsupported_platform.rs",
+        "blob": "a0332f7bf91a4576d0086869a9b7a6fcfa3460b2"
+      }
+    ],
+    "priorFields": "frozen candidate evidence retained unchanged; their pending-user-acceptance status describes the candidate delivery time",
+    "formalCiReceipt": "docs/MCP_PHASE3C_COMMIT_RECEIPT.md",
+    "p3d": "preparation_only_no_execution",
+    "backupSecurityDecision": "required_before_production_not_accepted_by_this_phase"
+  }
+}

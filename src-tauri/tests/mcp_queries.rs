@@ -14,9 +14,12 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 #[path = "mcp_queries/p3b.rs"]
 mod p3b;
+#[path = "mcp_queries/p3c.rs"]
+mod p3c;
 
 #[tokio::test]
 async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction() {
+    let p3c_enabled = p3c::enabled();
     let root = std::env::temp_dir().join(format!(
         "inline-p2-stdio-{}",
         platform::random_secret().unwrap()
@@ -39,6 +42,15 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             },
         })
         .unwrap();
+    let mut probe = p3c_enabled.then(|| {
+        p3c::Probe::new(
+            &root,
+            db.clone(),
+            security.clone(),
+            &issued.client_id,
+            &issued.token,
+        )
+    });
     let sec = security.clone();
     let data = db.clone();
     let response_fault = std::sync::atomic::AtomicBool::new(false);
@@ -76,8 +88,12 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
         .kill_on_drop(true)
         .spawn()
         .unwrap();
+    if let Some(p) = probe.as_mut() {
+        p.bind(&child);
+    }
     let mut input = child.stdin.take().unwrap();
     let mut output = BufReader::new(child.stdout.take().unwrap()).lines();
+    macro_rules! observe { ($id:expr, $tool:expr, $args:expr, $response:expr) => { if let Some(p)=probe.as_ref() { p.observe(&mut child,$id,&json!({"name":$tool,"arguments":$args}),&$response); } }; }
     let execute = async {
         async fn request(
             input: &mut tokio::process::ChildStdin,
@@ -225,6 +241,10 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             "forbidden"
         );
         assert_eq!(db.get_task(1).unwrap().title, "original-first");
+        observe!(8, "mutate_task", mutation, denied);
+        if let Some(p) = probe.as_ref() {
+            p.negative(&mut input,&mut output,&mut child,803,"manage_business_data",json!({"action":"backup","idempotencyKey":"p3c-backup-denied","intent":intent,"reason":"synthetic no-write backup isolation"}),"forbidden").await;
+        }
         let write = Permissions {
             regular_read: true,
             full_read: false,
@@ -241,6 +261,8 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 },
             )
             .unwrap();
+        let patch_before = probe.as_ref().map(|p| p.snapshot());
+        let patch_auth = probe.as_ref().map(|p| p.auth());
         let result = request(
             &mut input,
             &mut output,
@@ -255,6 +277,22 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             "verified_after_commit"
         );
         assert!(!result.to_string().contains("secret-"));
+        observe!(9, "mutate_task", mutation, result);
+        if let Some(p) = probe.as_ref() {
+            p.title(
+                "patch",
+                patch_before.as_ref().unwrap(),
+                "MCP changed",
+                1,
+                patch_auth.as_ref().unwrap(),
+            );
+            p.receipt(
+                "p3-real-patch",
+                &result["result"]["structuredContent"]["data"],
+                "patch",
+            );
+        }
+        let patched = probe.as_ref().map(|p| p.snapshot());
         let audit = result["result"]["structuredContent"]["data"]["auditId"].clone();
         let repeated = request(
             &mut input,
@@ -272,12 +310,36 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             repeated["result"]["structuredContent"]["data"]["replayed"],
             true
         );
+        observe!(10, "mutate_task", mutation, repeated);
+        if let Some(p) = probe.as_ref() {
+            p.unchanged(
+                "patch_replay",
+                patched.as_ref().unwrap(),
+                patch_auth.as_ref().unwrap(),
+            );
+            p.foreign_undo(&audit).await;
+        }
+        let undo_before = probe.as_ref().map(|p| p.snapshot());
         let undo=request(&mut input,&mut output,11,"tools/call",json!({"name":"request_undo","arguments":{"auditId":audit,"idempotencyKey":"p3-real-undo","intent":intent,"reason":"synthetic approval required"}})).await;
         assert_eq!(
             undo["result"]["structuredContent"]["data"]["status"],
             "needs_user_approval"
         );
         assert_eq!(db.get_task(1).unwrap().title, "MCP changed");
+        observe!(
+            11,
+            "request_undo",
+            json!({"auditId":audit,"idempotencyKey":"p3-real-undo","intent":intent,"reason":"synthetic approval required"}),
+            undo
+        );
+        if let Some(p) = probe.as_ref() {
+            p.pending(
+                undo_before.as_ref().unwrap(),
+                &undo["result"]["structuredContent"]["data"],
+                patch_auth.as_ref().unwrap(),
+            );
+        }
+        let pending = probe.as_ref().map(|p| p.snapshot());
         db.mcp_resolve_undo(
             undo["result"]["structuredContent"]["data"]["undoRequestId"]
                 .as_i64()
@@ -286,6 +348,14 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
         )
         .unwrap();
         assert_eq!(db.get_task(1).unwrap().title, "original-first");
+        if let Some(p) = probe.as_ref() {
+            p.approved(
+                patched.as_ref().unwrap(),
+                pending.as_ref().unwrap(),
+                &undo["result"]["structuredContent"]["data"],
+                patch_auth.as_ref().unwrap(),
+            );
+        }
         let history = request(
             &mut input,
             &mut output,
@@ -325,6 +395,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 .count(),
             1
         );
+        observe!(14, "mutate_task", uncertain, lost);
         let recovered = request(
             &mut input,
             &mut output,
@@ -346,6 +417,8 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 .count(),
             1
         );
+        observe!(15, "mutate_task", uncertain, recovered);
+        let batch_before = probe.as_ref().map(|p| p.snapshot());
         let batch_args = json!({"action":"dryRun","operations":[{"operation":{"action":"create","task":{"title":"p4-stdio-created","departments":["synthetic A"],"contacts":["synthetic C"],"taskType":"synthetic T"}}}],"idempotencyKey":"p4-wire","intent":intent,"reason":"explicit synthetic batch"});
         let dry = request(
             &mut input,
@@ -364,6 +437,14 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             .unwrap()
             .iter()
             .any(|t| t.title == "p4-stdio-created"));
+        observe!(16, "batch_mutate", batch_args, dry);
+        if let Some(p) = probe.as_ref() {
+            p.unchanged(
+                "batch_dry_run",
+                batch_before.as_ref().unwrap(),
+                patch_auth.as_ref().unwrap(),
+            );
+        }
         let mut apply = batch_args;
         apply["action"] = json!("apply");
         let actual = request(
@@ -378,6 +459,15 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             actual["result"]["structuredContent"]["data"]["verificationStatus"],
             "verified_after_commit"
         );
+        observe!(17, "batch_mutate", apply, actual);
+        if let Some(p) = probe.as_ref() {
+            p.batch_applied(
+                batch_before.as_ref().unwrap(),
+                &actual["result"]["structuredContent"]["data"],
+                patch_auth.as_ref().unwrap(),
+            );
+        }
+        let batch_committed = probe.as_ref().map(|p| p.snapshot());
         let repeat = request(
             &mut input,
             &mut output,
@@ -398,6 +488,17 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 .count(),
             1
         );
+        observe!(18, "batch_mutate", apply, repeat);
+        if let Some(p) = probe.as_ref() {
+            p.unchanged(
+                "batch_replay",
+                batch_committed.as_ref().unwrap(),
+                patch_auth.as_ref().unwrap(),
+            );
+            p.sentinel();
+            p.negative(&mut input,&mut output,&mut child,802,"batch_mutate",json!({"action":"apply","operations":[{"operation":{"action":"create","task":{"title":"p3c-never-created","departments":["synthetic A"],"contacts":["synthetic C"],"taskType":"synthetic T"}}},{"operation":{"action":"setStatus","target":{"taskId":9999},"taskVersion":0,"status":"pending"}}],"idempotencyKey":"p3c-mixed-invalid","intent":intent,"reason":"synthetic atomic apply refusal"}),"not_found").await;
+            p.negative(&mut input,&mut output,&mut child,804,"manage_business_data",json!({"action":"export","format":"json","projection":["id","contacts"],"idempotencyKey":"p3c-export-private-field","intent":intent,"reason":"synthetic private projection refusal"}),"forbidden").await;
+        }
         for (index, action, extra) in [
             (19, "backup", json!({})),
             (20, "export", json!({"format":"json"})),
@@ -406,6 +507,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             for (k, v) in extra.as_object().unwrap() {
                 args[k] = v.clone();
             }
+            let artifact_before = probe.as_ref().map(|p| p.snapshot());
             let response = request(
                 &mut input,
                 &mut output,
@@ -419,6 +521,15 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 "{response}"
             );
             assert!(!response.to_string().contains("secret-"));
+            observe!(index, "manage_business_data", args, response);
+            if let Some(p) = probe.as_ref() {
+                p.artifact(
+                    action,
+                    &response["result"]["structuredContent"]["data"],
+                    artifact_before.as_ref().unwrap(),
+                    patch_auth.as_ref().unwrap(),
+                );
+            }
             if action == "backup" {
                 assert!(db.list_backups().unwrap().iter().any(|b| b.name
                     == response["result"]["structuredContent"]["data"]["artifactName"]
@@ -439,6 +550,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             loss["result"]["structuredContent"]["error"]["code"], "result_unknown",
             "{loss}"
         );
+        observe!(21, "batch_mutate", uncertain_batch, loss);
         let recovery = request(
             &mut input,
             &mut output,
@@ -459,6 +571,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
                 .count(),
             1
         );
+        observe!(22, "batch_mutate", uncertain_batch, recovery);
         let full = request(
             &mut input,
             &mut output,
@@ -545,6 +658,7 @@ async fn p2_real_stdio_and_authenticated_pipe_use_bound_snapshot_and_redaction()
             "paused"
         );
         assert_eq!(db.get_task(1).unwrap().title, "original-first");
+        observe!(13, "mutate_task", mutation, paused);
     };
     tokio::time::timeout(std::time::Duration::from_secs(30), execute)
         .await
