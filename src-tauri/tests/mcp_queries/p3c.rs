@@ -243,6 +243,15 @@ impl Probe {
     }
     pub(super) fn title(&self, case: &str, before: &Value, value: &str, version: i64, auth: &[u8]) {
         let after = self.snapshot();
+        record(
+            &format!("{case}/initial_title_version"),
+            json!(version - 1),
+            rows(before, "mcp_field_versions")
+                .iter()
+                .find(|r| r["task_id"] == 1 && r["field"] == "title")
+                .unwrap()["version"]
+                .clone(),
+        );
         let mut old = by(before, "tasks", "id", &json!(1)).clone();
         let mut new = by(&after, "tasks", "id", &json!(1)).clone();
         for key in ["title", "updated_at"] {
@@ -257,7 +266,6 @@ impl Probe {
         for table in [
             "daily_sequences",
             "queue_number_allocations",
-            "task_queue_entries",
             "status_history",
             "task_work_events",
             "urgent_records",
@@ -271,6 +279,40 @@ impl Probe {
                 json!(before[table] == after[table]),
             );
         }
+        // Shared save_task_on updates queue.updated_at on every edit, even when
+        // its business fields do not change. Verify that metadata explicitly.
+        let queue_business = |state: &Value| {
+            rows(state, "task_queue_entries")
+                .iter()
+                .map(|r| {
+                    let mut r = r.clone();
+                    if r["task_id"] == 1 {
+                        r.as_object_mut().unwrap().remove("updated_at");
+                    }
+                    r
+                })
+                .collect::<Vec<_>>()
+        };
+        let task = by(&after, "tasks", "id", &json!(1));
+        record(
+            &format!("{case}/queue_business_and_metadata"),
+            json!({"businessUnchanged":true,"timestampMatchesTask":true}),
+            json!({"businessUnchanged":queue_business(before)==queue_business(&after),"timestampMatchesTask":rows(&after,"task_queue_entries").iter().filter(|r|r["task_id"]==1).all(|r|r["updated_at"]==task["updated_at"])}),
+        );
+        let added_logs = rows(&after, "task_logs")
+            .iter()
+            .filter(|r| !rows(before, "task_logs").contains(r))
+            .collect::<Vec<_>>();
+        let mut kinds = added_logs
+            .iter()
+            .map(|r| r["log_type"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        kinds.sort();
+        record(
+            &format!("{case}/exact_history_additions"),
+            json!({"kinds":if case=="patch"{vec!["updated"]}else{vec!["audit","updated"]},"ownTask":true,"auditsAdded":1,"receiptsAdded":if case=="patch"{1}else{0}}),
+            json!({"kinds":kinds,"ownTask":added_logs.iter().all(|r|r["task_id"]==1),"auditsAdded":rows(&after,"mcp_ai_audit").len()-rows(before,"mcp_ai_audit").len(),"receiptsAdded":rows(&after,"mcp_receipts").len()-rows(before,"mcp_receipts").len()}),
+        );
         record(
             &format!("{case}/other_fields_versions"),
             json!(true),
@@ -390,6 +432,17 @@ impl Probe {
             json!({"added":rows(&after,"tasks").len()-old.len(),"title":t["title"],"nextSequence":t["daily_sequence"]==old_max+1,"newPermanentNumber":!old.iter().any(|r|r["permanent_number"]==t["permanent_number"]),"oldTasksRetained":old.iter().all(|r|rows(&after,"tasks").contains(r)),"allocations":allocated,"itemVersionMatches":by(&after,"mcp_task_versions","task_id",&json!(id))["version"]==data["taskVersions"][id.to_string()],"noWorkEvent":before["task_work_events"]==after["task_work_events"],"authorization":auth==self.auth()}),
         );
         self.receipt("p4-wire", data, "batch");
+        let old_allocations = rows(before, "queue_number_allocations");
+        let date = rows(before, "tasks")[0]["ticket_date"].as_str().unwrap();
+        let sequence = by(before, "daily_sequences", "ticket_date", &json!(date))["last_sequence"]
+            .as_i64()
+            .unwrap()
+            + 1;
+        record(
+            "batch_apply/exact_number_and_audit",
+            json!({"knownNumber":true,"oldAllocationsRetained":true,"allocationsAdded":1,"queuesAdded":1,"auditsAdded":2,"receiptsAdded":2,"dictionaryPreserved":true}),
+            json!({"knownNumber":t["permanent_number"]==format!("{}-{:02}",date.replace('-',""),sequence)&&t["daily_sequence"]==sequence&&by(&after,"daily_sequences","ticket_date",&json!(date))["last_sequence"]==sequence,"oldAllocationsRetained":old_allocations.iter().all(|r|rows(&after,"queue_number_allocations").contains(r)),"allocationsAdded":rows(&after,"queue_number_allocations").len()-old_allocations.len(),"queuesAdded":rows(&after,"task_queue_entries").len()-rows(before,"task_queue_entries").len(),"auditsAdded":rows(&after,"mcp_ai_audit").len()-rows(before,"mcp_ai_audit").len(),"receiptsAdded":rows(&after,"mcp_receipts").len()-rows(before,"mcp_receipts").len(),"dictionaryPreserved":before["master_values"]==after["master_values"]}),
+        );
     }
     pub(super) fn sentinel(&self) {
         let before = self.db.get_task(1).unwrap();
@@ -429,6 +482,12 @@ impl Probe {
             json!({"inside":true,"files":if action=="backup"{1}else{2},"allFinalFiles":true,"extension":if action=="backup"{"db"}else{"json"},"noPartial":true,"noBody":true}),
             json!({"inside":p.starts_with(&root)&&root.starts_with(self.root.canonicalize().unwrap())&&self.db.backup_directory().canonicalize().unwrap().join("mcp-created")==root,"files":paths.len(),"allFinalFiles":paths.iter().all(|p|p.is_file()),"extension":p.extension().unwrap().to_str(),"noPartial":paths.iter().all(|p|p.extension().is_some_and(|x|x=="db"||x=="json")),"noBody":data.get("items").is_none()}),
         );
+        let acl = platform::Descriptor::new(true).unwrap();
+        record(
+            &format!("{action}/private_acl"),
+            json!(true),
+            json!(acl.verify(&root).is_ok() && acl.verify(&p).is_ok()),
+        );
         if action == "backup" {
             let c = read(&p);
             let count: i64 = c
@@ -446,7 +505,7 @@ impl Probe {
             record(
                 "backup/content",
                 json!({"tasks":5,"outsideSentinels":1,"credentialTables":0,"businessMatchesBefore":true}),
-                json!({"tasks":count,"outsideSentinels":outside,"credentialTables":secrets,"businessMatchesBefore":["tasks","task_queue_entries","daily_sequences","queue_number_allocations","task_work_events","master_values","mcp_field_versions","mcp_task_versions"].iter().all(|t|backup[*t]==before[*t])}),
+                json!({"tasks":count,"outsideSentinels":outside,"credentialTables":secrets,"businessMatchesBefore":(["tasks","task_queue_entries","daily_sequences","queue_number_allocations","task_work_events","master_values","mcp_field_versions","mcp_task_versions"].iter().all(|t|backup[*t]==before[*t]))}),
             );
         } else {
             let bytes = std::fs::read(&p).unwrap();
@@ -481,7 +540,7 @@ impl Probe {
         record(
             &format!("{action}/audit_receipt"),
             json!({"action":action,"owner":true,"complete":true,"linked":true,"businessPreserved":true,"authorization":true,"auditsAdded":1}),
-            json!({"action":audit["action"],"owner":audit["client_id"]==self.owner.client_id,"complete":job["status"]=="complete","linked":serde_json::from_str::<Value>(job["result_json"].as_str().unwrap()).unwrap()["auditId"]==data["auditId"],"businessPreserved":["tasks","daily_sequences","queue_number_allocations","task_queue_entries","task_logs","task_work_events","status_history","urgent_records","master_values","mcp_task_versions","mcp_field_versions"].iter().all(|t|before[*t]==after[*t]),"authorization":auth==self.auth(),"auditsAdded":rows(&after,"mcp_ai_audit").len()-rows(before,"mcp_ai_audit").len()}),
+            json!({"action":audit["action"],"owner":audit["client_id"]==self.owner.client_id,"complete":job["status"]=="complete","linked":serde_json::from_str::<Value>(job["result_json"].as_str().unwrap()).unwrap()["auditId"]==data["auditId"],"businessPreserved":(["tasks","daily_sequences","queue_number_allocations","task_queue_entries","task_logs","task_work_events","status_history","urgent_records","master_values","mcp_task_versions","mcp_field_versions"].iter().all(|t|before[*t]==after[*t])),"authorization":auth==self.auth(),"auditsAdded":rows(&after,"mcp_ai_audit").len()-rows(before,"mcp_ai_audit").len()}),
         );
     }
     pub(super) async fn negative(
@@ -546,6 +605,15 @@ impl Probe {
             json!({"code":r["result"]["structuredContent"]["error"]["code"],"isError":r["result"]["isError"]}),
         );
         self.unchanged(&format!("N{id}"), &before, &auth);
+        if id == 802 {
+            record(
+                "N2/never_created",
+                json!(true),
+                json!(!rows(&self.snapshot(), "tasks")
+                    .iter()
+                    .any(|r| r["title"] == "p3c-never-created")),
+            );
+        }
         record(
             &format!("N{id}/no_files"),
             json!(true),
@@ -689,3 +757,4 @@ fn p3c_environment_gate_precedes_all_additional_resources() {
         assert!(passed, "P3-C gate case {case}");
     }
 }
+
