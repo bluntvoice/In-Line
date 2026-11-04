@@ -757,4 +757,3 @@ fn p3c_environment_gate_precedes_all_additional_resources() {
         assert!(passed, "P3-C gate case {case}");
     }
 }
-
