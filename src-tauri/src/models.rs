@@ -193,6 +193,8 @@ pub struct TaskLog {
     pub log_type: String,
     pub content: String,
     pub created_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -879,17 +879,17 @@ fn enqueue_on(
             reason,
         )?;
     }
+    let action = if reopen && task.deleted_at.is_none() {
+        "重新开启并加入"
+    } else {
+        "重新加入"
+    };
+    let mut content = format!("{action} {date} 队列：{sequence:02}");
     let reason_text = reason.trim();
-    add_log(
-        connection,
-        task_id,
-        "queue",
-        &if reason_text.is_empty() {
-            format!("重新加入 {} 队列：{:02}", date, sequence)
-        } else {
-            format!("重新加入 {} 队列：{:02}（{}）", date, sequence, reason_text)
-        },
-    )?;
+    if !reason_text.is_empty() {
+        content.push_str(&format!("（{reason_text}）"));
+    }
+    add_log(connection, task_id, "queue", &content)?;
     Ok((date, sequence))
 }
 
@@ -1130,6 +1130,7 @@ impl Database {
             .map_err(|_| "数据库正忙，请稍后重试".to_string())?;
         let connection = guard.as_mut().ok_or("数据库尚未打开")?;
         let transaction = connection.transaction().map_err(display_error)?;
+        let log_checkpoint = timeline_log_checkpoint(&transaction)?;
         let stamp = now();
         let effective_is_urgent = input.is_urgent && !clears_urgent_status(&input.status);
         let previous_task = input
@@ -1344,12 +1345,13 @@ impl Database {
                 bump_master_use(&transaction, "contact", &contact)?;
             }
         }
+        mark_timeline_operation(&transaction, log_checkpoint)?;
         transaction.commit().map_err(display_error)?;
         get_task_on(connection, id)
     }
 
     pub fn create_subtask(&self, input: CreateSubtaskInput) -> Result<LegalTask, String> {
-        self.with_transaction(|transaction| {
+        self.with_timeline_transaction(|transaction| {
             let parent = get_task_on(transaction, input.parent_task_id)?;
             if parent.deleted_at.is_some() {
                 return Err("回收站中的事项不能新增子任务".into());
@@ -1522,6 +1524,18 @@ impl Database {
         Ok(result)
     }
 
+    fn with_timeline_transaction<T>(
+        &self,
+        operation: impl FnOnce(&Transaction<'_>) -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.with_transaction(|tx| {
+            let checkpoint = timeline_log_checkpoint(tx)?;
+            let result = operation(tx)?;
+            mark_timeline_operation(tx, checkpoint)?;
+            Ok(result)
+        })
+    }
+
     pub fn list_parent_task_candidates(&self, task_id: i64) -> Result<Vec<LegalTask>, String> {
         self.with_conn(|connection| {
             let task = get_task_on(connection, task_id)?;
@@ -1669,7 +1683,7 @@ impl Database {
     }
 
     pub fn complete_task(&self, input: CompleteTaskInput) -> Result<CompleteTaskResult, String> {
-        self.with_transaction(|transaction| {
+        self.with_timeline_transaction(|transaction| {
             let task = get_task_on(transaction, input.task_id)?;
             let mut completed_task_ids = Vec::new();
             if input.include_eligible_subtasks && task.parent_task_id.is_none() {
@@ -1705,7 +1719,7 @@ impl Database {
     }
 
     pub fn archive_task_group(&self, input: ArchiveTaskInput) -> Result<ArchiveTaskResult, String> {
-        self.with_transaction(|transaction| {
+        self.with_timeline_transaction(|transaction| {
             let task = get_task_on(transaction, input.task_id)?;
             let mut archived_task_ids = Vec::new();
             if input.include_completed_subtasks && task.parent_task_id.is_none() {
@@ -1739,7 +1753,7 @@ impl Database {
     }
 
     pub fn delete_task_group(&self, input: DeleteTaskInput) -> Result<DeleteTaskResult, String> {
-        self.with_transaction(|transaction| {
+        self.with_timeline_transaction(|transaction| {
             let task = get_task_on(transaction, input.task_id)?;
             if task.deleted_at.is_some() {
                 return Ok(DeleteTaskResult {
@@ -1790,7 +1804,7 @@ impl Database {
         if !ALL_STATUSES.contains(&status.as_str()) {
             return Err("事项状态无效".into());
         }
-        self.with_transaction(|transaction| {
+        self.with_timeline_transaction(|transaction| {
             let task = get_task_on(transaction, id)?;
             if task.status == status {
                 if clears_urgent_status(&status) {
@@ -1940,7 +1954,7 @@ impl Database {
         if input.target_task_id == input.source_task_id {
             return Err("不能将事项合并到自身".into());
         }
-        self.with_transaction(|tx| {
+        self.with_timeline_transaction(|tx| {
             let target = get_task_on(tx, input.target_task_id)?;
             let source = get_task_on(tx, input.source_task_id)?;
             if target.deleted_at.is_some() || source.deleted_at.is_some() {
@@ -2078,7 +2092,7 @@ impl Database {
         })
     }
     pub fn restore(&self, id: i64) -> Result<(), String> {
-        self.with_transaction(|tx| {
+        self.with_timeline_transaction(|tx| {
             let task = get_task_on(tx, id)?;
             if task.deleted_at.is_none() {
                 return Err("事项不在回收站中".into());
@@ -2188,7 +2202,7 @@ impl Database {
     }
 
     pub fn enqueue_task(&self, input: QueueInput) -> Result<(), String> {
-        self.with_transaction(|tx| {
+        self.with_timeline_transaction(|tx| {
             enqueue_on(
                 tx,
                 input.id,
@@ -2203,7 +2217,7 @@ impl Database {
     }
 
     pub fn reopen_task(&self, input: QueueInput) -> Result<(), String> {
-        self.with_transaction(|tx| {
+        self.with_timeline_transaction(|tx| {
             let task = get_task_on(tx, input.id)?;
             if task.deleted_at.is_some() {
                 return Err("回收站事项请先使用恢复操作".into());
@@ -2227,7 +2241,7 @@ impl Database {
     }
 
     pub fn process_round(&self, id: i64) -> Result<(), String> {
-        self.with_transaction(|tx| {
+        self.with_timeline_transaction(|tx| {
             let task = get_task_on(tx, id)?;
             if task.deleted_at.is_some()
                 || task.archived_at.is_some()
@@ -2244,7 +2258,8 @@ impl Database {
             } else {
                 "processed"
             };
-            if matches!(task.status.as_str(), "pending" | "processing") {
+            let entered_deferred = matches!(task.status.as_str(), "pending" | "processing");
+            if entered_deferred {
                 tx.execute(
                     "UPDATE tasks SET status='processed',updated_at=? WHERE id=?",
                     params![stamp, id],
@@ -2253,7 +2268,7 @@ impl Database {
                 add_status(tx, id, Some(&task.status), "processed", "本轮已处理")?;
             }
             clear_urgent_on(tx, id, "事项进入暂缓队列")?;
-            close_active_queue(tx, id, "本轮已处理")?;
+            let left_queue = close_active_queue(tx, id, "本轮已处理")?.is_some();
             record_work_event_on(
                 tx,
                 id,
@@ -2263,12 +2278,20 @@ impl Database {
                 "quick_action",
                 "",
             )?;
-            add_log(tx, id, "work", "已记录本轮处理，事项进入暂缓队列")
+            let mut content = if result_status == "processed" {
+                "本轮已处理".to_string()
+            } else {
+                format!("已记录本轮处理：{result_status}")
+            };
+            if entered_deferred || left_queue {
+                content.push_str("，移入暂缓事项");
+            }
+            add_log(tx, id, "work", &content)
         })
     }
 
     pub fn complete_round(&self, id: i64) -> Result<(), String> {
-        self.with_transaction(|tx| {
+        self.with_timeline_transaction(|tx| {
             ensure_direct_completion_allowed(tx, id)?;
             complete_task_on(tx, id, "本轮已完成")
         })
@@ -2279,7 +2302,7 @@ impl Database {
             return Err("处理结果无效".into());
         }
         validate_handled_at(&input.handled_at)?;
-        self.with_transaction(|tx| {
+        self.with_timeline_transaction(|tx| {
             let task = get_task_on(tx, input.task_id)?;
             if task.deleted_at.is_some() {
                 return Err("回收站事项不能新增处理活动".into());
@@ -3107,6 +3130,51 @@ impl Database {
         })
     }
 }
+const TIMELINE_LOG_PREFIX: &str = "timeline:v1:";
+
+fn timeline_log_checkpoint(connection: &Connection) -> Result<i64, String> {
+    connection
+        .query_row("SELECT COALESCE(MAX(id),0) FROM task_logs", [], |row| {
+            row.get(0)
+        })
+        .map_err(display_error)
+}
+
+fn mark_timeline_operation(connection: &Connection, checkpoint: i64) -> Result<(), String> {
+    // The caller holds the write transaction. AUTOINCREMENT isolates rows inserted by
+    // this operation even when it also moves existing records between tasks.
+    let nonce: String = connection
+        .query_row("SELECT lower(hex(randomblob(16)))", [], |row| row.get(0))
+        .map_err(display_error)?;
+    connection
+        .execute(
+            "UPDATE task_logs
+             SET log_type=?1 || ?2 || ':' || task_id || ':' || log_type
+             WHERE id>?3 AND log_type NOT IN ('note','audit')",
+            params![TIMELINE_LOG_PREFIX, nonce, checkpoint],
+        )
+        .map_err(display_error)?;
+    Ok(())
+}
+
+fn decode_timeline_log_type(raw: &str) -> (&str, Option<&str>) {
+    if let Some(tagged) = raw.strip_prefix(TIMELINE_LOG_PREFIX) {
+        if let Some((operation_id, kind)) = tagged.rsplit_once(':') {
+            if let Some((nonce, task_id)) = operation_id.split_once(':') {
+                if nonce.len() == 32
+                    && nonce.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    && task_id.parse::<i64>().is_ok()
+                    && !matches!(kind, "" | "note" | "audit")
+                    && !kind.contains(':')
+                {
+                    return (kind, Some(operation_id));
+                }
+            }
+        }
+    }
+    (raw, None)
+}
+
 fn add_log(connection: &Connection, id: i64, kind: &str, content: &str) -> Result<(), String> {
     connection
         .execute(
@@ -3243,11 +3311,28 @@ fn bump_master_use(connection: &Connection, kind: &str, name: &str) -> Result<()
 
 impl Database {
     pub fn get_logs(&self, task_id: i64) -> Result<Vec<TaskLog>, String> {
-        self.with_conn(|connection|{
-            let mut statement=connection.prepare("SELECT id,task_id,log_type,content,created_at FROM task_logs WHERE task_id=? ORDER BY created_at DESC").map_err(display_error)?;
-            let rows=statement.query_map([task_id],|row|Ok(TaskLog{id:row.get(0)?,task_id:row.get(1)?,log_type:row.get(2)?,content:row.get(3)?,created_at:row.get(4)?}))
-                .map_err(display_error)?.collect::<Result<Vec<_>,_>>().map_err(display_error);
-            rows
+        self.with_conn(|connection| {
+            let mut statement = connection
+                .prepare(
+                    "SELECT id,task_id,log_type,content,created_at
+                     FROM task_logs WHERE task_id=? ORDER BY created_at DESC,id DESC",
+                )
+                .map_err(display_error)?;
+            let rows = statement
+                .query_map([task_id], |row| {
+                    let raw: String = row.get(2)?;
+                    let (log_type, operation_id) = decode_timeline_log_type(&raw);
+                    Ok(TaskLog {
+                        id: row.get(0)?,
+                        task_id: row.get(1)?,
+                        log_type: log_type.to_string(),
+                        content: row.get(3)?,
+                        created_at: row.get(4)?,
+                        operation_id: operation_id.map(str::to_owned),
+                    })
+                })
+                .map_err(display_error)?;
+            rows.collect::<Result<Vec<_>, _>>().map_err(display_error)
         })
     }
     pub fn add_log(&self, task_id: i64, content: String) -> Result<(), String> {
@@ -6196,6 +6281,193 @@ mod tests {
         drop(target);
         let _ = fs::remove_dir_all(source_root);
         let _ = fs::remove_dir_all(target_root);
+    }
+
+    #[test]
+    fn timeline_operations_keep_repeated_actions_notes_and_audit_independent() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-timeline-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        let task = db.save_task(sample("时间线测试")).unwrap();
+        db.with_conn(|conn| add_log(conn, task.id, "status", "历史状态变更"))
+            .unwrap();
+
+        db.process_round(task.id).unwrap();
+        db.add_log(task.id, "人工备注 pending".into()).unwrap();
+        let queue_input = || QueueInput {
+            id: task.id,
+            inherit_deadline: false,
+            reason: "独立入队轮次".into(),
+        };
+        db.enqueue_task(queue_input()).unwrap();
+        db.process_round(task.id).unwrap();
+        db.complete_round(task.id).unwrap();
+        db.reopen_task(queue_input()).unwrap();
+        db.set_status(task.id, "waiting_materials".into()).unwrap();
+        db.process_round(task.id).unwrap();
+
+        db.with_conn(|conn| {
+            // Force ties in the fixture: operation identity must survive equal timestamps.
+            conn.execute(
+                "UPDATE task_logs SET created_at='2026-09-30T08:00:00+08:00'",
+                [],
+            )
+            .map_err(display_error)?;
+            add_log(conn, task.id, "audit", "独立审计记录")
+        })
+        .unwrap();
+
+        let logs = db.get_logs(task.id).unwrap();
+        let processed: Vec<_> = logs
+            .iter()
+            .filter(|log| log.content == "本轮已处理，移入暂缓事项")
+            .collect();
+        assert_eq!(processed.len(), 2);
+        assert_ne!(processed[0].operation_id, processed[1].operation_id);
+        for log in processed {
+            assert!(log.operation_id.is_some());
+            assert!(logs.iter().any(|related| related.log_type == "queue"
+                && related.operation_id == log.operation_id
+                && related.content.starts_with("退出 ")));
+        }
+        let waiting = logs.iter().find(|log| log.log_type == "work").unwrap();
+        assert_eq!(waiting.content, "已记录本轮处理：waiting_materials");
+        assert!(logs
+            .iter()
+            .any(|log| log.content.starts_with("重新开启并加入 ")));
+        assert!(logs
+            .iter()
+            .any(|log| log.content == "本轮已完成，事项整体结束"));
+        for kind in ["note", "audit"] {
+            assert!(logs
+                .iter()
+                .any(|log| log.log_type == kind && log.operation_id.is_none()));
+        }
+        assert!(logs
+            .iter()
+            .any(|log| log.content == "历史状态变更" && log.operation_id.is_none()));
+        assert_eq!(db.list_work_events(task.id).unwrap().len(), 5);
+
+        drop(db);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn timeline_operations_survive_restore_merge_and_legacy_import() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-timeline-backup-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let legacy_root = root.join("legacy");
+        let target_root = root.join("target");
+        fs::create_dir_all(&legacy_root).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        let legacy_path = legacy_root.join("inline.db");
+        create_v7_database(&legacy_path);
+        {
+            let conn = Connection::open(&legacy_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+                 CREATE TABLE task_logs(
+                   id INTEGER PRIMARY KEY AUTOINCREMENT, task_id INTEGER NOT NULL,
+                   log_type TEXT NOT NULL, content TEXT NOT NULL, created_at TEXT NOT NULL,
+                   FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE);",
+            )
+            .unwrap();
+            add_log(&conn, 1, "note", "旧库人工备注").unwrap();
+            add_log(&conn, 1, "queue", "旧库自动记录").unwrap();
+        }
+        let target = Database::open_at(target_root.join("inline.db")).unwrap();
+        let old_backup = target
+            .import_backup(legacy_path.to_string_lossy().into_owned())
+            .unwrap();
+        target.restore_backup(old_backup.path).unwrap();
+        let existing =
+            load_all_tasks(&Connection::open(target_root.join("inline.db")).unwrap()).unwrap();
+        let old_task = existing.first().unwrap();
+        let old_logs = target.get_logs(old_task.id).unwrap();
+        assert!(old_logs
+            .iter()
+            .any(|log| log.content == "旧库人工备注" && log.operation_id.is_none()));
+        assert!(old_logs
+            .iter()
+            .any(|log| log.content == "旧库自动记录" && log.operation_id.is_none()));
+
+        let source = target.save_task(sample("合并来源")).unwrap();
+        let child = target
+            .create_subtask(subtask_sample(source.id, "合并子任务"))
+            .unwrap();
+        let child_logs = target.get_logs(child.id).unwrap();
+        let create_id = child_logs
+            .iter()
+            .find(|log| log.log_type == "created")
+            .unwrap()
+            .operation_id
+            .clone()
+            .unwrap();
+        assert!(child_logs.iter().any(
+            |log| log.log_type == "relation" && log.operation_id.as_deref() == Some(&create_id)
+        ));
+        target.soft_delete(source.id).unwrap();
+        target.restore(source.id).unwrap();
+        let restored = target.get_logs(source.id).unwrap();
+        let restore_id = restored
+            .iter()
+            .find(|log| log.log_type == "restored")
+            .unwrap()
+            .operation_id
+            .clone()
+            .unwrap();
+        assert!(
+            restored
+                .iter()
+                .any(|log| log.log_type == "queue"
+                    && log.operation_id.as_deref() == Some(&restore_id))
+        );
+
+        target
+            .merge_tasks(MergeTaskInput {
+                target_task_id: old_task.id,
+                source_task_id: source.id,
+                deduplicate_records: true,
+                trash_source: true,
+            })
+            .unwrap();
+        assert!(target
+            .get_logs(old_task.id)
+            .unwrap()
+            .iter()
+            .any(|log| log.log_type == "restored"
+                && log.operation_id.as_deref() == Some(&restore_id)));
+
+        let backup = target.create_backup("manual").unwrap();
+        let readback_root = root.join("readback");
+        fs::create_dir_all(&readback_root).unwrap();
+        let readback = Database::open_at(readback_root.join("inline.db")).unwrap();
+        let imported = readback.import_backup(backup.path).unwrap();
+        readback.restore_backup(imported.path).unwrap();
+        let readback_tasks =
+            load_all_tasks(&Connection::open(readback_root.join("inline.db")).unwrap()).unwrap();
+        let merged_task = readback_tasks
+            .iter()
+            .find(|task| task.title == old_task.title)
+            .unwrap();
+        let logs = readback.get_logs(merged_task.id).unwrap();
+        assert!(logs
+            .iter()
+            .any(|log| log.operation_id.as_deref() == Some(&restore_id)
+                && log.log_type == "restored"));
+        assert!(logs
+            .iter()
+            .any(|log| log.operation_id.is_none() && log.content == "旧库自动记录"));
+        assert_eq!(readback.with_conn(Database::schema_version).unwrap(), 8);
+
+        drop(readback);
+        drop(target);
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

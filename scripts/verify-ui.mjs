@@ -17,12 +17,24 @@ const archive=Array.from({length:10},(_,i)=>task(i+31,"completed",i===1?31:null)
 const all=[...queue,...archive];
 queue.find(t=>t.id===9).parentTaskId=3;
 const settings={week_start_day:"monday",statistics_rate_mode:"processing"};
+const time="2026-09-30T08:00:00+08:00";
+const timelineLogs=[
+  {id:5,taskId:1,logType:"work",content:"本轮已处理，移入暂缓事项",createdAt:time,operationId:"one"},
+  {id:4,taskId:1,logType:"note",content:"保留 pending 原文",createdAt:time},
+  {id:3,taskId:1,logType:"queue",content:"退出 2026-09-30 队列：10（本轮已处理）",createdAt:time,operationId:"one"},
+  {id:2,taskId:1,logType:"status",content:"状态变更为：processed",createdAt:time},
+  {id:1,taskId:1,logType:"queue",content:"退出 2026-09-30 队列：09",createdAt:time}
+];
 settings.ui_font_family=localStorage.getItem("isolated-ui-font")??"";
 const callbacks=new Set();
 window.__inlineCalls=[];
 const detail=(id,status)=>({taskId:id,taskType:"合同审查",hasProcessedOrCompleted:true,permanentNumber:"IL-"+id,title:all.find(t=>t.id===id).title,department:"测试部门",contact:"测试人员",resultStatus:status,firstHandledAt:"2026-09-28T08:00:00+08:00",lastHandledAt:"2026-09-28T08:00:00+08:00",handlingCount:id===3?2:1});
 const details=[detail(1,"processed"),detail(2,"completed"),detail(3,"waiting_materials")];
 const specific={bootstrap:async()=>({queue,archive,trash:[],masters:{departments:["测试部门"],contacts:["测试人员"],taskTypes:["合同审查"]},settings:{...settings},backups:[]}),getVersion:async()=>"0.4.0",globalShortcutAvailable:async()=>true,launchAtLogin:async()=>false,getTask:async id=>all.find(t=>t.id===id),listParentTaskCandidates:async()=>all.filter(t=>!t.parentTaskId),listSubtasks:async id=>all.filter(t=>t.parentTaskId===id),getLogs:async()=>[],getWorkEvents:async()=>[],listBackups:async()=>[],onDataChanged:cb=>{callbacks.add(cb);return()=>callbacks.delete(cb)},onNewTask:()=>()=>{},onTaskUiAction:()=>()=>{},setSetting:async(key,value)=>{settings[key]=String(value);callbacks.forEach(cb=>cb())},getStatistics:async(start,end)=>({range:{start,end},summary:{handledTasks:3,topLevelTasks:2,subtasks:1,processed:1,completed:1,waitingMaterials:1,waitingConfirmation:0,waitingCounterpartyConfirmation:0,rateMode:"processing",rateNumerator:2,rateDenominator:3,completionRate:2/3},byTaskType:[{taskType:"合同审查",handledTasks:3,completed:1,pendingFollowUp:2}],byDepartment:[{department:"测试部门",handledTasks:3,completed:1,pendingFollowUp:2}],trend:[{periodStart:start.slice(0,10),handledTasks:3,processed:1,completed:1}],trendGranularity:"day"}),getStatisticsDetails:async(...args)=>{window.__inlineCalls.push(["type",...args]);return details},getStatisticsTrendDetails:async(...args)=>{window.__inlineCalls.push(["trend",...args]);return args[2]?details.filter(t=>t.resultStatus===args[2]):details}};
+if (${JSON.stringify(mode)}==="timeline") {
+  specific.getLogs=async id=>id===1?timelineLogs.map(log=>({...log})):[];
+  specific.updateLog=async (id,content)=>{ timelineLogs.find(log=>log.id===id).content=content; };
+}
 const originalStatistics=specific.getStatistics;
 const fonts=${JSON.stringify(nativeFonts)};
 specific.listSystemFonts=async()=>{window.__inlineCalls.push(["fonts"]);return fonts};
@@ -187,6 +199,32 @@ try {
     assert.equal(await page.locator(".font-setting-trigger").innerText(),"默认字体");
     assert.equal(await page.locator(".font-setting-row").getByRole("button",{name:"恢复默认",exact:true}).isDisabled(),true);
     console.log("PASS fonts:",nativeFonts.length,"native families; aliases/search/local cache/live global/default/missing/restart/auxiliary routes; 4 font row and overflow regression");
+  }
+  if (mode === "timeline") {
+    await page.locator(".task-table tbody tr").first().click();
+    const timeline=page.locator(".detail-panel .timeline");
+    const rows=timeline.locator(".timeline-entry");
+    await rows.nth(3).waitFor();
+    assert.equal(await rows.count(),4);
+    const disclosure=rows.first().locator("details");
+    const summary=disclosure.locator("summary");
+    assert.equal(await summary.innerText(),"本轮已处理，移入暂缓事项");
+    const originals=disclosure.getByRole("list",{name:"原始记录"});
+    assert.equal(await originals.isVisible(),false);
+    await summary.press("Enter");
+    assert.equal(await originals.isVisible(),true);
+    assert.deepEqual(await originals.getByRole("listitem").allTextContents(),[
+      "本轮已处理，移入暂缓事项","退出 2026-09-30 队列：10（本轮已处理）"
+    ]);
+    assert.equal(await rows.nth(1).locator("p").innerText(),"保留 pending 原文");
+    assert.equal(await rows.nth(2).locator("p").innerText(),"状态变更为：已处理");
+    assert.equal(await rows.nth(3).locator("p").innerText(),"退出 2026-09-30 队列：09");
+    await rows.nth(1).getByRole("button",{name:"编辑",exact:true}).click();
+    await rows.nth(1).locator("textarea").fill("修改后的备注");
+    await rows.nth(1).getByRole("button",{name:"保存",exact:true}).click();
+    await rows.nth(1).getByText("修改后的备注",{exact:true}).waitFor();
+    if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT});
+    console.log("PASS timeline: one operation summary, keyboard disclosure, same-time legacy rows and editable note");
   }
   if (mode === "periods") {
     await page.clock.setFixedTime(new Date("2024-04-16T00:15:00+08:00"));
