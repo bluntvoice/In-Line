@@ -3752,13 +3752,17 @@ impl Database {
             for mut source_task in source_tasks {
                 source_task.task_type = canonical_task_type(&transaction, &source_task.task_type)?;
                 let same_title = tasks_with_title(&transaction, &source_task.title)?;
-                let exact = same_title
+                let existing_id = match same_title
                     .iter()
-                    .find(|current| same_task_content(current, &source_task));
-                let conflict = exact.is_none() && !same_title.is_empty();
-                let (target_id, inserted) = if let Some(current) = exact {
+                    .find(|current| same_task_fields(current, &source_task))
+                {
+                    Some(current) => Some(current.id),
+                    None => matching_import_conflict(&transaction, &source_task)?,
+                };
+                let conflict = existing_id.is_none() && !same_title.is_empty();
+                let (target_id, inserted) = if let Some(current_id) = existing_id {
                     result.merged_tasks += 1;
-                    (current.id, false)
+                    (current_id, false)
                 } else {
                     let title = if conflict {
                         result.conflict_tasks += 1;
@@ -3912,11 +3916,42 @@ fn tasks_with_title(connection: &Connection, title: &str) -> Result<Vec<LegalTas
     Ok(values)
 }
 
-fn same_task_content(left: &LegalTask, right: &LegalTask) -> bool {
+fn matching_import_conflict(
+    connection: &Connection,
+    source: &LegalTask,
+) -> Result<Option<i64>, String> {
+    // Import preserves the source timestamp and fields but may assign a new
+    // number and title. Match only titles generated for unresolved conflicts.
+    let prefix = format!("{}（冲突", source.title);
+    let mut statement = connection
+        .prepare(&format!(
+            "{SELECT_TASK} WHERE is_import_conflict=1 AND created_at=?1
+               AND substr(title,1,length(?2))=?2 ORDER BY id"
+        ))
+        .map_err(display_error)?;
+    let candidates = statement
+        .query_map(params![source.created_at, prefix], Database::row_task)
+        .map_err(display_error)?;
+    for candidate in candidates {
+        let candidate = candidate.map_err(display_error)?;
+        let suffix = candidate.title.strip_prefix(&prefix).unwrap_or_default();
+        let generated_title = suffix == "）"
+            || suffix
+                .strip_prefix(' ')
+                .and_then(|value| value.strip_suffix('）'))
+                .and_then(|value| value.parse::<u64>().ok())
+                .is_some_and(|index| index >= 2);
+        if generated_title && same_task_fields(&candidate, source) {
+            return Ok(Some(candidate.id));
+        }
+    }
+    Ok(None)
+}
+
+fn same_task_fields(left: &LegalTask, right: &LegalTask) -> bool {
     left.department == right.department
         && left.contact == right.contact
         && left.task_type == right.task_type
-        && left.title == right.title
         && left.details == right.details
         && left.status == right.status
         && left.priority == right.priority
@@ -6281,6 +6316,80 @@ mod tests {
         drop(target);
         let _ = fs::remove_dir_all(source_root);
         let _ = fs::remove_dir_all(target_root);
+    }
+
+    #[test]
+    fn restoring_the_same_conflict_does_not_expand_the_next_backup() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-repeat-conflict-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let source_root = root.join("source");
+        let target_root = root.join("target");
+        fs::create_dir_all(&source_root).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        let source = Database::open_at(source_root.join("inline.db")).unwrap();
+        let target = Database::open_at(target_root.join("inline.db")).unwrap();
+
+        let mut input = sample("重复恢复的冲突事项");
+        input.details = "合成详细说明".repeat(1_400);
+        input.internal_notes = "独立办理记录".repeat(1_400);
+        let original = source.save_task(input).unwrap();
+        source
+            .add_log(original.id, "原备份人工备注".into())
+            .unwrap();
+        let source_backup = source.create_backup("manual").unwrap();
+
+        target.save_task(sample("重复恢复的冲突事项")).unwrap();
+        target
+            .save_task(sample("重复恢复的冲突事项（冲突）"))
+            .unwrap();
+        let first = target.import_backup(source_backup.path.clone()).unwrap();
+        let first_result = target.restore_backup(first.path).unwrap();
+        assert_eq!(
+            (first_result.added_tasks, first_result.conflict_tasks),
+            (1, 1)
+        );
+        let before = target.create_backup("manual").unwrap();
+        let same_source = target.import_backup(source_backup.path.clone()).unwrap();
+        let second_result = target.restore_backup(same_source.path).unwrap();
+        let after = target.create_backup("manual").unwrap();
+        let total = target
+            .with_conn(|conn| {
+                conn.query_row("SELECT COUNT(*) FROM tasks", [], |row| row.get::<_, i64>(0))
+                    .map_err(display_error)
+            })
+            .unwrap();
+        println!(
+            "first_bytes={} repeat_bytes={} task_count={total}",
+            before.size, after.size
+        );
+        assert_eq!(
+            (
+                second_result.added_tasks,
+                second_result.merged_tasks,
+                second_result.conflict_tasks
+            ),
+            (0, 1, 0)
+        );
+        assert_eq!(total, 3);
+        assert_eq!(after.size, before.size);
+
+        let mut changed = sample("重复恢复的冲突事项");
+        changed.id = Some(original.id);
+        changed.details = "内容已经不同".into();
+        source.save_task(changed).unwrap();
+        let different = source.create_backup("manual").unwrap();
+        let different = target.import_backup(different.path).unwrap();
+        let changed_result = target.restore_backup(different.path).unwrap();
+        assert_eq!(
+            (changed_result.added_tasks, changed_result.conflict_tasks),
+            (1, 1)
+        );
+
+        drop(source);
+        drop(target);
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
