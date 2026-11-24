@@ -92,7 +92,9 @@ ${ACCURACY_RULES}`
 export function reportTypeForPreset(preset:StatisticsPreset){
   if(preset==="currentWeek")return "本周周报";
   if(preset==="previousWeek")return "上周周报";
+  if(preset==="currentMonth")return "本月月报";
   if(preset==="month")return "月报";
+  if(preset==="currentQuarter")return "本季度工作报告";
   if(preset==="quarter")return "季度工作报告";
   return "阶段工作报告";
 }

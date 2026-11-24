@@ -1,5 +1,19 @@
 export type WeekStart = "monday" | "sunday";
-export type StatisticsPreset = "currentWeek" | "previousWeek" | "month" | "quarter" | "custom";
+export const STATISTICS_PRESETS = {
+  currentWeek: { label: "本周", comparison: "上周同期" },
+  previousWeek: { label: "上周", comparison: "上上周" },
+  currentMonth: { label: "本月", comparison: "上月同期" },
+  month: { label: "上月", comparison: "再上一个月" },
+  currentQuarter: { label: "本季度", comparison: "上季度同期" },
+  quarter: { label: "上季度", comparison: "再上一季度" },
+  custom: { label: "自定义", comparison: "前一等长周期" }
+} as const;
+
+export type StatisticsPreset = keyof typeof STATISTICS_PRESETS;
+export type StatisticsSelection = {
+  preset: StatisticsPreset;
+  customRange?: { start: string; end: string };
+};
 export type StatisticsTrendPoint = { periodStart: string; handledTasks: number; processed?: number; completed?: number };
 
 export function statisticsTrendRange(periodStart:string,granularity:"day"|"week",range:{start:string;end:string}){
@@ -33,6 +47,11 @@ export function statisticsPresetRange(
 ) {
   if (preset === "currentWeek") {
     return { start: dateInput(weekStartDate(now, weekStartsOn)), end: dateInput(now) };
+  }
+
+  if (preset === "currentMonth" || preset === "currentQuarter") {
+    const month = preset === "currentMonth" ? now.getMonth() : Math.floor(now.getMonth() / 3) * 3;
+    return { start: dateInput(new Date(now.getFullYear(), month, 1)), end: dateInput(now) };
   }
 
   let start: Date;
@@ -94,6 +113,7 @@ export function statisticsComparisonRange(
   preset: StatisticsPreset,
   range: { start: string; end: string }
 ) {
+  if (!range.start || !range.end || range.start > range.end) return range;
   const currentStart = parseDateInput(range.start);
   const currentEnd = parseDateInput(range.end);
   let comparisonStart: Date;
@@ -104,9 +124,13 @@ export function statisticsComparisonRange(
     const comparisonEnd = new Date(currentEnd);
     comparisonEnd.setDate(comparisonEnd.getDate() - 7);
     return { start: dateInput(comparisonStart), end: dateInput(comparisonEnd) };
-  } else if (preset === "month") {
+  }
+
+  const comparisonEnd = new Date(currentStart);
+  comparisonEnd.setDate(comparisonEnd.getDate() - 1);
+  if (preset === "month" || preset === "currentMonth") {
     comparisonStart = new Date(currentStart.getFullYear(), currentStart.getMonth() - 1, 1);
-  } else if (preset === "quarter") {
+  } else if (preset === "quarter" || preset === "currentQuarter") {
     comparisonStart = new Date(currentStart.getFullYear(), currentStart.getMonth() - 3, 1);
   } else {
     const inclusiveDays = Math.round((currentEnd.getTime() - currentStart.getTime()) / 86_400_000) + 1;
@@ -114,7 +138,11 @@ export function statisticsComparisonRange(
     comparisonStart.setDate(comparisonStart.getDate() - inclusiveDays);
   }
 
-  const comparisonEnd = new Date(currentStart);
-  comparisonEnd.setDate(comparisonEnd.getDate() - 1);
+  if (preset === "currentMonth" || preset === "currentQuarter") {
+    const dayOffset = Math.round((currentEnd.getTime() - currentStart.getTime()) / 86_400_000);
+    const sameDay = new Date(comparisonStart);
+    sameDay.setDate(sameDay.getDate() + dayOffset);
+    if (sameDay < comparisonEnd) comparisonEnd.setTime(sameDay.getTime());
+  }
   return { start: dateInput(comparisonStart), end: dateInput(comparisonEnd) };
 }

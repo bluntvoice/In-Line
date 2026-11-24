@@ -4,7 +4,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
 import type { StatisticsDetail,StatisticsResult } from "../types";
 import { formatDateTime,STATUS_LABELS } from "../lib/task-utils";
-import { statisticsComparisonRange,statisticsDisplayTrend,statisticsPresetRange,statisticsTrendRange,statisticsWeekdayLabel,type StatisticsPreset,type WeekStart } from "../lib/statistics-range";
+import { statisticsComparisonRange,statisticsDisplayTrend,statisticsPresetRange,statisticsTrendRange,statisticsWeekdayLabel,STATISTICS_PRESETS,type StatisticsPreset,type StatisticsSelection,type WeekStart } from "../lib/statistics-range";
 import { buildReportPrompt,customReportTemplateIsValid,DEFAULT_CUSTOM_REPORT_TEMPLATE,REPORT_TEMPLATE_OPTIONS,type ReportTemplateMode } from "../lib/report-prompts";
 import { DEFAULT_STATISTICS_CHART_ORDER,moveStatisticsChart,normalizeHiddenStatisticsCharts,normalizeStatisticsChartOrder,normalizeTaskTypeChartMode,STATISTICS_CHARTS,type StatisticsChartId,type TaskTypeChartMode } from "../lib/statistics-charts";
 import { buildNativeReport,nativeReportTitle } from "../lib/native-report";
@@ -21,13 +21,17 @@ const TASK_TYPE_MODE_KEY="in-line-statistics-task-type-mode";
 const PIE_COLORS=["#0b3a82","#2f69a8","#55a0a6","#78a85a","#c68a16","#ce6b54","#7d68a8","#7890aa"];
 const validMode=(value:string|null):value is ReportTemplateMode=>REPORT_TEMPLATE_OPTIONS.some(option=>option.value===value);
 type ReportChooserMode=ReportTemplateMode|"native";
-const comparisonName=(preset:StatisticsPreset)=>preset==="currentWeek"?"上周同期":preset==="previousWeek"?"上上周":preset==="month"?"再上一个月":preset==="quarter"?"再上一季度":"前一等长周期";
+const comparisonName=(preset:StatisticsPreset)=>STATISTICS_PRESETS[preset].comparison;
 const deltaText=(current:number,previous:number)=>previous===0?(current===0?"持平":"新增"): `${current>=previous?"+":""}${Math.round((current-previous)/previous*100)}%`;
 const changeTone=(current:number,previous:number)=>current>previous?"increase":current<previous?"decrease":"unchanged";
 
-export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStartsOn,currentOverdueCount,currentOverdueByTaskType}:{onOpenTask:(id:number)=>void;notify:(text:string)=>void;refreshKey?:string|number;weekStartsOn:WeekStart;currentOverdueCount:number;currentOverdueByTaskType:Record<string,number>}){
-  const [preset,setPreset]=useState<StatisticsPreset>("currentWeek");const initial=statisticsPresetRange("currentWeek",weekStartsOn);
-  const [customStart,setCustomStart]=useState(initial.start);const [customEnd,setCustomEnd]=useState(initial.end);
+export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStartsOn,currentOverdueCount,currentOverdueByTaskType,selection,onSelectionChange}:{selection:StatisticsSelection;onSelectionChange:(selection:StatisticsSelection)=>void;onOpenTask:(id:number)=>void;notify:(text:string)=>void;refreshKey?:string|number;weekStartsOn:WeekStart;currentOverdueCount:number;currentOverdueByTaskType:Record<string,number>}){
+  const {preset}=selection;
+  const customRange=selection.customRange??statisticsPresetRange("currentWeek",weekStartsOn);
+  const setPreset=(next:StatisticsPreset)=>onSelectionChange({
+    preset:next,
+    customRange:next==="custom"?customRange:selection.customRange
+  });
   const [data,setData]=useState<StatisticsResult|null>(null);const [comparisonData,setComparisonData]=useState<StatisticsResult|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState("");
   const [selectedType,setSelectedType]=useState("");const [details,setDetails]=useState<StatisticsDetail[]>([]);const detailsRequestRef=useRef(0);
   const [selectedTrend,setSelectedTrend]=useState<{key:string;title:string}|null>(null);const [detailsBusy,setDetailsBusy]=useState(false);
@@ -44,12 +48,38 @@ export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStar
   const [chartOrder,setChartOrder]=useState<StatisticsChartId[]>(()=>normalizeStatisticsChartOrder(window.localStorage.getItem(CHART_ORDER_KEY)));
   const [hiddenCharts,setHiddenCharts]=useState<StatisticsChartId[]>(()=>normalizeHiddenStatisticsCharts(window.localStorage.getItem(CHART_HIDDEN_KEY)));
   const [taskTypeMode,setTaskTypeMode]=useState<TaskTypeChartMode>(()=>normalizeTaskTypeChartMode(window.localStorage.getItem(TASK_TYPE_MODE_KEY)));
-  const range=useMemo(()=>preset==="custom"?{start:customStart,end:customEnd}:statisticsPresetRange(preset,weekStartsOn),[preset,customStart,customEnd,weekStartsOn]);
+  const range=preset==="custom"?customRange:statisticsPresetRange(preset,weekStartsOn);
   const comparisonRange=useMemo(()=>statisticsComparisonRange(preset,range),[preset,range.start,range.end]);
   const displayTrend=useMemo(()=>statisticsDisplayTrend(data?.trend??[],data?.trendGranularity??"day",range,preset).map(point=>({...point,processed:point.processed??0,completed:point.completed??0})),[data?.trend,data?.trendGranularity,range.start,range.end,preset]);
   const visibleChartIds=chartOrder.filter(id=>!hiddenCharts.includes(id));
-  const load=async()=>{if(!range.start||!range.end||range.start>range.end){setError("开始日期不能晚于结束日期");setLoading(false);return;}detailsRequestRef.current+=1;setLoading(true);setError("");setSelectedType("");setSelectedTrend(null);setDetailsBusy(false);setDetails([]);try{const [current,comparison]=await Promise.all([api.getStatistics(localStart(range.start),nextLocalDay(range.end)),api.getStatistics(localStart(comparisonRange.start),nextLocalDay(comparisonRange.end))]);setData(current);setComparisonData(comparison);}catch(value){setError(value instanceof Error?value.message:String(value));}finally{setLoading(false);}};
-  useEffect(()=>{void load();},[range.start,range.end,comparisonRange.start,comparisonRange.end,refreshKey]);
+  const statisticsRequestRef=useRef(0);
+  const load=async()=>{
+    const requestId=++statisticsRequestRef.current;
+    detailsRequestRef.current+=1;
+    setSelectedType("");setSelectedTrend(null);setDetailsBusy(false);setDetails([]);
+    setData(null);setComparisonData(null);
+    if(!range.start||!range.end||range.start>range.end){
+      setError(!range.start||!range.end?"请选择开始日期和结束日期":"开始日期不能晚于结束日期");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);setError("");
+    try{
+      const [current,comparison]=await Promise.all([
+        api.getStatistics(localStart(range.start),nextLocalDay(range.end)),
+        api.getStatistics(localStart(comparisonRange.start),nextLocalDay(comparisonRange.end))
+      ]);
+      if(requestId===statisticsRequestRef.current){setData(current);setComparisonData(comparison);}
+    }catch(value){
+      if(requestId===statisticsRequestRef.current)setError(value instanceof Error?value.message:String(value));
+    }finally{
+      if(requestId===statisticsRequestRef.current)setLoading(false);
+    }
+  };
+  useEffect(()=>{
+    void load();
+    return ()=>{statisticsRequestRef.current+=1;detailsRequestRef.current+=1;};
+  },[preset,range.start,range.end,comparisonRange.start,comparisonRange.end,refreshKey]);
   useEffect(()=>{if(!chooserOpen&&!customEditorOpen&&!chartManagerOpen&&!exportOpen&&!nativeReportOpen)return;const close=(event:KeyboardEvent)=>{if(event.key!=="Escape")return;setChooserOpen(false);setCustomEditorOpen(false);setChartManagerOpen(false);setExportOpen(false);setNativeReportOpen(false);setPendingGenerate(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[chooserOpen,customEditorOpen,chartManagerOpen,exportOpen,nativeReportOpen]);
   useEffect(()=>{
     const requestId=++nativeReportRequestRef.current;
@@ -147,7 +177,7 @@ export default function StatisticsPanel({onOpenTask,notify,refreshKey=0,weekStar
     </div>)}</div>:<p className="empty-copy">暂无趋势数据。</p>}<p className="trend-note">趋势总量按每日或每周分别去重；类别按该时间段内最后一次有效办理结果区分。同一事项可在不同日期或周出现，顶部总数在整个查询周期内统一去重。</p></section>;
   };
   return <section className="statistics-panel">
-    <header className="statistics-header"><div><p>实际处理事项 · 周期内按事项去重</p><h1>统计中心</h1></div><div className="period-controls"><div className="preset-tabs">{(["currentWeek","previousWeek","month","quarter","custom"] as StatisticsPreset[]).map(value=><button className={preset===value?"active":""} key={value} onClick={()=>setPreset(value)}>{value==="currentWeek"?"本周":value==="previousWeek"?"上一周":value==="month"?"上一个月":value==="quarter"?"上一季度":"自定义"}</button>)}</div>{preset==="custom"&&<div className="custom-range"><input type="date" value={customStart} onChange={e=>setCustomStart(e.target.value)}/><span>至</span><input type="date" value={customEnd} onChange={e=>setCustomEnd(e.target.value)}/></div>}<div className="period-footer"><small>{range.start} 至 {range.end}{preset==="currentWeek"&&` · ${weekStartsOn==="monday"?"周一":"周日"}起算`}</small><div className="report-controls"><label><span>报告结构</span><select value={reportMode} onChange={event=>changeReportMode(event.target.value as ReportTemplateMode)}>{REPORT_TEMPLATE_OPTIONS.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{reportMode==="custom"&&<button type="button" className="button secondary report-edit-button" onClick={()=>{setCustomDraft(customTemplate);setPendingGenerate(false);setCustomEditorOpen(true);}}><Pencil size={14}/>编辑</button>}<button type="button" className="button primary report-copy-button" disabled={reportBusy||!range.start||!range.end||range.start>range.end} onClick={()=>void startGeneration()}><FileText size={15}/>{reportBusy?"正在生成…":"生成报告"}</button></div></div></div></header>
+    <header className="statistics-header"><div><p>实际处理事项 · 周期内按事项去重</p><h1>统计中心</h1></div><div className="period-controls"><div className="preset-tabs" role="group" aria-label="统计时间范围">{(Object.keys(STATISTICS_PRESETS) as StatisticsPreset[]).map(value=><button type="button" aria-pressed={preset===value} className={preset===value?"active":""} key={value} onClick={()=>setPreset(value)}>{STATISTICS_PRESETS[value].label}</button>)}</div>{preset==="custom"&&<div className="custom-range"><input type="date" aria-label="开始日期" value={customRange.start} onChange={e=>onSelectionChange({preset,customRange:{...customRange,start:e.target.value}})}/><span>至</span><input type="date" aria-label="结束日期" value={customRange.end} onChange={e=>onSelectionChange({preset,customRange:{...customRange,end:e.target.value}})}/></div>}<div className="period-footer"><small>{range.start} 至 {range.end}{preset==="currentWeek"&&` · ${weekStartsOn==="monday"?"周一":"周日"}起算`}</small><div className="report-controls"><label><span>报告结构</span><select value={reportMode} onChange={event=>changeReportMode(event.target.value as ReportTemplateMode)}>{REPORT_TEMPLATE_OPTIONS.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}</select></label>{reportMode==="custom"&&<button type="button" className="button secondary report-edit-button" onClick={()=>{setCustomDraft(customTemplate);setPendingGenerate(false);setCustomEditorOpen(true);}}><Pencil size={14}/>编辑</button>}<button type="button" className="button primary report-copy-button" disabled={reportBusy||!range.start||!range.end||range.start>range.end} onClick={()=>void startGeneration()}><FileText size={15}/>{reportBusy?"正在生成…":"生成报告"}</button></div></div></div></header>
     {error&&<div className="statistics-error"><span>{error}</span><button onClick={()=>void load()}><RefreshCw size={15}/>重新加载</button></div>}
     {loading?<div className="statistics-loading"><BarChart3 size={32}/><p>正在汇总处理活动…</p></div>:data&&<>
       <div className="summary-grid">
