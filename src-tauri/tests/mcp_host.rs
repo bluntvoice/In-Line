@@ -8,11 +8,7 @@ use in_line_lib::{
         security::{Grant, Permissions, Scope, Security},
     },
 };
-use rmcp::{
-    model::CallToolRequestParams,
-    transport::{ConfigureCommandExt, TokioChildProcess},
-    ServiceExt,
-};
+use rmcp::{model::CallToolRequestParams, transport::ConfigureCommandExt, ServiceExt};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::{
@@ -21,7 +17,7 @@ use std::{
     mem::size_of_val,
     os::windows::{
         ffi::OsStrExt,
-        io::{AsRawHandle, FromRawHandle, OwnedHandle},
+        io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle},
         process::CommandExt,
     },
     path::Path,
@@ -105,8 +101,8 @@ impl ProcessJob {
         Ok(job)
     }
 
-    fn assign(&self, child: &Child) -> io::Result<()> {
-        if unsafe { AssignProcessToJobObject(self.0.as_raw_handle(), child.as_raw_handle()) } == 0 {
+    fn assign(&self, process: RawHandle) -> io::Result<()> {
+        if unsafe { AssignProcessToJobObject(self.0.as_raw_handle(), process) } == 0 {
             return Err(io::Error::last_os_error());
         }
         Ok(())
@@ -194,10 +190,18 @@ fn real_host_background_single_instance_and_protocol() -> Result<(), Box<dyn std
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
-        let status = runtime.block_on(run_host_checks(Path::new(&root)));
+        // Stop the real sidecar and its host descendants before Tokio joins its I/O workers.
+        // The outer Job remains the fallback if anything blocks before this point.
+        let host_job = ProcessJob::new()?;
+        let status = runtime.block_on(run_host_checks(Path::new(&root), &host_job));
+        let cleanup = stage("stop host tree before runtime shutdown", || host_job.stop());
+        drop(host_job);
         eprintln!("mcp_host: worker runtime shutdown: begin");
         drop(runtime);
-        return status;
+        eprintln!("mcp_host: worker runtime shutdown: ok");
+        status?;
+        cleanup?;
+        return Ok(());
     }
 
     let root = std::env::temp_dir().join(format!("inline-mcp-host-{}", platform::random_secret()?));
@@ -211,7 +215,7 @@ fn real_host_background_single_instance_and_protocol() -> Result<(), Box<dyn std
         .env(WORKER_ROOT, &root)
         .stdin(Stdio::piped())
         .spawn()?;
-    if let Err(error) = job.assign(&worker) {
+    if let Err(error) = job.assign(worker.as_raw_handle()) {
         // EOF is not permission to run. Stop this original child handle on an assignment error.
         drop(worker.stdin.take());
         let kill = worker.kill();
@@ -267,7 +271,10 @@ unsafe extern "system" fn visible(hwnd: HWND, param: LPARAM) -> i32 {
     1
 }
 
-async fn run_host_checks(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_host_checks(
+    root: &Path,
+    host_job: &ProcessJob,
+) -> Result<(), Box<dyn std::error::Error>> {
     let data = root.join("data");
     stage("fixture directories", || {
         std::fs::create_dir(root)?;
@@ -289,19 +296,39 @@ async fn run_host_checks(root: &Path) -> Result<(), Box<dyn std::error::Error>> 
     })?;
 
     // Start stdio only: it must authenticate before it silently starts the actual main binary.
-    let transport = stage("sidecar process spawn", || {
-        TokioChildProcess::new(
-            tokio::process::Command::new(env!("CARGO_BIN_EXE_in-line-mcp")).configure(|command| {
+    let mut sidecar = stage("sidecar process spawn", || {
+        tokio::process::Command::new(env!("CARGO_BIN_EXE_in-line-mcp"))
+            .configure(|command| {
                 command
                     .env("IN_LINE_MCP_TEST_SECURITY_ROOT", &security_root)
                     .env("IN_LINE_MCP_TEST_DATA_ROOT", &data)
                     .env("IN_LINE_MCP_CLIENT_ID", &issued.client_id)
                     .env("IN_LINE_MCP_TOKEN", &issued.token)
                     .env_remove("IN_LINE_MCP_TEST_HOST_EXE")
+                    .stdin(Stdio::piped())
+                    .stdout(Stdio::piped())
                     .kill_on_drop(true);
-            }),
+            })
+            .spawn()
+    })?;
+    stage("sidecar Job assignment before stdio", || {
+        host_job.assign(
+            sidecar
+                .raw_handle()
+                .ok_or_else(|| io::Error::other("sidecar already exited"))?,
         )
     })?;
+    // rmcp adapts this pair to the same AsyncRwTransport used by TokioChildProcess.
+    let transport = (
+        sidecar
+            .stdout
+            .take()
+            .ok_or_else(|| io::Error::other("missing sidecar stdout"))?,
+        sidecar
+            .stdin
+            .take()
+            .ok_or_else(|| io::Error::other("missing sidecar stdin"))?,
+    );
     let client = timed("stdio initialize", 20, ().serve(transport)).await?;
     let result = timed(
         "get_capabilities",
