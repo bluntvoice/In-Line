@@ -1,0 +1,41 @@
+name: v0.5.0 Windows host diagnostics
+on:
+  push:
+    branches:
+      - diagnostics/v050-host-timeout
+permissions:
+  contents: read
+jobs:
+  host:
+    name: Isolated Windows host diagnostics
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check runtime policy
+        shell: pwsh
+        run: ./scripts/check-github-actions-runtime.ps1
+      - name: Set up Node.js without cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Set up default stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Build and fingerprint host test
+        timeout-minutes: 21
+        shell: pwsh
+        run: ./scripts/verify-v050-host-timeout.ps1 Build
+      - name: Verify watchdog and process cleanup with synthetic fixtures
+        timeout-minutes: 3
+        shell: pwsh
+        run: ./scripts/verify-v050-host-timeout.ps1 Fixtures
+      - name: Run target test once with desktop and process evidence
+        timeout-minutes: 4
+        shell: pwsh
+        run: ./scripts/verify-v050-host-timeout.ps1 HostTest
