@@ -13,7 +13,9 @@ export interface NativeReportInput {
 const periodNames:Record<StatisticsPreset,{title:string;subject:string}>={
   currentWeek:{title:"本周工作报告",subject:"本周"},
   previousWeek:{title:"上一周工作报告",subject:"上一周"},
+  currentMonth:{title:"本月工作报告",subject:"本月"},
   month:{title:"月度工作报告",subject:"上一个月"},
+  currentQuarter:{title:"本季度工作报告",subject:"本季度"},
   quarter:{title:"季度工作报告",subject:"上一季度"},
   custom:{title:"自定义周期工作报告",subject:"本统计周期"}
 };

@@ -4702,6 +4702,7 @@ mod tests {
         let reopened = db.save_task(input).unwrap();
         assert!(reopened.has_active_queue && !reopened.is_scheduled);
         assert_eq!(reopened.status, "pending");
+        assert_eq!(db.list_work_events(original.id).unwrap().len(), 2);
         assert_eq!(
             db.get_logs(original.id)
                 .unwrap()
@@ -4716,7 +4717,40 @@ mod tests {
         processed.planned_date = Some("2026-10-10".into());
         processed.confirm_schedule_change = true;
         assert!(db.save_task(processed).unwrap().is_scheduled);
-        assert_eq!(db.list_work_events(original.id).unwrap().len(), 3);
+        let events = db.list_work_events(original.id).unwrap();
+        assert_eq!(events.len(), 3);
+        let range_start = "2026-10-08T00:00:00+08:00";
+        let range_end = "2026-10-09T00:00:00+08:00";
+        let latest = db
+            .statistics(range_start.into(), range_end.into(), 480)
+            .unwrap();
+        assert_eq!(
+            (latest.summary.handled_tasks, latest.summary.processed),
+            (1, 1)
+        );
+        let processed_event = events
+            .iter()
+            .find(|event| event.result_status == "processed")
+            .unwrap();
+        db.void_work_event(processed_event.id, true).unwrap();
+        let after_void = db
+            .statistics(range_start.into(), range_end.into(), 480)
+            .unwrap();
+        assert_eq!(
+            (
+                after_void.summary.handled_tasks,
+                after_void.summary.completed
+            ),
+            (1, 1)
+        );
+        let details = db
+            .statistics_details(range_start.into(), range_end.into(), "任务处理".into())
+            .unwrap();
+        assert_eq!(details.len(), 1);
+        assert_eq!(
+            (details[0].task_id, details[0].handling_count),
+            (original.id, 1)
+        );
     }
 
     #[test]
@@ -6474,6 +6508,91 @@ mod tests {
             .any(|item| item.task_id == deleted.id || item.task_id == end_boundary.id));
         drop(db);
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn statistics_half_open_periods_and_fixed_offset_trend_across_dst() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-statistics-dst-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let db = Database::open_at(root.join("inline.db")).unwrap();
+        db.set_setting("statistics_rate_mode".into(), "closure".into())
+            .unwrap();
+        let parent = db.save_task(sample("边界父任务")).unwrap();
+        let child = db
+            .create_subtask(subtask_sample(parent.id, "边界子任务"))
+            .unwrap();
+        for (task_id, handled_at, status) in [
+            (parent.id, "2025-03-09T04:59:59Z", "completed"),
+            (parent.id, "2025-03-09T05:00:00Z", "processed"),
+            (child.id, "2025-03-10T03:59:59Z", "completed"),
+            (child.id, "2025-03-10T04:00:00Z", "processed"),
+        ] {
+            db.record_work_event(WorkEventInput {
+                task_id,
+                result_status: status.into(),
+                handled_at: handled_at.into(),
+                note: String::new(),
+                sync_status: false,
+            })
+            .unwrap();
+        }
+        let query = |start: &str, end: &str| db.statistics(start.into(), end.into(), -300).unwrap();
+        let start = "2025-03-09T05:00:00Z";
+        let end = "2025-03-10T04:00:00Z";
+        let previous = query("2025-03-08T05:00:00Z", start);
+        let current = query(start, end);
+        let next = query(end, "2025-03-11T04:00:00Z");
+        assert_eq!(
+            (previous.summary.handled_tasks, previous.summary.completed),
+            (1, 1)
+        );
+        assert_eq!(
+            (
+                current.summary.handled_tasks,
+                current.summary.top_level_tasks,
+                current.summary.subtasks
+            ),
+            (2, 1, 1)
+        );
+        assert_eq!(
+            (
+                current.summary.rate_numerator,
+                current.summary.rate_denominator,
+                current.summary.completion_rate
+            ),
+            (1, 2, 0.5)
+        );
+        assert_eq!((next.summary.handled_tasks, next.summary.processed), (1, 1));
+        assert_eq!(current.by_task_type[0].handled_tasks, 2);
+        assert_eq!(current.by_department[0].department, "产品组");
+        assert_eq!(current.by_department[0].handled_tasks, 2);
+        assert_eq!(current.trend[0].period_start, "2025-03-09");
+        assert_eq!(current.trend[0].handled_tasks, 2);
+        // The API applies one offset: the event at the next EDT midnight
+        // is included by the query boundary even when its EST bucket is March 9.
+        assert_eq!(next.trend[0].period_start, "2025-03-09");
+        let edt = db
+            .statistics(end.into(), "2025-03-11T04:00:00Z".into(), -240)
+            .unwrap();
+        assert_eq!(edt.summary.handled_tasks, 1);
+        assert_eq!(edt.trend[0].period_start, "2025-03-10");
+        let details = db
+            .statistics_trend_details(start.into(), end.into(), None)
+            .unwrap();
+        assert_eq!(details.len(), 2);
+        assert!(details
+            .iter()
+            .any(|row| row.task_id == child.id && row.result_status == "completed"));
+        let sixty_two = query("2025-01-01T00:00:00Z", "2025-03-04T00:00:00Z");
+        let sixty_three = query("2025-01-01T00:00:00Z", "2025-03-05T00:00:00Z");
+        assert_eq!(sixty_two.trend_granularity, "day");
+        assert_eq!(sixty_three.trend_granularity, "week");
+
+        drop(db);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
