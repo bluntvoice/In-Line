@@ -5,12 +5,15 @@ import { pathToFileURL } from "node:url";
 import { createServer } from "vite";
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
+import {writeFile} from "node:fs/promises";
 
 const { chromium } = await import(process.env.INLINE_PLAYWRIGHT_MODULE
   ? pathToFileURL(process.env.INLINE_PLAYWRIGHT_MODULE).href : "playwright");
 const mode = process.argv[2] ?? "trend";
 const nativeFonts=mode==="fonts"?JSON.parse((await promisify(execFile)("cargo",["run","--locked","--manifest-path","src-tauri/Cargo.toml","--example","list_system_fonts"],{maxBuffer:4*1024*1024})).stdout):[];
+const periods = mode === "periods";
 const mock = `
+${periods ? 'import {api as realApi} from "/src/api.ts?f1-wire";' : ""}
 const task=(id,status="pending",parentTaskId=null)=>({id,permanentNumber:"IL-"+id,dailySequence:id,ticketDate:"2026-09-30",department:"测试部门",departments:["测试部门"],contact:"测试人员",contacts:["测试人员"],taskType:"合同审查",title:"隔离测试事项 "+id+" — 长标题与父子任务布局检查",details:"隔离测试详情",status,priority:"normal",workload:"standard",isUrgent:false,urgentRequester:"",urgentReason:"",requestedDeadline:null,requestedDeadlineLabel:null,internalNotes:"",createdAt:"2026-09-30T08:00:00+08:00",updatedAt:"2026-09-30T08:00:00+08:00",startedAt:null,completedAt:null,archivedAt:status==="completed"?"2026-09-30T08:00:00+08:00":null,deletedAt:null,customSortOrder:id,processingRounds:1,hasActiveQueue:status==="pending",deferredEnteredAt:status==="processed"?"2026-09-30T08:00:00+08:00":null,isImportConflict:false,parentTaskId,subtaskSortOrder:id});
 const queue=Array.from({length:30},(_,i)=>task(i+1,i%3===2?"processed":"pending",i===1?1:null));
 const archive=Array.from({length:10},(_,i)=>task(i+31,"completed",i===1?31:null));
@@ -43,6 +46,72 @@ const localDay=value=>{const d=new Date(value);return d.getFullYear()+"-"+String
 specific.getStatistics=async(...args)=>{window.__inlineCalls.push(["statistics",...args]);const day=localDay(args[0]);statisticsDays.add(day);const data=await originalStatistics(...args);data.trend[0].periodStart=day;if(new Date(args[1])-new Date(args[0])>62*86400000){const monday=new Date(args[0]);monday.setDate(monday.getDate()-(monday.getDay()+6)%7);data.trendGranularity="week";data.trend[0].periodStart=localDay(monday);}return data};
 specific.getStatisticsTrendDetails=async(...args)=>{window.__inlineCalls.push(["trend",...args]);if(!statisticsDays.has(localDay(args[0])))return [];return args[2]?details.filter(t=>t.resultStatus===args[2]):details};
 specific.copyText=async text=>{if(window.__inlineCopyFail)throw new Error("隔离剪贴板失败");window.__inlineCalls.push(["copyText",text]);window.__inlineClipboard=text};
+if (${periods}) {
+  queue[0].requestedDeadline="2025-03-01T00:00:00+08:00";
+  window.__inlineRules={};
+  window.__inlinePending={};
+  window.__inlineSetWeek=value=>specific.setSetting("week_start_day",value);
+  window.__inlineIpc=[];
+  window.__inlineCanvas=[];
+  const fillText=CanvasRenderingContext2D.prototype.fillText;
+  CanvasRenderingContext2D.prototype.fillText=function(text,...args){
+    window.__inlineCanvas.push(String(text));
+    return fillText.call(this,text,...args);
+  };
+  const statistics=specific.getStatistics;
+  const types=specific.getStatisticsDetails;
+  const trend=specific.getStatisticsTrendDetails;
+  const waitForRule=async(kind,start)=>{
+    const key=kind+":"+localDay(start);
+    const rule=window.__inlineRules[key];
+    if(rule==="fail")throw new Error("合成查询失败");
+    if(rule==="hold")await new Promise(resolve=>{(window.__inlinePending[key]??=[]).push(resolve)});
+    return rule;
+  };
+  window.__TAURI_INTERNALS__={invoke:async (command,args)=>{
+    window.__inlineIpc.push([command,command==="save_chart_export"?{path:args.path,size:args.bytes.length}:args]);
+    if(command==="get_statistics"){
+      const rule=await waitForRule("summary",args.start);
+      const data=await statistics(args.start,args.end);
+      if(rule==="empty"){
+        data.summary.handledTasks=data.summary.topLevelTasks=data.summary.subtasks=0;
+        data.summary.processed=data.summary.completed=data.summary.waitingMaterials=0;
+        data.summary.rateNumerator=data.summary.rateDenominator=data.summary.completionRate=0;
+        data.byDepartment=[];data.byTaskType=[];data.trend=[];
+        return data;
+      }
+      const count=Number(localDay(args.start).slice(5,7))*10+Number(localDay(args.start).slice(8));
+      data.summary.handledTasks=count;
+      data.summary.topLevelTasks=count-1;
+      data.summary.rateNumerator=count-1;
+      data.summary.rateDenominator=count;
+      data.summary.completionRate=(count-1)/count;
+      data.byDepartment[0].handledTasks=count;
+      data.byTaskType[0].handledTasks=count;
+      data.trend[0].handledTasks=count;
+      if (data.trendGranularity==="week") {
+        const last=new Date(args.end);
+        last.setDate(last.getDate()-1);
+        const lastDay=localDay(last);
+        last.setDate(last.getDate()-(last.getDay()+6)%7);
+        if (lastDay!==localDay(args.start)) data.trend.push({periodStart:localDay(last),handledTasks:2});
+      }
+      return data;
+    }
+    if(command==="get_statistics_details"){
+      await waitForRule("type",args.start);
+      return types(args.start,args.end,args.taskType);
+    }
+    if(command==="get_statistics_trend_details"){
+      await waitForRule("trend",args.start);
+      return trend(args.start,args.end,args.resultStatus);
+    }
+    if(command==="save_chart_export"){window.__inlinePng=args.bytes;return;}
+    throw new Error("Unexpected Tauri command "+command);
+  }};
+  for(const key of ["getStatistics","getStatisticsDetails","getStatisticsTrendDetails","saveChartExport"]) specific[key]=realApi[key];
+}
+if (${periods || mode === "trend"}) specific.getVersion=async()=>"0.5.0";
 specific.getRecommendedFontStatus=async()=>({phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null});specific.onRecommendedFontProgress=()=>()=>{};specific.getUIScale=async()=>"100";
 if (${JSON.stringify(mode)} === "history") {
   specific.getLogs=async id=>[{id:100+id,taskId:id,logType:"status",content:"保留的历史记录",createdAt:"2026-09-30T08:00:00+08:00"}];
@@ -56,18 +125,39 @@ if (${JSON.stringify(mode)} === "history") {
 }
 export const api=new Proxy(specific,{get:(target,key)=>target[key]??(async(...args)=>{window.__inlineCalls.push([key,...args]);return []})});
 `;
-const server = await createServer({ server: { port: 0, strictPort: false, watch: { ignored: ["**/src-tauri/target/**"] } }, plugins: [{
+const dialogStub="\0inline-statistics-dialog-stub";
+const server = await createServer({ server: { host: "127.0.0.1", port: 0, strictPort: false, watch: { ignored: ["**/src-tauri/target/**"] } }, plugins: [{
   name: "isolated-ui-api", enforce: "pre",
-  load(id) { if (id.replaceAll("\\", "/").endsWith("/src/api.ts")) return mock; }
+  resolveId(source) { if(periods&&source==="@tauri-apps/plugin-dialog")return dialogStub; },
+  load(id) {
+    if (id.replaceAll("\\", "/").endsWith("/src/api.ts")) return mock;
+    if (id===dialogStub) return `
+      export const save=async options=>{
+        window.__inlinePicker=options;
+        if (window.__inlineHoldPicker) await new Promise(resolve=>window.__inlineResolvePicker=resolve);
+        return "isolated-chart.png";
+      };
+      export const open=async()=>null;
+      export const ask=async()=>false;
+      export const confirm=async()=>false;`;
+  }
 }] });
 await server.listen();
 const browser = await chromium.launch({ headless: true, executablePath: process.env.INLINE_BROWSER_PATH });
 const errors = [];
 try {
   const mainContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: "Asia/Shanghai" });
+  if(periods||mode==="trend"){
+    const localOrigin=new URL(server.resolvedUrls.local[0]).origin;
+    await mainContext.route("**/*",route=>new URL(route.request().url()).origin===localOrigin?route.continue():route.abort());
+  }
   const page = await mainContext.newPage();
   page.setDefaultTimeout(15000);
   page.on("pageerror", error => errors.push(error.message));
+  if(periods||mode==="trend"){
+    const date=periods?"2025-03-30":"2025-03-12";
+    await page.clock.setFixedTime(new Date(date+"T04:00:00Z"));
+  }
   await page.goto(server.resolvedUrls.local[0],{waitUntil:"domcontentloaded",timeout:45000});
   await page.locator(".task-table tbody tr").first().waitFor();
   if (mode === "history") {
@@ -250,7 +340,7 @@ try {
     };
     await openStatistics();
     assert.equal(await tabs.locator(".active").innerText(),"本周");
-    for(const [index,label] of ["上一周","上一个月","上一季度"].entries()) {
+    for(const [index,label] of ["上周","上月","上季度"].entries()) {
       await tabs.getByRole("button",{name:label,exact:true}).click();
       await page.locator(".type-stats button, .task-type-pie-legend button").first().waitFor();
       const expectedText=await periodText(),expectedQueries=await queries();
@@ -275,7 +365,7 @@ try {
     assert.equal(await dates.nth(1).inputValue(),"2026-08-31");
     assert.equal(await periodText(),"2026-08-01 至 2026-08-31");
     assert.deepEqual(await queries(),expectedQueries);
-    await tabs.getByRole("button",{name:"上一周",exact:true}).click();
+    await tabs.getByRole("button",{name:"上周",exact:true}).click();
     await tabs.getByRole("button",{name:"自定义",exact:true}).click();
     assert.equal(await dates.nth(0).inputValue(),"2026-08-01");
     assert.equal(await dates.nth(1).inputValue(),"2026-08-31");
@@ -284,6 +374,237 @@ try {
     assert.equal(await tabs.locator(".active").innerText(),"自定义");
     assert.equal(await periodText(),"2026-08-01 至 2026-08-31");
     console.log("PASS statistics-range: presets/custom dates and query bounds survive task details and page navigation");
+  }
+  if (periods) {
+    const nav = label => page.locator(".sidebar nav button").filter({hasText:label}).click();
+    const tabs = page.getByRole("group",{name:"统计时间范围"});
+    const pick = label => tabs.getByRole("button",{name:label,exact:true}).click();
+    const current = () => page.locator(".structure-summary-main strong").innerText();
+    const ready = () => page.locator(".summary-grid").waitFor();
+    const report = page.getByRole("button",{name:"生成报告",exact:true});
+    const dateStart = page.getByLabel("开始日期",{exact:true});
+    const dateEnd = page.getByLabel("结束日期",{exact:true});
+    const iso = day => new Date(day+"T00:00:00+08:00").toISOString();
+    const calls = () => page.evaluate(() => window.__inlineIpc);
+    const lastStatistics = async () => (await calls()).filter(call=>call[0]==="get_statistics").slice(-2).map(call=>call[1]);
+    const expectPair = async ([start,end,oldStart,oldEnd]) => {
+      await ready();
+      assert.deepEqual(await lastStatistics(), [
+        {start:iso(start),end:iso(end),timezoneOffsetMinutes:480},
+        {start:iso(oldStart),end:iso(oldEnd),timezoneOffsetMinutes:480}
+      ]);
+    };
+    const cases = [
+      ["本周","2025-03-24","2025-03-31","2025-03-17","2025-03-24","本周工作报告","本周周报"],
+      ["上周","2025-03-17","2025-03-24","2025-03-10","2025-03-17","上一周工作报告","上周周报"],
+      ["本月","2025-03-01","2025-03-31","2025-02-01","2025-03-01","本月工作报告","本月月报"],
+      ["上月","2025-02-01","2025-03-01","2025-01-01","2025-02-01","月度工作报告","月报"],
+      ["本季度","2025-01-01","2025-03-31","2024-10-01","2024-12-29","本季度工作报告","本季度工作报告"],
+      ["上季度","2024-10-01","2025-01-01","2024-07-01","2024-10-01","季度工作报告","季度工作报告"],
+      ["自定义","2025-03-02","2025-03-03","2025-03-01","2025-03-02","自定义周期工作报告","阶段工作报告"]
+    ];
+    await nav("统计中心");
+    assert.deepEqual(await tabs.getByRole("button").allTextContents(),cases.map(row=>row[0]));
+    assert.equal(await tabs.locator('[aria-pressed="true"]').innerText(),"本周");
+    const inclusive = exclusive => new Date(Date.parse(exclusive+"T00:00:00Z")-86400000).toISOString().slice(0,10);
+    for (const [label,start,end,oldStart,oldEnd,native,prompt] of cases) {
+      await pick(label);
+      if(label==="自定义"){
+        await dateStart.fill("2025-03-02");
+        await dateEnd.fill("2025-03-02");
+      }
+      await expectPair([start,end,oldStart,oldEnd]);
+      const count=Number(start.slice(5,7))*10+Number(start.slice(8));
+      const oldCount=Number(oldStart.slice(5,7))*10+Number(oldStart.slice(8));
+      assert.equal(await current(),String(count));
+      assert.deepEqual(await page.locator(".workload-comparison .comparison-row").first().locator(".comparison-bars b").allTextContents(),[String(count),String(oldCount)]);
+      assert.equal(await page.locator(".type-stats button b").first().innerText(),String(count));
+      assert.match(await page.locator(".department-comparison").innerText(),/测试部门/);
+      await report.click();
+      await page.getByRole("button",{name:"原生工作报告"}).click();
+      await page.getByRole("button",{name:"预览报告"}).click();
+      const preview=page.getByRole("dialog",{name:native});
+      await preview.waitFor();
+      assert.ok((await preview.innerText()).includes("统计期间为 "+start+" 至 "+inclusive(end)));
+      assert.ok((await preview.innerText()).includes("共处理 "+count+" 项"));
+      assert.ok((await preview.innerText()).includes("截至当前仍有 1 项逾期"));
+      if(label==="本季度"){
+        await preview.locator("select").selectOption("合同审查");
+        await page.getByRole("dialog",{name:"本季度工作报告 · 合同审查"}).getByText(/本期共形成/).waitFor();
+        assert.deepEqual((await calls()).filter(call=>call[0]==="get_statistics_details").at(-1),
+          ["get_statistics_details",{start:iso(start),end:iso(end),taskType:"合同审查"}]);
+        await page.getByRole("button",{name:"复制报告",exact:true}).click();
+        assert.match(await page.evaluate(()=>window.__inlineClipboard),/本季度工作报告 · 合同审查/);
+        if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT.replace(/\.png$/,"-report.png")});
+        await page.getByRole("dialog",{name:"本季度工作报告 · 合同审查"}).getByRole("button",{name:"关闭",exact:true}).last().click();
+      }else{
+        await preview.getByRole("button",{name:"关闭",exact:true}).last().click();
+      }
+      await report.click();
+      await page.getByRole("button",{name:"确认并生成",exact:true}).click();
+      const copied=await page.evaluate(()=>window.__inlineClipboard);
+      assert.ok(copied.includes(prompt));
+      assert.ok(copied.includes(start));
+      assert.ok(copied.includes(inclusive(end)));
+      assert.doesNotMatch(copied,/\{\{(?:报告类型|开始日期|结束日期)\}\}/u);
+    }
+    const noResults = async () => {
+      assert.equal(await page.locator(".summary-grid").count(),0);
+      assert.equal(await report.isDisabled(),true);
+      assert.equal(await page.getByRole("button",{name:"导出图表",exact:true}).count(),0);
+    };
+    const beforeInvalidTotal=(await calls()).filter(call=>call[0]==="get_statistics").length;
+    await dateStart.fill("");
+    await page.getByRole("alert").getByText("请输入有效的开始日期和结束日期").waitFor();
+    await noResults();
+    await dateStart.fill("2025-03-03");
+    await page.getByRole("alert").getByText("开始日期不能晚于结束日期").waitFor();
+    await noResults();
+    assert.equal((await calls()).filter(call=>call[0]==="get_statistics").length,beforeInvalidTotal);
+    await dateStart.fill("2025-03-02");
+    await ready();
+    await page.locator(".type-stats button").first().click();
+    await page.locator(".details-card tbody tr").first().click();
+    await page.locator(".detail-panel").waitFor();
+    await page.locator(".detail-panel>header").getByRole("button",{name:"关闭",exact:true}).click();
+    await nav("统计中心");
+    await expectPair(cases.at(-1).slice(1,5));
+    await nav("待办队列");
+    await nav("统计中心");
+    assert.equal(await dateStart.inputValue(),"2025-03-02");
+    assert.equal(await dateEnd.inputValue(),"2025-03-02");
+    await page.getByRole("button",{name:"软件设置",exact:true}).click();
+    await page.getByRole("group",{name:"每周起始日"}).getByRole("button",{name:"周日",exact:true}).click();
+    await nav("统计中心");
+    await pick("本周");
+    await expectPair(["2025-03-30","2025-03-31","2025-03-23","2025-03-24"]);
+    await page.evaluate(() => window.__inlineSetWeek("monday"));
+    await expectPair(cases[0].slice(1,5));
+    await page.evaluate(() => window.__inlineSetWeek("sunday"));
+    await expectPair(["2025-03-30","2025-03-31","2025-03-23","2025-03-24"]);
+    await pick("上周");
+    await expectPair(["2025-03-23","2025-03-30","2025-03-16","2025-03-23"]);
+    await pick("自定义");
+    await expectPair(cases.at(-1).slice(1,5));
+    await pick("本周");
+    await page.clock.setFixedTime(new Date("2025-03-30T16:01:00Z"));
+    await page.evaluate(()=>window.dispatchEvent(new Event("focus")));
+    await expectPair(["2025-03-30","2025-04-01","2025-03-23","2025-03-25"]);
+    const future = page.locator(".trend-total:disabled");
+    assert.ok(await future.count()>0);
+    const drillCount=(await calls()).filter(call=>call[0]==="get_statistics_trend_details").length;
+    await future.first().evaluate(button=>button.click());
+    assert.equal((await calls()).filter(call=>call[0]==="get_statistics_trend_details").length,drillCount);
+    await pick("自定义");
+    await expectPair(cases.at(-1).slice(1,5));
+
+    const rule = (key,value) => page.evaluate(([k,v])=>{window.__inlineRules[k]=v;},[key,value]);
+    const waitHeld = key => page.waitForFunction(k=>Boolean(window.__inlinePending[k]?.length),key);
+    const release = key => page.evaluate(async k=>{
+      delete window.__inlineRules[k];
+      window.__inlinePending[k]?.splice(0).forEach(resolve=>resolve());
+      await new Promise(resolve=>setTimeout(resolve,0));
+    },key);
+    await rule("summary:2025-03-01","hold");
+    await pick("本月");
+    await waitHeld("summary:2025-03-01");
+    await noResults();
+    await rule("summary:2025-01-01","fail");
+    await pick("本季度");
+    await page.getByRole("alert").getByText("合成查询失败").waitFor();
+    await release("summary:2025-03-01");
+    await noResults();
+    await rule("summary:2025-01-01",null);
+    await page.getByRole("button",{name:"重新加载"}).click();
+    await ready();
+    assert.equal(await current(),"11");
+
+    await rule("summary:2025-03-01","hold");
+    await pick("本月");
+    await waitHeld("summary:2025-03-01");
+    await pick("上季度");
+    await ready();
+    await release("summary:2025-03-01");
+    assert.equal(await current(),"101");
+    await pick("本季度");
+    await ready();
+
+    await rule("type:2025-01-01","hold");
+    await page.locator(".type-stats button").first().click();
+    await waitHeld("type:2025-01-01");
+    await page.locator(".trend-total").first().click();
+    await page.locator(".details-card").getByText(/全部办理事项/).waitFor();
+    await release("type:2025-01-01");
+    assert.match(await page.locator(".details-card h2").innerText(),/全部办理事项/);
+    await rule("trend:2025-01-01","hold");
+    await page.locator(".trend-total").first().click();
+    await page.locator(".trend-total").first().click();
+    await waitHeld("trend:2025-01-01");
+    await pick("上月");
+    await ready();
+    await release("trend:2025-01-01");
+    assert.equal(await page.locator(".details-card").count(),0);
+
+    await rule("summary:2025-03-01","hold");
+    await pick("本月");
+    await waitHeld("summary:2025-03-01");
+    await nav("待办队列");
+    await release("summary:2025-03-01");
+    assert.equal(await page.locator(".statistics-panel").count(),0);
+    await nav("统计中心");
+    await ready();
+    assert.equal(await tabs.locator('[aria-pressed="true"]').innerText(),"本月");
+
+    await page.evaluate(()=>{window.__inlineHoldPicker=true;});
+    await page.getByRole("button",{name:"导出图表",exact:true}).click();
+    await page.getByRole("button",{name:"导出 300 DPI PNG",exact:true}).click();
+    await page.waitForFunction(()=>typeof window.__inlineResolvePicker==="function");
+    await tabs.getByRole("button",{name:"本季度",exact:true}).evaluate(button=>button.click());
+    await ready();
+    await page.evaluate(()=>{window.__inlineHoldPicker=false;window.__inlineResolvePicker();});
+    await page.waitForFunction(()=>!document.querySelector(".chart-export-button")?.disabled);
+    assert.ok(!(await calls()).some(call=>call[0]==="save_chart_export"));
+    await page.getByRole("button",{name:"导出图表",exact:true}).click();
+    await page.getByRole("button",{name:"导出 300 DPI PNG",exact:true}).click();
+    await page.waitForFunction(()=>Boolean(window.__inlinePng));
+    const png=await page.evaluate(()=>({picker:window.__inlinePicker,bytes:window.__inlinePng,texts:window.__inlineCanvas}));
+    assert.match(png.picker.defaultPath,/2025-01-01_2025-03-31\.png$/);
+    assert.ok(png.texts.includes("对比范围：2024-10-01 至 2024-12-29"));
+    assert.ok(png.texts.some(text=>text.includes("上季度同期")));
+    assert.ok(png.texts.includes("11")&&png.texts.includes("101"));
+    const image=Buffer.from(png.bytes);
+    assert.equal(image.subarray(1,4).toString(),"PNG");
+    const phys=image.indexOf("pHYs");
+    assert.ok(phys>0);
+    assert.equal(image.readUInt32BE(phys+4),11811);
+    assert.equal(image.readUInt32BE(phys+8),11811);
+    assert.equal(image[phys+12],1);
+    if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT});
+    if(process.env.INLINE_UI_PNG)await writeFile(process.env.INLINE_UI_PNG,image);
+    await page.locator(".trend-total").last().click();
+    assert.deepEqual((await calls()).filter(call=>call[0]==="get_statistics_trend_details").at(-1),
+      ["get_statistics_trend_details",{start:iso("2025-03-31"),end:iso("2025-04-01"),resultStatus:null}]);
+
+    await page.setViewportSize({width:550,height:850});
+    const layout=await tabs.getByRole("button").evaluateAll(buttons=>buttons.map(button=>{
+      const bounds=button.getBoundingClientRect();
+      const panel=button.closest(".statistics-panel").getBoundingClientRect();
+      return {top:bounds.top,inside:bounds.left>=panel.left&&bounds.right<=panel.right};
+    }));
+    assert.ok(layout.every(button=>button.inside),JSON.stringify(layout));
+    assert.ok(new Set(layout.map(button=>button.top)).size>1);
+    assert.equal(await page.locator(".summary-grid").evaluate(grid=>getComputedStyle(grid).gridTemplateColumns.split(" ").length),2);
+    if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT.replace(/\.png$/,"-narrow.png")});
+    await pick("自定义");
+    await rule("summary:2025-05-01","empty");
+    await rule("summary:2025-02-27","empty");
+    await dateEnd.fill("2025-07-02");
+    await dateStart.fill("2025-05-01");
+    await expectPair(["2025-05-01","2025-07-03","2025-02-27","2025-05-01"]);
+    assert.equal(await current(),"0");
+    assert.equal(await page.getByText("暂无趋势数据。",{exact:true}).count(),1);
+    assert.equal(await page.getByText("当前及对比周期均无部门相关工作量。",{exact:true}).count(),1);
+    console.log("PASS periods: seven preset IPC pairs, state/detail/navigation, validation, focus rollover, week setting, stale/failure/unmount isolation, all report modes, PNG pHYs and snapshot, narrow wrap");
   }
   if (mode === "trend") {
     await page.locator(".sidebar nav button").filter({ hasText: "统计中心" }).click();
@@ -320,7 +641,7 @@ try {
     await page.locator(".detail-panel").waitFor();
     await page.locator(".detail-panel>header").getByRole("button",{name:"关闭",exact:true}).click();
     await page.locator(".sidebar nav button").filter({hasText:"统计中心"}).click();
-    await page.getByRole("button",{name:"上一季度",exact:true}).click();
+    await page.getByRole("button",{name:"上季度",exact:true}).click();
     await page.getByText("按自然周去重 · 点击数量查看明细",{exact:true}).waitFor();
     const weeklyColumn=page.locator(".trend-column").first();
     const weeklyTitle=await weeklyColumn.getAttribute("title");
