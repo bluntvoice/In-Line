@@ -25,6 +25,9 @@ mod mcp_p4_tests;
 #[cfg(all(test, windows))]
 mod mcp_write_tests;
 mod scheduling;
+mod timeline;
+#[cfg(test)]
+mod timeline_tests;
 use chrono::{Datelike, FixedOffset, Local, Utc};
 use rusqlite::{
     params, params_from_iter, types::Value, Connection, OpenFlags, OptionalExtension, Transaction,
@@ -37,7 +40,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub const DATABASE_SCHEMA_VERSION: i64 = 14;
+pub const DATABASE_SCHEMA_VERSION: i64 = 15;
 
 const SELECT_TASK: &str = "SELECT tasks.id, permanent_number, daily_sequence, ticket_date, department, contact, task_type, title, details, status, priority, workload, is_urgent, urgent_requester, urgent_reason, requested_deadline, internal_notes, created_at, updated_at, started_at, completed_at, archived_at, deleted_at, custom_sort_order, requested_deadline_label,
     (SELECT count(*) FROM task_work_events work WHERE work.task_id=tasks.id AND work.voided_at IS NULL),
@@ -557,6 +560,23 @@ impl Database {
         mcp_schema::migrate(&transaction, version)?;
         mcp_schema::migrate_p4(&transaction, version)?;
         mcp_changes::migrate(&transaction, version)?;
+        if version < 15 {
+            let has_column: bool = transaction
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM pragma_table_info('task_logs') WHERE name='operation_id')",
+                    [],
+                    |row| row.get(0),
+                )
+                .map_err(display_error)?;
+            if !has_column {
+                transaction
+                    .execute("ALTER TABLE task_logs ADD COLUMN operation_id TEXT", [])
+                    .map_err(display_error)?;
+            }
+            transaction
+                .execute_batch("DELETE FROM schema_meta; INSERT INTO schema_meta VALUES(15);")
+                .map_err(display_error)?;
+        }
         let count: i64 = transaction
             .query_row(
                 "SELECT count(*) FROM master_values WHERE kind='task_type'",
@@ -1440,6 +1460,7 @@ impl Database {
             return Err("不能将事项合并到自身".into());
         }
         self.with_transaction(|tx| {
+            let _operation = timeline::begin(tx);
             let target = get_task_on(tx, input.target_task_id)?;
             let source = get_task_on(tx, input.source_task_id)?;
             if target.deleted_at.is_some() || source.deleted_at.is_some() {
@@ -1458,18 +1479,7 @@ impl Database {
                 clear_urgent_on(tx, source.id, "合并后移入回收站")?;
             }
             if input.deduplicate_records {
-                tx.execute(
-                    "DELETE FROM task_logs
-                     WHERE task_id=? AND EXISTS(
-                       SELECT 1 FROM task_logs target
-                       WHERE target.task_id=?
-                         AND target.log_type=task_logs.log_type
-                         AND target.content=task_logs.content
-                         AND target.created_at=task_logs.created_at
-                     )",
-                    params![source.id, target.id],
-                )
-                .map_err(display_error)?;
+                timeline::deduplicate_for_merge(tx, source.id, target.id)?;
                 tx.execute(
                     "DELETE FROM task_work_events
                      WHERE task_id=? AND correction_of IS NULL
@@ -2447,10 +2457,11 @@ impl Database {
     }
 }
 fn add_log(connection: &Connection, id: i64, kind: &str, content: &str) -> Result<(), String> {
+    let operation = timeline::operation_id(connection, id, kind)?;
     connection
         .execute(
-            "INSERT INTO task_logs(task_id,log_type,content,created_at) VALUES(?,?,?,?)",
-            params![id, kind, content, now()],
+            "INSERT INTO task_logs(task_id,log_type,content,created_at,operation_id) VALUES(?,?,?,?,?)",
+            params![id, kind, content, now(), operation],
         )
         .map_err(display_error)?;
     Ok(())
@@ -2594,9 +2605,14 @@ fn bump_master_use(connection: &Connection, kind: &str, name: &str) -> Result<()
 
 impl Database {
     pub fn get_logs(&self, task_id: i64) -> Result<Vec<TaskLog>, String> {
-        self.with_conn(|connection|{
-            let mut statement=connection.prepare("SELECT id,task_id,log_type,content,created_at FROM task_logs WHERE task_id=? ORDER BY created_at DESC").map_err(display_error)?;
-            let rows=statement.query_map([task_id],|row|Ok(TaskLog{id:row.get(0)?,task_id:row.get(1)?,log_type:row.get(2)?,content:row.get(3)?,created_at:row.get(4)?}))
+        self.with_conn(|connection| {
+            let mut statement=connection.prepare("SELECT id,task_id,log_type,content,created_at,operation_id FROM task_logs WHERE task_id=? ORDER BY created_at DESC,id DESC").map_err(display_error)?;
+            let rows=statement.query_map([task_id],|row| {
+                let raw: String = row.get(2)?;
+                let stored: Option<String> = row.get(5)?;
+                let (kind, operation_id) = timeline::visible_log(&raw, stored.as_deref());
+                Ok(TaskLog { id:row.get(0)?,task_id:row.get(1)?,log_type:kind.into(),content:row.get(3)?,created_at:row.get(4)?,operation_id })
+            })
                 .map_err(display_error)?.collect::<Result<Vec<_>,_>>().map_err(display_error);
             rows
         })
@@ -3114,8 +3130,8 @@ impl Database {
                     inserted_task_ids.insert(target_id);
                 }
 
+                timeline::copy_for_restore(&source, &transaction, source_task.id, target_id)?;
                 for (table, columns) in [
-                    ("task_logs", &["log_type", "content", "created_at"][..]),
                     (
                         "status_history",
                         &["old_status", "new_status", "reason", "created_at"][..],
@@ -4221,7 +4237,7 @@ mod tests {
         assert_eq!(current.permanent_number, original.permanent_number);
         assert_eq!(current.updated_at, original.updated_at);
         assert_eq!(current.ticket_color, None);
-        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 14);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 15);
         let backups = db.list_backups().unwrap();
         let before = backups
             .iter()
@@ -4328,7 +4344,7 @@ mod tests {
             .unwrap();
     }
 
-    fn sample(title: &str) -> TaskInput {
+    pub(super) fn sample(title: &str) -> TaskInput {
         TaskInput {
             planned_date: None,
             confirm_schedule_change: false,
@@ -4359,9 +4375,9 @@ mod tests {
         input
     }
 
-    struct TestClock;
+    pub(super) struct TestClock;
     impl TestClock {
-        fn at(value: &str) -> Self {
+        pub(super) fn at(value: &str) -> Self {
             TEST_TIME.with(|clock| {
                 *clock.borrow_mut() = Some(chrono::DateTime::parse_from_rfc3339(value).unwrap())
             });
@@ -4805,7 +4821,7 @@ mod tests {
         .unwrap();
     }
 
-    fn subtask_sample(parent_task_id: i64, title: &str) -> CreateSubtaskInput {
+    pub(super) fn subtask_sample(parent_task_id: i64, title: &str) -> CreateSubtaskInput {
         CreateSubtaskInput {
             parent_task_id,
             planned_date: None,
@@ -4892,10 +4908,10 @@ mod tests {
             .create_subtask(subtask_sample(parent.id, "v8子任务"))
             .unwrap();
         db.process_round(child.id).unwrap();
-        db.with_conn(|conn|conn.execute_batch("DROP INDEX idx_scheduled_due; DROP TABLE queue_number_allocations; ALTER TABLE tasks DROP COLUMN planned_date; ALTER TABLE tasks DROP COLUMN is_scheduled; ALTER TABLE tasks DROP COLUMN schedule_action; ALTER TABLE tasks DROP COLUMN schedule_action_at; UPDATE schema_meta SET version=8;").map_err(display_error)).unwrap();
+        db.with_conn(|conn|conn.execute_batch("DROP INDEX idx_scheduled_due; DROP TABLE queue_number_allocations; ALTER TABLE tasks DROP COLUMN planned_date; ALTER TABLE tasks DROP COLUMN is_scheduled; ALTER TABLE tasks DROP COLUMN schedule_action; ALTER TABLE tasks DROP COLUMN schedule_action_at; ALTER TABLE task_logs DROP COLUMN operation_id; UPDATE schema_meta SET version=8;").map_err(display_error)).unwrap();
         drop(db);
         let db = Database::open_root(root.clone()).unwrap();
-        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 14);
+        assert_eq!(db.with_conn(Database::schema_version).unwrap(), 15);
         assert_eq!(
             db.settings().unwrap().get("ui_font_family").unwrap(),
             "in-line:sarasa-ui-sc"
@@ -5204,7 +5220,7 @@ mod tests {
         create_v7_database(&upgraded_path);
 
         let upgraded = Database::open_at(upgraded_path.clone()).unwrap();
-        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 14);
+        assert_eq!(upgraded.with_conn(Database::schema_version).unwrap(), 15);
         let task = upgraded.get_task(1).unwrap();
         assert_eq!(task.parent_task_id, None);
         assert_eq!(task.subtask_sort_order, 0);
@@ -6665,7 +6681,7 @@ mod tests {
         drop(legacy);
 
         let migrated = Database::open_at(path).unwrap();
-        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 14);
+        assert_eq!(migrated.with_conn(Database::schema_version).unwrap(), 15);
         let task = migrated.get_task(created.id).unwrap();
         assert_eq!(task.departments, vec!["法务组"]);
         assert!(!task.has_active_queue);

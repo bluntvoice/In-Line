@@ -267,7 +267,10 @@ impl Database {
                 let ids=statement.query_map([&date],|row|row.get::<_,i64>(0)).map_err(display_error)?.collect::<Result<Vec<_>,_>>().map_err(display_error)?;
                 ids
             };
-            for id in &ids { activate_reserved_on(tx,*id)?; }
+            for id in &ids {
+                let _operation = timeline::begin(tx);
+                activate_reserved_on(tx,*id)?;
+            }
             Ok(ids.len())
         })
     }
@@ -439,7 +442,7 @@ mod tests {
             tx.execute("INSERT INTO queue_number_allocations(permanent_number,queue_date,daily_sequence,allocated_at,voided_at) VALUES('deleted-task',?,?,?,?)",params![date,one,now(),now()]).map_err(display_error)?;
             tx.execute("DELETE FROM daily_sequences WHERE ticket_date=?",[date]).map_err(display_error)?;
             assert_eq!(next_daily_sequence(tx,date)?,one+1);
-            assert_eq!(Database::schema_version(tx)?,14);
+            assert_eq!(Database::schema_version(tx)?,15);
             Ok(())
         }).unwrap();
     }

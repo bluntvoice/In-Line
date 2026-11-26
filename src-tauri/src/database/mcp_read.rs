@@ -101,7 +101,7 @@ mod tests {
             serde_json::to_value(upgraded.get_task(task.id).unwrap()).unwrap(),
             original
         );
-        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 14);
+        assert_eq!(upgraded.mcp_basis().unwrap().schema_version, 15);
         assert!(!upgraded.list_backups().unwrap().is_empty());
     }
     #[test]
@@ -254,14 +254,19 @@ impl Database {
                     let (event_id,at,from,to,text)=row.map_err(display_error)?;
                     if kind=="work"&&!voided&&!to.is_empty(){continue;}
                     if kind=="log"&&!full{continue;}
-                    let mut value=json!({"id":event_id,"taskId":id,"kind":kind,"at":at,"from":from,"to":to});
+                    let (projected_from,cross_task)=if kind=="log" {
+                        from.as_deref().map_or((None,false),|raw| {
+                            let (base,cross_task)=timeline::mcp_type(raw);
+                            (Some(base),cross_task)
+                        })
+                    } else { (from.as_deref(),false) };
+                    let mut value=json!({"id":event_id,"taskId":id,"kind":kind,"at":at,"from":projected_from,"to":to});
                     if kind=="queue"{value["phase"]=json!("enqueued");value["enqueuedAt"]=json!(at);value["closedAt"]=json!(from);}
                     if kind=="work"{value["voidedAt"]=if to.is_empty(){serde_json::Value::Null}else{json!(to)};value["correctionOf"]=json!(conn.query_row("SELECT correction_of FROM task_work_events WHERE id=?",[event_id],|r|r.get::<_,Option<i64>>(0)).map_err(display_error)?);}
                     if full{
                         // Legacy relationship/merge logs contain other task titles
                         // but lack stable referenced IDs. Limited clients must not
                         // receive that text even when they can read this task fully.
-                        let cross_task=kind=="log"&&from.as_deref().is_some_and(|k|k.contains("relation")||k.contains("merge"));
                         if redact_cross_task&&cross_task{value["redactedFields"]=json!(["text"]);}else{value["text"]=json!(text);}
                     }
                     if full&&kind=="urgent"{
