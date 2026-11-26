@@ -1,0 +1,98 @@
+name: F1 statistics E2 diagnostic
+on:
+  push:
+    branches: [diagnostics/v050-f1-statistics-e2]
+permissions:
+  contents: read
+jobs:
+  synthetic-statistics:
+    if: github.repository == 'bluntvoice/In-Line' && github.event_name == 'push' && github.ref == 'refs/heads/diagnostics/v050-f1-statistics-e2'
+    runs-on: windows-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check GitHub Actions runtime policy
+        shell: pwsh
+        run: ./scripts/check-github-actions-runtime.ps1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Admit hosted environment
+        shell: pwsh
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') { throw 'Unexpected runner' }
+          if ((git rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'Unexpected checkout' }
+          if (Get-Process -Name 'in-line','in-line-mcp','in-line-cli' -ErrorAction SilentlyContinue) { throw 'Unexpected existing product process' }
+          $root=Join-Path $env:RUNNER_TEMP "f1-e2-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $root) { throw 'Test root already exists' }
+          foreach ($item in @('temp','appdata','localappdata','cargo','target','npm','cases')) {
+            [void][IO.Directory]::CreateDirectory((Join-Path $root $item))
+          }
+          @("F1_E2_ROOT=$root","TEMP=$root\temp","TMP=$root\temp","APPDATA=$root\appdata","LOCALAPPDATA=$root\localappdata","CARGO_HOME=$root\cargo","CARGO_TARGET_DIR=$root\target","npm_config_cache=$root\npm") |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "runner=$env:RUNNER_ENVIRONMENT image=$env:ImageOS/$env:ImageVersion pwsh=$($PSVersionTable.PSVersion) sha=$env:GITHUB_SHA"
+          node -v
+          rustc -Vv
+          cargo -V
+      - name: Build locked frontend assets
+        timeout-minutes: 5
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Compile and execute only the seven synthetic statistics regressions
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          Get-ChildItem Env:IN_LINE_* -ErrorAction SilentlyContinue | Remove-Item
+          $vs=& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$vs) { throw 'MSVC unavailable' }
+          & (Join-Path $vs 'Common7\Tools\Launch-VsDevShell.ps1') -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+          Get-Command cl.exe,link.exe | ForEach-Object { Write-Host $_.Source }
+          $sdk=Join-Path $env:WindowsSdkDir ('Lib\'+$env:WindowsSDKVersion+'um\x64\kernel32.lib')
+          if (!(Test-Path -LiteralPath $sdk -PathType Leaf)) { throw 'Windows SDK unavailable' }
+          Write-Host "SDK=$sdk"
+          cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $timer=[Diagnostics.Stopwatch]::StartNew()
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib --no-run
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Write-Host "F1 E2 compile PASS in $([math]::Round($timer.Elapsed.TotalSeconds,1)) seconds"
+          $cases=@(
+            'statistics_use_latest_event_and_guard_historical_attribution',
+            'statistics_distinguish_top_level_tasks_and_subtasks',
+            'due_scheduled_is_idempotent_keeps_reserved_order_and_skips_non_pending',
+            'delayed_startup_keeps_original_date_and_attributes_real_work_to_operation_day',
+            'future_early_workflow_all_entry_points_and_defer_override',
+            'reactivation_retains_historical_statistics_clears_deadline_and_starts_new_cycle',
+            'statistics_half_open_periods_and_fixed_offset_trend_across_dst'
+          )
+          $failures=@()
+          foreach ($case in $cases) {
+            $env:TEMP=Join-Path $env:F1_E2_ROOT "cases\$case"
+            $env:TMP=$env:TEMP
+            [void][IO.Directory]::CreateDirectory($env:TEMP)
+            $timer.Restart()
+            $lines=@(cargo test --locked --manifest-path src-tauri/Cargo.toml --lib -- "database::tests::$case" --exact --nocapture 2>&1 | ForEach-Object { "$_" })
+            $exit=$LASTEXITCODE
+            $lines | ForEach-Object { Write-Host $_ }
+            if ($exit -ne 0 -or $lines -notcontains 'running 1 test' -or (-not ($lines -match '^test result: ok\. 1 passed; 0 failed;'))) {
+              $failures+=$case
+              Write-Host "F1 E2 FAIL $case exit=$exit"
+            } else {
+              Write-Host "F1 E2 PASS $case seconds=$([math]::Round($timer.Elapsed.TotalSeconds,1))"
+            }
+          }
+          if (Get-Process -Name 'in-line','in-line-mcp','in-line-cli' -ErrorAction SilentlyContinue) { throw 'Unexpected product process after tests' }
+          git diff --exit-code -- src-tauri/Cargo.lock package-lock.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          if ($failures.Count) { throw "Directed cases failed: $($failures -join ', ')" }
+          Write-Host 'F1 E2 PASS 7/7, no In-Line host/CLI processes, locked dependencies unchanged'
