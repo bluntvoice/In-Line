@@ -1,0 +1,69 @@
+name: F2 hosted compatibility
+on:
+  push:
+    branches: [diagnostics/v050-f2-compat]
+permissions:
+  contents: read
+jobs:
+  f2-synthetic:
+    if: github.repository == 'bluntvoice/In-Line' && github.event_name == 'push' && github.ref == 'refs/heads/diagnostics/v050-f2-compat'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: GitHub Actions runtime policy
+        shell: pwsh
+        run: ./scripts/check-github-actions-runtime.ps1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Admit temporary hosted Windows environment
+        shell: pwsh
+        run: |
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') { throw 'Unexpected runner' }
+          if ((git rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'Unexpected checkout' }
+          Write-Host "F2 hosted candidate tree=$(git rev-parse 'HEAD^^{tree}') checkout=$env:GITHUB_SHA"
+          if (Get-Process -Name 'in-line','in-line-mcp','in-line-cli' -ErrorAction SilentlyContinue) { throw 'Unexpected installed host process' }
+          $root=Join-Path $env:RUNNER_TEMP "f2-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          if (Test-Path -LiteralPath $root) { throw 'Run root already exists' }
+          $drive=[IO.DriveInfo]::new([IO.Path]::GetPathRoot($root))
+          if ($drive.AvailableFreeSpace -lt 16GB) { throw 'Insufficient disk for bounded synthetic builds' }
+          foreach ($sub in @('temp','appdata','localappdata','cargo','target','npm')) {
+            [void][IO.Directory]::CreateDirectory((Join-Path $root $sub))
+          }
+          @("F2_RUN_ROOT=$root","TEMP=$root\temp","TMP=$root\temp","APPDATA=$root\appdata","LOCALAPPDATA=$root\localappdata","CARGO_HOME=$root\cargo","CARGO_TARGET_DIR=$root\target","npm_config_cache=$root\npm",'CARGO_PROFILE_TEST_DEBUG=0','CARGO_PROFILE_DEV_DEBUG=0','CARGO_INCREMENTAL=0') |
+            Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "F2 host $env:ImageOS $env:ImageVersion pwsh=$($PSVersionTable.PSVersion) diskGB=$([math]::Round($drive.AvailableFreeSpace/1GB,1))"
+          rustc -Vv
+          cargo -V
+      - name: Build and test candidate frontend and format
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cargo fmt --manifest-path src-tauri/Cargo.toml --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Synthetic migration, rollback and actual CLI/MCP routes
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          Get-ChildItem Env:IN_LINE_* -ErrorAction SilentlyContinue | Remove-Item
+          $vs=& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (!$vs) { throw 'MSVC unavailable' }
+          & (Join-Path $vs 'Common7\Tools\Launch-VsDevShell.ps1') -Arch amd64 -HostArch amd64 -SkipAutomaticLocation
+          Get-Command cl.exe,link.exe | ForEach-Object { Write-Host $_.Source }
+          $sdk=Join-Path $env:WindowsSdkDir ('Lib\'+$env:WindowsSDKVersion+'um\x64\kernel32.lib')
+          if (!(Test-Path -LiteralPath $sdk -PathType Leaf)) { throw 'SDK unavailable' }
+          & ./scripts/verify-f2-hosted.ps1
