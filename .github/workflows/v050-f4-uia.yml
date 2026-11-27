@@ -76,7 +76,7 @@ jobs:
         timeout-minutes: 10
         env:
           SCENARIO: ${{ matrix.scenario }}
-        run: ./scripts/test-native-nsis.ps1 -Scenario $env:SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/f4-installed-$env:SCENARIO"
+        run: ./scripts/test-native-nsis.ps1 -Scenario $env:SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/f4-uia-$env:SCENARIO"
       - uses: actions/upload-artifact@v7
         if: always()
         with:

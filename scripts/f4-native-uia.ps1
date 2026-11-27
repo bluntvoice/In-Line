@@ -5,6 +5,7 @@ Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class InlineUiWindow {
  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid);
@@ -12,6 +13,20 @@ public static class InlineUiWindow {
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd,IntPtr after,int x,int y,int w,int h,uint flags);
+ delegate bool Enumerate(IntPtr hwnd, IntPtr param);
+ [DllImport("user32.dll")] static extern bool EnumWindows(Enumerate callback, IntPtr param);
+ [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder name, int size);
+ public static IntPtr ProductWindow(uint expectedPid, string expectedTitle) {
+  IntPtr found=IntPtr.Zero;
+  EnumWindows((hwnd, unused)=>{
+   uint owner; GetWindowThreadProcessId(hwnd,out owner);
+   if(owner!=expectedPid || !IsWindowVisible(hwnd))return true;
+   var name=new StringBuilder(256); GetWindowText(hwnd,name,name.Capacity);
+   if(!String.Equals(name.ToString(),expectedTitle,StringComparison.Ordinal))return true;
+   found=hwnd;return false;
+  },IntPtr.Zero);
+  return found;
+ }
 }
 '@
 $lab=Join-Path $env:RUNNER_TEMP ("inline-f4-uia-"+[guid]::NewGuid().ToString('N'))
@@ -119,8 +134,7 @@ function New-Task([string]$title,[string]$note=''){
 try {
   $until=[DateTime]::UtcNow.AddSeconds(35)
   while([DateTime]::UtcNow -lt $until -and !$process.HasExited){
-    $process.Refresh()
-    $window=$process.MainWindowHandle
+    $window=[InlineUiWindow]::ProductWindow([uint32]$process.Id,'In Line｜排着呢')
     if($window -ne [IntPtr]::Zero -and [InlineUiWindow]::IsWindowVisible($window)){break}
     Start-Sleep -Milliseconds 250
   }
@@ -128,6 +142,9 @@ try {
   $dpi=[InlineUiWindow]::GetDpiForWindow($window)
   if($dpi -ne 96){throw "Initial runner DPI is $dpi, expected 96"}
   "F4_UIA hwnd=$window pid=$($process.Id) session=$pidSession dpi=$dpi sha256=$((Get-FileHash -LiteralPath $Exe).Hash)"
+  $productRoot=[Windows.Automation.AutomationElement]::FromHandle($window)
+  "F4_UIA selected product title=$($productRoot.Current.Name) descendants=$(@(Children).Count)"
+  try{Screen 'first-visible-window'}catch{"First native screenshot unavailable: $($_.Exception.Message)"}
   Step 'about-and-native-window' {
     Click '^关于$'
     [void](Get-Control '\b0\.5\.0\b')
