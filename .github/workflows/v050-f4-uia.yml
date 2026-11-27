@@ -17,11 +17,11 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 26
     strategy:
-      max-parallel: 1
+      max-parallel: 2
       fail-fast: false
       matrix:
         scenario: [native-ui]
-        mode: [statistics-state]
+        mode: [business-tail, statistics-state]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

@@ -127,7 +127,7 @@ function R1-Business {
     Click '^关闭$'
     @{merge=$true;trash=$true;restore=$true}
   }
-  if( -ne 'business-tail'){
+  if($env:F4_R1_MODE -ne 'business-tail'){
   Step 'r1-business-restart' {
     try{Click '^关闭$'}catch{}
     Click '^待办队列(?:\s+\d+)?$'
@@ -287,9 +287,17 @@ function R1-StatsState {
     Screen 'statistics-custom-before'
     $focus=[Windows.Automation.AutomationElement]::FocusedElement
     Write-Host "F4_R1_STATE focusBefore=$($focus.Current.Name)"
-    [Windows.Forms.SendKeys]::SendWait('{TAB}')
-    $focus=[Windows.Automation.AutomationElement]::FocusedElement
+    $safe=Get-Control '^生成报告$' 'Button'
+    Set-InputFocus $safe
+    $until=[datetime]::UtcNow.AddSeconds(4)
+    do{
+      $focus=[Windows.Automation.AutomationElement]::FocusedElement
+      if($focus.Current.Name -eq '生成报告' -or $safe.Current.HasKeyboardFocus){break}
+      Start-Sleep -Milliseconds 150
+    }while([datetime]::UtcNow -lt $until)
     Write-Host "F4_R1_STATE focusAfter=$($focus.Current.Name)"
+    if($focus.Current.Name -ne '生成报告' -and !$safe.Current.HasKeyboardFocus){throw 'Could not settle focus outside the custom date fields'}
+    [void](R1-Range '自定义' $start $today $start.AddDays(-3) $start.AddDays(-1) '前一等长周期')
     $queue=Get-Control '^待办队列(?:\s+\d+)?$' 'Button'
     $bounds=$queue.Current.BoundingRectangle
     if($bounds.IsEmpty -or $queue.Current.IsOffscreen){throw 'Queue button has no actual visible bounds'}
