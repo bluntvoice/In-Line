@@ -62,6 +62,14 @@ Invoke-Case @('test','--locked','--manifest-path',$manifest,'--lib','timeline_',
 foreach ($test in @('production_upgrade_from_v8_preserves_data_and_creates_pre_migration_backup','merge_tasks_preserves_history_and_deduplicates_events','archive_delete_restore_and_permanent_cleanup_apply_only_the_selected_scope','p4_batch_refs_two_level_structure_and_group_undo_are_atomic','p4_deadline_batch_requires_single_approval_and_cannot_be_smuggled_as_patch','gui_transactions_and_failed_batches_do_not_leave_derived_events','pre_v15_cursor_requires_full_resync_without_mutating_business_data','quota_lru_expiry_scope_and_clock_guards_do_not_touch_other_stores','statistics_half_open_periods_and_fixed_offset_trend_across_dst','reactivation_retains_historical_statistics_clears_deadline_and_starts_new_cycle')) {
   Invoke-Case @('test','--locked','--manifest-path',$manifest,'--lib',$test,'--','--nocapture','--test-threads=1')
 }
+# Exact build identity requires an unmodified checkout. Keep the temporary
+# probe out of the source tree until protocol and host assertions complete.
+if (git status --porcelain --untracked-files=normal) { throw 'Protocol build checkout must be clean' }
+Write-Host "F2 exact identity protocol checkout=$(git rev-parse HEAD), clean=true"
+Invoke-Case @('test','--locked','--manifest-path',$manifest,'--test','cli_foundation','phase4::','--','--nocapture','--test-threads=1')
+Invoke-Case @('test','--locked','--manifest-path',$manifest,'--test','mcp_queries','--','--nocapture','--test-threads=1')
+Invoke-Case @('test','--locked','--manifest-path',$manifest,'--test','mcp_host','real_host_background_single_instance_and_protocol','--','--nocapture','--test-threads=1')
+
 $candidate=Build-Probe candidate
 Invoke-Probe $candidate upgrade $fixture
 $v15=(Get-FileHash -LiteralPath (Join-Path $fixture 'inline.db')).Hash
@@ -76,10 +84,6 @@ if ((Get-FileHash -LiteralPath $restored).Hash -ne (Get-FileHash -LiteralPath $b
 Invoke-Probe $old rollback $rollback
 if ((Get-FileHash -LiteralPath (Join-Path $fixture 'inline.db')).Hash -ne $v15) { throw 'v15 candidate was altered during rollback' }
 Write-Host "F2 matching pre-upgrade copy verified and v15 preserved SHA256=$v15"
-Invoke-Case @('test','--locked','--manifest-path',$manifest,'--test','cli_foundation','phase4::','--','--nocapture','--test-threads=1')
-Invoke-Case @('test','--locked','--manifest-path',$manifest,'--test','mcp_queries','--','--nocapture','--test-threads=1')
-Invoke-Case @('test','--locked','--manifest-path',$manifest,'--test','mcp_host','real_host_background_single_instance_and_protocol','--','--nocapture','--test-threads=1')
-
 git diff --exit-code -- package-lock.json src-tauri/Cargo.lock .github/workflows/ci.yml
 Assert-Native 'frozen files'
 if (Get-Process -Name 'in-line','in-line-mcp','in-line-cli' -ErrorAction SilentlyContinue) { throw 'Unexpected residual product process' }

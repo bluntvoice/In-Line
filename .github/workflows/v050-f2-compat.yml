@@ -29,7 +29,7 @@ jobs:
         run: |
           if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') { throw 'Unexpected runner' }
           if ((git rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'Unexpected checkout' }
-          Write-Host "F2 hosted candidate tree=$(git rev-parse 'HEAD^^{tree}') checkout=$env:GITHUB_SHA"
+          Write-Host "F2 hosted candidate tree=$(git rev-parse '4d860bb101d980e78863a79ab03e5143f03d1ccf^{tree}') checkout=$env:GITHUB_SHA"
           if (Get-Process -Name 'in-line','in-line-mcp','in-line-cli' -ErrorAction SilentlyContinue) { throw 'Unexpected installed host process' }
           $root=Join-Path $env:RUNNER_TEMP "f2-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
           if (Test-Path -LiteralPath $root) { throw 'Run root already exists' }
