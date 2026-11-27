@@ -98,7 +98,8 @@ function Fill([string]$pattern,[string]$value,[bool]$commit=$false){
   $node=Get-Control $pattern 'Edit|ComboBox'
   Set-InputFocus $node
   [Windows.Forms.Clipboard]::SetText($value)
-  [Windows.Forms.SendKeys]::SendWait('^a^v')
+  [Windows.Forms.SendKeys]::SendWait('^a')
+  [Windows.Forms.SendKeys]::SendWait('^v')
   if($commit){[Windows.Forms.SendKeys]::SendWait('{ENTER}')}
 }
 function Screen([string]$label){
@@ -228,8 +229,15 @@ try {
   Step 'real-clipboard-report' {
     Click '^统计中心$';Click '^生成报告$'
     Click '原生工作报告';Click '^预览报告$'
+    [Windows.Forms.Clipboard]::Clear()
     Click '^复制报告$'
-    $text=[Windows.Forms.Clipboard]::GetText()
+    $until=[DateTime]::UtcNow.AddSeconds(5)
+    $text=''
+    while([DateTime]::UtcNow -lt $until){
+      $text=[Windows.Forms.Clipboard]::GetText()
+      if($text -match '工作报告'){break}
+      Start-Sleep -Milliseconds 150
+    }
     if($text.Length -lt 100 -or $text -notmatch '工作报告'){throw 'System clipboard does not contain the expected synthetic native report'}
     Screen 'native-report'
     Click '^关闭$'

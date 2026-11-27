@@ -45,8 +45,8 @@ while([DateTime]::UtcNow -lt $deadline){
 }
 if(!$dlg){throw "Native $Mode picker was not visible in foreground"}
 $all=$dlg.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
-$field=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and $_.Current.AutomationId -in @('1001','1148') }|Select-Object -First 1
-$ok=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.AutomationId -eq '1'}|Select-Object -First 1
+$field=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and ($_.Current.AutomationId -in @('1001','1148','FileNameControl') -or $_.Current.Name -match 'File name|文件名') }|Select-Object -First 1
+$ok=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and ($_.Current.AutomationId -eq '1' -or $_.Current.Name -match '^(Open|Save|保存|打开)(\s.*)?$')}|Select-Object -First 1
 if($field -and $ok){
   $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Path)
   $ok.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
@@ -56,8 +56,13 @@ if($field -and $ok){
   $target=[Windows.Automation.AutomationElement]::FocusedElement
   [uint32]$focusedOwner=0
   [void][F4Win]::GetWindowThreadProcessId([F4Win]::GetForegroundWindow(),[ref]$focusedOwner)
-  if($focusedOwner -ne $ProductPid -or $target.Current.ControlType -notin @([Windows.Automation.ControlType]::Edit,[Windows.Automation.ControlType]::ComboBox)){throw "Native $Mode picker did not focus an owned filename control"}
+  if($focusedOwner -ne $ProductPid -or $target.Current.ControlType -notin @([Windows.Automation.ControlType]::Edit,[Windows.Automation.ControlType]::ComboBox)){
+    $known=@($all|ForEach-Object {$c=$_.Current;"$($c.ControlType.ProgrammaticName) [$($c.AutomationId)] $($c.Name)"}|Select-Object -First 30)
+    throw "Native $Mode picker did not focus an owned filename control. Dialog=$($dlg.Current.Name); controls=$($known -join ' / ')"
+  }
   [Windows.Forms.Clipboard]::SetText($Path)
-  [Windows.Forms.SendKeys]::SendWait('^a^v{ENTER}')
+  [Windows.Forms.SendKeys]::SendWait('^a')
+  [Windows.Forms.SendKeys]::SendWait('^v')
+  [Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }
 @{mode=$Mode;owner=$owner;class='#32770'}|ConvertTo-Json -Compress
