@@ -43,7 +43,7 @@ foreach($k in @($info.Environment.Keys)){if($k -match 'TOKEN|SECRET|PASSWORD|CRE
 $info.Environment['TEMP']=$lab
 $info.Environment['TMP']=$lab
 $pidSession=(Get-Process -Id $PID).SessionId
-if($env:F4_APPROVAL_ONLY -eq '1'){
+if($env:F4_APPROVAL_ONLY -eq '1' -or $env:F4_R1_MODE -eq 'dpi125-extended'){
   Add-Type -AssemblyName System.Security.Cryptography.ProtectedData
   $auth=Join-Path $env:USERPROFILE '.in-line/mcp-security/authorization.dpapi'
   if(Test-Path -LiteralPath $auth){throw 'Approval fixture cannot use prior authorization'}
@@ -331,6 +331,7 @@ try {
       'business' {R1-Business}
       'dpi125' {R1-Dpi 125}
       'dpi200' {R1-Dpi 200}
+      'dpi125-extended' {R1-DpiExtended}
       'restore' {}
       default {throw 'Unknown F4-R1 scenario'}
     }

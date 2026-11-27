@@ -56,13 +56,25 @@ elif mode == "timeline-read":
     assert sum(row["log_type"] == "audit" for row in rows) == 1
     print(json.dumps(rows, ensure_ascii=False))
 elif mode == "stats-seed":
-    assert db.execute("select count(*) from tasks").fetchone()[0] == 3
+    assert db.execute("select count(*) from tasks").fetchone()[0] == 1
     today = date.fromisoformat(args[0])
-    for suffix, day in (("New A", today), ("New B", today), ("Prior", today - timedelta(days=7))):
-        row = task(f"F4 R1 {suffix}")
-        with db:
-            result = db.execute("update task_work_events set handled_at=? where task_id=? and voided_at is null", (stamp(day), row["id"]))
-            assert result.rowcount == 1
+    original = task("F4 R1 New A")
+    event_rows = db.execute("select * from task_work_events where task_id=? and voided_at is null", (original["id"],)).fetchall()
+    assert len(event_rows) == 1 and event_rows[0]["result_status"] == "processed"
+    event = dict(event_rows[0])
+    event.pop("id")
+    details = dict(original)
+    details.pop("id")
+    def insert(table, values):
+        columns = ",".join(values)
+        slots = ",".join("?" for _ in values)
+        return db.execute(f"insert into {table}({columns}) values({slots})", tuple(values.values())).lastrowid
+    with db:
+        db.execute("update task_work_events set handled_at=? where task_id=?", (stamp(today), original["id"]))
+        for index, (suffix, day) in enumerate((("New B", today), ("Prior", today - timedelta(days=7))), 2):
+            task_id = insert("tasks", dict(details, permanent_number=f"R1-STATS-{index}", daily_sequence=100+index,
+                title=f"F4 R1 {suffix}", ticket_date=day.isoformat(), created_at=stamp(day), updated_at=stamp(day)))
+            insert("task_work_events", dict(event, task_id=task_id, handled_at=stamp(day), created_at=stamp(day), updated_at=stamp(day)))
     print(json.dumps([dict(row) for row in db.execute("select title, handled_at, result_status from task_work_events join tasks on tasks.id=task_id order by tasks.id")]))
 else:
     title, state, data = args

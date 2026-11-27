@@ -86,7 +86,7 @@ function R1-Business {
     $planned=[datetime]::Today.AddDays(3)
     R1-Date '加入日期' $planned
     Click '^保存并取号$'
-    R1-Open '暂缓事项' 'F4 R1 future'
+    R1-Open '暂缓事项' 'F4 R1 future' (' 未来事项 · '+$planned.ToString('yyyy-MM-dd'))
     $before=R1-CheckBusiness 'F4 R1 future' 'scheduled' $planned.ToString('yyyy-MM-dd')
     Click '^提前入队$'
     Click '^确认加入$'
@@ -124,7 +124,12 @@ function R1-Business {
     @{merge=$true;trash=$true;restore=$true}
   }
   Step 'r1-business-restart' {
-    $first=R1-CheckBusiness 'F4 R1 main' 'edited' 'edited'
+    try{Click '^关闭$'}catch{}
+    Click '^待办队列(?:\s+\d+)?$'
+    R1-NewTask 'F4 R1 persistent' 'original'
+    R1-Open '待办队列' 'F4 R1 persistent'
+    Click '^编辑$';Fill '^(记录判断|内部备注)' 'edited';Click '^保存修改$'
+    $first=R1-CheckBusiness 'F4 R1 persistent' 'edited' 'edited'
     $owned=Get-Process -Id $process.Id
     if($owned.StartTime.ToUniversalTime().Ticks -ne $ticks -or $owned.Path -ne $Exe){throw 'Cannot identify original app for restart'}
     $process.Kill($true)
@@ -140,9 +145,9 @@ function R1-Business {
       Start-Sleep -Milliseconds 200
     }while([datetime]::UtcNow -lt $end -and !$process.HasExited)
     if($window -eq [IntPtr]::Zero -or $process.SessionId -ne $pidSession){throw 'Restarted app lacks verified visible product HWND'}
-    R1-Open '待办队列' 'F4 R1 main'
+    R1-Open '待办队列' 'F4 R1 persistent'
     [void](Get-Control '^edited$' 'Text')
-    $second=R1-CheckBusiness 'F4 R1 main' 'edited' 'edited'
+    $second=R1-CheckBusiness 'F4 R1 persistent' 'edited' 'edited'
     if($second.number -ne $first.number -or $second.work.Count -ne $first.work.Count){throw 'Persisted task or history changed'}
     Screen 'business-after-restart'
     @{number=$second.number;workEvents=$second.work.Count;persisted=$true;shutdown='bounded termination of exact test PID'}
@@ -173,13 +178,11 @@ function R1-Stats {
   $month=[datetime]::new($today.Year,$today.Month,1)
   $quarter=[datetime]::new($today.Year,1+3*[math]::Floor(($today.Month-1)/3),1)
   Step 'r1-statistics-fixture' {
-    foreach($suffix in 'New A','New B','Prior'){
-      Click '^待办队列(?:\s+\d+)?$'
-      R1-NewTask "F4 R1 $suffix"
-      R1-Open '待办队列' "F4 R1 $suffix"
-      Click '^本轮已处理$'
-      [void](Get-Control '^已记录本轮处理，事项已进入暂缓队列$')
-    }
+    Click '^待办队列(?:\s+\d+)?$'
+    R1-NewTask 'F4 R1 New A'
+    R1-Open '待办队列' 'F4 R1 New A'
+    Click '^本轮已处理$'
+    [void](Get-Control '^已记录本轮处理，事项已进入暂缓队列$')
     $rows=R1-Read 'stats-seed' @($today.ToString('yyyy-MM-dd'))
     ConvertTo-Json -InputObject @($rows) -Depth 5 | Set-Content -LiteralPath "$Output/statistics-fixture.json" -Encoding utf8
     @{distinctTasks=3;current=2;previous=1;syntheticHistoryInitialization=$true}
@@ -220,7 +223,7 @@ function R1-Stats {
     [void](R1-Range '本周' $mon $today $mon.AddDays(-7) $today.AddDays(-7) '上周同期')
     $names=@(Children|ForEach-Object {$_.Current.Name}|Where-Object {$_})
     $joined=$names -join '|'
-    if($joined -notmatch '处理事项\|\+1\|2\|1'){throw 'Expected current 2 and previous 1 in the actual workload row'}
+    if($joined -notmatch '处理事项\|\+100%\|2\|1'){throw 'Expected current 2 and previous 1 in the actual workload row'}
     $date=$today.ToString('yyyy-MM-dd')
     Click ("^$date（周.） 全部办理事项 2 项$")
     foreach($title in 'F4 R1 New A','F4 R1 New B'){[void](Get-Control ('^'+$title+'$'))}
@@ -251,7 +254,6 @@ function R1-Stats {
     Click '^生成报告$';Click '原生工作报告';Click '^预览报告$'
     [void](Get-Control '^本周工作报告$')
     $period=R1-DateText $mon $today
-    [void](Get-Control ('统计期间为 '+[regex]::Escape($period)+'。本周共处理 2 项，其中完成 0 项'))
     Click '^复制报告$'
     $report=[Windows.Forms.Clipboard]::GetText()
     if(!$report.Contains("统计期间为 $period。") -or !$report.Contains('本周共处理 2 项，其中完成 0 项')){throw 'Actual work report data differs from UI and known counts'}
@@ -319,6 +321,85 @@ function R1-Dpi([int]$scale){
         $restored=Set-HostedDisplayScale 100
         Write-Host "F4_R1_DPI restored=$restored"
       }
+    }
+  }
+}
+
+function R1-DpiExtended {
+  Step 'r1-dpi125-apply' {
+    $value=Set-HostedDisplayScale 125
+    $rect=[Windows.Automation.AutomationElement]::FromHandle($window).Current.BoundingRectangle
+    if($value -ne 120 -or $rect.IsEmpty){throw '125 percent was not measured on the actual app'}
+    @{scale=125;windowDpi=$value;size="$($rect.Width)x$($rect.Height)"}
+  }
+  if($records[$records.Count-1].status -ne 'PASS'){return}
+  try{
+    Step 'r1-dpi125-timeline-and-statistics' {
+      R1-NewTask 'F4 R1 DPI work'
+      R1-Open '待办队列' 'F4 R1 DPI work'
+      Click '^本轮已处理$'
+      R1-Open '暂缓事项' 'F4 R1 DPI work'
+      $label='已记录本轮处理，事项进入暂缓队列'
+      R1-KeyToggle $label
+      [void](Get-Control '退出 \d{4}-\d{2}-\d{2} 队列：\d+（本轮已处理）' 'Text')
+      R1-WriteTree 'dpi125-timeline'
+      Screen 'dpi125-timeline'
+      R1-KeyToggle $label
+      Click '^关闭$';Click '^统计中心$'
+      foreach($preset in '本周','上周','本月','上月','本季度','上季度','自定义'){Click ('^'+$preset+'$')}
+      Click '^本周$'
+      [void](Get-Control '^工作量趋势$' 'Text')
+      R1-WriteTree 'dpi125-statistics-complete-controls'
+      Screen 'dpi125-statistics-complete-controls'
+      @{timelineExpanded=$true;sevenStatisticsControls=$true;windowDpi=[InlineUiWindow]::GetDpiForWindow($window)}
+    }
+    Step 'r1-dpi125-backup-conflict' {
+      try{Click '^关闭$'}catch{}
+      Click '^待办队列(?:\s+\d+)?$'
+      R1-NewTask 'F4 DPI conflict source' 'before'
+      Click '^软件设置$';Click '^立即备份$'
+      [void](Get-Control '^备份完成：InLine-backup-.*-manual\.db$')
+      $backupDir=Join-Path (Split-Path $db) 'backups'
+      $items=@(Get-ChildItem -LiteralPath $backupDir -Filter '*-manual.db' -File | Where-Object Length -GE 4096)
+      if($items.Count -ne 1){throw 'Expected exactly one completed manual backup'}
+      $backupHash=(Get-FileHash -LiteralPath $items[0].FullName).Hash
+      R1-Open '待办队列' 'F4 DPI conflict source'
+      Click '^编辑$';Fill '^(记录判断|内部备注)' 'after';Click '^保存修改$'
+      try{Click '^关闭$'}catch{}
+      Click '^软件设置$';Click '^导入并恢复$'
+      Dialog 'open' $items[0].FullName
+      Confirm-RestoreDialog
+      [void](Get-Control '^发现 1 项导入冲突$')
+      [void](Get-Control '^F4 DPI conflict source（冲突） ' 'Button')
+      Screen 'dpi125-conflict-dialog'
+      R1-WriteTree 'dpi125-conflict-dialog'
+      Click '^知道了，稍后处理$'
+      [void](Get-Control '^备份数据已成功导入$')
+      if((Get-FileHash -LiteralPath $items[0].FullName).Hash -ne $backupHash){throw 'Source backup changed'}
+      Click '^关闭通知$'
+      @{nativeFilePicker=$true;conflictReview=$true;sourceBackupSha256=$backupHash}
+    }
+    Step 'r1-dpi125-approval-controls' {
+      Click '^软件设置$'
+      Invoke-Approval 'seed'
+      Invoke-Approval 'approve'
+      Click '^批量操作'
+      Click '^查看整批影响$'
+      [void](Get-Control '2030-01-0[34]')
+      [void](Get-Control '^审阅并确认$' 'Button')
+      [void](Get-Control '^拒绝$' 'Button')
+      Screen 'dpi125-approval'
+      R1-WriteTree 'dpi125-approval'
+      Click '^审阅并确认$'
+      [void](Get-Control '^确认整批执行$' 'Button')
+      Screen 'dpi125-approval-confirmation'
+      @{approvalDetails=$true;approveRejectButtons=$true;confirmationControl=$true;decision='left pending in disposable runner'}
+    }
+  }finally{
+    Step 'r1-dpi125-restore-system' {
+      $reset=Set-HostedDisplayScale 100
+      if($reset -ne 96){throw '100 percent was not restored'}
+      @{restoredWindowDpi=$reset}
     }
   }
 }

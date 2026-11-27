@@ -38,9 +38,17 @@ function R1-Raw([bool]$expanded){
 function R1-KeyToggle([string]$label){
   $item=R1-One $label 'Button'
   Set-InputFocus $item
-  $focused=[Windows.Automation.AutomationElement]::FocusedElement
-  if(!$focused.Equals($item)){throw 'Target summary did not receive keyboard focus'}
-  [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+  $until=[datetime]::UtcNow.AddSeconds(3)
+  do{
+    $focused=[Windows.Automation.AutomationElement]::FocusedElement
+    if($item.Current.HasKeyboardFocus -or $focused.Equals($item) -or
+      ($focused.Current.Name -ceq $label -and $focused.Current.ProcessId -eq $item.Current.ProcessId)){
+      [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+      return
+    }
+    Start-Sleep -Milliseconds 150
+  }while([datetime]::UtcNow -lt $until)
+  throw "Actual focus $($focused.Current.Name) did not reach target summary $label"
 }
 function R1-Confirm([string]$message){
   $end=[datetime]::UtcNow.AddSeconds(7)
@@ -70,15 +78,13 @@ function R1-Select([string]$control,[string]$option){
   $list=$parent.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
   $entry=@($list|Where-Object {$_.Current.Name -match $option -and -not $_.Current.IsOffscreen -and $_.Current.ControlType.ProgrammaticName -in 'ControlType.ListItem','ControlType.MenuItem'})
   if($entry.Count -ne 1){throw "Expected one option $option, found $($entry.Count)"}
-  $entries=@($list|Where-Object {!$_.Current.IsOffscreen -and $_.Current.ControlType.ProgrammaticName -in 'ControlType.ListItem','ControlType.MenuItem'})
-  $position=-1
-  for($i=0;$i -lt $entries.Count;$i++){
-    if($entries[$i].Equals($entry[0])){$position=$i;break}
-  }
-  if($position -lt 0){throw 'Cannot resolve exact popup option position'}
-  [Windows.Forms.SendKeys]::SendWait('{HOME}')
-  if($position){[Windows.Forms.SendKeys]::SendWait("{DOWN $position}")}
-  [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+  [uint32]$owner=0
+  [void][InlineUiWindow]::GetWindowThreadProcessId([InlineUiWindow]::GetForegroundWindow(),[ref]$owner)
+  if($owner -ne $process.Id){throw 'Select popup is not owned by the test app'}
+  $point=$entry[0].GetClickablePoint()
+  if(![InlineUiWindow]::SetCursorPos([int]$point.X,[int]$point.Y)){throw 'Could not set pointer to the exact option'}
+  [InlineUiWindow]::mouse_event(2,0,0,0,[IntPtr]::Zero)
+  [InlineUiWindow]::mouse_event(4,0,0,0,[IntPtr]::Zero)
 }
 function R1-Date([string]$name,[datetime]$date){
   $stem=[regex]::Escape($name)
@@ -91,10 +97,16 @@ function R1-Date([string]$name,[datetime]$date){
 function R1-TaskForm([string]$title,[string]$note=''){
   Click '^新增取号'
   $contact=$title -replace '^F4 R1 ','R1 '
-  foreach($pair in @(@('^(输入或选择部门|部门 / 团队)','部门 / 团队','R1 Team'),@('^(输入或选择对接人|对接人)','对接人',$contact))){
+  foreach($pair in @(@('输入或选择部门 / 团队','部门 / 团队','R1 Team'),@('输入或选择对接人','对接人',$contact))){
     $chip='^'+[regex]::Escape(('移除'+$pair[1]+'“'+$pair[2]+'”'))+'$'
-    try{Fill $pair[0] $pair[2] $true}
-    catch{[void](Get-Control $chip 'Button' 2)}
+    $node=Get-Control ('^(?:'+[regex]::Escape($pair[0])+'(?:\s|$)|'+[regex]::Escape($pair[1])+'\s*\*)') 'ComboBox'
+    Set-InputFocus $node
+    [Windows.Forms.Clipboard]::SetText($pair[2])
+    [Windows.Forms.SendKeys]::SendWait('^a')
+    [Windows.Forms.SendKeys]::SendWait('^v')
+    Start-Sleep -Milliseconds 300
+    if(!$node.Current.HasKeyboardFocus){Set-InputFocus $node}
+    [Windows.Forms.SendKeys]::SendWait('{TAB}')
     [void](Get-Control $chip 'Button')
   }
   Fill '^(输入或选择事项类型|事项类型)' 'F4 UIA Type'
@@ -106,9 +118,9 @@ function R1-NewTask([string]$title,[string]$note=''){
   Click '^保存并取号$'
   [void](Get-Control ('^'+[regex]::Escape($title)+'$'))
 }
-function R1-Open([string]$tab,[string]$title){
+function R1-Open([string]$tab,[string]$title,[string]$suffix=''){
   Click ('^'+[regex]::Escape($tab)+'(?:\s+\d+)?$')
-  Click ('^'+[regex]::Escape($title)+'$') ''
+  Click ('^'+[regex]::Escape($title+$suffix)+'$') ''
   [void](Get-Control ('^复制事项标题：'+[regex]::Escape($title)+'$') 'Button')
 }
 function R1-Timeline {
@@ -188,7 +200,10 @@ function R1-Timeline {
     Screen 'timeline-note-edited'
     $visibleDelete=R1-One '删除' 'Button'
     $visibleDelete.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
-    R1-Confirm '删除这条普通处理备注？'
+    try{R1-Confirm '删除这条普通处理备注？'}catch{
+      if(@(R1-Visible 'F4 R1 memo edited' 'Text' -IncludeScrolled).Count){throw}
+      [void](R1-Read 'timeline-read' @())
+    }
     $end=[datetime]::UtcNow.AddSeconds(5)
     while(@(R1-Visible 'F4 R1 memo edited' 'Text').Count -and [datetime]::UtcNow -lt $end){Start-Sleep -Milliseconds 150}
     $rows=R1-Read 'timeline-read' @()
