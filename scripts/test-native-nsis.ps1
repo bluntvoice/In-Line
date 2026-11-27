@@ -360,7 +360,7 @@ try {
         Test-DatabaseUpgrade $oldVersion
     } elseif($Scenario -eq 'native-ui') {
         $null=Install-Candidate 'interactive-fresh'
-        & (Join-Path $PSScriptRoot 'f4-native-ui.ps1') -Exe (Join-Path $install 'in-line.exe') -Output $out
+        & (Get-Process -Id $PID).Path -NoProfile -STA -File (Join-Path $PSScriptRoot 'f4-native-uia.ps1') -Exe (Join-Path $install 'in-line.exe') -Output $out
         Check ($LASTEXITCODE -eq 0) 'Native GUI acceptance driver finished' $true
         $null=Uninstall-Candidate 'interactive-uninstall'
     } elseif($Scenario -eq 'lifecycle') {
