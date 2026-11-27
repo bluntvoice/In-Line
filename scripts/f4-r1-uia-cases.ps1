@@ -234,28 +234,20 @@ function R1-Stats {
     Click '^收起明细$'
     @{current=2;previous=1;detail=2;date=$date}
   }
-  Step 'r1-statistics-custom-and-state' {
-    Click '^统计中心$';Click '^自定义$'
-    $start=$today.AddDays(-2)
-    R1-Date '开始日期' $start
-    R1-Date '结束日期' $today
-    $null=R1-Range '自定义' $start $today $start.AddDays(-3) $start.AddDays(-1) '前一等长周期'
-    R1-Open '暂缓事项' 'F4 R1 New A'
-    Click '^关闭$';Click '^统计中心$'
-    $range=R1-Range '自定义' $start $today $start.AddDays(-3) $start.AddDays(-1) '前一等长周期'
-    R1-WriteTree 'statistics-custom-restored'
-    Click '^本周$'
-    $range
-  }
   Step 'r1-statistics-report-and-png-content' {
-    try{Click '^关闭$'}catch{}
+
     Click '^统计中心$';Click '^本周$'
     $null=R1-Range '本周' $mon $today $mon.AddDays(-7) $today.AddDays(-7) '上周同期'
     Click '^生成报告$';Click '原生工作报告';Click '^预览报告$'
     [void](Get-Control '^本周工作报告$')
     $period=R1-DateText $mon $today
     Click '^复制报告$'
-    $report=[Windows.Forms.Clipboard]::GetText()
+    $deadline=[datetime]::UtcNow.AddSeconds(5)
+    do{
+      $report=[Windows.Forms.Clipboard]::GetText()
+      if($report.Contains("统计期间为 $period。")){break}
+      Start-Sleep -Milliseconds 150
+    }while([datetime]::UtcNow -lt $deadline)
     if(!$report.Contains("统计期间为 $period。") -or !$report.Contains('本周共处理 2 项，其中完成 0 项')){throw 'Actual work report data differs from UI and known counts'}
     $report|Set-Content -LiteralPath "$Output/statistics-report.txt" -Encoding utf8
     Screen 'statistics-report'
@@ -273,6 +265,25 @@ function R1-Stats {
     }finally{$image.Dispose()}
     Copy-Item -LiteralPath $png -Destination "$Output/r1-statistics-content.png"
     $metadata
+  }
+}
+function R1-StatsState {
+  Step 'r1-statistics-custom-and-state' {
+    Click '^待办队列(?:\s+\d+)?$'
+    R1-NewTask 'F4 R1 state detail'
+    $today=[datetime]::Today
+    Click '^统计中心$';Click '^自定义$'
+    $start=$today.AddDays(-2)
+    R1-Date '开始日期' $start
+    R1-Date '结束日期' $today
+    $range=R1-Range '自定义' $start $today $start.AddDays(-3) $start.AddDays(-1) '前一等长周期'
+    R1-WriteTree 'statistics-custom-before'
+    R1-Open '待办队列' 'F4 R1 state detail'
+    Click '^关闭$';Click '^统计中心$'
+    [void](R1-Range '自定义' $start $today $start.AddDays(-3) $start.AddDays(-1) '前一等长周期')
+    R1-WriteTree 'statistics-custom-restored'
+    Screen 'statistics-custom-restored'
+    $range
   }
 }
 function R1-Dpi([int]$scale){
@@ -362,12 +373,14 @@ function R1-DpiExtended {
       $backupDir=Join-Path (Split-Path $db) 'backups'
       $items=@(Get-ChildItem -LiteralPath $backupDir -Filter '*-manual.db' -File | Where-Object Length -GE 4096)
       if($items.Count -ne 1){throw 'Expected exactly one completed manual backup'}
-      $backupHash=(Get-FileHash -LiteralPath $items[0].FullName).Hash
+      $source=Join-Path $lab 'dpi125-source.db'
+      Copy-Item -LiteralPath $items[0].FullName -Destination $source
+      $backupHash=(Get-FileHash -LiteralPath $source).Hash
       R1-Open '待办队列' 'F4 DPI conflict source'
       Click '^编辑$';Fill '^(记录判断|内部备注)' 'after';Click '^保存修改$'
       try{Click '^关闭$'}catch{}
       Click '^软件设置$';Click '^导入并恢复$'
-      Dialog 'open' $items[0].FullName
+      Dialog 'open' $source
       Confirm-RestoreDialog
       [void](Get-Control '^发现 1 项导入冲突$')
       [void](Get-Control '^F4 DPI conflict source（冲突） ' 'Button')
@@ -375,7 +388,7 @@ function R1-DpiExtended {
       R1-WriteTree 'dpi125-conflict-dialog'
       Click '^知道了，稍后处理$'
       [void](Get-Control '^备份数据已成功导入$')
-      if((Get-FileHash -LiteralPath $items[0].FullName).Hash -ne $backupHash){throw 'Source backup changed'}
+      if((Get-FileHash -LiteralPath $source).Hash -ne $backupHash){throw 'Source backup changed'}
       Click '^关闭通知$'
       @{nativeFilePicker=$true;conflictReview=$true;sourceBackupSha256=$backupHash}
     }
@@ -383,7 +396,10 @@ function R1-DpiExtended {
       Click '^软件设置$'
       Invoke-Approval 'seed'
       Invoke-Approval 'approve'
-      Click '^批量操作'
+      $section=Get-Control '^批量操作' 'Button'
+      $expand=$null
+      if(!$section.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$expand) -or
+         $expand.Current.ExpandCollapseState -ne [Windows.Automation.ExpandCollapseState]::Expanded){Click '^批量操作'}
       Click '^查看整批影响$'
       [void](Get-Control '2030-01-0[34]')
       [void](Get-Control '^审阅并确认$' 'Button')

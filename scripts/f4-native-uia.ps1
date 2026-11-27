@@ -328,6 +328,7 @@ try {
     switch($env:F4_R1_MODE){
       'timeline' {R1-Timeline}
       'statistics' {R1-Stats}
+      'statistics-state' {R1-StatsState}
       'business' {R1-Business}
       'dpi125' {R1-Dpi 125}
       'dpi200' {R1-Dpi 200}
