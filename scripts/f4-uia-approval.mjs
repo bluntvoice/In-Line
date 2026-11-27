@@ -39,6 +39,7 @@ try {
   };
   const common={reason:"Synthetic F4 native approval",intent:{summary:"Synthetic F4 native approval",explicitUserRequest:true,confirmedRealWork:true}};
   const tasks=async()=>sql("select t.id,t.title,t.planned_date,v.version from tasks t join mcp_task_versions v on v.task_id=t.id where t.title like 'F4 approval %' order by t.id");
+  const signal=async()=>sql("select commit_sequence from mcp_data_basis where singleton=1");
   const caps=await call("get_capabilities");
   assert.equal(caps.schemaVersion,15);assert.equal(caps.mcpVersion,1);assert.equal(caps.tools.length,16);assert.equal(caps.permissions.fullRead,false);
   assert.equal(caps.commit,"e276844fc08b3a308c14938f0c6cc232926bfa3c");
@@ -57,13 +58,17 @@ try {
     const result=await call("batch_mutate",request);
     assert.equal(result.commitStatus,"needs_user_approval");
     assert.deepEqual(await tasks(),before);
-    await writeFile(join(root,mode+".json"),JSON.stringify({request,before,plannedDate}));
+    const pendingBasis=(await signal())[0][0];
+    await writeFile(join(root,mode+".json"),JSON.stringify({request,before,plannedDate,pendingBasis}));
   }else if(mode==="check-approve" || mode==="check-reject"){
     const action=mode.slice(6);
-    const {request,before,plannedDate}=JSON.parse(await readFile(join(root,action+".json"),"utf8"));
+    const {request,before,plannedDate,pendingBasis}=JSON.parse(await readFile(join(root,action+".json"),"utf8"));
+    const statuses=await sql("select status from mcp_batch_approvals where request_key=?",[request.idempotencyKey]);
+    const currentBasis=(await signal())[0][0];
+    const events=await sql("select source,operation,count(*) from mcp_change_events where sequence>? group by source,operation order by source,operation",[pendingBasis]);
+    console.log("F4_NATIVE_APPROVAL readback "+JSON.stringify({action,statuses,pendingBasis,currentBasis,events}));
     if(action==="approve"){assert.ok((await tasks()).every(row=>row[2]===plannedDate));}
     else assert.deepEqual(await tasks(),before);
-    const statuses=await sql("select status from mcp_batch_approvals where request_key=?",[request.idempotencyKey]);
     assert.equal(statuses.length,1);assert.notEqual(statuses[0][0],"pending");
     const replay=await call("batch_mutate",request);
     assert.equal(replay.replayed,true);

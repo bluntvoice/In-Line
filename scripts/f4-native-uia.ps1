@@ -182,6 +182,8 @@ function Dialog([string]$mode,[string]$path){
 function Confirm-RestoreDialog {
   $due=[DateTime]::UtcNow.AddSeconds(7)
   while([DateTime]::UtcNow -lt $due){
+    $saved=@(Children)|Where-Object {$_.Current.Name -eq '备份数据已成功导入'}|Select-Object -First 1
+    if($saved){return}
     $front=[InlineUiWindow]::GetForegroundWindow()
     [uint32]$owner=0
     [void][InlineUiWindow]::GetWindowThreadProcessId($front,[ref]$owner)
@@ -280,11 +282,14 @@ try {
   try{Screen 'first-visible-window'}catch{"First native screenshot unavailable: $($_.Exception.Message)"}
   if($env:F4_APPROVAL_ONLY -eq '1'){
     Step 'real-batch-approve-reject-and-replay' {
+      Click '^软件设置$'
       Invoke-Approval 'seed'
       foreach($mode in 'approve','reject'){
         Invoke-Approval $mode
-        Click '^待办队列(?:\s+\d+)?$';Click '^软件设置$'
-        Click '^批量操作'
+        $section=Get-Control '^批量操作' 'Button'
+        $expand=$null
+        if(!$section.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$expand) -or
+           $expand.Current.ExpandCollapseState -ne [Windows.Automation.ExpandCollapseState]::Expanded){Click '^批量操作'}
         Click '^查看整批影响$'
         [void](Get-Control '2030-01-0[34]')
         if($mode -eq 'approve'){
@@ -347,7 +352,7 @@ try {
       Verify-Db 'restore'
       if((Get-FileHash -LiteralPath $source).Hash -ne $sourceHash){throw 'Source bytes changed'}
       Screen ("restore-"+($i+1))
-      if($i -eq 2){Click '^查看待办$'}
+      if($i -eq 2){Click '^查看待办$'}else{Click '^关闭通知$'}
     }
     [void](Get-Control '^F4 source（冲突 2）$')
     @{sourceSha256=$sourceHash;rounds=$expected}
