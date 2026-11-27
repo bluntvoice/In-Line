@@ -47,7 +47,17 @@ if(!$dlg){throw "Native $Mode picker was not visible in foreground"}
 $all=$dlg.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
 $field=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and $_.Current.AutomationId -in @('1001','1148') }|Select-Object -First 1
 $ok=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.AutomationId -eq '1'}|Select-Object -First 1
-if(!$field -or !$ok){throw "Native $Mode picker expected filename and confirmation controls are unavailable"}
-$field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Path)
-$ok.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+if($field -and $ok){
+  $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Path)
+  $ok.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+} else {
+  [Windows.Forms.SendKeys]::SendWait('%n')
+  Start-Sleep -Milliseconds 200
+  $target=[Windows.Automation.AutomationElement]::FocusedElement
+  [uint32]$focusedOwner=0
+  [void][F4Win]::GetWindowThreadProcessId([F4Win]::GetForegroundWindow(),[ref]$focusedOwner)
+  if($focusedOwner -ne $ProductPid -or $target.Current.ControlType -notin @([Windows.Automation.ControlType]::Edit,[Windows.Automation.ControlType]::ComboBox)){throw "Native $Mode picker did not focus an owned filename control"}
+  [Windows.Forms.Clipboard]::SetText($Path)
+  [Windows.Forms.SendKeys]::SendWait('^a^v{ENTER}')
+}
 @{mode=$Mode;owner=$owner;class='#32770'}|ConvertTo-Json -Compress

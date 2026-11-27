@@ -13,6 +13,8 @@ public static class InlineUiWindow {
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hwnd);
  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hwnd);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hwnd,IntPtr after,int x,int y,int w,int h,uint flags);
+ [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+ [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint x,uint y,uint data,IntPtr extra);
  delegate bool Enumerate(IntPtr hwnd, IntPtr param);
  [DllImport("user32.dll")] static extern bool EnumWindows(Enumerate callback, IntPtr param);
  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetWindowText(IntPtr hwnd, StringBuilder name, int size);
@@ -57,7 +59,8 @@ function Get-Control([string]$pattern,[string]$type='',[int]$timeout=8) {
     foreach($node in (Children)){
       try {
         $summary=$node.Current
-        if($summary.Name -match $pattern -and (!$type -or $summary.ControlType.ProgrammaticName -eq "ControlType.$type") -and $summary.IsEnabled){return $node}
+        $kind=$summary.ControlType.ProgrammaticName -replace '^ControlType\.',''
+        if($summary.Name -match $pattern -and (!$type -or $kind -match "^($type)$") -and $summary.IsEnabled){return $node}
       } catch [Windows.Automation.ElementNotAvailableException] {}
     }
     Start-Sleep -Milliseconds 160
@@ -70,6 +73,17 @@ function Click([string]$pattern,[string]$type='Button'){
   if($node.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$inv)){$inv.Invoke();return}
   $toggle=$null
   if($node.TryGetCurrentPattern([Windows.Automation.TogglePattern]::Pattern,[ref]$toggle)){$toggle.Toggle();return}
+  if(!$type){
+    [void][InlineUiWindow]::SetForegroundWindow($window)
+    [uint32]$owner=0
+    [void][InlineUiWindow]::GetWindowThreadProcessId([InlineUiWindow]::GetForegroundWindow(),[ref]$owner)
+    $rect=$node.Current.BoundingRectangle
+    if($owner -ne $process.Id -or $node.Current.IsOffscreen -or $rect.IsEmpty){throw 'Native row is not a visible product control'}
+    if(![InlineUiWindow]::SetCursorPos([int]($rect.X+$rect.Width/2),[int]($rect.Y+$rect.Height/2))){throw 'Native row pointer unavailable'}
+    [InlineUiWindow]::mouse_event(2,0,0,0,[IntPtr]::Zero)
+    [InlineUiWindow]::mouse_event(4,0,0,0,[IntPtr]::Zero)
+    return
+  }
   Set-InputFocus $node
   [Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }
@@ -81,7 +95,7 @@ function Set-InputFocus($node) {
   $node.SetFocus()
 }
 function Fill([string]$pattern,[string]$value,[bool]$commit=$false){
-  $node=Get-Control $pattern 'Edit'
+  $node=Get-Control $pattern 'Edit|ComboBox'
   Set-InputFocus $node
   [Windows.Forms.Clipboard]::SetText($value)
   [Windows.Forms.SendKeys]::SendWait('^a^v')
@@ -147,9 +161,9 @@ try {
   try{Screen 'first-visible-window'}catch{"First native screenshot unavailable: $($_.Exception.Message)"}
   Step 'about-and-native-window' {
     Click '^关于$'
-    [void](Get-Control '\b0\.5\.0\b')
+    [void](Get-Control '^v?0\.5\.0$' 'Text')
     Screen 'about'
-    Click '^待办队列$'
+    Click '^待办队列(?:\s+\d+)?$'
     @{dpi=$dpi;actualHwnd=$true;about='0.5.0'}
   }
   Step 'three-real-restore-rounds' {
@@ -168,7 +182,7 @@ try {
     $sourceHash=(Get-FileHash -LiteralPath $source).Hash
     (Get-Item -LiteralPath $source).LastWriteTimeUtc=[DateTime]::new(2024,1,1)
     for($i=1;$i -le 13;$i++){Copy-Item -LiteralPath $source -Destination (Join-Path $backupDir ('InLine-backup-20261001-0101{0:00}-manual.db' -f $i))}
-    Click '^待办队列$';Click '^F4 source$' ''
+    Click '^待办队列(?:\s+\d+)?$';Click '^F4 source$' ''
     Click '^编辑$';Fill '^(记录判断|内部备注)' 'local edited note';Click '^保存修改$'
     try{Click '^关闭$'}catch{}
     New-Task 'F4 source（冲突）'
@@ -190,7 +204,7 @@ try {
     @{sourceSha256=$sourceHash;rounds=$expected}
   }
   Step 'timeline-keyboard-and-real-stats' {
-    Click '^待办队列$'
+    Click '^待办队列(?:\s+\d+)?$'
     New-Task 'F4 processed'
     Click '^F4 processed$' ''
     Click '^本轮已处理$'
