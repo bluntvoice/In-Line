@@ -284,7 +284,27 @@ function R1-StatsState {
     R1-Date '结束日期' $today
     $range=R1-Range '自定义' $start $today $start.AddDays(-3) $start.AddDays(-1) '前一等长周期'
     R1-WriteTree 'statistics-custom-before'
-    R1-Open '待办队列' 'F4 R1 state detail'
+    Screen 'statistics-custom-before'
+    $focus=[Windows.Automation.AutomationElement]::FocusedElement
+    Write-Host "F4_R1_STATE focusBefore=$($focus.Current.Name)"
+    [Windows.Forms.SendKeys]::SendWait('{TAB}')
+    $focus=[Windows.Automation.AutomationElement]::FocusedElement
+    Write-Host "F4_R1_STATE focusAfter=$($focus.Current.Name)"
+    $queue=Get-Control '^待办队列(?:\s+\d+)?$' 'Button'
+    $bounds=$queue.Current.BoundingRectangle
+    if($bounds.IsEmpty -or $queue.Current.IsOffscreen){throw 'Queue button has no actual visible bounds'}
+    [uint32]$owner=0
+    [void][InlineUiWindow]::GetWindowThreadProcessId([InlineUiWindow]::GetForegroundWindow(),[ref]$owner)
+    if($owner -ne $process.Id){throw 'Actual foreground lost before clicking queue'}
+    if(![InlineUiWindow]::SetCursorPos([int]($bounds.X+$bounds.Width/2),[int]($bounds.Y+$bounds.Height/2))){throw 'Could not point to the actual queue button'}
+    [InlineUiWindow]::mouse_event(2,0,0,0,[IntPtr]::Zero)
+    [InlineUiWindow]::mouse_event(4,0,0,0,[IntPtr]::Zero)
+    [void](Get-Control '^待办队列$' 'Text')
+    R1-WriteTree 'statistics-custom-queue'
+    Screen 'statistics-custom-queue'
+    Click '^F4 R1 state detail$' ''
+    [void](Get-Control '^复制事项标题：F4 R1 state detail$' 'Button')
+    Screen 'statistics-custom-detail'
     Click '^关闭$';Click '^统计中心$'
     [void](R1-Range '自定义' $start $today $start.AddDays(-3) $start.AddDays(-1) '前一等长周期')
     R1-WriteTree 'statistics-custom-restored'
