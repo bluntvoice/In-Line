@@ -99,7 +99,7 @@ impl Wire {
         );
         record(
             &format!("{identity}/protocol_versions"),
-            json!({"software":"0.5.0","mcp":1,"schema":14}),
+            json!({"software":"0.5.0","mcp":1,"schema":15}),
             json!({"software":caps["softwareVersion"],"mcp":caps["mcpVersion"],"schema":caps["schemaVersion"]}),
         );
         wire

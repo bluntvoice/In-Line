@@ -371,6 +371,35 @@ async fn gui_cli_and_actual_mcp_stdio_share_task_queue_number_event_and_status_r
             "CLI versus GUI domain after {key}"
         );
     }
+    let partition = |db: &Database| {
+        let mut logs = db.get_logs(1).unwrap();
+        logs.sort_by_key(|log| log.id);
+        let mut scopes = std::collections::HashMap::new();
+        logs.into_iter()
+            .map(|log| {
+                let id = log
+                    .operation_id
+                    .expect("automatic business log has an operation identity");
+                assert!(id.starts_with("timeline:v2:"));
+                let next = scopes.len();
+                (log.log_type, *scopes.entry(id).or_insert(next))
+            })
+            .collect::<Vec<_>>()
+    };
+    let gui_partition = partition(&gui_db);
+    assert_eq!(partition(&cli_db), gui_partition);
+    assert_eq!(partition(&mcp_db), gui_partition);
+    let work_scopes = gui_partition
+        .iter()
+        .filter(|(kind, _)| kind == "work")
+        .map(|(_, scope)| *scope)
+        .collect::<std::collections::HashSet<_>>();
+    assert_eq!(work_scopes.len(), 2);
+    for scope in work_scopes {
+        assert!(gui_partition
+            .iter()
+            .any(|(kind, other)| kind == "queue" && *other == scope));
+    }
     // A normal MCP identity cannot use the private CLI routes even over IPC.
     for tool in [
         "cli_get_receipt",

@@ -38,6 +38,73 @@ struct Cursor {
 pub struct Changes {
     root: PathBuf,
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use crate::mcp::{scope::Scope, security::Permissions};
+
+    #[test]
+    fn pre_v15_cursor_requires_full_resync_without_mutating_business_data() {
+        let root = std::env::temp_dir().join(format!(
+            "inline-f2-cursor-{}",
+            Utc::now().timestamp_nanos_opt().unwrap()
+        ));
+        let data = root.join("data");
+        let metadata = root.join("metadata");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::create_dir_all(&metadata).unwrap();
+        let db = Database::open_at(data.join("inline.db")).unwrap();
+        let auth = Authorization {
+            revision: 1,
+            permissions: Permissions {
+                regular_read: true,
+                ..Permissions::default()
+            },
+            scope: Scope::default(),
+        };
+        let mut changes = Changes::new(metadata.clone());
+        let mut queries = QueryState::new(metadata.join("query"));
+        let execute_args = |cursor: Option<&str>| {
+            serde_json::from_value::<ChangesArgs>(json!({"projection":["id"],"cursor":cursor}))
+                .unwrap()
+        };
+        let first = changes
+            .execute(&mut queries, &db, "fixture", &auth, execute_args(None))
+            .unwrap();
+        let token = first["nextCursor"].as_str().unwrap();
+        let path = metadata.join("changes");
+        let mut old: Cursor = durable::read(&path, token, 2 * 1024 * 1024).unwrap();
+        old.basis.schema_version = 14;
+        durable::write(&path, token, &old, 2 * 1024 * 1024, 16 * 1024 * 1024, 256).unwrap();
+        assert_eq!(
+            changes.health(&db, "fixture", &auth, token).unwrap()["valid"],
+            false
+        );
+        let before = db.mcp_basis().unwrap();
+        assert_eq!(
+            changes
+                .execute(
+                    &mut queries,
+                    &db,
+                    "fixture",
+                    &auth,
+                    execute_args(Some(token))
+                )
+                .unwrap_err()
+                .code,
+            "resync_required"
+        );
+        assert_eq!(db.mcp_basis().unwrap(), before);
+        let refreshed = changes
+            .execute(&mut queries, &db, "fixture", &auth, execute_args(None))
+            .unwrap();
+        assert_eq!(refreshed["phase"], "fullSync");
+        assert_eq!(refreshed["meta"]["dataVersion"]["schemaVersion"], 15);
+        drop(db);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
 impl Changes {
     pub(crate) fn health(
         &self,
@@ -53,7 +120,7 @@ impl Changes {
         }
         let live = db.mcp_basis()?;
         Ok(
-            json!({"valid":db.mcp_quality_health()?["healthy"]==true && db.mcp_change_index()?.get("historyFloor").and_then(Value::as_i64).is_some_and(|floor|c.after>=floor) && c.revision==auth.revision && c.expires>=Utc::now().timestamp() && live.database_uuid==c.basis.database_uuid && live.data_generation==c.basis.data_generation && live.index_epoch.as_deref()==Some(c.epoch.as_str()),"fullSyncInProgress":c.full,"expiresAt":c.expires,"indexEpoch":c.epoch,"historyFloor":c.floor,"watermark":c.after,"businessBodyIncluded":false}),
+            json!({"valid":db.mcp_quality_health()?["healthy"]==true && db.mcp_change_index()?.get("historyFloor").and_then(Value::as_i64).is_some_and(|floor|c.after>=floor) && c.revision==auth.revision && c.expires>=Utc::now().timestamp() && live.database_uuid==c.basis.database_uuid && live.data_generation==c.basis.data_generation && live.schema_version==c.basis.schema_version && live.index_epoch.as_deref()==Some(c.epoch.as_str()),"fullSyncInProgress":c.full,"expiresAt":c.expires,"indexEpoch":c.epoch,"historyFloor":c.floor,"watermark":c.after,"businessBodyIncluded":false}),
         )
     }
     pub fn new(parent: PathBuf) -> Self {
@@ -132,6 +199,7 @@ impl Changes {
             if c.expires < now
                 || c.basis.database_uuid != live.database_uuid
                 || c.basis.data_generation != live.data_generation
+                || c.basis.schema_version != live.schema_version
                 || c.epoch != index["epoch"].as_str().unwrap_or("")
                 || c.after < index["historyFloor"].as_i64().unwrap_or(i64::MAX)
             {
@@ -226,6 +294,7 @@ impl Changes {
             let watermark = basis.commit_sequence as i64;
             if basis.database_uuid != cursor.basis.database_uuid
                 || basis.data_generation != cursor.basis.data_generation
+                || basis.schema_version != cursor.basis.schema_version
             {
                 return Err(McpError::new("resync_required"));
             }

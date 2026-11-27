@@ -111,7 +111,32 @@ if (${periods}) {
   }};
   for(const key of ["getStatistics","getStatisticsDetails","getStatisticsTrendDetails","saveChartExport"]) specific[key]=realApi[key];
 }
-if (${periods || mode === "trend"}) specific.getVersion=async()=>"0.5.0";
+if (${periods || mode === "trend" || mode === "timeline"}) specific.getVersion=async()=>"0.5.0";
+if (${mode === "timeline"}) {
+  const time="2026-09-30T08:00:00+08:00";
+  const logs=[
+    [9,"work","本轮已处理，移入暂缓事项","timeline:v2:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:1"],
+    [8,"note","保留 pending 原文"],
+    [7,"work","本轮已处理，移入暂缓事项","timeline:v2:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:1"],
+    [6,"queue","退出 2026-09-30 队列：10（本轮已处理）","timeline:v2:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:1"],
+    [5,"audit","作废一条结构化处理活动"],
+    [4,"queue","退出 2026-09-30 队列：09","timeline:v2:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:1"],
+    [3,"relation","旧关联记录","timeline:v1:cccccccccccccccccccccccccccccccc:91"],
+    [2,"queue","旧队列记录","timeline:v1:cccccccccccccccccccccccccccccccc:91"],
+    [1,"status","状态变更为：processed"]
+  ].map(([id,logType,content,operationId])=>({id,taskId:1,logType,content,createdAt:time,operationId}));
+  window.__inlineTimelineRules={};
+  window.__inlineTimelineHeld={};
+  specific.getLogs=async id=>{
+    window.__inlineCalls.push(["getLogs",id]);
+    const rule=window.__inlineTimelineRules[id];
+    if(rule==="fail")throw new Error("合成读取失败");
+    if(rule==="hold")await new Promise(resolve=>window.__inlineTimelineHeld[id]=resolve);
+    return id===1?logs.map(row=>({...row})):[{id:11,taskId:id,logType:"note",content:"隔离事项记录 "+id,createdAt:time}];
+  };
+  specific.updateLog=async(id,content)=>{logs.find(row=>row.id===id).content=content;};
+  specific.deleteLog=async id=>{logs.splice(logs.findIndex(row=>row.id===id),1);};
+}
 specific.getRecommendedFontStatus=async()=>({phase:"idle",downloadedBytes:0,totalBytes:25443648,percent:0,message:null});specific.onRecommendedFontProgress=()=>()=>{};specific.getUIScale=async()=>"100";
 if (${JSON.stringify(mode)} === "history") {
   specific.getLogs=async id=>[{id:100+id,taskId:id,logType:"status",content:"保留的历史记录",createdAt:"2026-09-30T08:00:00+08:00"}];
@@ -147,7 +172,7 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const errors = [];
 try {
   const mainContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: "Asia/Shanghai" });
-  if(periods||mode==="trend"){
+  if(periods||mode==="trend"||mode==="timeline"){
     const localOrigin=new URL(server.resolvedUrls.local[0]).origin;
     await mainContext.route("**/*",route=>new URL(route.request().url()).origin===localOrigin?route.continue():route.abort());
   }
@@ -160,6 +185,56 @@ try {
   }
   await page.goto(server.resolvedUrls.local[0],{waitUntil:"domcontentloaded",timeout:45000});
   await page.locator(".task-table tbody tr").first().waitFor();
+  if (mode==="timeline") {
+    const open=id=>page.locator(".task-table tbody tr").filter({hasText:`隔离测试事项 ${id} —`}).first().click();
+    const panel=page.locator(".detail-panel");
+    const timeline=panel.locator(".timeline");
+    const rows=timeline.locator(".timeline-entry");
+    const close=()=>panel.locator("header").first().getByRole("button",{name:"关闭",exact:true}).click();
+    await open(1);
+    await rows.nth(5).waitFor();
+    assert.equal(await rows.count(),6);
+    const summaries=timeline.locator("summary");
+    assert.equal(await summaries.count(),3);
+    const first=rows.first().locator("details");
+    const originals=first.getByRole("list",{name:"原始记录"});
+    assert.equal(await originals.isVisible(),false);
+    await first.locator("summary").press("Enter");
+    assert.equal(await originals.isVisible(),true);
+    assert.deepEqual(await originals.locator("li p").allTextContents(),[
+      "本轮已处理，移入暂缓事项","退出 2026-09-30 队列：10（本轮已处理）"
+    ]);
+    assert.equal(await originals.locator("time").count(),2);
+    assert.equal(await rows.nth(1).locator("p").innerText(),"保留 pending 原文");
+    assert.equal(await rows.nth(3).locator("p").innerText(),"作废一条结构化处理活动");
+    assert.equal(await rows.last().locator("p").innerText(),"状态变更为：已处理");
+    await rows.nth(1).getByRole("button",{name:"编辑",exact:true}).click();
+    await rows.nth(1).locator("textarea").fill("修改后仍保留 pending 原文");
+    await rows.nth(1).getByRole("button",{name:"保存",exact:true}).click();
+    await rows.nth(1).getByText("修改后仍保留 pending 原文",{exact:true}).waitFor();
+    if(process.env.INLINE_UI_SCREENSHOT)await page.screenshot({path:process.env.INLINE_UI_SCREENSHOT});
+    page.once("dialog",dialog=>dialog.accept());
+    await rows.nth(1).getByRole("button",{name:"删除",exact:true}).click();
+    await page.getByText("修改后仍保留 pending 原文",{exact:true}).waitFor({state:"detached"});
+    await close();
+    await page.evaluate(()=>{window.__inlineTimelineRules[1]="hold";window.__inlineTimelineRules[4]="fail";});
+    await open(1);
+    await page.waitForFunction(()=>Boolean(window.__inlineTimelineHeld[1]));
+    await close();
+    await open(4);
+    const alert=timeline.getByRole("alert");
+    await alert.getByText(/合成读取失败/).waitFor();
+    await page.evaluate(async()=>{
+      window.__inlineTimelineHeld[1]();
+      delete window.__inlineTimelineRules[4];
+      await new Promise(resolve=>setTimeout(resolve,0));
+    });
+    assert.equal(await rows.count(),0);
+    await alert.getByRole("button",{name:"重试"}).click();
+    await rows.getByText("隔离事项记录 4",{exact:true}).waitFor();
+    assert.equal(await rows.count(),1);
+    console.log("PASS timeline: v2 and v1 groups, same-second independence, exact expanded rows, notes and audit, keyboard, stale task and retry");
+  }
   if (mode === "history") {
     await page.locator(".sidebar nav button").filter({hasText:"历史归档"}).click();
     const rows=page.locator(".task-table tbody tr");

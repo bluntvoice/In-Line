@@ -1,9 +1,10 @@
-import { useEffect,useState } from "react";
+import { useEffect,useLayoutEffect,useRef,useState } from "react";
 import { AlertTriangle,ArrowDown,ArrowUp,Check,CheckCircle2,Edit3,GitMerge,GripVertical,ListPlus,MoreHorizontal,Pencil,PlayCircle,Plus,RotateCcw,ShieldCheck,Trash2,X } from "lucide-react";
 import type { LegalTask,TaskLog,TaskView,TaskWorkEvent } from "../types";
 import { api } from "../api";
-import { displayTicket,formatDateTime,formatDeadline,isOverdue,localizeStatusText,PRIORITY_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
+import { displayTicket,formatDateTime,formatDeadline,isOverdue,PRIORITY_LABELS,WORKLOAD_LABELS } from "../lib/task-utils";
 import { moveById,reorderById } from "../lib/subtask-ui";
+import { taskTimelineEntries } from "../lib/task-timeline";
 import StatusBadge from "./StatusBadge";
 import TicketNumber from "./TicketNumber";
 import QueueDialog from "./QueueDialog";
@@ -33,13 +34,29 @@ interface Props {
 }
 
 export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey=0,onClose,onEdit,onChanged,onRelationshipChanged,onAddSubtask,onOpenTask,onQuickAction,onCompleteTask,onOpenContext,notify=()=>undefined}:Props){
-  const [logs,setLogs]=useState<TaskLog[]>([]);const [events,setEvents]=useState<TaskWorkEvent[]>([]);const [note,setNote]=useState("");
+  const [history,setHistory]=useState<{taskId:number;logs:TaskLog[];events:TaskWorkEvent[]}>();
+  const [historyError,setHistoryError]=useState("");
+  const [note,setNote]=useState("");
+  const logs=history?.taskId===task.id?history.logs:[];
+  const events=history?.taskId===task.id?history.events:[];
+  const activeTask=useRef<number|null>(null);
+  const historyRequest=useRef(0);
   const [editingLog,setEditingLog]=useState<number|null>(null);const [editingContent,setEditingContent]=useState("");
   const [queueDialog,setQueueDialog]=useState<"enqueue"|"reopen"|null>(null);const [mergeDialog,setMergeDialog]=useState(false);
   const [subtasks,setSubtasks]=useState<LegalTask[]>([]);const [parentCandidates,setParentCandidates]=useState<LegalTask[]>([]);const [parentTask,setParentTask]=useState<LegalTask|null>(null);
   const [relationParentId,setRelationParentId]=useState<number|null>(task.parentTaskId);const [relationError,setRelationError]=useState("");
   const [relationLoading,setRelationLoading]=useState(true);const [relationSaving,setRelationSaving]=useState(false);const [orderSaving,setOrderSaving]=useState(false);const [draggedTaskId,setDraggedTaskId]=useState<number|null>(null);
-  const refresh=async()=>{const [nextLogs,nextEvents]=await Promise.all([api.getLogs(task.id),api.getWorkEvents(task.id)]);setLogs(nextLogs);setEvents(nextEvents);};
+  const refresh=async()=>{
+    if(activeTask.current!==task.id)return;
+    const request=++historyRequest.current;
+    setHistoryError("");
+    try{
+      const [logs,events]=await Promise.all([api.getLogs(task.id),api.getWorkEvents(task.id)]);
+      if(request===historyRequest.current)setHistory({taskId:task.id,logs,events});
+    }catch(error){
+      if(request===historyRequest.current)setHistoryError((error instanceof Error?error.message:String(error))||"读取失败");
+    }
+  };
   const refreshRelations=async()=>{
     setRelationLoading(true);setRelationError("");
     try{
@@ -52,7 +69,15 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
     }catch(error){setRelationError(error instanceof Error?error.message:String(error));}
     finally{setRelationLoading(false);}
   };
-  useEffect(()=>{void refresh();},[task.id]);
+  useLayoutEffect(()=>{
+    activeTask.current=task.id;
+    setHistoryError("");
+    return ()=>{activeTask.current=null;historyRequest.current+=1;};
+  },[task.id]);
+  useEffect(()=>{
+    void refresh();
+    return ()=>{historyRequest.current+=1;};
+  },[task.id,task.updatedAt,task.processingRounds,relationRefreshKey]);
   useEffect(()=>{void refreshRelations();},[task.id,task.parentTaskId,view,relationRefreshKey]);
   const add=async()=>{if(!note.trim())return;await api.addLog(task.id,note);setNote("");await refresh();};
   const saveLog=async()=>{if(editingLog===null||!editingContent.trim())return;await api.updateLog(editingLog,editingContent);setEditingLog(null);setEditingContent("");await refresh();};
@@ -147,8 +172,10 @@ export default function TaskDetail({task,view,mergeCandidates,relationRefreshKey
       {!events.length&&<p className="muted">暂无办理记录</p>}
     </section>}
     <section className="timeline"><h3>事项时间线</h3><div className="log-compose"><input value={note} onChange={e=>setNote(e.target.value)} placeholder="补充一条普通处理备注"/><button onClick={()=>void add()}>添加</button></div>
-      {logs.map(log=><article key={log.id} className="timeline-entry"><div className="timeline-meta"><time>{formatDateTime(log.createdAt)}</time>{log.logType==="note"&&<span className="timeline-actions">{editingLog===log.id?<><button title="保存" onClick={()=>void saveLog()}><Check size={14}/></button><button title="取消" onClick={()=>{setEditingLog(null);setEditingContent("");}}><X size={14}/></button></>:<><button title="编辑" onClick={()=>{setEditingLog(log.id);setEditingContent(log.content);}}><Pencil size={14}/></button><button className="danger" title="删除" onClick={()=>void removeLog(log.id)}><Trash2 size={14}/></button></>}</span>}</div>{editingLog===log.id?<textarea className="log-edit" rows={3} maxLength={2000} value={editingContent} onChange={event=>setEditingContent(event.target.value)}/>:<p>{localizeStatusText(log.content)}</p>}</article>)}
-      {!logs.length&&<p className="muted">暂无时间线记录</p>}
+      {taskTimelineEntries(logs).map(({log,records,text})=><article key={log.id} className="timeline-entry"><div className="timeline-meta"><time dateTime={log.createdAt}>{formatDateTime(log.createdAt)}</time>{log.logType==="note"&&<span className="timeline-actions">{editingLog===log.id?<><button title="保存" onClick={()=>void saveLog()}><Check size={14}/></button><button title="取消" onClick={()=>{setEditingLog(null);setEditingContent("");}}><X size={14}/></button></>:<><button title="编辑" onClick={()=>{setEditingLog(log.id);setEditingContent(log.content);}}><Pencil size={14}/></button><button className="danger" title="删除" onClick={()=>void removeLog(log.id)}><Trash2 size={14}/></button></>}</span>}</div>{editingLog===log.id?<textarea className="log-edit" rows={3} maxLength={2000} value={editingContent} onChange={event=>setEditingContent(event.target.value)}/>:records.length?<details className="timeline-operation"><summary>{text}</summary>
+        <ul aria-label="原始记录">{records.map(record=><li key={record.id}><time dateTime={record.createdAt}>{formatDateTime(record.createdAt)}</time><p>{record.content}</p></li>)}</ul>
+      </details>:<p>{text}</p>}</article>)}
+      {historyError?<p role="alert">时间线读取失败 · {historyError} <button type="button" onClick={()=>void refresh()}>重试</button></p>:!logs.length&&<p className="muted">{history?.taskId===task.id?"暂无时间线记录":"正在读取时间线…"}</p>}
     </section>
     {queueDialog&&<QueueDialog task={task} reopen={queueDialog==="reopen"} onClose={()=>setQueueDialog(null)} onSaved={()=>{setQueueDialog(null);notify(queueDialog==="reopen"?"事项已重新开启并加入今日队列":"事项已加入今日队列");onChanged();}}/>}
     {mergeDialog&&<MergeTaskDialog target={task} candidates={mergeCandidates} onClose={()=>setMergeDialog(false)} onMerged={()=>{setMergeDialog(false);notify("事项已合并，相关记录已保留");onChanged();}}/>}

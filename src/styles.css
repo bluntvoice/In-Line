@@ -387,3 +387,4 @@ html[data-ui-font] body,html[data-ui-font] body :not(svg):not(svg *):not([data-s
 .mcp-connect-dialog>.modal-header>.icon-button,.mcp-content-dialog>header>.icon-button{flex-shrink:0}
 .mcp-content-dialog>footer{flex-wrap:wrap;gap:10px}
 @media(max-width:600px){.mcp-client-list li>div{flex-basis:100%}.mcp-content-help>div{grid-template-columns:1fr;gap:3px}}
+.timeline-operation>summary{cursor:pointer;color:#0b3a82;font-size:13px;line-height:1.5}.timeline-operation>ul{display:grid;gap:8px;margin:8px 0 0;padding-left:16px}.timeline-operation li>time{font-size:11px;color:#607086}.timeline-operation li>p{margin:2px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}

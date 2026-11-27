@@ -18,7 +18,7 @@ export interface TaskInput{
   id?:number;department:string;departments:string[];contact:string;contacts:string[];taskType:string;title:string;details:string;status:TaskStatus;priority:Priority;
   workload:Workload;isUrgent:boolean;urgentRequester:string;urgentReason:string;requestedDeadline:string|null;requestedDeadlineLabel:string|null;internalNotes:string;
 }
-export interface TaskLog{id:number;taskId:number;logType:string;content:string;createdAt:string}
+export interface TaskLog{id:number;taskId:number;logType:string;content:string;createdAt:string;operationId?:string}
 export interface TaskWorkEvent{id:number;taskId:number;resultStatus:WorkResult;handledAt:string;taskTypeSnapshot:string;source:string;note:string;createdAt:string;updatedAt:string;isFirstValid:boolean}
 export type WorkResult="processed"|"completed"|"waiting_materials"|"waiting_confirmation"|"waiting_counterparty_confirmation";
 export interface QueueInput{id:number;inheritDeadline:boolean;reason:string}

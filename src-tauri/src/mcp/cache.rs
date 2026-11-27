@@ -93,6 +93,22 @@ mod tests {
         let mut new = auth.clone();
         new.revision += 1;
         assert!(cache.get("revision", "client-3", &new, &b).is_none());
+        cache
+            .put(
+                "schema".into(),
+                "client-3",
+                &auth,
+                b.clone(),
+                json!({"meta":{"snapshotId":"old-schema"}}),
+            )
+            .unwrap();
+        let mut migrated = b.clone();
+        migrated.schema_version = 15;
+        assert_ne!(
+            Cache::key("client-3", &json!({}), &auth, &b),
+            Cache::key("client-3", &json!({}), &auth, &migrated)
+        );
+        assert!(cache.get("schema", "client-3", &auth, &migrated).is_none());
         let old:DataVersion=serde_json::from_value(json!({"databaseUuid":"fixture","dataGeneration":1,"commitSequence":1,"schemaVersion":14,"querySchemaVersion":1,"statisticsDefinitionVersion":1})).unwrap();
         assert!(old.index_epoch.is_none());
         assert_ne!(old, b);

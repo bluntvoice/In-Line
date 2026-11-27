@@ -259,6 +259,7 @@ pub(super) fn execute_action(
     auth: &Authorization,
     args: &MutateArgs,
 ) -> Result<(Option<i64>, Json, Json, String, bool), McpError> {
+    let _operation = timeline::begin(conn);
     if !matches!(
         &args.operation,
         TaskAction::Create { .. }

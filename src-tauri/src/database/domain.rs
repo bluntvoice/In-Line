@@ -4,6 +4,7 @@ pub(super) fn save_task_on(
     connection: &Connection,
     mut input: TaskInput,
 ) -> Result<LegalTask, String> {
+    let _operation = timeline::begin(connection);
     validate_task_input(&input)?;
     let contacts = normalized_contacts(&input);
     let departments = normalized_departments(&input);
@@ -335,6 +336,7 @@ pub(crate) fn set_status_on(
     id: i64,
     status: String,
 ) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     if !ALL_STATUSES.contains(&status.as_str()) {
         return Err("事项状态无效".into());
     }
@@ -422,6 +424,7 @@ pub(super) fn set_urgent_on(
     requester: String,
     reason: String,
 ) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     let transaction = connection;
 
     let task = get_task_on(transaction, id)?;
@@ -460,6 +463,7 @@ pub(super) fn record_work_event_on_input(
     connection: &Connection,
     input: WorkEventInput,
 ) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     if !is_work_event_status(&input.result_status) {
         return Err("处理结果无效".into());
     }
@@ -584,6 +588,7 @@ pub(super) fn create_subtask_on_domain(
     connection: &Connection,
     input: CreateSubtaskInput,
 ) -> Result<LegalTask, String> {
+    let _operation = timeline::begin(connection);
     let transaction = connection;
     let parent = get_task_on(transaction, input.parent_task_id)?;
     if parent.deleted_at.is_some() {
@@ -786,6 +791,7 @@ pub(super) fn set_parent_task_on_domain(
     task_id: i64,
     parent_task_id: Option<i64>,
 ) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     let transaction = connection;
     let task = get_task_on(transaction, task_id)?;
     if task.parent_task_id == parent_task_id {
@@ -878,6 +884,7 @@ pub(crate) fn complete_task_on_domain(
     connection: &Connection,
     input: CompleteTaskInput,
 ) -> Result<CompleteTaskResult, String> {
+    let _operation = timeline::begin(connection);
     let transaction = connection;
     let task = get_task_on(transaction, input.task_id)?;
     let mut completed_task_ids = Vec::new();
@@ -916,6 +923,7 @@ pub(super) fn archive_task_group_on_domain(
     connection: &Connection,
     input: ArchiveTaskInput,
 ) -> Result<ArchiveTaskResult, String> {
+    let _operation = timeline::begin(connection);
     let transaction = connection;
     let task = get_task_on(transaction, input.task_id)?;
     let mut archived_task_ids = Vec::new();
@@ -952,6 +960,7 @@ pub(super) fn delete_task_group_on_domain(
     connection: &Connection,
     input: DeleteTaskInput,
 ) -> Result<DeleteTaskResult, String> {
+    let _operation = timeline::begin(connection);
     let transaction = connection;
     let task = get_task_on(transaction, input.task_id)?;
     if task.deleted_at.is_some() {
@@ -1048,6 +1057,7 @@ pub(super) fn move_task_on_domain(
 }
 
 pub(super) fn restore_on_domain(connection: &Connection, id: i64) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     let tx = connection;
     let task = get_task_on(tx, id)?;
     if task.deleted_at.is_none() {
@@ -1069,6 +1079,7 @@ pub(super) fn enqueue_task_on_domain(
     connection: &Connection,
     input: QueueInput,
 ) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     let tx = connection;
     enqueue_on(
         tx,
@@ -1086,6 +1097,7 @@ pub(super) fn reopen_task_on_domain(
     connection: &Connection,
     input: QueueInput,
 ) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     let tx = connection;
     let task = get_task_on(tx, input.id)?;
     if task.deleted_at.is_some() {
@@ -1107,6 +1119,7 @@ pub(super) fn reopen_task_on_domain(
 }
 
 pub(super) fn process_round_on_domain(connection: &Connection, id: i64) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     let tx = connection;
     let task = enter_current_workflow_on(tx, id)?;
     if task.deleted_at.is_some()
@@ -1147,6 +1160,7 @@ pub(super) fn process_round_on_domain(connection: &Connection, id: i64) -> Resul
 }
 
 pub(super) fn complete_round_on_domain(connection: &Connection, id: i64) -> Result<(), String> {
+    let _operation = timeline::begin(connection);
     let tx = connection;
     ensure_direct_completion_allowed(tx, id)?;
     complete_task_on(tx, id, "本轮已完成")
