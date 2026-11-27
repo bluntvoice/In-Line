@@ -1,4 +1,4 @@
-name: F4 native Windows UI Automation
+name: F4-R1 native Windows targeted acceptance
 on:
   push:
     branches: [diagnostics/v050-f4-uia-20261127]
@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         scenario: [native-ui]
-        approval: ['0', '1']
+        mode: [restore]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -77,12 +77,12 @@ jobs:
         timeout-minutes: 10
         env:
           SCENARIO: ${{ matrix.scenario }}
-          F4_APPROVAL_ONLY: ${{ matrix.approval }}
-        run: ./scripts/test-native-nsis.ps1 -Scenario $env:SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/f4-uia-$env:SCENARIO-$env:F4_APPROVAL_ONLY"
+          F4_R1_MODE: ${{ matrix.mode }}
+        run: ./scripts/test-native-nsis.ps1 -Scenario $env:SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/f4-uia-$env:SCENARIO-$env:F4_R1_MODE"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: f4-uia-${{ matrix.scenario }}-${{ matrix.approval }}
-          path: release/f4-uia-${{ matrix.scenario }}-${{ matrix.approval }}/
+          name: f4-uia-${{ matrix.scenario }}-${{ matrix.mode }}
+          path: release/f4-uia-${{ matrix.scenario }}-${{ matrix.mode }}/
           retention-days: 14
           if-no-files-found: warn

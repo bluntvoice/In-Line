@@ -313,6 +313,7 @@ try {
     if($records.FindAll({param($x) $x.status -eq 'FAIL'}).Count){exit 1}
     exit 0
   }
+  if(!$env:F4_R1_MODE){
   Step 'about-and-native-window' {
     Click '^关于$'
     [void](Get-Control '^v?0\.5\.0$' 'Text')
@@ -320,6 +321,8 @@ try {
     Click '^待办队列(?:\s+\d+)?$'
     @{dpi=$dpi;actualHwnd=$true;about='0.5.0'}
   }
+  }
+  if(!$env:F4_R1_MODE -or $env:F4_R1_MODE -eq 'restore'){
   Step 'three-real-restore-rounds' {
     New-Task 'F4 source' 'original source note'
     Click '^软件设置$';Click '^立即备份$'
@@ -354,9 +357,19 @@ try {
       Screen ("restore-"+($i+1))
       if($i -eq 2){Click '^查看待办$'}else{Click '^关闭通知$'}
     }
-    [void](Get-Control '^F4 source（冲突 2）$')
-    @{sourceSha256=$sourceHash;rounds=$expected}
+    [void](Get-Control '^待办队列$' 'Text')
+    $leaf=@(Children | Where-Object {
+      $x=$_.Current
+      $x.ControlType -eq [Windows.Automation.ControlType]::DataItem -and
+        !$x.IsOffscreen -and $x.Name -ceq 'F4 source（冲突 2） 导入冲突'
+    })
+    if($leaf.Count -ne 1){throw "Expected one exact conflict title and badge in queue, found $($leaf.Count)"}
+    $title=$leaf[0].Current.Name
+    Screen 'restore-queue-conflict'
+    @{sourceSha256=$sourceHash;rounds=$expected;queueConflict=$title;exactVisibleMatches=$leaf.Count;sqlIntegrity='ok';foreignKeyViolations=0}
   }
+  }
+  if(!$env:F4_R1_MODE){
   Step 'real-timeline-keyboard' {
     Click '^待办队列(?:\s+\d+)?$'
     New-Task 'F4 processed'
@@ -440,6 +453,7 @@ try {
     }
     if($prereq){throw $prereq}
     @{physicalDpi=$verified;restoredDpi=[InlineUiWindow]::GetDpiForWindow($window)}
+  }
   }
 } finally {
   if(!$process.HasExited){
