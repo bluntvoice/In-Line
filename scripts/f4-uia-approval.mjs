@@ -32,7 +32,9 @@ try {
   sidecar.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n');
   const call=async(name,args={})=>{
     const x=(await rpc("tools/call",{name,arguments:args})).structuredContent;
-    assert.equal(x?.status,"ok","Unexpected structured status for "+name);
+    const errorCode=x?.error?.code;
+    const sanitized=typeof errorCode==="string" && /^[a-z_]{1,80}$/.test(errorCode)?errorCode:"unavailable";
+    assert.equal(x?.status,"ok","Unexpected structured status for "+name+" ("+sanitized+")");
     return x.data;
   };
   const common={reason:"Synthetic F4 native approval",intent:{summary:"Synthetic F4 native approval",explicitUserRequest:true,confirmedRealWork:true}};

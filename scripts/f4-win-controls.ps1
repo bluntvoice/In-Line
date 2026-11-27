@@ -13,6 +13,8 @@ public static class F4Win {
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr w,IntPtr insertAfter,int x,int y,int cx,int cy,uint flags);
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr w);
+ [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
+ [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint x,uint y,uint data,IntPtr extra);
 }
 '@
 if($Mode -eq 'clipboard'){
@@ -51,10 +53,24 @@ do {
   Start-Sleep -Milliseconds 200
 } while([DateTime]::UtcNow -lt $ready)
 $field=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and ($_.Current.AutomationId -in @('1001','1148','FileNameControl') -or $_.Current.Name -match 'File name|文件名') }|Select-Object -First 1
+$filenamePane=$all|Where-Object {$_.Current.AutomationId -eq '1001' -and $_.Current.ControlType -eq [Windows.Automation.ControlType]::Pane}|Select-Object -First 1
 $ok=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and ($_.Current.AutomationId -eq '1' -or $_.Current.Name -match '^(Open|Save|保存|打开)(\s.*)?$')}|Select-Object -First 1
 if($field -and $ok){
   $field.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Path)
   $ok.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()
+} elseif($filenamePane) {
+  $bounds=$filenamePane.Current.BoundingRectangle
+  [uint32]$foregroundOwner=0
+  [void][F4Win]::GetWindowThreadProcessId([F4Win]::GetForegroundWindow(),[ref]$foregroundOwner)
+  if($bounds.IsEmpty -or $filenamePane.Current.IsOffscreen -or $foregroundOwner -ne $ProductPid -or [F4Win]::GetForegroundWindow() -ne $hwnd){throw 'Native filename pane is not foreground and owned'}
+  if(![F4Win]::SetCursorPos([int]($bounds.X+$bounds.Width/2),[int]($bounds.Y+$bounds.Height/2))){throw 'Native filename pane pointer was rejected'}
+  [F4Win]::mouse_event(2,0,0,0,[IntPtr]::Zero);[F4Win]::mouse_event(4,0,0,0,[IntPtr]::Zero)
+  [Windows.Forms.Clipboard]::SetText($Path)
+  [Windows.Forms.SendKeys]::SendWait('^a')
+  [Windows.Forms.SendKeys]::SendWait('^v')
+  Start-Sleep -Milliseconds 300
+  if($ok){$ok.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()}
+  else{[Windows.Forms.SendKeys]::SendWait('{ENTER}')}
 } else {
   [Windows.Forms.SendKeys]::SendWait('%n')
   Start-Sleep -Milliseconds 200

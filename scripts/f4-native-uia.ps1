@@ -60,7 +60,7 @@ if($env:F4_APPROVAL_ONLY -eq '1'){
   try{
     if($store.clients.Count -ne 0 -or $store.sid -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value){throw 'Foreign or pre-existing DPAPI grant'}
     $localToken=[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
-    $localClient=[Guid]::NewGuid().ToString('N')
+    $localClient=[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
     $permissions=@{regularRead=$true;fullRead=$false;write=$true}
     $store.groups=$permissions
     $hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($localToken))).ToLowerInvariant()
@@ -125,9 +125,22 @@ function Set-InputFocus($node) {
 function Fill([string]$pattern,[string]$value,[bool]$commit=$false){
   $node=Get-Control $pattern 'Edit|ComboBox'
   Set-InputFocus $node
-  [Windows.Forms.Clipboard]::SetText($value)
-  [Windows.Forms.SendKeys]::SendWait('^a')
-  [Windows.Forms.SendKeys]::SendWait('^v')
+  $inputValue=$null
+  $hasValue=$node.TryGetCurrentPattern([Windows.Automation.ValuePattern]::Pattern,[ref]$inputValue) -and !$inputValue.Current.IsReadOnly
+  if($hasValue){
+    $inputValue.SetValue($value)
+    Start-Sleep -Milliseconds 150
+  }
+  if(!$hasValue -or $inputValue.Current.Value -ne $value){
+    [Windows.Forms.Clipboard]::SetText($value)
+    [Windows.Forms.SendKeys]::SendWait('^a')
+    [Windows.Forms.SendKeys]::SendWait('^v')
+    $until=[DateTime]::UtcNow.AddSeconds(3)
+    if($hasValue){
+      while($inputValue.Current.Value -ne $value -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 100}
+      if($inputValue.Current.Value -ne $value){throw "Native editor input did not settle: $pattern"}
+    }else{Start-Sleep -Milliseconds 400}
+  }
   if($commit){[Windows.Forms.SendKeys]::SendWait('{ENTER}')}
 }
 function Screen([string]$label){
@@ -361,7 +374,9 @@ try {
     $verified=@(96)
     try {
       foreach($scale in 125,150,200){
-        $verified+=Set-HostedDisplayScale $scale
+        $measured=Set-HostedDisplayScale $scale
+        $verified+=$measured
+        Write-Host "F4_UIA system scale=$scale HWND dpi=$measured"
         Click '^统计中心$'
         [void](Get-Control '工作量趋势')
         Screen "statistics-system-dpi-$scale"
