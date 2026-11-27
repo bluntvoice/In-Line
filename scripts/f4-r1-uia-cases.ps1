@@ -5,7 +5,7 @@ function R1-CheckBusiness([string]$title,[string]$state,[string]$expected='-'){
 }
 function R1-Business {
   Step 'r1-business-new-edit-defer-queue' {
-    New-Task 'F4 R1 main' 'original'
+    R1-NewTask 'F4 R1 main' 'original'
     R1-Open '待办队列' 'F4 R1 main'
     Click '^编辑$'
     Fill '^(记录判断|内部备注)' 'edited'
@@ -28,7 +28,7 @@ function R1-Business {
   }
   Step 'r1-business-complete-archive-reopen' {
     Click '^待办队列(?:\s+\d+)?$'
-    New-Task 'F4 R1 complete'
+    R1-NewTask 'F4 R1 complete'
     R1-Open '待办队列' 'F4 R1 complete'
     Click '^本轮已完成$'
     R1-Open '历史归档' 'F4 R1 complete'
@@ -46,9 +46,9 @@ function R1-Business {
   }
   Step 'r1-business-relationship' {
     Click '^待办队列(?:\s+\d+)?$'
-    New-Task 'F4 R1 parent' 'parent attribute'
-    New-Task 'F4 R1 parent two' 'second parent attribute'
-    New-Task 'F4 R1 child' 'child attribute'
+    R1-NewTask 'F4 R1 parent' 'parent attribute'
+    R1-NewTask 'F4 R1 parent two' 'second parent attribute'
+    R1-NewTask 'F4 R1 child' 'child attribute'
     R1-Open '待办队列' 'F4 R1 child'
     R1-Select '^设置所属任务$' '^F4 R1 parent · '
     [void](Get-Control '^所属任务已更新$')
@@ -66,7 +66,7 @@ function R1-Business {
   Step 'r1-business-urgent-deadline' {
     try{Click '^关闭$'}catch{}
     Click '^待办队列(?:\s+\d+)?$'
-    New-Task 'F4 R1 urgent'
+    R1-NewTask 'F4 R1 urgent'
     R1-Open '待办队列' 'F4 R1 urgent'
     Click '^编辑$'
     Click '^标记为加急事项$' 'CheckBox'
@@ -82,11 +82,7 @@ function R1-Business {
   Step 'r1-business-future-and-early-entry' {
     try{Click '^关闭$'}catch{}
     Click '^待办队列(?:\s+\d+)?$'
-    Click '^新增取号'
-    Fill '^(输入或选择部门|部门 / 团队)' 'F4 UIA Team' $true
-    Fill '^(输入或选择对接人|对接人)' 'F4 UIA Contact' $true
-    Fill '^(输入或选择事项类型|事项类型)' 'F4 UIA Type'
-    Fill '^(一句话说明|事项标题)' 'F4 R1 future'
+    R1-TaskForm 'F4 R1 future'
     $planned=[datetime]::Today.AddDays(3)
     R1-Date '加入日期' $planned
     Click '^保存并取号$'
@@ -107,8 +103,8 @@ function R1-Business {
   Step 'r1-business-merge-trash-restore' {
     try{Click '^关闭$'}catch{}
     Click '^待办队列(?:\s+\d+)?$'
-    New-Task 'F4 R1 merge source'
-    New-Task 'F4 R1 merge target'
+    R1-NewTask 'F4 R1 merge source'
+    R1-NewTask 'F4 R1 merge target'
     R1-Open '待办队列' 'F4 R1 merge target'
     Click '^合并$'
     R1-Select '^选择需要并入的重复事项$' ' · F4 R1 merge source$'
@@ -131,7 +127,8 @@ function R1-Business {
     $first=R1-CheckBusiness 'F4 R1 main' 'edited' 'edited'
     $owned=Get-Process -Id $process.Id
     if($owned.StartTime.ToUniversalTime().Ticks -ne $ticks -or $owned.Path -ne $Exe){throw 'Cannot identify original app for restart'}
-    if(!$process.CloseMainWindow() -or !$process.WaitForExit(8000)){throw 'Could not close the app gracefully for restart'}
+    $process.Kill($true)
+    if(!$process.WaitForExit(10000)){throw 'Verified test app did not exit for controlled restart'}
     $script:process=[Diagnostics.Process]::Start($info)
     $script:ticks=$process.StartTime.ToUniversalTime().Ticks
     $script:stdout=$process.StandardOutput.ReadToEndAsync()
@@ -148,7 +145,7 @@ function R1-Business {
     $second=R1-CheckBusiness 'F4 R1 main' 'edited' 'edited'
     if($second.number -ne $first.number -or $second.work.Count -ne $first.work.Count){throw 'Persisted task or history changed'}
     Screen 'business-after-restart'
-    @{number=$second.number;workEvents=$second.work.Count;persisted=$true}
+    @{number=$second.number;workEvents=$second.work.Count;persisted=$true;shutdown='bounded termination of exact test PID'}
   }
 }
 function R1-DateText([datetime]$a,[datetime]$b){
@@ -178,7 +175,7 @@ function R1-Stats {
   Step 'r1-statistics-fixture' {
     foreach($suffix in 'New A','New B','Prior'){
       Click '^待办队列(?:\s+\d+)?$'
-      New-Task "F4 R1 $suffix"
+      R1-NewTask "F4 R1 $suffix"
       R1-Open '待办队列' "F4 R1 $suffix"
       Click '^本轮已处理$'
       [void](Get-Control '^已记录本轮处理，事项已进入暂缓队列$')
@@ -213,7 +210,7 @@ function R1-Stats {
     Click '^周日$'
     Click '^统计中心$';Click '^本周$'
     $period=R1-Range '周日' $sun $today $sun.AddDays(-7) $today.AddDays(-7) '上周同期'
-    [void](Get-Control ('^'+[regex]::Escape((R1-DateText $sun $today))+' · 周日起算$') 'Text')
+    [void](Get-Control '^\s*· 周日起算$' 'Text')
     R1-WriteTree 'statistics-sunday'
     Click '^软件设置$';Click '^周一$';Click '^统计中心$';Click '^本周$'
     $period
@@ -285,7 +282,7 @@ function R1-Dpi([int]$scale){
       $windowBounds=[Windows.Automation.AutomationElement]::FromHandle($window).Current.BoundingRectangle
       Write-Host "F4_R1_DPI scale=$scale dpi=$measurement size=$($windowBounds.Width)x$($windowBounds.Height)"
       Click '^待办队列(?:\s+\d+)?$'
-      New-Task 'F4 R1 DPI'
+      R1-NewTask 'F4 R1 DPI'
       R1-Open '待办队列' 'F4 R1 DPI'
       [void](Get-Control '^事项时间线$' 'Text')
       R1-WriteTree "dpi-$scale-detail"

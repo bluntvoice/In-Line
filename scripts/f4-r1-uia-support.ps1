@@ -12,24 +12,24 @@ function R1-Read([string]$mode,[string[]]$inputs){
   if($LASTEXITCODE){throw "Synthetic SQLite check $mode failed with exit $LASTEXITCODE"}
   if($value){ConvertFrom-Json -InputObject ($value -join [Environment]::NewLine)}
 }
-function R1-Visible([string]$name,[string]$role){
+function R1-Visible([string]$name,[string]$role,[switch]$IncludeScrolled){
   @(Children|Where-Object {
     try{
       $n=$_.Current
-      $n.Name -ceq $name -and (!$role -or $n.ControlType.ProgrammaticName -eq "ControlType.$role") -and !$n.IsOffscreen
+      $n.Name -ceq $name -and (!$role -or $n.ControlType.ProgrammaticName -eq "ControlType.$role") -and ($IncludeScrolled -or !$n.IsOffscreen)
     }catch [Windows.Automation.ElementNotAvailableException]{$false}
   })
 }
 function R1-One([string]$name,[string]$role){
   [void](Get-Control ('^'+[regex]::Escape($name)+'$') $role)
-  $found=@(R1-Visible $name $role)
+  $found=@(R1-Visible $name $role -IncludeScrolled)
   if($found.Count -ne 1){throw "Expected one visible $role named $name, found $($found.Count)"}
   $found[0]
 }
 function R1-Raw([bool]$expanded){
   $until=[datetime]::UtcNow.AddSeconds(5)
   do{
-    $current=@(R1-Visible '原始记录' 'List')
+    $current=@(R1-Visible '原始记录' '' -IncludeScrolled | Where-Object {$_.Current.ControlType.ProgrammaticName -in 'ControlType.List','ControlType.Group'})
     if(($expanded -and $current.Count -eq 1) -or (!$expanded -and !$current.Count)){return}
     Start-Sleep -Milliseconds 150
   }while([datetime]::UtcNow -lt $until)
@@ -39,7 +39,7 @@ function R1-KeyToggle([string]$label){
   $item=R1-One $label 'Button'
   Set-InputFocus $item
   $focused=[Windows.Automation.AutomationElement]::FocusedElement
-  if(![Windows.Automation.AutomationElement]::Compare($focused,$item)){throw 'Target summary did not receive keyboard focus'}
+  if(!$focused.Equals($item)){throw 'Target summary did not receive keyboard focus'}
   [Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }
 function R1-Confirm([string]$message){
@@ -70,21 +70,41 @@ function R1-Select([string]$control,[string]$option){
   $list=$parent.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
   $entry=@($list|Where-Object {$_.Current.Name -match $option -and -not $_.Current.IsOffscreen -and $_.Current.ControlType.ProgrammaticName -in 'ControlType.ListItem','ControlType.MenuItem'})
   if($entry.Count -ne 1){throw "Expected one option $option, found $($entry.Count)"}
-  $select=$null
-  if($entry[0].TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern,[ref]$select)){$select.Select()}
-  else{$entry[0].GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke()}
+  $entries=@($list|Where-Object {!$_.Current.IsOffscreen -and $_.Current.ControlType.ProgrammaticName -in 'ControlType.ListItem','ControlType.MenuItem'})
+  $position=-1
+  for($i=0;$i -lt $entries.Count;$i++){
+    if($entries[$i].Equals($entry[0])){$position=$i;break}
+  }
+  if($position -lt 0){throw 'Cannot resolve exact popup option position'}
+  [Windows.Forms.SendKeys]::SendWait('{HOME}')
+  if($position){[Windows.Forms.SendKeys]::SendWait("{DOWN $position}")}
   [Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }
 function R1-Date([string]$name,[datetime]$date){
-  $p='^'+[regex]::Escape($name)+'(?:\s*\*)?$'
-  $root=Get-Control $p
-  $children=$root.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
-  foreach($field in @(@('^(month|月)$',$date.ToString('MM')),@('^(day|日)$',$date.ToString('dd')),@('^(year|年)$',$date.ToString('yyyy')))){
-    $target=@($children|Where-Object {$_.Current.Name -match $field[0] -and $_.Current.IsKeyboardFocusable})
-    if($target.Count -ne 1){throw "Date $name lacks a unique segment $($field[0])"}
-    Set-InputFocus $target[0]
+  $stem=[regex]::Escape($name)
+  foreach($field in @(@('Month|月',$date.ToString('MM')),@('Day|日',$date.ToString('dd')),@('Year|年',$date.ToString('yyyy')))){
+    $target=Get-Control ("^(?:"+$field[0]+") "+$stem+"(?:\s*\*)?$") 'Spinner'
+    Set-InputFocus $target
     [Windows.Forms.SendKeys]::SendWait($field[1])
   }
+}
+function R1-TaskForm([string]$title,[string]$note=''){
+  Click '^新增取号'
+  $contact=$title -replace '^F4 R1 ','R1 '
+  foreach($pair in @(@('^(输入或选择部门|部门 / 团队)','部门 / 团队','R1 Team'),@('^(输入或选择对接人|对接人)','对接人',$contact))){
+    $chip='^'+[regex]::Escape(('移除'+$pair[1]+'“'+$pair[2]+'”'))+'$'
+    try{Fill $pair[0] $pair[2] $true}
+    catch{[void](Get-Control $chip 'Button' 2)}
+    [void](Get-Control $chip 'Button')
+  }
+  Fill '^(输入或选择事项类型|事项类型)' 'F4 UIA Type'
+  Fill '^(一句话说明|事项标题)' $title
+  if($note){Fill '^(记录判断|内部备注)' $note}
+}
+function R1-NewTask([string]$title,[string]$note=''){
+  R1-TaskForm $title $note
+  Click '^保存并取号$'
+  [void](Get-Control ('^'+[regex]::Escape($title)+'$'))
 }
 function R1-Open([string]$tab,[string]$title){
   Click ('^'+[regex]::Escape($tab)+'(?:\s+\d+)?$')
@@ -93,8 +113,8 @@ function R1-Open([string]$tab,[string]$title){
 }
 function R1-Timeline {
   Step 'r1-timeline-fixture' {
-    New-Task 'F4 R1 timeline A'
-    New-Task 'F4 R1 timeline B'
+    R1-NewTask 'F4 R1 timeline A'
+    R1-NewTask 'F4 R1 timeline B'
     R1-Open '待办队列' 'F4 R1 timeline A'
     Click '^本轮已处理$'
     R1-Open '暂缓事项' 'F4 R1 timeline A'
@@ -120,6 +140,7 @@ function R1-Timeline {
     R1-Raw $false
     R1-KeyToggle $action
     R1-Raw $true
+    [void](Get-Control '^退出 \d{4}-\d{2}-\d{2} 队列：\d+（本轮已处理）$' 'Text')
     R1-WriteTree 'timeline-v2-real-open'
     Screen 'timeline-v2-real-open'
     R1-KeyToggle $action
@@ -159,7 +180,8 @@ function R1-Timeline {
     if($editors.Count -ne 1){throw 'Note editor is not unique'}
     Set-InputFocus $editors[0]
     [Windows.Forms.Clipboard]::SetText('F4 R1 memo edited')
-    [Windows.Forms.SendKeys]::SendWait('^a^v')
+    [Windows.Forms.SendKeys]::SendWait('^a')
+    [Windows.Forms.SendKeys]::SendWait('^v')
     Click '^保存$'
     [void](R1-One 'F4 R1 memo edited' 'Text')
     [void](R1-Read 'timeline-read' @('F4 R1 memo edited'))

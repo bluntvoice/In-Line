@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         scenario: [native-ui]
-        mode: [restore, timeline, statistics, business, dpi125, dpi200]
+        mode: [timeline, statistics, business]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

@@ -34,8 +34,8 @@ elif mode == "timeline-seed":
     for version, digit in ((1, "a"), (2, "b")):
         key = f"timeline:v{version}:{digit * 32}:1"
         seed.extend([
-            (a["id"], "created", f"R1 v{version} 主动作", "2024-05-06T12:31:00Z", key),
-            (a["id"], "queue", f"R1 v{version} 队列原文", "2024-05-06T12:32:00Z", key),
+            (a["id"], f"{key}:created" if version == 1 else "created", f"R1 v{version} 主动作", "2024-05-06T12:31:00Z", None if version == 1 else key),
+            (a["id"], f"{key}:queue" if version == 1 else "queue", f"R1 v{version} 队列原文", "2024-05-06T12:32:00Z", None if version == 1 else key),
         ])
     seed.append((a["id"], "audit", "R1 独立业务审计", "2024-05-06T12:33:00Z", seed[-1][-1]))
     with db:
@@ -48,11 +48,11 @@ elif mode == "timeline-read":
     work_ids = {row["operation_id"] for row in rows if row["log_type"] == "work"}
     assert None not in work_ids and len(work_ids) == 1
     work = [row for row in rows if row["operation_id"] in work_ids]
-    assert {"work", "status", "queue"} <= {row["log_type"] for row in work}, work
+    assert {row["log_type"] for row in work} == {"work", "queue"} and len(work) == 2, work
     notes = [row["content"] for row in rows if row["log_type"] == "note"]
     assert notes == args, notes
     for version in (1, 2):
-        assert sum(row["log_type"] != "audit" and (row["operation_id"] or "").startswith(f"timeline:v{version}:") and row["content"].startswith("R1 ") for row in rows) == 2
+        assert sum(row["log_type"] != "audit" and (row["operation_id"] or row["log_type"]).startswith(f"timeline:v{version}:") and row["content"].startswith("R1 ") for row in rows) == 2
     assert sum(row["log_type"] == "audit" for row in rows) == 1
     print(json.dumps(rows, ensure_ascii=False))
 elif mode == "stats-seed":
