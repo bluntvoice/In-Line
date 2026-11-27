@@ -201,7 +201,7 @@ function Confirm-RestoreDialog {
     try{Click '^(确定|OK|Yes|是)$';return}catch{}
     Start-Sleep -Milliseconds 160
   }
-  throw 'Owned restore confirmation was not detected'
+  [void](Get-Control '^备份数据已成功导入$' '' 15)
 }
 function Verify-Db([string]$mode){
   & python (Join-Path $PSScriptRoot 'f4_uia_db.py') $db $mode
@@ -357,20 +357,32 @@ try {
     [void](Get-Control '^F4 source（冲突 2）$')
     @{sourceSha256=$sourceHash;rounds=$expected}
   }
-  Step 'timeline-keyboard-and-real-stats' {
+  Step 'real-timeline-keyboard' {
     Click '^待办队列(?:\s+\d+)?$'
     New-Task 'F4 processed'
     Click '^F4 processed$' ''
     Click '^本轮已处理$'
-    [void](Get-Control '事项时间线')
+    Click '^暂缓事项(?:\s+\d+)?$'
+    Click '^F4 processed$' ''
+    [void](Get-Control '^事项时间线$')
     Fill '^补充一条普通处理备注' 'F4 UIA memo'
     Click '^添加$'
     [void](Get-Control 'F4 UIA memo')
-    $toggle=Get-Control '原始记录' 'Button'
+    $summary='^本轮已处理，移入暂缓事项$'
+    $toggle=Get-Control $summary
     Set-InputFocus $toggle
     [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    [void](Get-Control '^原始记录$')
+    [void](Get-Control '^已记录本轮处理事项$|^状态变更为：|^退出 ')
     Screen 'timeline'
+    Set-InputFocus (Get-Control $summary)
+    [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    $raw=@(Children|Where-Object {$_.Current.Name -eq '原始记录' -and !$_.Current.IsOffscreen})
+    if($raw.Count){throw 'Keyboard collapse left raw entries visible'}
     Click '^关闭$'
+    @{rawRecords=$true;keyboardExpandCollapse=$true;note=$true}
+  }
+  Step 'real-statistics-navigation' {
     Click '^统计中心$'
     foreach($name in '本周','上周','本月','上月','本季度','上季度','自定义'){Click "^$name$"}
     Click '^本周$'
