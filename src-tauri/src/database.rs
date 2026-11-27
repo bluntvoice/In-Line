@@ -24,6 +24,9 @@ mod application_tests;
 mod mcp_p4_tests;
 #[cfg(all(test, windows))]
 mod mcp_write_tests;
+mod restore_matching;
+#[cfg(test)]
+mod restore_tests;
 mod scheduling;
 mod timeline;
 #[cfg(test)]
@@ -3051,9 +3054,11 @@ impl Database {
         let merge_result = (|| -> Result<BackupMergeResult, String> {
             let mut source = Self::connect(&staged)?;
             Self::migrate(&mut source)?;
-            let source_tasks = load_all_tasks(&source)?;
+            let mut source_tasks = load_all_tasks(&source)?;
+            let source_by_id = source_tasks.iter().map(|task| (task.id, task)).collect();
             let mut source_relations = source_tasks
                 .iter()
+                .filter(|task| restore_matching::valid_source_parent(task, &source_by_id))
                 .filter_map(|task| {
                     task.parent_task_id
                         .map(|parent_task_id| (task.id, parent_task_id, task.subtask_sort_order))
@@ -3088,18 +3093,19 @@ impl Database {
                 .map_err(display_error)?;
             let mut imported_task_ids = HashMap::new();
             let mut inserted_task_ids = HashSet::new();
+            for task in &mut source_tasks {
+                task.task_type = canonical_task_type(&transaction, &task.task_type)?;
+            }
+            let plan = restore_matching::plan(&source, &transaction, &source_tasks)?;
             merge_sequence_watermarks_on(&source, &transaction)?;
 
-            for mut source_task in source_tasks {
-                source_task.task_type = canonical_task_type(&transaction, &source_task.task_type)?;
-                let same_title = tasks_with_title(&transaction, &source_task.title)?;
-                let exact = same_title
-                    .iter()
-                    .find(|current| same_task_content(current, &source_task));
-                let conflict = exact.is_none() && !same_title.is_empty();
-                let (target_id, inserted) = if let Some(current) = exact {
+            for source_task in source_tasks {
+                let existing = plan.ids.get(&source_task.id).copied();
+                let conflict = existing.is_none()
+                    && !tasks_with_title(&transaction, &source_task.title)?.is_empty();
+                let (target_id, inserted) = if let Some(id) = existing {
                     result.merged_tasks += 1;
-                    (current.id, false)
+                    (id, false)
                 } else {
                     let title = if conflict {
                         result.conflict_tasks += 1;
@@ -3132,57 +3138,22 @@ impl Database {
 
                 timeline::copy_for_restore(&source, &transaction, source_task.id, target_id)?;
                 for (table, columns) in [
-                    (
-                        "status_history",
-                        &["old_status", "new_status", "reason", "created_at"][..],
-                    ),
-                    (
-                        "urgent_records",
-                        &[
-                            "requester",
-                            "reason",
-                            "requested_deadline",
-                            "requested_at",
-                            "confirmation_status",
-                            "confirmed_at",
-                            "cancelled_at",
-                            "notes",
-                        ][..],
-                    ),
-                    (
-                        "task_work_events",
-                        &[
-                            "result_status",
-                            "handled_at",
-                            "task_type_snapshot",
-                            "source",
-                            "note",
-                            "created_at",
-                            "updated_at",
-                            "voided_at",
-                        ][..],
-                    ),
+                    ("status_history", STATUS_HISTORY_COLUMNS),
+                    ("urgent_records", URGENT_HISTORY_COLUMNS),
                 ] {
-                    if table == "task_work_events" {
-                        copy_linked_work_events(
-                            &source,
-                            &transaction,
-                            columns,
-                            source_task.id,
-                            target_id,
-                        )?;
-                    } else {
-                        copy_unique_task_rows(
-                            &source,
-                            &transaction,
-                            table,
-                            columns,
-                            source_task.id,
-                            target_id,
-                        )?;
-                    }
+                    copy_unique_task_rows(
+                        &source,
+                        &transaction,
+                        table,
+                        columns,
+                        source_task.id,
+                        target_id,
+                    )?;
                 }
-                copy_queue_entries(&source, &transaction, source_task.id, target_id, inserted)?;
+                copy_linked_work_events(&source, &transaction, source_task.id, target_id, false)?;
+                if !plan.verified_conflicts.contains(&target_id) {
+                    copy_queue_entries(&source, &transaction, &source_task, target_id, inserted)?;
+                }
             }
 
             for (source_task_id, source_parent_id, _) in source_relations {
@@ -3226,6 +3197,7 @@ impl Database {
                 &transaction,
                 &imported_task_ids,
                 &inserted_task_ids,
+                &plan.verified_conflicts,
             )?;
             merge_master_values(&source, &transaction)?;
             deduplicate_task_types(&transaction)?;
@@ -3275,8 +3247,7 @@ fn tasks_with_title(connection: &Connection, title: &str) -> Result<Vec<LegalTas
 fn same_task_content(left: &LegalTask, right: &LegalTask) -> bool {
     left.department == right.department
         && left.contact == right.contact
-        && left.task_type == right.task_type
-        && left.title == right.title
+        && left.task_type.trim().to_lowercase() == right.task_type.trim().to_lowercase()
         && left.details == right.details
         && left.status == right.status
         && left.priority == right.priority
@@ -3293,6 +3264,15 @@ fn same_task_content(left: &LegalTask, right: &LegalTask) -> bool {
         && left.deleted_at == right.deleted_at
         && left.planned_date == right.planned_date
         && left.is_scheduled == right.is_scheduled
+        && left.schedule_action == right.schedule_action
+        && left.schedule_action_at == right.schedule_action_at
+        && restore_ticket_color(left) == restore_ticket_color(right)
+}
+
+fn restore_ticket_color(task: &LegalTask) -> Option<String> {
+    task.ticket_color
+        .as_deref()
+        .and_then(|value| normalize_ticket_color(value).ok())
 }
 
 fn canonical_task_type(connection: &Connection, source: &str) -> Result<String, String> {
@@ -3466,10 +3446,7 @@ fn insert_imported_task(
         )
         .map_err(display_error)?;
     let id = connection.last_insert_rowid();
-    let color = task
-        .ticket_color
-        .as_deref()
-        .and_then(|value| normalize_ticket_color(value).ok());
+    let color = restore_ticket_color(task);
     connection.execute("UPDATE tasks SET planned_date=?,is_scheduled=?,schedule_action=?,schedule_action_at=?,ticket_color=? WHERE id=?",params![task.planned_date,task.is_scheduled as i64,task.schedule_action,task.schedule_action_at,color,id]).map_err(display_error)?;
     allocate_number_on(connection, id, &ticket_date, daily_sequence)?;
     if daily_sequence != task.daily_sequence {
@@ -3477,28 +3454,52 @@ fn insert_imported_task(
             connection,
             id,
             "backup_number_remapped",
-            &format!(
-                "备份原队列 {}-{:02} 已被占用；保留本地记录，导入队列改为 {}-{:02}，原固定编号 {}",
-                task.ticket_date,
-                task.daily_sequence,
-                ticket_date,
-                daily_sequence,
-                task.permanent_number
-            ),
+            &remapped_number_note(task, daily_sequence),
         )?;
     }
     Ok(id)
 }
+
+fn remapped_number_note(task: &LegalTask, sequence: i64) -> String {
+    format!(
+        "备份原队列 {date}-{:02} 已被占用；保留本地记录，导入队列改为 {date}-{sequence:02}，原固定编号 {}",
+        task.daily_sequence,
+        task.permanent_number,
+        date = task.ticket_date,
+    )
+}
+
+const STATUS_HISTORY_COLUMNS: &[&str] = &["old_status", "new_status", "reason", "created_at"];
+const URGENT_HISTORY_COLUMNS: &[&str] = &[
+    "requester",
+    "reason",
+    "requested_deadline",
+    "requested_at",
+    "confirmation_status",
+    "confirmed_at",
+    "cancelled_at",
+    "notes",
+];
 
 // Correction links refer to event IDs, which must be translated during non-destructive merge.
 // Never rewrite an existing event merely to match an imported correction chain.
 fn copy_linked_work_events(
     source: &Connection,
     target: &Connection,
-    columns: &[&str],
     source_task: i64,
     target_task: i64,
-) -> Result<(), String> {
+    compare_only: bool,
+) -> Result<bool, String> {
+    let columns = [
+        "result_status",
+        "handled_at",
+        "task_type_snapshot",
+        "source",
+        "note",
+        "created_at",
+        "updated_at",
+        "voided_at",
+    ];
     let mut statement = source
         .prepare(&format!(
             "SELECT id,correction_of,{} FROM task_work_events WHERE task_id=? ORDER BY id",
@@ -3518,7 +3519,20 @@ fn copy_linked_work_events(
         .map_err(display_error)?
         .collect::<Result<Vec<_>, _>>()
         .map_err(display_error)?;
+    if compare_only {
+        let count: usize = target
+            .query_row(
+                "SELECT COUNT(*) FROM task_work_events WHERE task_id=?",
+                [target_task],
+                |row| row.get(0),
+            )
+            .map_err(display_error)?;
+        if count != pending.len() {
+            return Ok(false);
+        }
+    }
     let mut translated = HashMap::<i64, i64>::new();
+    let mut used = HashSet::new();
     let predicates = columns
         .iter()
         .map(|c| format!("{c} IS ?"))
@@ -3542,21 +3556,65 @@ fn copy_linked_work_events(
                     .map(|parent| Value::Integer(translated[&parent]))
                     .unwrap_or(Value::Null),
             );
-            let existing:Option<i64> = target.query_row(&format!("SELECT id FROM task_work_events WHERE task_id=? AND {predicates} AND correction_of IS ? ORDER BY id LIMIT 1"),params_from_iter(values.iter()),|r|r.get(0)).optional().map_err(display_error)?;
+            let mut query = target.prepare_cached(&format!(
+                "SELECT id FROM task_work_events WHERE task_id=? AND {predicates} AND correction_of IS ? ORDER BY id"
+            )).map_err(display_error)?;
+            let mut rows = query
+                .query(params_from_iter(values.iter()))
+                .map_err(display_error)?;
+            let mut existing = None;
+            while let Some(row) = rows.next().map_err(display_error)? {
+                let id = row.get::<_, i64>(0).map_err(display_error)?;
+                if !used.contains(&id) {
+                    existing = Some(id);
+                    break;
+                }
+            }
+            drop(rows);
             let target_id = if let Some(existing) = existing {
                 existing
+            } else if compare_only {
+                return Ok(false);
             } else {
                 target.execute(&format!("INSERT INTO task_work_events(task_id,{},correction_of) VALUES({placeholders})",columns.join(",")),params_from_iter(values.iter())).map_err(display_error)?;
                 target.last_insert_rowid()
             };
+            used.insert(target_id);
             translated.insert(id, target_id);
         }
         if next.len() == count {
+            if compare_only {
+                return Ok(false);
+            }
             return Err("备份中的办理纠错关联不完整或存在循环，未合并业务数据".into());
         }
         pending = next;
     }
-    Ok(())
+    Ok(true)
+}
+
+fn task_history_rows(
+    connection: &Connection,
+    table: &str,
+    columns: &[&str],
+    task_id: i64,
+) -> Result<Vec<Vec<Value>>, String> {
+    let mut statement = connection
+        .prepare(&format!(
+            "SELECT {} FROM {table} WHERE task_id=? ORDER BY id",
+            columns.join(",")
+        ))
+        .map_err(display_error)?;
+    let values = statement
+        .query_map([task_id], |row| {
+            (0..columns.len())
+                .map(|index| row.get::<_, Value>(index))
+                .collect::<Result<Vec<_>, _>>()
+        })
+        .map_err(display_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(display_error)?;
+    Ok(values)
 }
 
 fn copy_unique_task_rows(
@@ -3567,53 +3625,27 @@ fn copy_unique_task_rows(
     source_task_id: i64,
     target_task_id: i64,
 ) -> Result<(), String> {
-    let rows = {
-        let mut statement = source
-            .prepare(&format!(
-                "SELECT {} FROM {table} WHERE task_id=? ORDER BY id",
-                columns.join(",")
-            ))
-            .map_err(display_error)?;
-        let values = statement
-            .query_map([source_task_id], |row| {
-                (0..columns.len())
-                    .map(|index| row.get::<_, Value>(index))
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .map_err(display_error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(display_error)?;
-        values
-    };
-    let predicates = columns
-        .iter()
-        .map(|column| format!("{column} IS ?"))
-        .collect::<Vec<_>>()
-        .join(" AND ");
+    let rows = task_history_rows(source, table, columns, source_task_id)?;
+    let mut existing = task_history_rows(target, table, columns, target_task_id)?;
     let placeholders = std::iter::repeat_n("?", columns.len() + 1)
         .collect::<Vec<_>>()
         .join(",");
     for row in rows {
+        if let Some(index) = existing.iter().position(|values| values == &row) {
+            existing.swap_remove(index);
+            continue;
+        }
         let mut values = vec![Value::Integer(target_task_id)];
         values.extend(row);
-        let exists: i64 = target
-            .query_row(
-                &format!("SELECT EXISTS(SELECT 1 FROM {table} WHERE task_id=? AND {predicates})"),
+        target
+            .execute(
+                &format!(
+                    "INSERT INTO {table}(task_id,{}) VALUES({placeholders})",
+                    columns.join(",")
+                ),
                 params_from_iter(values.iter()),
-                |result| result.get(0),
             )
             .map_err(display_error)?;
-        if exists == 0 {
-            target
-                .execute(
-                    &format!(
-                        "INSERT INTO {table}(task_id,{}) VALUES({placeholders})",
-                        columns.join(",")
-                    ),
-                    params_from_iter(values.iter()),
-                )
-                .map_err(display_error)?;
-        }
     }
     Ok(())
 }
@@ -3631,41 +3663,60 @@ struct ImportedQueueEntry {
     updated_at: String,
 }
 
+impl ImportedQueueEntry {
+    fn same_history(&self, other: &Self) -> bool {
+        self.queue_date == other.queue_date
+            && self.requested_deadline == other.requested_deadline
+            && self.requested_deadline_label == other.requested_deadline_label
+            && self.enqueued_at == other.enqueued_at
+            && self.closed_at == other.closed_at
+            && self.close_reason == other.close_reason
+            && self.created_at == other.created_at
+            && self.updated_at == other.updated_at
+    }
+}
+
+fn queue_entries(connection: &Connection, task_id: i64) -> Result<Vec<ImportedQueueEntry>, String> {
+    let mut statement = connection
+        .prepare(
+            "SELECT queue_date,daily_sequence,requested_deadline,requested_deadline_label,
+                        enqueued_at,closed_at,close_reason,created_at,updated_at
+                 FROM task_queue_entries WHERE task_id=? ORDER BY id",
+        )
+        .map_err(display_error)?;
+    let values = statement
+        .query_map([task_id], |row| {
+            Ok(ImportedQueueEntry {
+                queue_date: row.get(0)?,
+                daily_sequence: row.get(1)?,
+                requested_deadline: row.get(2)?,
+                requested_deadline_label: row.get(3)?,
+                enqueued_at: row.get(4)?,
+                closed_at: row.get(5)?,
+                close_reason: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })
+        .map_err(display_error)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(display_error)?;
+    Ok(values)
+}
+
 fn copy_queue_entries(
     source: &Connection,
     target: &Connection,
-    source_task_id: i64,
+    source_task: &LegalTask,
     target_task_id: i64,
     inserted_task: bool,
 ) -> Result<(), String> {
-    let entries = {
-        let mut statement = source
-            .prepare(
-                "SELECT queue_date,daily_sequence,requested_deadline,requested_deadline_label,
-                        enqueued_at,closed_at,close_reason,created_at,updated_at
-                 FROM task_queue_entries WHERE task_id=? ORDER BY id",
-            )
-            .map_err(display_error)?;
-        let values = statement
-            .query_map([source_task_id], |row| {
-                Ok(ImportedQueueEntry {
-                    queue_date: row.get(0)?,
-                    daily_sequence: row.get(1)?,
-                    requested_deadline: row.get(2)?,
-                    requested_deadline_label: row.get(3)?,
-                    enqueued_at: row.get(4)?,
-                    closed_at: row.get(5)?,
-                    close_reason: row.get(6)?,
-                    created_at: row.get(7)?,
-                    updated_at: row.get(8)?,
-                })
-            })
-            .map_err(display_error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(display_error)?;
-        values
+    let source_allocations = if inserted_task {
+        scheduling::owned_allocations(source, source_task.id)?
+    } else {
+        Vec::new()
     };
-    for entry in entries {
+    for entry in queue_entries(source, source_task.id)? {
         let duplicate: i64 = target
             .query_row(
                 "SELECT EXISTS(SELECT 1 FROM task_queue_entries
@@ -3686,7 +3737,7 @@ fn copy_queue_entries(
                 |row| row.get(0),
             )
             .map_err(display_error)?;
-        if duplicate != 0 {
+        if duplicate != 0 && !inserted_task {
             continue;
         }
         if entry.closed_at.is_none() {
@@ -3708,7 +3759,12 @@ fn copy_queue_entries(
                 |row| row.get(0),
             )
             .map_err(display_error)?;
-        let sequence = if pair_used == 0 {
+        let is_current = inserted_task
+            && entry.queue_date == source_task.ticket_date
+            && entry.daily_sequence == source_task.daily_sequence;
+        let sequence = if is_current {
+            get_task_on(target, target_task_id)?.daily_sequence
+        } else if pair_used == 0 {
             reserve_daily_sequence(target, &entry.queue_date, entry.daily_sequence)?;
             entry.daily_sequence
         } else {
@@ -3734,8 +3790,23 @@ fn copy_queue_entries(
                 ],
             )
             .map_err(display_error)?;
-        target.execute("INSERT OR IGNORE INTO queue_number_allocations(task_id,permanent_number,queue_date,daily_sequence,allocated_at,activated_at,voided_at,void_reason) SELECT id,permanent_number,?,?,?, ?,?,? FROM tasks WHERE id=?",params![entry.queue_date,sequence,entry.created_at,entry.enqueued_at,entry.closed_at,if entry.closed_at.is_some(){"导入历史队列"}else{""},target_task_id]).map_err(display_error)?;
-        target.execute("UPDATE queue_number_allocations SET activated_at=? WHERE task_id=? AND queue_date=? AND daily_sequence=?",params![entry.enqueued_at,target_task_id,entry.queue_date,sequence]).map_err(display_error)?;
+        let original = source_allocations.iter().find(|row| {
+            !is_current
+                && sequence == entry.daily_sequence
+                && row.queue_date == entry.queue_date
+                && row.daily_sequence == sequence
+        });
+        if let Some(original) = original {
+            target.execute(
+                "INSERT OR IGNORE INTO queue_number_allocations(task_id,permanent_number,queue_date,daily_sequence,allocated_at,activated_at,voided_at,void_reason)
+                 VALUES(?,?,?,?,?,?,?,?)",
+                params![target_task_id, original.permanent_number, entry.queue_date, sequence,
+                    original.allocated_at, original.activated_at, original.voided_at, original.void_reason],
+            ).map_err(display_error)?;
+        } else {
+            target.execute("INSERT OR IGNORE INTO queue_number_allocations(task_id,permanent_number,queue_date,daily_sequence,allocated_at,activated_at,voided_at,void_reason) SELECT id,permanent_number,?,?,?, ?,?,? FROM tasks WHERE id=?",params![entry.queue_date,sequence,entry.created_at,entry.enqueued_at,entry.closed_at,if entry.closed_at.is_some(){"导入历史队列"}else{""},target_task_id]).map_err(display_error)?;
+            target.execute("UPDATE queue_number_allocations SET activated_at=? WHERE task_id=? AND queue_date=? AND daily_sequence=?",params![entry.enqueued_at,target_task_id,entry.queue_date,sequence]).map_err(display_error)?;
+        }
         if inserted_task && entry.closed_at.is_none() {
             target
                 .execute(

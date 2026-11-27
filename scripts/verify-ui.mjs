@@ -112,6 +112,18 @@ if (${periods}) {
   for(const key of ["getStatistics","getStatisticsDetails","getStatisticsTrendDetails","saveChartExport"]) specific[key]=realApi[key];
 }
 if (${periods || mode === "trend" || mode === "timeline"}) specific.getVersion=async()=>"0.5.0";
+if (${mode === "backup-restore"}) {
+  const backup={name:"isolated-import.db",path:"isolated-import.db",modifiedAt:"2026-10-02T10:00:00+08:00",size:294912};
+  specific.listBackups=async()=>[backup];
+  specific.restoreBackup=async path=>{
+    window.__inlineCalls.push(["restoreBackup",path]);
+    const first=window.__inlineCalls.filter(call=>call[0]==="restoreBackup").length===1;
+    return first
+      ? {addedTasks:1,mergedTasks:0,conflictTasks:1,appliedSettings:0,
+         conflicts:[{taskId:1,permanentNumber:"IL-1",sourceTitle:"来源事项",importedTitle:"来源事项（冲突 2）"}]}
+      : {addedTasks:0,mergedTasks:1,conflictTasks:0,appliedSettings:0,conflicts:[]};
+  };
+}
 if (${mode === "timeline"}) {
   const time="2026-09-30T08:00:00+08:00";
   const logs=[
@@ -172,7 +184,7 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const errors = [];
 try {
   const mainContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: "Asia/Shanghai" });
-  if(periods||mode==="trend"||mode==="timeline"){
+  if(periods||mode==="trend"||mode==="timeline"||mode==="backup-restore"){
     const localOrigin=new URL(server.resolvedUrls.local[0]).origin;
     await mainContext.route("**/*",route=>new URL(route.request().url()).origin===localOrigin?route.continue():route.abort());
   }
@@ -185,6 +197,32 @@ try {
   }
   await page.goto(server.resolvedUrls.local[0],{waitUntil:"domcontentloaded",timeout:45000});
   await page.locator(".task-table tbody tr").first().waitFor();
+  if (mode==="backup-restore") {
+    await page.getByRole("button",{name:"软件设置",exact:true}).click();
+    const restore=page.getByRole("button",{name:"恢复数据",exact:true});
+    const notice=page.locator(".backup-result-notice");
+    const conflict=page.locator(".import-conflict-dialog");
+    for(const [round,message] of [
+      [1,"新增 1 项，合并 0 项，冲突保留 1 项。"],
+      [2,"新增 0 项，合并 1 项，冲突保留 0 项。"],
+      [3,"新增 0 项，合并 1 项，冲突保留 0 项。"],
+    ]){
+      const confirmation=page.waitForEvent("dialog");
+      await Promise.all([restore.click(),confirmation.then(dialog=>dialog.accept())]);
+      await notice.getByText(message,{exact:true}).waitFor();
+      if(round===1){
+        await conflict.getByText("来源事项（冲突 2）",{exact:true}).waitFor();
+        await conflict.getByRole("button",{name:"知道了，稍后处理"}).click();
+      }
+      await conflict.waitFor({state:"hidden"});
+      await notice.getByRole("button",{name:"关闭通知"}).click();
+    }
+    assert.deepEqual(
+      (await page.evaluate(()=>window.__inlineCalls)).filter(call=>call[0]==="restoreBackup"),
+      Array.from({length:3},()=>["restoreBackup","isolated-import.db"]),
+    );
+    console.log("PASS backup-restore: first conflict dialog, repeat merge totals, three requests for same fixture");
+  }
   if (mode==="timeline") {
     const open=id=>page.locator(".task-table tbody tr").filter({hasText:`隔离测试事项 ${id} —`}).first().click();
     const panel=page.locator(".detail-panel");
