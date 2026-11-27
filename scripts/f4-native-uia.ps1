@@ -97,6 +97,12 @@ function Get-Control([string]$pattern,[string]$type='',[int]$timeout=8) {
 }
 function Click([string]$pattern,[string]$type='Button'){
   $node=Get-Control $pattern $type
+  if($node.Current.IsOffscreen){
+    $scroll=$null
+    if($node.TryGetCurrentPattern([Windows.Automation.ScrollItemPattern]::Pattern,[ref]$scroll)){$scroll.ScrollIntoView()}
+    elseif($type -eq 'Button'){Set-InputFocus $node}
+    Start-Sleep -Milliseconds 150
+  }
   $inv=$null
   if($node.TryGetCurrentPattern([Windows.Automation.InvokePattern]::Pattern,[ref]$inv)){$inv.Invoke();return}
   $toggle=$null
@@ -170,8 +176,30 @@ function Step([string]$name,[scriptblock]$body){
   $records|ConvertTo-Json -Depth 12 | Set-Content "$Output/uia-evidence.json" -Encoding utf8
 }
 function Dialog([string]$mode,[string]$path){
-  & (Join-Path $PSScriptRoot 'f4-win-controls.ps1') -Mode $mode -Path $path -ProductPid $process.Id
+  & (Join-Path $PSScriptRoot 'f4-win-controls.ps1') -Mode $mode -Path $path -ProductPid $process.Id | ForEach-Object {Write-Host $_}
   if($LASTEXITCODE){throw "Native common dialog $mode failed"}
+}
+function Confirm-RestoreDialog {
+  $due=[DateTime]::UtcNow.AddSeconds(7)
+  while([DateTime]::UtcNow -lt $due){
+    $front=[InlineUiWindow]::GetForegroundWindow()
+    [uint32]$owner=0
+    [void][InlineUiWindow]::GetWindowThreadProcessId($front,[ref]$owner)
+    if($front -ne $window -and $owner -eq $process.Id){
+      $popup=[Windows.Automation.AutomationElement]::FromHandle($front)
+      $children=$popup.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+      $yes=$children|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and $_.Current.Name -match '^(确定|OK|Yes|是)$'}|Select-Object -First 1
+      $question=$children|Where-Object {$_.Current.Name -match '备份|恢复|合并|backup|restore'}|Select-Object -First 1
+      if($yes -and $question){$yes.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke();return}
+      if($popup.Current.Name -match '了解|排着呢|In Line|确认' -and $question){
+        [Windows.Forms.SendKeys]::SendWait('{ENTER}')
+        return
+      }
+    }
+    try{Click '^(确定|OK|Yes|是)$';return}catch{}
+    Start-Sleep -Milliseconds 160
+  }
+  throw 'Owned restore confirmation was not detected'
 }
 function Verify-Db([string]$mode){
   & python (Join-Path $PSScriptRoot 'f4_uia_db.py') $db $mode
@@ -191,7 +219,7 @@ function Invoke-Approval([string]$mode){
   $env:F4_GUI_CLIENT=$localClient
   $env:F4_GUI_TOKEN=$localToken
   try{
-    & node (Join-Path $PSScriptRoot 'f4-uia-approval.mjs') $mode $Exe $db $lab
+    & node (Join-Path $PSScriptRoot 'f4-uia-approval.mjs') $mode $Exe $db $lab | ForEach-Object {Write-Host $_}
     if($LASTEXITCODE){throw "Synthetic endpoint assertion failed at $mode"}
   }finally{Remove-Item Env:F4_GUI_CLIENT,Env:F4_GUI_TOKEN -ErrorAction SilentlyContinue}
 }
@@ -216,7 +244,9 @@ function Set-HostedDisplayScale([int]$scale){
   if(!$combo){throw 'Windows Display Settings did not expose an owned Scale control'}
   $expand=$combo.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern)
   $expand.Expand()
-  $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,("$scale%"))
+  $optionsNames=@("$scale%","$scale% (Recommended)","$scale%（推荐）","$scale% (推荐)")
+  [Windows.Automation.Condition[]]$match=@($optionsNames|ForEach-Object{[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,$_)})
+  $condition=[Windows.Automation.OrCondition]::new($match)
   $options=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Descendants,$condition)
   $select=$null
   foreach($option in $options){
@@ -254,12 +284,13 @@ try {
       foreach($mode in 'approve','reject'){
         Invoke-Approval $mode
         Click '^待办队列(?:\s+\d+)?$';Click '^软件设置$'
-        Click '^批量操作' ''
-        Click '^查看整批影响$' ''
+        Click '^批量操作'
+        Click '^查看整批影响$'
         [void](Get-Control '2030-01-0[34]')
         if($mode -eq 'approve'){
           Click '^审阅并确认$';Click '^确认整批执行$'
         }else{Click '^拒绝$'}
+        Start-Sleep -Milliseconds 700
         Invoke-Approval ("check-"+$mode)
         Screen ("native-batch-"+$mode)
       }
@@ -267,9 +298,10 @@ try {
     Step 'real-undo-approved-in-gui' {
       Invoke-Approval 'undo'
       Click '^待办队列(?:\s+\d+)?$';Click '^软件设置$'
-      Click '^AI 操作记录与撤销申请' ''
-      Click '^查看原操作前后变化$' ''
+      Click '^AI 操作记录与撤销申请'
+      Click '^查看原操作前后变化$'
       Click '^审阅并撤销$';Click '^确认撤销$'
+      Start-Sleep -Milliseconds 700
       Invoke-Approval 'check-undo'
       Screen 'native-undo'
     }
@@ -308,7 +340,7 @@ try {
     for($i=0;$i -lt 3;$i++){
       Click '^导入并恢复$'
       Dialog 'open' $source
-      Click '^(确定|OK)$'
+      Confirm-RestoreDialog
       [void](Get-Control $expected[$i])
       if($i -eq 0){[void](Get-Control 'F4 source（冲突 2）');Click '^知道了，稍后处理$'}
       [void](Get-Control '刚刚导入')
@@ -372,6 +404,7 @@ try {
   }
   Step 'real-display-dpi' {
     $verified=@(96)
+    $prereq=$null
     try {
       foreach($scale in 125,150,200){
         $measured=Set-HostedDisplayScale $scale
@@ -381,9 +414,14 @@ try {
         [void](Get-Control '工作量趋势')
         Screen "statistics-system-dpi-$scale"
       }
-    } finally {
-      if([InlineUiWindow]::GetDpiForWindow($window) -ne 96){[void](Set-HostedDisplayScale 100)}
+    } catch {$prereq=$_.Exception.Message;Write-Host "F4_UIA display primary=$prereq"}
+    finally {
+      if([InlineUiWindow]::GetDpiForWindow($window) -ne 96){
+        try{[void](Set-HostedDisplayScale 100)}
+        catch {Write-Host "F4_UIA display reset=$($_.Exception.Message)"; if(!$prereq){$prereq=$_.Exception.Message}}
+      }
     }
+    if($prereq){throw $prereq}
     @{physicalDpi=$verified;restoredDpi=[InlineUiWindow]::GetDpiForWindow($window)}
   }
 } finally {
