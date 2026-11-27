@@ -43,6 +43,34 @@ foreach($k in @($info.Environment.Keys)){if($k -match 'TOKEN|SECRET|PASSWORD|CRE
 $info.Environment['TEMP']=$lab
 $info.Environment['TMP']=$lab
 $pidSession=(Get-Process -Id $PID).SessionId
+if($env:F4_APPROVAL_ONLY -eq '1'){
+  Add-Type -AssemblyName System.Security.Cryptography.ProtectedData
+  $auth=Join-Path $env:USERPROFILE '.in-line/mcp-security/authorization.dpapi'
+  if(Test-Path -LiteralPath $auth){throw 'Approval fixture cannot use prior authorization'}
+  $warm=[Diagnostics.Process]::Start($info)
+  $warmOut=$warm.StandardOutput.ReadToEndAsync();$warmErr=$warm.StandardError.ReadToEndAsync()
+  try{
+    $until=[DateTime]::UtcNow.AddSeconds(28)
+    while(!$warm.HasExited -and !(Test-Path -LiteralPath $auth) -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 250}
+    if($warm.HasExited -or !(Test-Path -LiteralPath $auth)){throw 'Installed app did not create synthetic DPAPI root'}
+  } finally {if(!$warm.HasExited){$warm.Kill($true);[void]$warm.WaitForExit(10000)}}
+  $scope=[Security.Cryptography.DataProtectionScope]::CurrentUser
+  $clear=[Security.Cryptography.ProtectedData]::Unprotect([IO.File]::ReadAllBytes($auth),$null,$scope)
+  $store=[Text.Encoding]::UTF8.GetString($clear)|ConvertFrom-Json
+  try{
+    if($store.clients.Count -ne 0 -or $store.sid -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value){throw 'Foreign or pre-existing DPAPI grant'}
+    $localToken=[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32)).ToLowerInvariant()
+    $localClient=[Guid]::NewGuid().ToString('N')
+    $permissions=@{regularRead=$true;fullRead=$false;write=$true}
+    $store.groups=$permissions
+    $hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($localToken))).ToLowerInvariant()
+    $store.clients=@(@{id=$localClient;name='Synthetic F4 UIA client';kind='codex';tokenHash=$hash;revoked=$false;permissions=$permissions;scope=@{departments=@('F4 approval');taskTypes=$null}})
+    $store.revision++
+    $bytes=[Text.Encoding]::UTF8.GetBytes(($store|ConvertTo-Json -Depth 15 -Compress))
+    try{[IO.File]::WriteAllBytes($auth,[Security.Cryptography.ProtectedData]::Protect($bytes,$null,$scope))}
+    finally{[Array]::Clear($bytes)}
+  } finally {[Array]::Clear($clear);$store=$null}
+}
 $process=[Diagnostics.Process]::Start($info)
 $ticks=$process.StartTime.ToUniversalTime().Ticks
 $stdout=$process.StandardOutput.ReadToEndAsync()
@@ -146,6 +174,53 @@ function New-Task([string]$title,[string]$note=''){
   Click '^保存并取号$'
   [void](Get-Control ('^'+[regex]::Escape($title)+'$'))
 }
+function Invoke-Approval([string]$mode){
+  $env:F4_GUI_CLIENT=$localClient
+  $env:F4_GUI_TOKEN=$localToken
+  try{
+    & node (Join-Path $PSScriptRoot 'f4-uia-approval.mjs') $mode $Exe $db $lab
+    if($LASTEXITCODE){throw "Synthetic endpoint assertion failed at $mode"}
+  }finally{Remove-Item Env:F4_GUI_CLIENT,Env:F4_GUI_TOKEN -ErrorAction SilentlyContinue}
+}
+function Set-HostedDisplayScale([int]$scale){
+  Start-Process 'ms-settings:display'
+  $until=[DateTime]::UtcNow.AddSeconds(12)
+  $combo=$null
+  while(!$combo -and [DateTime]::UtcNow -lt $until){
+    $active=[InlineUiWindow]::GetForegroundWindow()
+    [uint32]$owner=0;[void][InlineUiWindow]::GetWindowThreadProcessId($active,[ref]$owner)
+    $settingsProcess=Get-Process -Id $owner -ErrorAction SilentlyContinue
+    if($settingsProcess.ProcessName -in @('SystemSettings','ApplicationFrameHost') -and $settingsProcess.SessionId -eq $pidSession){
+      $settingsRoot=[Windows.Automation.AutomationElement]::FromHandle($active)
+      $controls=$settingsRoot.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+      $combo=$controls|Where-Object {
+        $_.Current.ControlType -eq [Windows.Automation.ControlType]::ComboBox -and
+        ($_.Current.Name -match 'scale|size of text|缩放' -or $_.Current.AutomationId -match 'Scale')
+      }|Select-Object -First 1
+    }
+    if(!$combo){Start-Sleep -Milliseconds 250}
+  }
+  if(!$combo){throw 'Windows Display Settings did not expose an owned Scale control'}
+  $expand=$combo.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern)
+  $expand.Expand()
+  $condition=[Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::NameProperty,("$scale%"))
+  $options=[Windows.Automation.AutomationElement]::RootElement.FindAll([Windows.Automation.TreeScope]::Descendants,$condition)
+  $select=$null
+  foreach($option in $options){
+    $native=$option.Current
+    $p=Get-Process -Id $native.ProcessId -ErrorAction SilentlyContinue
+    if($p.ProcessName -in @('SystemSettings','ApplicationFrameHost') -and $p.SessionId -eq $pidSession -and !$native.IsOffscreen -and
+       $option.TryGetCurrentPattern([Windows.Automation.SelectionItemPattern]::Pattern,[ref]$select)){break}
+  }
+  if(!$select){$expand.Collapse();throw "Windows Display Settings lacks a selectable $scale% scale"}
+  $select.Select()
+  $expected=[int](96*$scale/100)
+  $end=[DateTime]::UtcNow.AddSeconds(8)
+  while([InlineUiWindow]::GetDpiForWindow($window) -ne $expected -and [DateTime]::UtcNow -lt $end){Start-Sleep -Milliseconds 220}
+  if([InlineUiWindow]::GetDpiForWindow($window) -ne $expected){throw "Native HWND did not receive $expected DPI after the Windows setting"}
+  [void][InlineUiWindow]::SetForegroundWindow($window)
+  $expected
+}
 try {
   $until=[DateTime]::UtcNow.AddSeconds(35)
   while([DateTime]::UtcNow -lt $until -and !$process.HasExited){
@@ -160,6 +235,34 @@ try {
   $productRoot=[Windows.Automation.AutomationElement]::FromHandle($window)
   "F4_UIA selected product title=$($productRoot.Current.Name) descendants=$(@(Children).Count)"
   try{Screen 'first-visible-window'}catch{"First native screenshot unavailable: $($_.Exception.Message)"}
+  if($env:F4_APPROVAL_ONLY -eq '1'){
+    Step 'real-batch-approve-reject-and-replay' {
+      Invoke-Approval 'seed'
+      foreach($mode in 'approve','reject'){
+        Invoke-Approval $mode
+        Click '^待办队列(?:\s+\d+)?$';Click '^软件设置$'
+        Click '^批量操作' ''
+        Click '^查看整批影响$' ''
+        [void](Get-Control '2030-01-0[34]')
+        if($mode -eq 'approve'){
+          Click '^审阅并确认$';Click '^确认整批执行$'
+        }else{Click '^拒绝$'}
+        Invoke-Approval ("check-"+$mode)
+        Screen ("native-batch-"+$mode)
+      }
+    }
+    Step 'real-undo-approved-in-gui' {
+      Invoke-Approval 'undo'
+      Click '^待办队列(?:\s+\d+)?$';Click '^软件设置$'
+      Click '^AI 操作记录与撤销申请' ''
+      Click '^查看原操作前后变化$' ''
+      Click '^审阅并撤销$';Click '^确认撤销$'
+      Invoke-Approval 'check-undo'
+      Screen 'native-undo'
+    }
+    if($records.FindAll({param($x) $x.status -eq 'FAIL'}).Count){exit 1}
+    exit 0
+  }
   Step 'about-and-native-window' {
     Click '^关于$'
     [void](Get-Control '^v?0\.5\.0$' 'Text')
@@ -253,6 +356,20 @@ try {
     $image=[Drawing.Image]::FromFile($png)
     try {if([Math]::Abs($image.HorizontalResolution-300) -gt 0.5 -or [Math]::Abs($image.VerticalResolution-300) -gt 0.5){throw 'PNG was not saved at 300 DPI'};@{dpiX=$image.HorizontalResolution;dpiY=$image.VerticalResolution;sha256=(Get-FileHash -LiteralPath $png).Hash}}finally{$image.Dispose()}
     Copy-Item -LiteralPath $png -Destination "$Output/actual-statistics.png"
+  }
+  Step 'real-display-dpi' {
+    $verified=@(96)
+    try {
+      foreach($scale in 125,150,200){
+        $verified+=Set-HostedDisplayScale $scale
+        Click '^统计中心$'
+        [void](Get-Control '工作量趋势')
+        Screen "statistics-system-dpi-$scale"
+      }
+    } finally {
+      if([InlineUiWindow]::GetDpiForWindow($window) -ne 96){[void](Set-HostedDisplayScale 100)}
+    }
+    @{physicalDpi=$verified;restoredDpi=[InlineUiWindow]::GetDpiForWindow($window)}
   }
 } finally {
   if(!$process.HasExited){

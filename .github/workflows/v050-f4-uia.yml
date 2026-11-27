@@ -21,6 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         scenario: [native-ui]
+        approval: ['0', '1']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -76,11 +77,12 @@ jobs:
         timeout-minutes: 10
         env:
           SCENARIO: ${{ matrix.scenario }}
-        run: ./scripts/test-native-nsis.ps1 -Scenario $env:SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/f4-uia-$env:SCENARIO"
+          F4_APPROVAL_ONLY: ${{ matrix.approval }}
+        run: ./scripts/test-native-nsis.ps1 -Scenario $env:SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/f4-uia-$env:SCENARIO-$env:F4_APPROVAL_ONLY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: f4-uia-${{ matrix.scenario }}
-          path: release/f4-uia-${{ matrix.scenario }}/
+          name: f4-uia-${{ matrix.scenario }}-${{ matrix.approval }}
+          path: release/f4-uia-${{ matrix.scenario }}-${{ matrix.approval }}/
           retention-days: 14
           if-no-files-found: warn

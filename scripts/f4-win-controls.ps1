@@ -44,7 +44,12 @@ while([DateTime]::UtcNow -lt $deadline){
   Start-Sleep -Milliseconds 120
 }
 if(!$dlg){throw "Native $Mode picker was not visible in foreground"}
-$all=$dlg.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+$ready=[DateTime]::UtcNow.AddSeconds(4)
+do {
+  $all=$dlg.FindAll([Windows.Automation.TreeScope]::Descendants,[Windows.Automation.Condition]::TrueCondition)
+  if($all.Count -gt 0){break}
+  Start-Sleep -Milliseconds 200
+} while([DateTime]::UtcNow -lt $ready)
 $field=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Edit -and ($_.Current.AutomationId -in @('1001','1148','FileNameControl') -or $_.Current.Name -match 'File name|文件名') }|Select-Object -First 1
 $ok=$all|Where-Object {$_.Current.ControlType -eq [Windows.Automation.ControlType]::Button -and ($_.Current.AutomationId -eq '1' -or $_.Current.Name -match '^(Open|Save|保存|打开)(\s.*)?$')}|Select-Object -First 1
 if($field -and $ok){
@@ -58,7 +63,9 @@ if($field -and $ok){
   [void][F4Win]::GetWindowThreadProcessId([F4Win]::GetForegroundWindow(),[ref]$focusedOwner)
   if($focusedOwner -ne $ProductPid -or $target.Current.ControlType -notin @([Windows.Automation.ControlType]::Edit,[Windows.Automation.ControlType]::ComboBox)){
     $known=@($all|ForEach-Object {$c=$_.Current;"$($c.ControlType.ProgrammaticName) [$($c.AutomationId)] $($c.Name)"}|Select-Object -First 30)
-    throw "Native $Mode picker did not focus an owned filename control. Dialog=$($dlg.Current.Name); controls=$($known -join ' / ')"
+    $caption=$dlg.Current.Name
+    if($focusedOwner -eq $ProductPid){[Windows.Forms.SendKeys]::SendWait('{ESC}')}
+    throw "Native $Mode picker did not focus an owned filename control. Dialog=$caption; controls=$($known -join ' / ')"
   }
   [Windows.Forms.Clipboard]::SetText($Path)
   [Windows.Forms.SendKeys]::SendWait('^a')
