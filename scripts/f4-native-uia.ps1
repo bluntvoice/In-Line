@@ -330,6 +330,7 @@ try {
       'statistics' {R1-Stats}
       'statistics-state' {R1-StatsState}
       'business' {R1-Business}
+      'business-tail' {R1-Business}
       'dpi125' {R1-Dpi 125}
       'dpi200' {R1-Dpi 200}
       'dpi125-extended' {R1-DpiExtended}

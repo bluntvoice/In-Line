@@ -81,10 +81,33 @@ function R1-Select([string]$control,[string]$option){
   [uint32]$owner=0
   [void][InlineUiWindow]::GetWindowThreadProcessId([InlineUiWindow]::GetForegroundWindow(),[ref]$owner)
   if($owner -ne $process.Id){throw 'Select popup is not owned by the test app'}
-  $point=$entry[0].GetClickablePoint()
-  if(![InlineUiWindow]::SetCursorPos([int]$point.X,[int]$point.Y)){throw 'Could not set pointer to the exact option'}
-  [InlineUiWindow]::mouse_event(2,0,0,0,[IntPtr]::Zero)
-  [InlineUiWindow]::mouse_event(4,0,0,0,[IntPtr]::Zero)
+  $target=$entry[0]
+  $bounds=$target.Current.BoundingRectangle
+  if(!$bounds.IsEmpty -and $bounds.Width -gt 1 -and $bounds.Height -gt 1){
+    $x=[int]($bounds.X+$bounds.Width/2)
+    $y=[int]($bounds.Y+$bounds.Height/2)
+    if(![InlineUiWindow]::SetCursorPos($x,$y)){throw 'Could not set pointer to the exact option'}
+    [InlineUiWindow]::mouse_event(2,0,0,0,[IntPtr]::Zero)
+    [InlineUiWindow]::mouse_event(4,0,0,0,[IntPtr]::Zero)
+    return
+  }
+  $walker=[Windows.Automation.TreeWalker]::ControlViewWalker
+  $container=$walker.GetParent($target)
+  if(!$container){throw 'Exact option has no accessible parent'}
+  $entries=$container.FindAll([Windows.Automation.TreeScope]::Children,[Windows.Automation.Condition]::TrueCondition)
+  $items=@($entries|Where-Object {$_.Current.ControlType.ProgrammaticName -eq $target.Current.ControlType.ProgrammaticName})
+  $position=-1
+  for($idx=0;$idx -lt $items.Count;$idx++){
+    if($items[$idx].Equals($target)){$position=$idx;break}
+  }
+  if($position -lt 0 -or $items.Count -lt 2){throw 'Exact option position cannot be determined within popup'}
+  Write-Host "F4_R1_SELECT popupPosition=$position count=$($items.Count) target=$($target.Current.Name)"
+  [Windows.Forms.SendKeys]::SendWait('{HOME}')
+  for($idx=0;$idx -lt $position;$idx++){
+    [Windows.Forms.SendKeys]::SendWait('{DOWN}')
+    Start-Sleep -Milliseconds 70
+  }
+  [Windows.Forms.SendKeys]::SendWait('{ENTER}')
 }
 function R1-Date([string]$name,[datetime]$date){
   $stem=[regex]::Escape($name)

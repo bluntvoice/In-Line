@@ -4,6 +4,7 @@ function R1-CheckBusiness([string]$title,[string]$state,[string]$expected='-'){
   $row
 }
 function R1-Business {
+  if($env:F4_R1_MODE -ne 'business-tail'){
   Step 'r1-business-new-edit-defer-queue' {
     R1-NewTask 'F4 R1 main' 'original'
     R1-Open '待办队列' 'F4 R1 main'
@@ -44,6 +45,7 @@ function R1-Business {
     Click '^关闭$'
     @{archived=$true;reopened=$true;priorHistory=$true}
   }
+  }
   Step 'r1-business-relationship' {
     Click '^待办队列(?:\s+\d+)?$'
     R1-NewTask 'F4 R1 parent' 'parent attribute'
@@ -63,6 +65,7 @@ function R1-Business {
     Click '^关闭$'
     @{parentId=$parent.parent;changedAndRemoved=$true;independentAttributes=$true}
   }
+  if($env:F4_R1_MODE -ne 'business-tail'){
   Step 'r1-business-urgent-deadline' {
     try{Click '^关闭$'}catch{}
     Click '^待办队列(?:\s+\d+)?$'
@@ -79,6 +82,7 @@ function R1-Business {
     try{Click '^关闭$'}catch{}
     @{deadline='one-hour preset';urgency=$true}
   }
+  }
   Step 'r1-business-future-and-early-entry' {
     try{Click '^关闭$'}catch{}
     Click '^待办队列(?:\s+\d+)?$'
@@ -91,7 +95,7 @@ function R1-Business {
     Click '^提前入队$'
     Click '^确认加入$'
     try{Click '^关闭$'}catch{}
-    R1-Open '待办队列' 'F4 R1 future'
+    R1-Open '待办队列' 'F4 R1 future' ' 提前入队'
     $after=R1-CheckBusiness 'F4 R1 future' 'early'
     if($before.number -ne $after.number -or !@($after.allocations|Where-Object {$_.voided_at -and $_.queue_date -eq $planned.ToString('yyyy-MM-dd')}).Count){
       throw 'Scheduled reservation was not safely voided'
@@ -123,6 +127,7 @@ function R1-Business {
     Click '^关闭$'
     @{merge=$true;trash=$true;restore=$true}
   }
+  if( -ne 'business-tail'){
   Step 'r1-business-restart' {
     try{Click '^关闭$'}catch{}
     Click '^待办队列(?:\s+\d+)?$'
@@ -151,6 +156,7 @@ function R1-Business {
     if($second.number -ne $first.number -or $second.work.Count -ne $first.work.Count){throw 'Persisted task or history changed'}
     Screen 'business-after-restart'
     @{number=$second.number;workEvents=$second.work.Count;persisted=$true;shutdown='bounded termination of exact test PID'}
+  }
   }
 }
 function R1-DateText([datetime]$a,[datetime]$b){
