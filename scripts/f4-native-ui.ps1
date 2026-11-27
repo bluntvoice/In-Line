@@ -1,6 +1,6 @@
 param([Parameter(Mandatory)][string]$Exe,[Parameter(Mandatory)][string]$Output)
 $ErrorActionPreference='Stop'
-if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:GITHUB_REF -ne 'refs/heads/diagnostics/v050-f4-installed-20261127'){throw 'Native GUI requires the pinned hosted Windows workflow'}
+if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:GITHUB_REF -notin @('refs/heads/diagnostics/v050-f4-installed-20261127','refs/heads/diagnostics/v050-f4-medium-20261127')){throw 'Native GUI requires the pinned hosted Windows workflow'}
 $root=[IO.Path]::GetFullPath((Join-Path $env:RUNNER_TEMP ("f4-desktop-"+[Guid]::NewGuid().ToString('N'))))
 [void][IO.Directory]::CreateDirectory($root)
 $probe=@(& "$PSScriptRoot/f4-hosted-admission.ps1" -Desktop -Installed)

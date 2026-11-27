@@ -1,10 +1,10 @@
 param([switch]$Desktop,[switch]$Installed)
 $ErrorActionPreference='Stop'
-if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:GITHUB_REF -notin @('refs/heads/diagnostics/v050-f4-integration-20261127','refs/heads/diagnostics/v050-f4-installed-20261127','refs/heads/diagnostics/v050-f4-uia-20261127')) { throw 'Unapproved F4 hosted identity' }
+if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:GITHUB_REF -notin @('refs/heads/diagnostics/v050-f4-integration-20261127','refs/heads/diagnostics/v050-f4-installed-20261127','refs/heads/diagnostics/v050-f4-uia-20261127','refs/heads/diagnostics/v050-f4-medium-20261127')) { throw 'Unapproved F4 hosted identity' }
 if (Get-Process -Name 'in-line','in-line-cli','in-line-mcp' -ErrorAction SilentlyContinue) { throw 'Existing In Line process' }
 $paths=@((Join-Path $env:APPDATA 'in-line'),(Join-Path $env:USERPROFILE '.in-line'),(Join-Path $env:USERPROFILE '.codex/config.toml'))
 if(!$Installed){$paths+=@('HKCU:\Software\github\In Line','HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\In Line')}
-elseif($env:GITHUB_REF -ne 'refs/heads/diagnostics/v050-f4-installed-20261127'){throw 'Installed desktop probe outside its harness branch'}
+elseif($env:GITHUB_REF -notin @('refs/heads/diagnostics/v050-f4-installed-20261127','refs/heads/diagnostics/v050-f4-medium-20261127')){throw 'Installed desktop probe outside its harness branch'}
 foreach($p in $paths){
   if(Test-Path -LiteralPath $p){throw 'In Line or Codex state already exists'}
 }

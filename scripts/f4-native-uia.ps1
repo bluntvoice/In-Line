@@ -1,6 +1,6 @@
 param([Parameter(Mandatory)][string]$Exe,[Parameter(Mandatory)][string]$Output)
 $ErrorActionPreference='Stop'
-if($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:GITHUB_REF -ne 'refs/heads/diagnostics/v050-f4-uia-20261127'){throw 'Native UIA requires the pinned hosted workflow'}
+if($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:GITHUB_REF -notin @('refs/heads/diagnostics/v050-f4-uia-20261127','refs/heads/diagnostics/v050-f4-medium-20261127')){throw 'Native UIA requires the pinned hosted workflow'}
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms,System.Drawing
 Add-Type -TypeDefinition @'
 using System;
@@ -128,6 +128,10 @@ try {
   $dpi=[InlineUiWindow]::GetDpiForWindow($window)
   if($dpi -ne 96){throw "Initial runner DPI is $dpi, expected 96"}
   "F4_UIA hwnd=$window pid=$($process.Id) session=$pidSession dpi=$dpi sha256=$((Get-FileHash -LiteralPath $Exe).Hash)"
+  (whoami /groups | Select-String 'Mandatory Label').Line
+  $rootNode=[Windows.Automation.AutomationElement]::FromHandle($window)
+  "F4_UIA root=$($rootNode.Current.Name) class=$($rootNode.Current.ClassName) childCount=$(@(Children).Count)"
+  try{Screen 'first-visible-window'}catch{"F4 screenshot admission: $($_.Exception.Message)"}
   Step 'about-and-native-window' {
     Click '^关于$'
     [void](Get-Control '\b0\.5\.0\b')

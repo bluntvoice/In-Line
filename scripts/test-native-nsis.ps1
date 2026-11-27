@@ -360,7 +360,11 @@ try {
         Test-DatabaseUpgrade $oldVersion
     } elseif($Scenario -eq 'native-ui') {
         $null=Install-Candidate 'interactive-fresh'
-        & (Get-Process -Id $PID).Path -NoProfile -STA -File (Join-Path $PSScriptRoot 'f4-native-uia.ps1') -Exe (Join-Path $install 'in-line.exe') -Output $out
+        if($env:F4_DESKTOP_METHOD -eq 'medium'){
+            & (Get-Process -Id $PID).Path -NoProfile -STA -File (Join-Path $PSScriptRoot 'f4-medium-launch.ps1') -Exe (Join-Path $install 'in-line.exe') -Output $out
+        } elseif($env:F4_DESKTOP_METHOD -eq 'uia'){
+            & (Get-Process -Id $PID).Path -NoProfile -STA -File (Join-Path $PSScriptRoot 'f4-native-uia.ps1') -Exe (Join-Path $install 'in-line.exe') -Output $out
+        } else {throw 'Unknown hosted GUI automation method'}
         Check ($LASTEXITCODE -eq 0) 'Native GUI acceptance driver finished' $true
         $null=Uninstall-Candidate 'interactive-uninstall'
     } elseif($Scenario -eq 'lifecycle') {
