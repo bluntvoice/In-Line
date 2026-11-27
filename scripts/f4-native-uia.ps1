@@ -322,20 +322,38 @@ try {
     @{dpi=$dpi;actualHwnd=$true;about='0.5.0'}
   }
   }
+  if($env:F4_R1_MODE){
+    . (Join-Path $PSScriptRoot 'f4-r1-uia-support.ps1')
+    . (Join-Path $PSScriptRoot 'f4-r1-uia-cases.ps1')
+    switch($env:F4_R1_MODE){
+      'timeline' {R1-Timeline}
+      'statistics' {R1-Stats}
+      'business' {R1-Business}
+      'dpi125' {R1-Dpi 125}
+      'dpi200' {R1-Dpi 200}
+      'restore' {}
+      default {throw 'Unknown F4-R1 scenario'}
+    }
+  }
   if(!$env:F4_R1_MODE -or $env:F4_R1_MODE -eq 'restore'){
   Step 'three-real-restore-rounds' {
     New-Task 'F4 source' 'original source note'
     Click '^软件设置$';Click '^立即备份$'
+    [void](Get-Control '^备份完成：InLine-backup-.*-manual\.db$')
     $backupDir=Join-Path (Split-Path $db) 'backups'
     $backup=$null
     $until=[DateTime]::UtcNow.AddSeconds(10)
     while(!$backup -and [DateTime]::UtcNow -lt $until){
-      $backup=Get-ChildItem -LiteralPath $backupDir -Filter '*-manual.db' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+      $backup=Get-ChildItem -LiteralPath $backupDir -Filter '*-manual.db' -File -ErrorAction SilentlyContinue | Where-Object Length -GE 4096 | Select-Object -First 1
       if(!$backup){Start-Sleep -Milliseconds 200}
     }
     if(!$backup){throw 'GUI did not create backup'}
     $source=Join-Path $lab 'import-source.db'
     Copy-Item -LiteralPath $backup.FullName -Destination $source
+    if($env:F4_R1_MODE -eq 'restore'){
+      & python -X utf8 (Join-Path $PSScriptRoot 'f4-r1-fixtures.py') $source 'backup-source' | ForEach-Object {Write-Host "F4_R1 source $_"}
+      if($LASTEXITCODE){throw 'GUI manual backup is not a valid synthetic source'}
+    }
     $sourceHash=(Get-FileHash -LiteralPath $source).Hash
     (Get-Item -LiteralPath $source).LastWriteTimeUtc=[DateTime]::new(2024,1,1)
     for($i=1;$i -le 13;$i++){Copy-Item -LiteralPath $source -Destination (Join-Path $backupDir ('InLine-backup-20261001-0101{0:00}-manual.db' -f $i))}
