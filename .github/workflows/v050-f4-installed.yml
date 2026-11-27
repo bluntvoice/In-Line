@@ -1,0 +1,86 @@
+name: F4 installed GUI and database paths
+on:
+  push:
+    branches: [diagnostics/v050-f4-installed-20261127]
+permissions:
+  contents: read
+  actions: read
+env:
+  PRODUCT_SHA: e276844fc08b3a308c14938f0c6cc232926bfa3c
+  NATIVE_RUN: '45931820102'
+  NATIVE_PACKAGE_HARNESS: f9c6f0e5510a9ed5c816aa367a186826696c9da4
+  V14_RUN: '45932083312'
+  V14_PACKAGE_HARNESS: 46148b15ab5dcbaf1ecb7e6163f811bc53133f1c
+jobs:
+  installed:
+    if: github.repository == 'bluntvoice/In-Line' && github.ref == 'refs/heads/diagnostics/v050-f4-installed-20261127'
+    runs-on: windows-2025
+    timeout-minutes: 26
+    strategy:
+      max-parallel: 2
+      fail-fast: false
+      matrix:
+        scenario: [upgrade-v8, upgrade-v14, native-ui]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Admit fresh runner and verify package provenance
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCENARIO: ${{ matrix.scenario }}
+        run: |
+          ./scripts/check-github-actions-runtime.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ./scripts/f4-hosted-admission.ps1
+          if ((git rev-parse HEAD) -ne $env:GITHUB_SHA -or (git status --porcelain)) {throw 'Harness commit mismatch'}
+          $ref=git ls-remote origin refs/heads/codex/v050-f1-f2-f3
+          if ($LASTEXITCODE -or ($ref -split '\s+')[0] -ne $env:PRODUCT_SHA) {throw 'Product commit drift'}
+          function Wait-Package([string]$id,[string]$harness,[string]$jobName){
+            $deadline=[DateTime]::UtcNow.AddMinutes(15)
+            while([DateTime]::UtcNow -lt $deadline){
+              $m=gh run view $id --repo $env:GITHUB_REPOSITORY --json headSha,status,jobs | ConvertFrom-Json
+              if($LASTEXITCODE -or $m.headSha -ne $harness){throw 'Unverified package source run'}
+              $job=$m.jobs | Where-Object name -EQ $jobName
+              if($job.status -eq 'completed'){
+                if($job.conclusion -ne 'success'){throw "Prerequisite $jobName did not succeed"}
+                return
+              }
+              Start-Sleep -Seconds 15
+            }
+            throw "Time budget expired waiting for $jobName"
+          }
+          Wait-Package $env:NATIVE_RUN $env:NATIVE_PACKAGE_HARNESS 'package'
+          $pkg=Join-Path $env:RUNNER_TEMP 'native-nsis-package'
+          gh run download $env:NATIVE_RUN --repo $env:GITHUB_REPOSITORY --name native-nsis-package --dir $pkg
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          $prov=Get-Content "$pkg/provenance.json" -Raw|ConvertFrom-Json
+          if($prov.productCommit -ne $env:PRODUCT_SHA -or $prov.harnessCommit -ne $env:NATIVE_PACKAGE_HARNESS -or $prov.installerSha256 -ne (Get-FileHash "$pkg/candidate.exe").Hash){throw 'Package provenance mismatch'}
+          if($env:SCENARIO -eq 'upgrade-v14'){
+            Wait-Package $env:V14_RUN $env:V14_PACKAGE_HARNESS 'v14-development-package'
+            $oldRoot=Join-Path $env:RUNNER_TEMP 'f4-v14'
+            gh run download $env:V14_RUN --repo $env:GITHUB_REPOSITORY --name inline-f4-v14-control --dir $oldRoot
+            if($LASTEXITCODE){exit $LASTEXITCODE}
+            $setup=@(Get-ChildItem -LiteralPath $oldRoot -Recurse -File -Filter '*.exe')
+            $ver=@(Get-ChildItem -LiteralPath $oldRoot -Recurse -File -Filter 'installer-verification.json')
+            if($setup.Count -ne 1 -or $ver.Count -ne 1){throw 'v14 artifact contents unexpected'}
+            Copy-Item -LiteralPath $setup[0].FullName -Destination "$pkg/baseline-v14.exe"
+            Copy-Item -LiteralPath $ver[0].FullName -Destination "$pkg/v14-verification.json"
+          }
+          "F4_PACKAGE product=$env:PRODUCT_SHA harness=$env:GITHUB_SHA packageHash=$($prov.installerSha256)"
+      - name: Execute isolated installed workflow
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          SCENARIO: ${{ matrix.scenario }}
+        run: ./scripts/test-native-nsis.ps1 -Scenario $env:SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/f4-installed-$env:SCENARIO"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: f4-installed-${{ matrix.scenario }}
+          path: release/f4-installed-${{ matrix.scenario }}/
+          retention-days: 14
+          if-no-files-found: warn

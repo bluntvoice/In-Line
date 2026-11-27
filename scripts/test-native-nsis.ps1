@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][ValidateSet('lifecycle','upgrade','file-lock','mcp-lock','uninstaller-lock','file-deny','registry-deny','uninstall-registry-deny','shortcut-deny','ps-exit','ps-compile-deny','ps-hang')][string]$Scenario,
+    [Parameter(Mandatory)][ValidateSet('lifecycle','upgrade','file-lock','mcp-lock','uninstaller-lock','file-deny','registry-deny','uninstall-registry-deny','shortcut-deny','ps-exit','ps-compile-deny','ps-hang','upgrade-v8','upgrade-v14','native-ui')][string]$Scenario,
     [Parameter(Mandatory)][string]$PackageDirectory,
     [Parameter(Mandatory)][string]$ExpectedCommit,
     [Parameter(Mandatory)][string]$OutputDirectory
@@ -268,6 +268,78 @@ function Probe-Programs {
     $doctor=Get-Content -LiteralPath (Join-Path $out 'cli-doctor.json') -Raw | ConvertFrom-Json
     Check ($doctor.apiVersion -eq 1 -and $doctor.status -in @('ok','error')) 'Installed CLI doctor returns its structured protocol (profile authorization separately scoped)'
 }
+function Verify-Database([string]$mode,[string]$path,[int]$version) {
+    $rows=@(& python (Join-Path $PSScriptRoot 'f4_install_db.py') $mode $path $version)
+    if($LASTEXITCODE){throw "SQLite $mode v$version assertions failed"}
+    if($mode -ne 'version'){"SQLite $mode $($rows -join '')"}
+}
+function Open-InstalledDatabase([int]$version,[string]$label) {
+    $gui=Start-Owned (Join-Path $install 'in-line.exe') @() $label
+    try {
+        $until=[DateTime]::UtcNow.AddSeconds(35)
+        $ready=$false
+        while([DateTime]::UtcNow -lt $until -and !$gui.process.HasExited) {
+            if(Test-Path -LiteralPath $script:database -PathType Leaf) {
+                & python (Join-Path $PSScriptRoot 'f4_install_db.py') version $script:database $version 2>$null
+                if(!$LASTEXITCODE){$ready=$true;break}
+            }
+            Start-Sleep -Milliseconds 400
+        }
+        Check $ready "$label production app opens schema v$version" $true
+    } finally {
+        # The app can keep running in the notification area after closing its main window.
+        if(!$gui.process.HasExited){[void]$gui.process.CloseMainWindow();Start-Sleep -Milliseconds 250}
+        Stop-Owned $gui
+        $gui.stderr.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $out "$label-stderr.txt") -Encoding utf8
+    }
+}
+function Test-DatabaseUpgrade([int]$oldVersion) {
+    $script:database=Join-Path $env:APPDATA 'in-line/inline.db'
+    $oldInstaller=$baseline
+    $oldSha='1baac96252af2665274f2a955b3adacfa80519fd'
+    if($oldVersion -eq 8) {
+        Check ((Hash $oldInstaller) -eq 'f8e0bf5d1ec4ef1c4759579713aa8ca49be05624acd74c50af49a62b30842f68') 'Pinned v0.4.0 baseline hash' $true
+    } else {
+        $oldSha='62288a61f673f49ec8530063bb8dc349dcf3a934'
+        $oldInstaller=Join-Path $package 'baseline-v14.exe'
+        $oldVerification=Get-Content (Join-Path $package 'v14-verification.json') -Raw | ConvertFrom-Json
+        Check ($oldVerification.ExpectedCommit -eq $oldSha -and $oldVerification.PayloadMatched -and (Hash $oldInstaller) -eq $oldVerification.Sha256.ToLowerInvariant()) 'Pinned v14 payload and installer hash' $true
+    }
+    $result.databaseMigration=[ordered]@{baselineSha=$oldSha;baselineInstallerSha256=(Hash $oldInstaller);startupSchema=$oldVersion;finalSchema=15}
+    $op=Run-NSIS $oldInstaller 'baseline-install'
+    Check (!$op.timedOut -and $op.exitCode -eq 0) 'Baseline NSIS installation completed' $true
+    $oldBinary=Hash (Join-Path $install 'in-line.exe')
+    Open-InstalledDatabase $oldVersion 'baseline-gui'
+    Verify-Database 'seed' $database $oldVersion
+    $seedHash=Hash $database
+    $null=Install-Candidate 'upgrade-to-v15'
+    Check ((Hash $database) -eq $seedHash) 'NSIS upgrade preserves source before app migration' $true
+    Open-InstalledDatabase 15 'candidate-gui'
+    Verify-Database 'verify' $database 15
+    $before=@(Get-ChildItem -LiteralPath (Join-Path (Split-Path $database) 'backups') -File -Filter '*-before-migration.db')
+    Check ($before.Count -eq 1) 'Real program generated exactly one before-migration backup' $true
+    Verify-Database 'verify' $before[0].FullName $oldVersion
+    $prove=Hash $before[0].FullName
+    Verify-Database 'sentinel' $database 15
+    $retained=Join-Path $lab 'preserved-v15.db'
+    Move-Item -LiteralPath $database -Destination $retained
+    $retainedHash=Hash $retained
+    $null=Uninstall-Candidate 'candidate-uninstall-for-data-rollback'
+    $op=Run-NSIS $oldInstaller 'reinstall-old-program'
+    Check (!$op.timedOut -and $op.exitCode -eq 0 -and (Hash (Join-Path $install 'in-line.exe')) -eq $oldBinary) 'System rollback restored exact prior program bytes' $true
+    Check (!(Test-Path -LiteralPath $database)) 'Rollback destination has no active v15 database' $true
+    Copy-Item -LiteralPath $before[0].FullName -Destination $database
+    Check ((Hash $database) -eq $prove) 'Old program receives matched before-migration backup' $true
+    Open-InstalledDatabase $oldVersion 'rollback-gui'
+    Verify-Database 'verify' $database $oldVersion
+    Verify-Database 'preserved' $retained 15
+    Check ((Hash $retained) -eq $retainedHash -and (Hash $before[0].FullName) -eq $prove) 'Rollback preserves v15 with its new data and untouched migration backup' $true
+    $result.databaseMigration.sourceDatabaseSha256=$seedHash
+    $result.databaseMigration.beforeMigrationSha256=$prove
+    $result.databaseMigration.preservedV15Sha256=$retainedHash
+    $op=Run-NSIS (Join-Path $install 'uninstall.exe') 'uninstall-old-program' $true
+    Check (!$op.timedOut -and $op.exitCode -eq 0) 'Old program uninstalled after verification' $true
+}
 try {
     Check ([IO.Path]::GetFullPath($lab).StartsWith([IO.Path]::GetFullPath($env:RUNNER_TEMP)+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) 'Lab stays under RUNNER_TEMP' $true
     foreach($path in @((Join-Path $env:APPDATA 'in-line'),(Join-Path $env:USERPROFILE '.in-line'),(Join-Path $env:USERPROFILE '.codex/config.toml'))) { Check (!(Test-Path -LiteralPath $path)) 'Fresh hosted user has no preexisting In-Line/Codex data' $true }
@@ -280,10 +352,18 @@ try {
     Check ($provenance.productCommit -eq $ExpectedCommit -and $payload.build.exactCommit -eq $ExpectedCommit -and (Hash $candidate) -eq $verification.Sha256.ToLowerInvariant()) 'Verified formal source and installer digest' $true
     $result.installerSha256=Hash $candidate;$result.baselineSha256=Hash $baseline
     New-Item -ItemType Directory -Path $install -Force | Out-Null
-    Seed-SyntheticData
+    if($Scenario -ne 'native-ui'){Seed-SyntheticData}
     Check ((@((DataState).Values | Where-Object { !$_.Length })).Count -eq 0) 'Synthetic data baseline digests are readable' $true
     $before=Snapshot 'initial'
-    if($Scenario -eq 'lifecycle') {
+    if($Scenario -in @('upgrade-v8','upgrade-v14')) {
+        $oldVersion=if($Scenario -eq 'upgrade-v8'){8}else{14}
+        Test-DatabaseUpgrade $oldVersion
+    } elseif($Scenario -eq 'native-ui') {
+        $null=Install-Candidate 'interactive-fresh'
+        & (Join-Path $PSScriptRoot 'f4-native-ui.ps1') -Exe (Join-Path $install 'in-line.exe') -Output $out
+        Check ($LASTEXITCODE -eq 0) 'Native GUI acceptance driver finished' $true
+        $null=Uninstall-Candidate 'interactive-uninstall'
+    } elseif($Scenario -eq 'lifecycle') {
         $null=Install-Candidate 'fresh';$fresh=Snapshot 'fresh'
         Probe-Programs
         $preserved=DataState
