@@ -1,0 +1,122 @@
+name: F4 integrated candidate evidence
+on:
+  push:
+    branches: [diagnostics/v050-f4-integration-20261127]
+permissions:
+  contents: read
+  actions: read
+env:
+  PRODUCT_SHA: e276844fc08b3a308c14938f0c6cc232926bfa3c
+  PRODUCT_TREE: 536bf824ff1a4217541ad8c78bd32f1b8eb476c6
+  V14_SHA: 62288a61f673f49ec8530063bb8dc349dcf3a934
+jobs:
+  migration-endpoints:
+    if: github.repository == 'bluntvoice/In-Line' && github.ref == 'refs/heads/diagnostics/v050-f4-integration-20261127'
+    runs-on: windows-2025
+    timeout-minutes: 32
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.PRODUCT_SHA }}
+          path: product
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/src-tauri
+      - name: Admit hosted lab and bind product source
+        shell: pwsh
+        run: |
+          ./harness/scripts/check-github-actions-runtime.ps1
+          ./harness/scripts/f4-hosted-admission.ps1
+          $remote = git -C product ls-remote origin refs/heads/codex/v050-f1-f2-f3
+          if ($LASTEXITCODE -ne 0 -or ($remote -split '\s+')[0] -ne $env:PRODUCT_SHA -or (git -C product rev-parse HEAD) -ne $env:PRODUCT_SHA -or (git -C product rev-parse 'HEAD^{tree}') -ne $env:PRODUCT_TREE -or (git -C product status --porcelain)) { throw 'F4 source mismatch' }
+          if ((git -C harness rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'F4 harness mismatch' }
+          git -C product merge-base --is-ancestor $env:V14_SHA $env:PRODUCT_SHA
+          if ($LASTEXITCODE) { throw 'F4 ancestry mismatch' }
+          $root = Join-Path $env:RUNNER_TEMP "inline-f4-$env:GITHUB_RUN_ID"
+          if (Test-Path $root) { throw 'F4 scratch path occupied' }
+          foreach ($name in @('temp','appdata','localappdata')) { [void][IO.Directory]::CreateDirectory((Join-Path $root $name)) }
+          @("F2_RUN_ROOT=$root","TEMP=$root/temp","TMP=$root/temp","APPDATA=$root/appdata","LOCALAPPDATA=$root/localappdata",'CARGO_PROFILE_TEST_DEBUG=0','CARGO_PROFILE_DEV_DEBUG=0','CARGO_INCREMENTAL=0') | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "F4 harness=$env:GITHUB_SHA product=$env:PRODUCT_SHA tree=$env:PRODUCT_TREE"
+      - name: Real production-open migration and isolated endpoints
+        shell: pwsh
+        working-directory: product
+        timeout-minutes: 25
+        run: |
+          $env:GITHUB_SHA=$env:PRODUCT_SHA
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & ../harness/scripts/verify-f4-hosted.ps1
+  v14-development-package:
+    if: github.repository == 'bluntvoice/In-Line' && github.ref == 'refs/heads/diagnostics/v050-f4-integration-20261127'
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.V14_SHA }}
+          path: product
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: product/src-tauri
+      - name: Build exact v14 upgrade control installer
+        shell: pwsh
+        run: |
+          ./harness/scripts/f4-hosted-admission.ps1
+          Set-Location product
+          if ((git rev-parse HEAD) -ne $env:V14_SHA -or (git status --porcelain)) { throw 'v14 source mismatch' }
+          $env:GITHUB_SHA=$env:V14_SHA
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run dist
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/verify-cli-package.mjs src-tauri/target/release --expected-commit $env:V14_SHA --companions src-tauri/binaries --target x86_64-pc-windows-msvc --output release/package-build.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $setup=@(Get-ChildItem src-tauri/target/release/bundle/nsis/*.exe -File)
+          if ($setup.Count -ne 1) { throw 'Expected one v14 installer' }
+          ./scripts/verify-installer-package.ps1 -InstallerPath $setup[0].FullName -BinaryDirectory src-tauri/target/release -ExpectedCommit $env:V14_SHA
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: inline-f4-v14-control
+          path: |
+            product/src-tauri/target/release/bundle/nsis/*.exe
+            product/release/package-build.json
+            product/release/installer-payload.json
+            product/release/installer-verification.json
+          retention-days: 14
+          if-no-files-found: error
+  desktop-capabilities:
+    if: github.repository == 'bluntvoice/In-Line' && github.ref == 'refs/heads/diagnostics/v050-f4-integration-20261127'
+    runs-on: windows-2025
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Measure Windows desktop and DPI admission conditions
+        shell: pwsh
+        run: ./scripts/f4-hosted-admission.ps1 -Desktop
