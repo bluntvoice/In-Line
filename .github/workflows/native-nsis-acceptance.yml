@@ -29,6 +29,7 @@ concurrency:
 jobs:
   metadata-components:
     if: github.event_name == 'workflow_dispatch'
+    needs: package
     runs-on: windows-2025
     timeout-minutes: 10
     steps:
@@ -77,8 +78,23 @@ jobs:
         run: |
           if ($env:PRODUCT_REF -cnotmatch '^[0-9a-f]{40}$') { throw 'A full commit SHA is required' }
           $remote = git -C harness ls-remote origin refs/heads/feat/scheduled-items
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $baseSha = ($remote -split '\s+')[0]
-          if ($env:CANDIDATE_BRANCH) {
+          if ($env:CANDIDATE_BRANCH -eq 'codex/v050-f1-f2-f3') {
+            if ($env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or
+                $env:RUNNER_OS -ne 'Windows' -or $env:GITHUB_REF -ne 'refs/heads/diagnostics/v050-f4-native-20261127' -or
+                $env:PRODUCT_REF -ne 'e276844fc08b3a308c14938f0c6cc232926bfa3c') { throw 'Unexpected F4 harness, host or pinned product SHA' }
+            $reviewedBase = 'baca2736a30154cb748174d73d907d66a2604e9a'
+            $candidate = git -C harness ls-remote origin "refs/heads/$env:CANDIDATE_BRANCH"
+            if ($LASTEXITCODE -ne 0 -or ($candidate -split '\s+')[0] -ne $env:PRODUCT_REF) { throw 'F4 product branch drift' }
+            git -C harness fetch origin $env:PRODUCT_REF $reviewedBase
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            git -C harness merge-base --is-ancestor $reviewedBase $env:PRODUCT_REF
+            if ($LASTEXITCODE -ne 0) { throw 'F4 product does not descend from reviewed F2 base' }
+            if ((git -C harness rev-parse "$env:PRODUCT_REF^{tree}") -ne '536bf824ff1a4217541ad8c78bd32f1b8eb476c6' -or
+                (git -C harness rev-parse HEAD) -ne $env:GITHUB_SHA) { throw 'F4 product tree or harness SHA mismatch' }
+            "F4 product=$env:PRODUCT_REF harness=$env:GITHUB_SHA base=$reviewedBase"
+          } elseif ($env:CANDIDATE_BRANCH) {
             if ($env:CANDIDATE_BRANCH -ne 'codex/p2c-r1-20261030' -or $baseSha -ne 'ebeb57106a898fb47e0a0d3a6ca05e7b56cfbe75') { throw 'Unapproved candidate branch or changed development baseline' }
             $candidate = git -C harness ls-remote origin "refs/heads/$env:CANDIDATE_BRANCH"
             if (($candidate -split '\s+')[0] -ne $env:PRODUCT_REF) { throw 'Candidate SHA differs from the explicitly selected temporary test branch' }
@@ -216,7 +232,15 @@ jobs:
         env:
           NATIVE_SCENARIO: ${{ matrix.scenario }}
           PRODUCT_SHA: ${{ needs.package.outputs.product_sha }}
-        run: ./scripts/test-native-nsis.ps1 -Scenario $env:NATIVE_SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/native-nsis-$env:NATIVE_SCENARIO"
+        run: |
+          if ($env:GITHUB_REPOSITORY -ne 'bluntvoice/In-Line' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:RUNNER_OS -ne 'Windows') { throw 'Unapproved NSIS runner' }
+          if (Get-Process -Name 'in-line','in-line-cli','in-line-mcp' -ErrorAction SilentlyContinue) { throw 'Existing In Line process on fresh runner' }
+          foreach ($path in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\In Line','HKCU:\Software\github\In Line')) {
+            if (Test-Path -LiteralPath $path) { throw 'Existing In Line registration on fresh runner' }
+          }
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          "F4 NSIS admission SID=$($identity.User.Value) processSession=$((Get-Process -Id $PID).SessionId) image=$env:ImageOS/$env:ImageVersion"
+          ./scripts/test-native-nsis.ps1 -Scenario $env:NATIVE_SCENARIO -PackageDirectory "$env:RUNNER_TEMP/native-nsis-package" -ExpectedCommit $env:PRODUCT_SHA -OutputDirectory "release/native-nsis-$env:NATIVE_SCENARIO"
       - name: Preserve sanitized evidence even on failure
         if: always()
         uses: actions/upload-artifact@v7
